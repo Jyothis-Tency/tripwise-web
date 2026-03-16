@@ -1,0 +1,1337 @@
+import { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  Car,
+  ChevronRight,
+  ClipboardList,
+  History,
+  Pencil,
+  Plus,
+  Route,
+  Search,
+  UserCheck,
+  UserMinus,
+  UserPlus,
+  X,
+  AlertTriangle,
+  CheckCircle2,
+  Calculator,
+  Edit2,
+  Trash2,
+} from 'lucide-react';
+import {
+  fetchVehicles,
+  fetchVehicleHistory,
+  fetchVehicleExpenses,
+  fetchDriversList,
+  createVehicle,
+  updateVehicle,
+  assignDriverToVehicle,
+  unassignDriverFromVehicle,
+  assignDriverToTrip,
+  unassignDriverFromTripApi,
+  createTrip,
+  updateTrip,
+  cancelTrip,
+  createVehicleExpense,
+  updateVehicleExpense,
+  deleteVehicleExpense,
+  type Vehicle,
+  type TripItem,
+  type DriverItem,
+  type ExpenseItem,
+  type HistoryTripItem,
+} from '../api';
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// UTILITIES
+// ═══════════════════════════════════════════════════════════════════════════════
+
+const VEHICLE_TYPES = ['Car', 'Traveller', 'Bus', 'Van'];
+const VEHICLE_STATUSES = ['Available', 'On Trip', 'Maintenance', 'Inactive'];
+
+function statusDotCls(status?: string) {
+  switch ((status ?? '').toLowerCase()) {
+    case 'available': return 'bg-green-500';
+    case 'on trip': case 'on_trip': return 'bg-indigo-500';
+    case 'maintenance': case 'under maintenance': return 'bg-orange-400';
+    case 'inactive': return 'bg-slate-400';
+    default: return 'bg-slate-300';
+  }
+}
+
+function statusBadgeCls(status?: string) {
+  switch ((status ?? '').toLowerCase()) {
+    case 'available': return 'bg-green-100 text-green-700 border-green-200';
+    case 'on trip': case 'on_trip': return 'bg-indigo-100 text-indigo-700 border-indigo-200';
+    case 'maintenance': case 'under maintenance': return 'bg-orange-100 text-orange-700 border-orange-200';
+    case 'inactive': return 'bg-slate-100 text-slate-600 border-slate-200';
+    case 'scheduled': return 'bg-blue-100 text-blue-700 border-blue-200';
+    case 'in_progress': case 'in progress': return 'bg-indigo-100 text-indigo-700 border-indigo-200';
+    case 'completed': return 'bg-green-100 text-green-700 border-green-200';
+    case 'cancelled': return 'bg-red-100 text-red-700 border-red-200';
+    default: return 'bg-slate-100 text-slate-600 border-slate-200';
+  }
+}
+
+function commissionText(v: Vehicle): string {
+  if (v.commission == null) return '';
+  const n = v.commission;
+  return `${n % 1 === 0 ? n.toFixed(0) : n}%`;
+}
+
+function formatDate(d?: string) {
+  if (!d) return '—';
+  try { return new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }); }
+  catch { return d; }
+}
+
+function driverDisplayName(d: DriverItem) {
+  return (d.fullName ?? d.name ?? `${d.firstName ?? ''} ${d.lastName ?? ''}`.trim()) || 'Unknown';
+}
+
+function tripDriverName(t: TripItem) {
+  const dr = t.driver;
+  if (!dr) return null;
+  return (dr.fullName ?? dr.name ?? `${dr.firstName ?? ''} ${dr.lastName ?? ''}`.trim()) || null;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// SHARED UI
+// ═══════════════════════════════════════════════════════════════════════════════
+
+const inputCls = 'w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500';
+
+function Field({ label, id, required, children }: { label: string; id: string; required?: boolean; children: React.ReactNode }) {
+  return (
+    <div className="space-y-1">
+      <label htmlFor={id} className="text-xs font-medium text-slate-600">{label}{required && <span className="ml-0.5 text-red-500">*</span>}</label>
+      {children}
+    </div>
+  );
+}
+
+function InfoRow({ label, value }: { label: string; value?: string | number | null }) {
+  return (
+    <div className="flex items-start justify-between py-2 border-b border-slate-100 last:border-0">
+      <span className="text-xs text-slate-500 shrink-0 mr-4">{label}</span>
+      <span className="text-xs font-medium text-slate-800 text-right">{value ?? '—'}</span>
+    </div>
+  );
+}
+
+interface ModalShellProps {
+  title: string;
+  onClose: () => void;
+  children: React.ReactNode;
+  maxWidth?: string;
+}
+function ModalShell({ title, onClose, children, maxWidth = 'max-w-lg' }: ModalShellProps) {
+  const backdropRef = useRef<HTMLDivElement>(null);
+  return (
+    <div
+      ref={backdropRef}
+      onClick={(e) => e.target === backdropRef.current && onClose()}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4"
+    >
+      <div className={`w-full ${maxWidth} rounded-2xl bg-white shadow-2xl flex flex-col max-h-[90vh]`}>
+        <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4 shrink-0">
+          <h3 className="text-base font-semibold text-slate-900">{title}</h3>
+          <button type="button" onClick={onClose} className="text-slate-400 hover:text-slate-600"><X className="h-5 w-5" /></button>
+        </div>
+        <div className="overflow-y-auto flex-1">{children}</div>
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// VEHICLE CARD (Left List)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+function VehicleCard({ vehicle, isSelected, onSelect, onEdit }: {
+  vehicle: Vehicle; isSelected: boolean; onSelect: () => void; onEdit: () => void;
+}) {
+  const trip = vehicle.currentTrip && typeof vehicle.currentTrip === 'object' ? vehicle.currentTrip as any : null;
+  const tripFrom = vehicle.tripFrom ?? trip?.from;
+  const tripTo = vehicle.tripTo ?? trip?.to;
+
+  return (
+    <button type="button" onClick={onSelect}
+      className={`w-full rounded-xl border p-3 text-left transition-all ${isSelected ? 'border-indigo-400 bg-indigo-50 shadow-sm' : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'}`}
+    >
+      <div className="flex items-start gap-3">
+        <div className="flex h-10 w-12 shrink-0 items-center justify-center rounded-lg bg-indigo-100">
+          <Car className="h-5 w-5 text-indigo-500" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center justify-between gap-1">
+            <p className="truncate text-sm font-semibold text-slate-900">{vehicle.vehicleNumber}</p>
+            <button type="button" onClick={(e) => { e.stopPropagation(); onEdit(); }}
+              className="shrink-0 rounded p-0.5 text-slate-400 hover:text-indigo-500" title="Edit vehicle">
+              <Pencil className="h-3.5 w-3.5" />
+            </button>
+          </div>
+          <div className="mt-0.5 flex items-center gap-1.5">
+            <span className={`inline-block h-2 w-2 shrink-0 rounded-full ${statusDotCls(vehicle.status)}`} />
+            <span className="text-xs text-slate-500 capitalize">{vehicle.status ?? 'Unknown'}</span>
+          </div>
+          <p className="mt-0.5 truncate text-xs text-slate-400">
+            {[vehicle.vehicleType, vehicle.vehicleModel].filter(Boolean).join(' – ')}
+          </p>
+          {commissionText(vehicle) && <p className="text-xs text-slate-400">Bata: {commissionText(vehicle)}</p>}
+          <p className="text-xs text-slate-400">Driver: {vehicle.currentDriverName ?? 'Unassigned'}</p>
+          {tripFrom && tripTo && (
+            <p className="mt-0.5 flex items-center gap-1 text-xs font-medium text-indigo-500">
+              <span className="truncate">{tripFrom}</span>
+              <ChevronRight className="h-3 w-3 shrink-0" />
+              <span className="truncate">{tripTo}</span>
+            </p>
+          )}
+        </div>
+      </div>
+    </button>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// ADD / EDIT VEHICLE MODAL
+// ═══════════════════════════════════════════════════════════════════════════════
+
+function VehicleModal({ vehicle, onClose, onSaved }: { vehicle?: Vehicle | null; onClose: () => void; onSaved: (v: Vehicle) => void }) {
+  const isEdit = !!vehicle;
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [form, setForm] = useState({
+    vehicleNumber: vehicle?.vehicleNumber ?? '',
+    vehicleType: vehicle?.vehicleType ?? '',
+    vehicleModel: vehicle?.vehicleModel ?? '',
+    vehicleYear: vehicle?.vehicleYear ?? '',
+    seats: vehicle?.seats?.toString() ?? '',
+    commission: vehicle?.commission?.toString() ?? '',
+    status: vehicle?.status ?? 'Available',
+  });
+
+  const set = (k: keyof typeof form, upper?: boolean) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
+    setForm((prev) => ({ ...prev, [k]: upper ? e.target.value.toUpperCase() : e.target.value }));
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!form.vehicleNumber.trim()) { setError('Vehicle number is required'); return; }
+    if (!form.vehicleType) { setError('Vehicle type is required'); return; }
+    if (!form.vehicleModel.trim()) { setError('Vehicle name is required'); return; }
+    if (!form.vehicleYear.trim()) { setError('Year is required'); return; }
+    if (!form.commission.trim()) { setError('Driver Bata is required'); return; }
+    setSaving(true); setError(null);
+    try {
+      const payload = {
+        vehicleNumber: form.vehicleNumber.trim(),
+        vehicleType: form.vehicleType,
+        vehicleModel: form.vehicleModel.trim(),
+        vehicleYear: form.vehicleYear ? parseInt(form.vehicleYear) : undefined,
+        seats: form.seats ? parseInt(form.seats) : undefined,
+        commission: form.commission ? parseFloat(form.commission) : undefined,
+        ...(isEdit ? { status: form.status } : {}),
+      };
+      const saved = isEdit && vehicle ? await updateVehicle(vehicle._id, payload) : await createVehicle(payload as any);
+      onSaved(saved);
+      onClose();
+    } catch (err: any) {
+      setError(err?.response?.data?.message ?? 'Failed to save vehicle');
+    } finally { setSaving(false); }
+  };
+
+  return (
+    <ModalShell title={isEdit ? 'Edit Vehicle' : 'Add New Vehicle'} onClose={onClose}>
+      <form onSubmit={submit} className="space-y-3 p-6">
+        {error && <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-600">{error}</p>}
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Vehicle Number" id="vnum" required>
+            <input id="vnum" value={form.vehicleNumber} onChange={set('vehicleNumber', true)} required
+              className={inputCls} placeholder="e.g. KL01AB1234" style={{ textTransform: 'uppercase' }} />
+          </Field>
+          <Field label="Vehicle Type" id="vtype" required>
+            <select id="vtype" value={form.vehicleType} onChange={set('vehicleType')} className={inputCls}>
+              <option value="">Select type...</option>
+              {VEHICLE_TYPES.map(t => <option key={t} value={t}>{t.toUpperCase()}</option>)}
+            </select>
+          </Field>
+          <Field label="Vehicle Name" id="vmodel" required>
+            <input id="vmodel" value={form.vehicleModel} onChange={set('vehicleModel', true)} required
+              className={inputCls} placeholder="e.g. INNOVA" style={{ textTransform: 'uppercase' }} />
+          </Field>
+          <Field label="Year" id="vyear" required>
+            <input id="vyear" value={form.vehicleYear} onChange={set('vehicleYear')} type="number" required
+              className={inputCls} placeholder="e.g. 2022" />
+          </Field>
+          <Field label="Seats (optional)" id="vseats">
+            <input id="vseats" value={form.seats} onChange={set('seats')} type="number"
+              className={inputCls} placeholder="e.g. 7" />
+          </Field>
+          <Field label="Driver Bata (%)" id="vcomm" required>
+            <input id="vcomm" value={form.commission} onChange={set('commission')} type="number" step="0.1" required
+              className={inputCls} placeholder="e.g. 10" />
+          </Field>
+          {isEdit && (
+            <Field label="Status" id="vstatus">
+              <select id="vstatus" value={form.status} onChange={set('status')} className={inputCls}>
+                {VEHICLE_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
+              </select>
+            </Field>
+          )}
+        </div>
+        <div className="flex justify-end gap-2 pt-2">
+          <button type="button" onClick={onClose}
+            className="rounded-lg border border-slate-200 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50">Cancel</button>
+          <button type="submit" disabled={saving}
+            className="rounded-lg bg-indigo-500 px-5 py-2 text-sm font-semibold text-white hover:bg-indigo-600 disabled:opacity-50">
+            {saving ? 'Saving…' : 'Save'}
+          </button>
+        </div>
+      </form>
+    </ModalShell>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// TRIP FORM MODAL (Start / Update)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+function TripFormModal({ vehicleId, trip, onClose, onSaved }: {
+  vehicleId: string; trip?: TripItem | null; onClose: () => void;
+  onSaved: (t: TripItem) => void;
+}) {
+  const isUpdate = !!trip;
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  
+  const [form, setForm] = useState({
+    from: trip?.from ?? '',
+    to: trip?.to ?? '',
+    startDate: trip?.startDate ?? (trip?.departureDate ? trip.departureDate.split('T')[0] : ''),
+    expectedEndDate: trip?.expectedEndDate ?? '',
+    distance: trip?.distance?.toString() ?? '',
+    customer: trip?.customer ?? '',
+    priority: trip?.priority ?? 'Medium',
+    careOfName: trip?.careOf?.name ?? '',
+    careOfPhone: trip?.careOf?.phone ?? '',
+    agencyName: trip?.agencyName ?? '',
+    agencyCost: trip?.agencyCost?.toString() ?? trip?.amount?.toString() ?? '',
+    cabCost: trip?.cabCost?.toString() ?? '',
+    notes: trip?.notes ?? '',
+  });
+
+  const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
+    setForm(prev => ({ ...prev, [k]: e.target.value }));
+
+  const profit = (parseFloat(form.agencyCost || '0') - parseFloat(form.cabCost || '0')).toFixed(2);
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!form.from.trim() || !form.to.trim()) { setError('From and To locations are required'); return; }
+    setSaving(true); setError(null);
+    try {
+      const payload = {
+        from: form.from.trim(),
+        to: form.to.trim(),
+        startDate: form.startDate || undefined,
+        expectedEndDate: form.expectedEndDate || undefined,
+        departureDate: form.startDate || undefined, // Fallback for old fields
+        distance: form.distance ? parseFloat(form.distance) : undefined,
+        customer: form.customer.trim() || undefined,
+        priority: form.priority,
+        careOf: (form.careOfName || form.careOfPhone) ? { name: form.careOfName, phone: form.careOfPhone } : undefined,
+        agencyName: form.agencyName.trim() || undefined,
+        agencyCost: form.agencyCost ? parseFloat(form.agencyCost) : undefined,
+        cabCost: form.cabCost ? parseFloat(form.cabCost) : undefined,
+        ownerProfit: profit,
+        amount: form.agencyCost ? parseFloat(form.agencyCost) : undefined, // Fallback
+        notes: form.notes.trim() || undefined,
+      };
+      const saved = isUpdate && trip
+        ? await updateTrip(trip._id, payload)
+        : await createTrip({ vehicleId, ...payload });
+      onSaved(saved);
+      onClose();
+    } catch (err: any) {
+      setError(err?.response?.data?.message ?? 'Failed to save trip');
+    } finally { setSaving(false); }
+  };
+
+  return (
+    <ModalShell title={isUpdate ? 'Update Trip Details' : 'Start New Trip'} onClose={onClose} maxWidth="max-w-2xl">
+      <form onSubmit={submit} className="flex flex-col h-full max-h-[85vh]">
+        <div className="flex-1 overflow-y-auto p-6 space-y-4">
+          {error && <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-600">{error}</p>}
+          
+          <div className="grid grid-cols-2 gap-4">
+            <Field label="From" id="tfrom" required>
+              <input id="tfrom" value={form.from} onChange={set('from')} required className={inputCls} placeholder="Origin city" />
+            </Field>
+            <Field label="To" id="tto" required>
+              <input id="tto" value={form.to} onChange={set('to')} required className={inputCls} placeholder="Destination city" />
+            </Field>
+
+            <Field label="Start Date" id="tstartdate">
+              <input id="tstartdate" type="date" value={form.startDate} onChange={set('startDate')} className={inputCls} />
+            </Field>
+            <Field label="Expected End Date" id="tenddate">
+              <input id="tenddate" type="date" value={form.expectedEndDate} onChange={set('expectedEndDate')} className={inputCls} />
+            </Field>
+
+            <Field label="Distance (km)" id="tdist">
+              <input id="tdist" type="number" value={form.distance} onChange={set('distance')} className={inputCls} placeholder="0" />
+            </Field>
+            <Field label="Customer" id="tcus">
+              <input id="tcus" value={form.customer} onChange={set('customer')} className={inputCls} placeholder="Customer Name" />
+            </Field>
+
+            <Field label="Priority" id="tprio">
+              <select id="tprio" value={form.priority} onChange={set('priority')} className={inputCls}>
+                <option value="Low">Low</option>
+                <option value="Medium">Medium</option>
+                <option value="High">High</option>
+              </select>
+            </Field>
+            <Field label="Agency Name (Optional)" id="tagn">
+              <input id="tagn" value={form.agencyName} onChange={set('agencyName')} className={inputCls} placeholder="Agency Name" />
+            </Field>
+          </div>
+
+          <fieldset className="rounded-lg border border-slate-200 p-4">
+            <legend className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 px-1 -ml-1 text-indigo-500 flex items-center gap-1">
+              <UserCheck className="h-3.5 w-3.5" /> Care Of Details
+            </legend>
+            <div className="grid grid-cols-2 gap-4 mt-2">
+              <Field label="Name" id="tcarename">
+                <input id="tcarename" value={form.careOfName} onChange={set('careOfName')} className={inputCls} placeholder="Care of name" />
+              </Field>
+              <Field label="Phone" id="tcarephone">
+                <input id="tcarephone" value={form.careOfPhone} onChange={set('careOfPhone')} className={inputCls} placeholder="Phone number" />
+              </Field>
+            </div>
+          </fieldset>
+
+          <div className="grid grid-cols-2 gap-4">
+            <Field label="Agency Cost (₹)" id="tagenC">
+              <input id="tagenC" type="number" step="0.01" value={form.agencyCost} onChange={set('agencyCost')} className={inputCls} placeholder="0.00" />
+            </Field>
+            <Field label="Cab Cost (₹)" id="tcabC">
+              <input id="tcabC" type="number" step="0.01" value={form.cabCost} onChange={set('cabCost')} className={inputCls} placeholder="0.00" />
+            </Field>
+          </div>
+
+          <div className="flex items-center gap-2 rounded-lg border border-indigo-200 bg-indigo-50 p-3 text-indigo-700">
+            <Calculator className="h-5 w-5 shrink-0" />
+            <span className="text-sm font-semibold">Owner Profit: ₹{profit}</span>
+          </div>
+
+          <Field label="Notes (optional)" id="tnotes">
+            <textarea id="tnotes" value={form.notes} onChange={set('notes') as any}
+              className={`${inputCls} resize-none`} rows={2} placeholder="Additional details..." />
+          </Field>
+        </div>
+
+        <div className="flex justify-end gap-2 border-t border-slate-100 p-4 shrink-0 bg-slate-50 rounded-b-xl">
+          <button type="button" onClick={onClose}
+            className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm text-slate-700 hover:bg-slate-100">Cancel</button>
+          <button type="submit" disabled={saving}
+            className="rounded-lg bg-indigo-500 px-6 py-2 text-sm font-semibold text-white hover:bg-indigo-600 disabled:opacity-50">
+            {saving ? 'Saving…' : isUpdate ? 'Update Trip' : 'Start Trip'}
+          </button>
+        </div>
+      </form>
+    </ModalShell>
+  );
+}
+
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// CANCEL TRIP CONFIRM
+// ═══════════════════════════════════════════════════════════════════════════════
+
+function CancelTripModal({ tripId, onClose, onCancelled }: {
+  tripId: string; onClose: () => void; onCancelled: () => void;
+}) {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const confirm = async () => {
+    setLoading(true); setError(null);
+    try {
+      await cancelTrip(tripId);
+      onCancelled();
+      onClose();
+    } catch (err: any) {
+      setError(err?.response?.data?.message ?? 'Failed to cancel trip');
+      setLoading(false);
+    }
+  };
+
+  return (
+    <ModalShell title="Cancel Trip" onClose={onClose} maxWidth="max-w-sm">
+      <div className="p-6 space-y-4">
+        <div className="flex items-start gap-3">
+          <AlertTriangle className="h-6 w-6 text-red-500 shrink-0 mt-0.5" />
+          <div>
+            <p className="text-sm font-medium text-slate-900">Are you sure?</p>
+            <p className="text-xs text-slate-500 mt-1">This will cancel the trip. This action cannot be undone.</p>
+          </div>
+        </div>
+        {error && <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-600">{error}</p>}
+        <div className="flex justify-end gap-2 pt-2">
+          <button type="button" onClick={onClose}
+            className="rounded-lg border border-slate-200 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50">Keep Trip</button>
+          <button type="button" onClick={confirm} disabled={loading}
+            className="rounded-lg bg-red-500 px-5 py-2 text-sm font-semibold text-white hover:bg-red-600 disabled:opacity-50">
+            {loading ? 'Cancelling…' : 'Cancel Trip'}
+          </button>
+        </div>
+      </div>
+    </ModalShell>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// DRIVER ASSIGNMENT MODAL
+// ═══════════════════════════════════════════════════════════════════════════════
+
+function DriverAssignModal({ vehicleId, tripId, currentDriverName, onClose, onAssigned }: {
+  vehicleId: string; tripId?: string; currentDriverName?: string;
+  onClose: () => void; onAssigned: (name: string) => void;
+}) {
+  const [drivers, setDrivers] = useState<DriverItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState('');
+  const [assigning, setAssigning] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetchDriversList().then(setDrivers).catch(() => setError('Failed to load drivers')).finally(() => setLoading(false));
+  }, []);
+
+  const filtered = drivers.filter(d => {
+    const n = driverDisplayName(d).toLowerCase();
+    return n.includes(search.toLowerCase());
+  });
+
+  const assign = async (driver: DriverItem) => {
+    setAssigning(driver._id); setError(null);
+    try {
+      if (tripId) {
+        await assignDriverToTrip(tripId, driver._id);
+      } else {
+        await assignDriverToVehicle(vehicleId, driver._id);
+      }
+      onAssigned(driverDisplayName(driver));
+      onClose();
+    } catch (err: any) {
+      setError(err?.response?.data?.message ?? 'Failed to assign driver');
+      setAssigning(null);
+    }
+  };
+
+  const hasDriver = currentDriverName && currentDriverName.toLowerCase() !== 'unassigned' && currentDriverName.trim() !== '';
+
+  return (
+    <ModalShell title={hasDriver ? 'Change Driver' : 'Assign Driver'} onClose={onClose} maxWidth="max-w-md">
+      <div className="flex flex-col" style={{ maxHeight: '60vh' }}>
+        <div className="px-4 pt-4 pb-2">
+          {hasDriver && (
+            <div className="mb-3 flex items-center gap-2 rounded-lg bg-indigo-50 border border-indigo-100 px-3 py-2 text-xs text-indigo-700">
+              <UserCheck className="h-4 w-4 shrink-0" />
+              <span>Current driver: <strong>{currentDriverName}</strong></span>
+            </div>
+          )}
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
+            <input type="text" value={search} onChange={e => setSearch(e.target.value)}
+              placeholder="Search drivers..." className={`${inputCls} pl-8`} />
+          </div>
+          {error && <p className="mt-2 text-xs text-red-600">{error}</p>}
+        </div>
+        <div className="flex-1 overflow-y-auto px-4 pb-4 space-y-1.5">
+          {loading ? (
+            Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="h-12 animate-pulse rounded-lg bg-slate-100" />
+            ))
+          ) : filtered.length === 0 ? (
+            <p className="py-4 text-center text-xs text-slate-400">No drivers found</p>
+          ) : (
+            filtered.map(driver => {
+              const name = driverDisplayName(driver);
+              const isCurrent = name === currentDriverName;
+              return (
+                <button key={driver._id} type="button" onClick={() => assign(driver)} disabled={!!assigning}
+                  className={`flex w-full items-center justify-between rounded-lg border px-3 py-2.5 text-left transition hover:bg-slate-50 disabled:opacity-60 ${
+                    isCurrent ? 'border-indigo-300 bg-indigo-50' : 'border-slate-200'
+                  }`}>
+                  <div>
+                    <p className="text-sm font-medium text-slate-800">{name}</p>
+                    {driver.phone && <p className="text-xs text-slate-400">{driver.phone}</p>}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {isCurrent && <span className="text-xs text-indigo-500">Current</span>}
+                    {assigning === driver._id
+                      ? <span className="text-xs text-slate-400">Assigning…</span>
+                      : <UserPlus className="h-4 w-4 text-slate-400" />}
+                  </div>
+                </button>
+              );
+            })
+          )}
+        </div>
+      </div>
+    </ModalShell>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// VEHICLE HISTORY MODAL
+// ═══════════════════════════════════════════════════════════════════════════════
+
+function VehicleHistoryModal({ vehicle, onClose }: { vehicle: Vehicle; onClose: () => void }) {
+  const [history, setHistory] = useState<HistoryTripItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetchVehicleHistory(vehicle._id)
+      .then(setHistory)
+      .catch(() => setError('Failed to load history'))
+      .finally(() => setLoading(false));
+  }, [vehicle._id]);
+
+  return (
+    <ModalShell title={`Vehicle History — ${vehicle.vehicleNumber}`} onClose={onClose} maxWidth="max-w-2xl">
+      <div className="p-4">
+        {loading ? (
+          <div className="space-y-2">{Array.from({ length: 5 }).map((_, i) => <div key={i} className="h-10 animate-pulse rounded-lg bg-slate-100" />)}</div>
+        ) : error ? (
+          <p className="py-6 text-center text-xs text-red-500">{error}</p>
+        ) : history.length === 0 ? (
+          <div className="flex flex-col items-center py-10 text-center">
+            <History className="h-10 w-10 text-slate-300" />
+            <p className="mt-2 text-sm text-slate-400">No trip history found</p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="min-w-full text-xs text-left">
+              <thead>
+                <tr className="border-b border-slate-200 text-[11px] uppercase tracking-wide text-slate-400">
+                  <th className="pb-2 pr-4">Trip #</th>
+                  <th className="pb-2 pr-4">Route</th>
+                  <th className="pb-2 pr-4">Date</th>
+                  <th className="pb-2 pr-4">Driver</th>
+                  <th className="pb-2 pr-4">Amount</th>
+                  <th className="pb-2">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {history.map(t => (
+                  <tr key={t._id} className="border-b border-slate-100 last:border-0">
+                    <td className="py-2 pr-4 font-medium">{t.tripNumber ?? '—'}</td>
+                    <td className="py-2 pr-4">{t.from && t.to ? `${t.from} → ${t.to}` : '—'}</td>
+                    <td className="py-2 pr-4 whitespace-nowrap">{formatDate(t.departureDate)}</td>
+                    <td className="py-2 pr-4">{t.driverName ?? '—'}</td>
+                    <td className="py-2 pr-4">{t.amount != null ? `₹${t.amount.toLocaleString('en-IN')}` : '—'}</td>
+                    <td className="py-2">
+                      <span className={`rounded-full border px-2 py-0.5 capitalize ${statusBadgeCls(t.status)}`}>{t.status ?? '—'}</span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </ModalShell>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// TAB 1 — BASIC INFORMATION
+// ═══════════════════════════════════════════════════════════════════════════════
+
+function BasicInfoTab({ vehicle }: { vehicle: Vehicle }) {
+  return (
+    <div className="space-y-3">
+      <section className="rounded-xl border border-slate-200 bg-white p-4">
+        <h4 className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-400">Basic Information</h4>
+        <InfoRow label="Registration Number" value={vehicle.vehicleNumber} />
+        <InfoRow label="Type" value={vehicle.vehicleType} />
+        <InfoRow label="Model" value={vehicle.vehicleModel} />
+        <InfoRow label="Year" value={vehicle.vehicleYear} />
+        <InfoRow label="Seats" value={vehicle.seats} />
+        <InfoRow label="Driver Bata" value={commissionText(vehicle) || null} />
+      </section>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// TAB 2 — TRIP & DRIVER
+// ═══════════════════════════════════════════════════════════════════════════════
+
+interface TripDriverTabProps {
+  vehicle: Vehicle;
+  onStartTrip: () => void;
+  onUpdateTrip: (trip: TripItem) => void;
+  onCancelTrip: (tripId: string) => void;
+  onAssignDriver: (tripId?: string) => void;
+  onUnassignDriver: (tripId?: string) => void;
+}
+
+function TripDriverTab({ vehicle, onStartTrip, onUpdateTrip, onCancelTrip, onAssignDriver, onUnassignDriver }: TripDriverTabProps) {
+  const [mode, setMode] = useState<'single' | 'multi'>('single');
+  const [unassigning, setUnassigning] = useState(false);
+  const [uErr, setUErr] = useState<string | null>(null);
+
+  const activeTrip: any = vehicle.activeTrip ?? vehicle.currentTrip ?? null;
+  const hasActiveTrip = activeTrip && typeof activeTrip === 'object' &&
+    !['cancelled', 'completed'].includes((activeTrip.status ?? '').toLowerCase());
+
+  const scheduledTrips: TripItem[] = (vehicle.trips ?? []).filter(t =>
+    !['cancelled', 'completed'].includes((t.status ?? '').toLowerCase())
+  );
+
+  const handleUnassign = async (tripId?: string) => {
+    setUnassigning(true); setUErr(null);
+    try {
+      if (tripId) {
+        await unassignDriverFromTripApi(tripId);
+      } else {
+        await unassignDriverFromVehicle(vehicle._id);
+      }
+      onUnassignDriver(tripId);
+    } catch (err: any) {
+      setUErr(err?.response?.data?.message ?? 'Failed to unassign driver');
+    } finally { setUnassigning(false); }
+  };
+
+  return (
+    <div className="space-y-4">
+      {/* Mode Toggle */}
+      <div className="flex rounded-lg border border-slate-200 bg-white overflow-hidden">
+        {([['single', 'Single Trip', Route], ['multi', 'Multiple Trips', ClipboardList]] as const).map(([val, label, Icon]) => (
+          <button key={val} type="button" onClick={() => setMode(val)}
+            className={`flex flex-1 items-center justify-center gap-2 py-2.5 text-sm font-medium transition ${
+              mode === val
+                ? 'bg-indigo-500 text-white'
+                : 'text-slate-500 hover:bg-slate-50'
+            }`}>
+            <Icon className="h-4 w-4" />
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {mode === 'single' ? (
+        <div className="space-y-3">
+          {/* Active trip card or Start Trip */}
+          {hasActiveTrip ? (
+            <section className="rounded-xl border border-indigo-100 bg-indigo-50 p-4">
+              <div className="flex items-start justify-between mb-2">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-indigo-400">Active Trip</p>
+                  {activeTrip.tripNumber && <p className="text-sm font-bold text-slate-800 mt-0.5">Trip #{activeTrip.tripNumber}</p>}
+                </div>
+                <span className={`text-xs rounded-full border px-2 py-0.5 capitalize ${statusBadgeCls(activeTrip.status)}`}>
+                  {activeTrip.status ?? '—'}
+                </span>
+              </div>
+              <div className="space-y-1 text-xs text-slate-600">
+                {activeTrip.from && activeTrip.to && (
+                  <p className="flex items-center gap-1 font-medium">
+                    <span>{activeTrip.from}</span>
+                    <ChevronRight className="h-3.5 w-3.5 text-indigo-400" />
+                    <span>{activeTrip.to}</span>
+                  </p>
+                )}
+                {activeTrip.departureDate && <p>📅 {formatDate(activeTrip.departureDate)}</p>}
+                {activeTrip.amount != null && <p>💰 ₹{Number(activeTrip.amount).toLocaleString('en-IN')}</p>}
+              </div>
+              <div className="flex gap-2 mt-3">
+                <button type="button" onClick={() => onUpdateTrip(activeTrip as TripItem)}
+                  className="flex-1 rounded-lg border border-indigo-300 bg-white px-3 py-1.5 text-xs font-medium text-indigo-700 hover:bg-indigo-50">
+                  Update
+                </button>
+                <button type="button" onClick={() => onCancelTrip(activeTrip._id ?? activeTrip.id ?? activeTrip.tripId)}
+                  className="flex-1 rounded-lg border border-red-200 bg-white px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50">
+                  Cancel Trip
+                </button>
+              </div>
+            </section>
+          ) : (
+            <section className="rounded-xl border border-dashed border-slate-300 bg-white p-4 text-center">
+              <Route className="mx-auto h-8 w-8 text-slate-300" />
+              <p className="mt-1 text-sm text-slate-400">No active trip</p>
+              <button type="button" onClick={onStartTrip}
+                className="mt-2 rounded-lg bg-indigo-500 px-4 py-2 text-xs font-semibold text-white hover:bg-indigo-600">
+                + Start Trip
+              </button>
+            </section>
+          )}
+
+          {/* Driver Assignment Card */}
+          <section className="rounded-xl border border-slate-200 bg-white p-4">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400 mb-2">Driver Assignment</p>
+            {uErr && <p className="mb-2 text-xs text-red-500">{uErr}</p>}
+            {vehicle.currentDriverName && vehicle.currentDriverName.toLowerCase() !== 'unassigned' ? (
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <UserCheck className="h-5 w-5 text-indigo-500" />
+                  <div>
+                    <p className="text-sm font-medium text-slate-800">{vehicle.currentDriverName}</p>
+                    <p className="text-xs text-slate-400">Assigned Driver</p>
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <button type="button" onClick={() => onAssignDriver()}
+                    className="rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50">
+                    Change
+                  </button>
+                  <button type="button" onClick={() => handleUnassign()} disabled={unassigning}
+                    className="rounded-lg border border-red-200 px-2.5 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 disabled:opacity-50">
+                    {unassigning ? '…' : <UserMinus className="h-3.5 w-3.5" />}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-center justify-between">
+                <p className="text-sm text-slate-400">No driver assigned</p>
+                <button type="button" onClick={() => onAssignDriver()}
+                  className="flex items-center gap-1.5 rounded-lg bg-indigo-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-600">
+                  <UserPlus className="h-3.5 w-3.5" />
+                  Assign Driver
+                </button>
+              </div>
+            )}
+          </section>
+        </div>
+      ) : (
+        /* Multiple Trips View */
+        <div className="space-y-3">
+          <button type="button" onClick={onStartTrip}
+            className="flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-indigo-300 bg-indigo-50 py-3 text-sm font-medium text-indigo-600 hover:bg-indigo-100">
+            <Plus className="h-4 w-4" />
+            Add New Trip
+          </button>
+
+          {scheduledTrips.length === 0 ? (
+            <p className="py-4 text-center text-xs text-slate-400">No scheduled trips</p>
+          ) : (
+            scheduledTrips.map(trip => {
+              const drName = tripDriverName(trip);
+              return (
+                <section key={trip._id} className="rounded-xl border border-slate-200 bg-white p-4">
+                  <div className="flex items-start justify-between mb-2">
+                    <div>
+                      {trip.tripNumber && <p className="text-sm font-bold text-slate-800">Trip #{trip.tripNumber}</p>}
+                      {trip.from && trip.to && (
+                        <p className="flex items-center gap-1 text-xs text-slate-600 mt-0.5">
+                          <span>{trip.from}</span>
+                          <ChevronRight className="h-3 w-3 text-slate-400" />
+                          <span>{trip.to}</span>
+                        </p>
+                      )}
+                    </div>
+                    <span className={`text-xs rounded-full border px-2 py-0.5 capitalize ${statusBadgeCls(trip.status)}`}>
+                      {trip.status ?? '—'}
+                    </span>
+                  </div>
+                  <div className="text-xs text-slate-500 space-y-0.5 mb-3">
+                    {trip.departureDate && <p>📅 {formatDate(trip.departureDate)}</p>}
+                    {trip.amount != null && <p>💰 ₹{Number(trip.amount).toLocaleString('en-IN')}</p>}
+                    <p>👤 {drName ?? 'Unassigned'}</p>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    <button type="button" onClick={() => onUpdateTrip(trip)}
+                      className="rounded border border-indigo-200 px-2.5 py-1 text-xs text-indigo-600 hover:bg-indigo-50">Update</button>
+                    <button type="button" onClick={() => onCancelTrip(trip._id)}
+                      className="rounded border border-red-200 px-2.5 py-1 text-xs text-red-600 hover:bg-red-50">Cancel</button>
+                    {drName ? (
+                      <button type="button" onClick={() => handleUnassign(trip._id)} disabled={unassigning}
+                        className="rounded border border-slate-200 px-2.5 py-1 text-xs text-slate-600 hover:bg-slate-50">Unassign Driver</button>
+                    ) : (
+                      <button type="button" onClick={() => onAssignDriver(trip._id)}
+                        className="rounded border border-indigo-200 px-2.5 py-1 text-xs text-indigo-600 hover:bg-indigo-50">Assign Driver</button>
+                    )}
+                  </div>
+                </section>
+              );
+            })
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// TAB 3 — VEHICLE EXPENSES
+// ═══════════════════════════════════════════════════════════════════════════════
+
+function ExpensesTab({ vehicle }: { vehicle: Vehicle }) {
+  const [expenses, setExpenses] = useState<ExpenseItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const [expenseModal, setExpenseModal] = useState<'add' | { edit: ExpenseItem } | null>(null);
+  const [deleteModal, setDeleteModal] = useState<ExpenseItem | null>(null);
+  const [deleting, setDeleting] = useState(false);
+
+  const fetchExpenses = useCallback(() => {
+    setLoading(true);
+    fetchVehicleExpenses(vehicle._id)
+      .then(setExpenses)
+      .catch(() => setError('Failed to load expenses'))
+      .finally(() => setLoading(false));
+  }, [vehicle._id]);
+
+  useEffect(() => {
+    fetchExpenses();
+  }, [fetchExpenses]);
+
+  const total = expenses.reduce((sum, e) => sum + (e.amount ?? 0), 0);
+
+  const handleDelete = async () => {
+    if (!deleteModal) return;
+    setDeleting(true);
+    try {
+      await deleteVehicleExpense(vehicle._id, deleteModal._id);
+      fetchExpenses();
+    } catch (err) {
+      alert('Failed to delete expense');
+    } finally {
+      setDeleting(false);
+      setDeleteModal(null);
+    }
+  };
+
+  if (loading) return <div className="space-y-2">{Array.from({ length: 4 }).map((_, i) => <div key={i} className="h-10 animate-pulse rounded-lg bg-slate-100" />)}</div>;
+
+  return (
+    <div className="space-y-4">
+      <div className="flex justify-between items-center bg-white p-4 rounded-xl border border-slate-200">
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600">
+            <Calculator className="h-5 w-5" />
+          </div>
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Total Expenses</p>
+            <p className="text-lg font-bold text-slate-800">₹{total.toLocaleString('en-IN')}</p>
+          </div>
+        </div>
+        <button type="button" onClick={() => setExpenseModal('add')}
+          className="flex items-center gap-1.5 rounded-lg bg-indigo-500 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-600">
+          <Plus className="h-4 w-4" /> Add Expense
+        </button>
+      </div>
+
+      <section className="rounded-xl border border-slate-200 bg-white overflow-hidden">
+        {error && <p className="py-2 text-center text-xs text-red-500 bg-red-50 border-b border-red-100">{error}</p>}
+        {expenses.length === 0 ? (
+          <div className="flex flex-col items-center py-10 text-center">
+            <CheckCircle2 className="h-10 w-10 text-slate-300" />
+            <p className="mt-2 text-sm text-slate-400">No expenses recorded</p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="min-w-full text-xs text-left">
+              <thead>
+                <tr className="border-b border-slate-100 text-[11px] uppercase tracking-wide text-slate-400">
+                  <th className="px-4 py-3">Date</th>
+                  <th className="px-4 py-3">Category</th>
+                  <th className="px-4 py-3">Vendor</th>
+                  <th className="px-4 py-3">Notes</th>
+                  <th className="px-4 py-3 text-right">Amount</th>
+                  <th className="px-4 py-3 text-center">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {expenses.map(e => (
+                  <tr key={e._id} className="border-b border-slate-50 last:border-0 hover:bg-slate-50">
+                    <td className="px-4 py-3 whitespace-nowrap">{formatDate(e.date)}</td>
+                    <td className="px-4 py-3 capitalize font-medium text-slate-700">{e.category ?? '—'}</td>
+                    <td className="px-4 py-3 text-slate-500">{e.vendor ?? '—'}</td>
+                    <td className="px-4 py-3 text-slate-500">{e.notes ?? '—'}</td>
+                    <td className="px-4 py-3 text-right font-bold text-slate-800">{e.amount != null ? `₹${e.amount.toLocaleString('en-IN')}` : '—'}</td>
+                    <td className="px-4 py-3 text-center">
+                      <div className="flex items-center justify-center gap-2">
+                        <button type="button" onClick={() => setExpenseModal({ edit: e })} className="text-indigo-500 hover:text-indigo-700 p-1" title="Edit">
+                          <Edit2 className="h-3.5 w-3.5" />
+                        </button>
+                        <button type="button" onClick={() => setDeleteModal(e)} className="text-red-500 hover:text-red-700 p-1" title="Delete">
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+
+      {expenseModal && (
+        <ExpenseFormModal
+          vehicleId={vehicle._id}
+          expense={expenseModal === 'add' ? null : expenseModal.edit}
+          onClose={() => setExpenseModal(null)}
+          onSaved={() => { setExpenseModal(null); fetchExpenses(); }}
+        />
+      )}
+
+      {deleteModal && (
+        <ModalShell title="Delete Expense" onClose={() => setDeleteModal(null)} maxWidth="max-w-sm">
+          <div className="p-6 space-y-4">
+            <div className="flex items-start gap-3">
+              <Trash2 className="h-6 w-6 text-red-500 shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm font-medium text-slate-900">Delete this expense?</p>
+                <p className="text-xs text-slate-500 mt-1">This action cannot be undone.</p>
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 pt-2">
+              <button type="button" onClick={() => setDeleteModal(null)}
+                className="rounded-lg border border-slate-200 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50">Cancel</button>
+              <button type="button" onClick={handleDelete} disabled={deleting}
+                className="rounded-lg bg-red-500 px-5 py-2 text-sm font-semibold text-white hover:bg-red-600 disabled:opacity-50">
+                {deleting ? 'Deleting…' : 'Delete'}
+              </button>
+            </div>
+          </div>
+        </ModalShell>
+      )}
+    </div>
+  );
+}
+
+function ExpenseFormModal({ vehicleId, expense, onClose, onSaved }: {
+  vehicleId: string; expense?: ExpenseItem | null; onClose: () => void; onSaved: () => void;
+}) {
+  const isUpdate = !!expense;
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const [form, setForm] = useState({
+    category: expense?.category ?? 'Fuel',
+    amount: expense?.amount?.toString() ?? '',
+    date: expense?.date ? expense.date.split('T')[0] : new Date().toISOString().split('T')[0],
+    vendor: expense?.vendor ?? '',
+    description: expense?.description ?? expense?.notes ?? '',
+  });
+
+  const CATEGORIES = ['Fuel', 'Maintenance', 'Insurance', 'Cleaning', 'Fine', 'Other'];
+
+  const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
+    setForm(prev => ({ ...prev, [k]: e.target.value }));
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSaving(true); setError(null);
+    try {
+      const payload = {
+        category: form.category,
+        amount: parseFloat(form.amount),
+        date: form.date,
+        vendor: form.vendor.trim() || undefined,
+        description: form.description.trim() || '',
+      };
+
+      if (isUpdate && expense) await updateVehicleExpense(vehicleId, expense._id, payload);
+      else await createVehicleExpense(vehicleId, payload);
+
+      onSaved();
+    } catch (err: any) {
+      setError(err?.response?.data?.message ?? 'Failed to save expense');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <ModalShell title={isUpdate ? 'Edit Expense' : 'Add Expense'} onClose={onClose} maxWidth="max-w-md">
+      <form onSubmit={submit} className="p-6 space-y-4">
+        {error && <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-600">{error}</p>}
+        
+        <Field label="Category" id="ecat">
+          <select id="ecat" value={form.category} onChange={set('category')} className={inputCls} required>
+            {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+          </select>
+        </Field>
+        
+        <Field label="Amount (₹)" id="eamt">
+          <input id="eamt" type="number" step="0.01" value={form.amount} onChange={set('amount')} required className={inputCls} placeholder="0.00" />
+        </Field>
+        
+        <Field label="Date" id="edte">
+          <input id="edte" type="date" value={form.date} onChange={set('date')} required className={inputCls} />
+        </Field>
+        
+        <Field label="Vendor (Optional)" id="even">
+          <input id="even" value={form.vendor} onChange={set('vendor')} className={inputCls} placeholder="Vendor name" />
+        </Field>
+        
+        <Field label="Description" id="edesc">
+          <textarea id="edesc" rows={2} value={form.description} onChange={set('description') as any} className={`${inputCls} resize-none`} placeholder="Details about this expense..." required />
+        </Field>
+        
+        <div className="flex justify-end gap-2 pt-2">
+          <button type="button" onClick={onClose}
+            className="rounded-lg border border-slate-200 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50">Cancel</button>
+          <button type="submit" disabled={saving}
+            className="rounded-lg bg-indigo-500 px-5 py-2 text-sm font-semibold text-white hover:bg-indigo-600 disabled:opacity-50">
+            {saving ? 'Saving…' : isUpdate ? 'Update' : 'Save'}
+          </button>
+        </div>
+      </form>
+    </ModalShell>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// VEHICLE DETAIL PANEL
+// ═══════════════════════════════════════════════════════════════════════════════
+
+type DetailModal =
+  | { kind: 'startTrip' }
+  | { kind: 'updateTrip'; trip: TripItem }
+  | { kind: 'cancelTrip'; tripId: string }
+  | { kind: 'assignDriver'; tripId?: string }
+  | { kind: 'history' };
+
+interface VehicleDetailPanelProps {
+  vehicle: Vehicle;
+  onEditClicked: () => void;
+  onVehicleUpdated: (updated: Partial<Vehicle>) => void;
+}
+
+function VehicleDetailPanel({ vehicle, onEditClicked, onVehicleUpdated }: VehicleDetailPanelProps) {
+  const [tab, setTab] = useState<'basic' | 'trip' | 'expenses'>('basic');
+  const [detailModal, setDetailModal] = useState<DetailModal | null>(null);
+
+  const closeDetailModal = () => setDetailModal(null);
+
+  const getDisplayStatus = () => {
+    const at = vehicle.activeTrip as any;
+    if (at && typeof at === 'object' && at.status) return at.status;
+    const ct = vehicle.currentTrip as any;
+    if (ct && typeof ct === 'object' && ct.status) return ct.status;
+    return vehicle.status;
+  };
+
+  const tabs: { key: 'basic' | 'trip' | 'expenses'; label: string }[] = [
+    { key: 'basic', label: 'BASIC INFORMATION' },
+    { key: 'trip', label: 'TRIP & DRIVER' },
+    { key: 'expenses', label: 'VEHICLE EXPENSES' },
+  ];
+
+  return (
+    <div className="flex h-full flex-col bg-slate-50">
+      {/* Header */}
+      <div className="flex items-center justify-between border-b border-slate-200 bg-white px-6 py-4 shrink-0">
+        <div>
+          <h3 className="text-xl font-bold text-slate-900">{vehicle.vehicleNumber}</h3>
+          <p className="text-sm text-slate-500">
+            {[vehicle.vehicleType, vehicle.vehicleModel].filter(Boolean).join(' – ')}
+            {vehicle.vehicleYear ? ` (${vehicle.vehicleYear})` : ''}
+          </p>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          <span className={`rounded-full border px-3 py-0.5 text-xs font-semibold capitalize ${statusBadgeCls(getDisplayStatus())}`}>
+            {getDisplayStatus() ?? 'Unknown'}
+          </span>
+          <button type="button" onClick={() => setDetailModal({ kind: 'history' })}
+            title="Vehicle History"
+            className="flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50">
+            <History className="h-3.5 w-3.5" />
+            History
+          </button>
+          <button type="button" onClick={onEditClicked}
+            className="flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50">
+            <Pencil className="h-3.5 w-3.5" />
+            Edit
+          </button>
+        </div>
+      </div>
+
+      {/* Tab bar */}
+      <div className="flex border-b border-slate-200 bg-white shrink-0">
+        {tabs.map(t => (
+          <button key={t.key} type="button" onClick={() => setTab(t.key)}
+            className={`px-5 py-3 text-[11px] font-semibold tracking-wide transition border-b-2 ${
+              tab === t.key
+                ? 'border-indigo-500 text-indigo-600'
+                : 'border-transparent text-slate-400 hover:text-slate-600'
+            }`}>
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Tab content */}
+      <div className="flex-1 overflow-y-auto p-4">
+        {tab === 'basic' && <BasicInfoTab vehicle={vehicle} />}
+        {tab === 'trip' && (
+          <TripDriverTab
+            vehicle={vehicle}
+            onStartTrip={() => setDetailModal({ kind: 'startTrip' })}
+            onUpdateTrip={(trip) => setDetailModal({ kind: 'updateTrip', trip })}
+            onCancelTrip={(tripId) => setDetailModal({ kind: 'cancelTrip', tripId })}
+            onAssignDriver={(tripId) => setDetailModal({ kind: 'assignDriver', tripId })}
+            onUnassignDriver={() => onVehicleUpdated({ currentDriverName: undefined })}
+          />
+        )}
+        {tab === 'expenses' && <ExpensesTab vehicle={vehicle} />}
+      </div>
+
+      {/* Detail-level modals */}
+      {detailModal?.kind === 'startTrip' && (
+        <TripFormModal vehicleId={vehicle._id} onClose={closeDetailModal}
+          onSaved={() => { closeDetailModal(); onVehicleUpdated({ status: 'On Trip' }); }} />
+      )}
+      {detailModal?.kind === 'updateTrip' && (
+        <TripFormModal vehicleId={vehicle._id} trip={detailModal.trip} onClose={closeDetailModal}
+          onSaved={() => closeDetailModal()} />
+      )}
+      {detailModal?.kind === 'cancelTrip' && (
+        <CancelTripModal tripId={detailModal.tripId} onClose={closeDetailModal}
+          onCancelled={() => onVehicleUpdated({ status: 'Available' })} />
+      )}
+      {detailModal?.kind === 'assignDriver' && (
+        <DriverAssignModal
+          vehicleId={vehicle._id}
+          tripId={detailModal.tripId}
+          currentDriverName={vehicle.currentDriverName}
+          onClose={closeDetailModal}
+          onAssigned={(name) => onVehicleUpdated({ currentDriverName: name })}
+        />
+      )}
+      {detailModal?.kind === 'history' && (
+        <VehicleHistoryModal vehicle={vehicle} onClose={closeDetailModal} />
+      )}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// MAIN PAGE
+// ═══════════════════════════════════════════════════════════════════════════════
+
+type PageModal = 'add' | 'edit' | null;
+
+export function VehiclesPage() {
+  const [vehicles, setVehicles] = useState<Vehicle[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [search, setSearch] = useState('');
+  const [selectedIdx, setSelectedIdx] = useState<number>(0);
+  const [pageModal, setPageModal] = useState<PageModal>(null);
+
+  const selectedVehicle = vehicles[selectedIdx] ?? null;
+
+  const load = useCallback(async (q: string) => {
+    setLoading(true); setError(null);
+    try {
+      const data = await fetchVehicles({ page: 1, limit: 50, search: q });
+      setVehicles(data.items);
+      setSelectedIdx(0);
+    } catch (e: any) {
+      setError(e?.response?.data?.message ?? 'Failed to load vehicles');
+    } finally { setLoading(false); }
+  }, []);
+
+  useEffect(() => {
+    const t = setTimeout(() => load(search), 300);
+    return () => clearTimeout(t);
+  }, [search, load]);
+
+  const handleSaved = (saved: Vehicle) => {
+    setVehicles(prev => {
+      const idx = prev.findIndex(v => v._id === saved._id);
+      if (idx >= 0) { const n = [...prev]; n[idx] = saved; return n; }
+      return [saved, ...prev];
+    });
+  };
+
+  const handleVehicleUpdated = (updated: Partial<Vehicle>) => {
+    if (!selectedVehicle) return;
+    setVehicles(prev => prev.map((v, i) => i === selectedIdx ? { ...v, ...updated } : v));
+  };
+
+  return (
+    <div className="flex h-full overflow-hidden">
+      {/* LEFT: vehicle list panel */}
+      <div className="flex w-72 shrink-0 flex-col border-r border-slate-200 bg-white xl:w-80">
+        {/* Header */}
+        <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
+          <h2 className="text-sm font-semibold text-slate-900">Vehicles</h2>
+          <button type="button" onClick={() => setPageModal('add')}
+            className="flex items-center gap-1 rounded-lg bg-indigo-500 px-2.5 py-1.5 text-xs font-semibold text-white hover:bg-indigo-600">
+            <Plus className="h-3.5 w-3.5" />Add
+          </button>
+        </div>
+
+        {/* Search */}
+        <div className="relative border-b border-slate-100 px-3 py-2">
+          <Search className="absolute left-5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
+          <input type="text" value={search} onChange={e => setSearch(e.target.value)}
+            placeholder="Search vehicles..."
+            className="w-full rounded-md border border-slate-200 bg-slate-50 py-1.5 pl-7 pr-3 text-xs text-slate-700 outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400" />
+        </div>
+
+        {/* List */}
+        <div className="flex-1 space-y-1.5 overflow-y-auto p-3">
+          {loading ? (
+            Array.from({ length: 6 }).map((_, i) => <div key={i} className="h-24 animate-pulse rounded-xl bg-slate-100" />)
+          ) : error ? (
+            <p className="p-4 text-center text-xs text-red-500">{error}</p>
+          ) : vehicles.length === 0 ? (
+            <div className="flex flex-col items-center justify-center gap-2 py-12 text-center">
+              <Car className="h-10 w-10 text-slate-300" />
+              <p className="text-sm text-slate-400">No vehicles found</p>
+              <button type="button" onClick={() => setPageModal('add')} className="text-xs text-indigo-500 underline">
+                Add your first vehicle
+              </button>
+            </div>
+          ) : (
+            vehicles.map((v, i) => (
+              <VehicleCard key={v._id} vehicle={v} isSelected={i === selectedIdx}
+                onSelect={() => setSelectedIdx(i)}
+                onEdit={() => { setSelectedIdx(i); setPageModal('edit'); }} />
+            ))
+          )}
+        </div>
+      </div>
+
+      {/* RIGHT: detail panel */}
+      <div className="flex-1 overflow-hidden">
+        {selectedVehicle ? (
+          <VehicleDetailPanel
+            vehicle={selectedVehicle}
+            onEditClicked={() => setPageModal('edit')}
+            onVehicleUpdated={handleVehicleUpdated}
+          />
+        ) : !loading ? (
+          <div className="flex h-full items-center justify-center">
+            <div className="text-center">
+              <Car className="mx-auto h-12 w-12 text-slate-300" />
+              <p className="mt-3 text-sm font-medium text-slate-500">No vehicle selected</p>
+              <p className="mt-1 text-xs text-slate-400">Select a vehicle from the list to view details</p>
+            </div>
+          </div>
+        ) : null}
+      </div>
+
+      {/* Page-level modals */}
+      {pageModal === 'add' && (
+        <VehicleModal onClose={() => setPageModal(null)} onSaved={handleSaved} />
+      )}
+      {pageModal === 'edit' && selectedVehicle && (
+        <VehicleModal vehicle={selectedVehicle} onClose={() => setPageModal(null)} onSaved={handleSaved} />
+      )}
+    </div>
+  );
+}

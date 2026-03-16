@@ -4,6 +4,7 @@ import { LoginPage } from './features/auth/pages/Login';
 import { DashboardLayout } from './layouts/DashboardLayout';
 import { DashboardPage } from './features/dashboard/pages/DashboardPage';
 import { VehiclesPage } from './features/vehicles/pages/VehiclesPage';
+import { PLPage } from './features/pnl/pages/PLPage';
 
 function App() {
   return (
@@ -26,7 +27,7 @@ function App() {
         <Route path="expenses" element={<div>Expenses (coming soon)</div>} />
         <Route path="history" element={<div>History (coming soon)</div>} />
         <Route path="analytics" element={<div>Analytics (coming soon)</div>} />
-        <Route path="pl" element={<div>P&L (coming soon)</div>} />
+        <Route path="pl" element={<PLPage />} />
         <Route path="reminders" element={<div>Reminders (coming soon)</div>} />
         <Route path="credit-debit" element={<div>Credit / Debit (coming soon)</div>} />
         <Route path="tracking" element={<div>Tracking (coming soon)</div>} />

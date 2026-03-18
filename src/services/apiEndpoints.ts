@@ -25,6 +25,10 @@ export const ApiEndpoints = {
   // DRIVERS
   drivers: '/owners/drivers',
   driverById: (id: string) => `/owners/drivers/${id}`,
+  driverSalary: (id: string) => `/owners/drivers/${id}/salary`,
+  driverTrips: (id: string) => `/owners/drivers/${id}/trips`,
+  driverSalaryTransactions: (driverId: string) => `/owners/drivers/${driverId}/salary/transactions`,
+  driverSalaryTransactionById: (id: string) => `/owners/driver-salary/${id}`,
 
   // TRIPS
   trips: '/owners/trips',
@@ -38,4 +42,37 @@ export const ApiEndpoints = {
 
   // ANALYTICS
   analyticsOverview: '/owners/analytics/overview',
+
+  // TRACKING
+  trackingVehicles: '/owners/tracking/vehicles',
+  trackingVehicleById: (id: string) => `/owners/tracking/vehicles/${id}`,
+
+  // AGENCIES
+  agencies: '/owners/agencies',
+  agencyById: (id: string) => `/owners/agencies/${id}`,
+
+  // BULK ENTRY
+  bulkEntryTrips: '/owners/bulk-entry/trips',
+  bulkEntrySync: '/owners/bulk-entry/sync',
+  bulkEntryTripById: (id: string) => `/owners/bulk-entry/trips/${id}`,
+
+  // NORMAL ENTRY
+  normalEntry: '/owners/normal-entry',
+  normalEntryTrips: '/owners/normal-entry/trips',
+  normalEntryTripById: (id: string) => `/owners/normal-entry/trips/${id}`,
+
+  // REMINDERS
+  reminders: '/owners/reminders',
+  reminderById: (id: string) => `/owners/reminders/${id}`,
+  completeReminder: (id: string) => `/owners/reminders/${id}/complete`,
+
+  // EXPENSES (Personal)
+  expenses: '/owners/expenses',
+  expenseById: (id: string) => `/owners/expenses/${id}`,
+  expenseCategories: '/owners/expenses/categories',
+
+  // EXPENSES (Trip)
+  tripsWithExpenses: '/owners/trips/expenses',
+  tripExpenses: (tripId: string) => `/owners/trips/${tripId}/expenses`,
+  tripExpenseById: (tripId: string, expenseId: string) => `/owners/trips/${tripId}/expenses/${expenseId}`,
 };

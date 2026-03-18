@@ -11,12 +11,13 @@ import {
   UserCheck,
   UserMinus,
   UserPlus,
-  X,
   AlertTriangle,
   CheckCircle2,
   Calculator,
   Edit2,
   Trash2,
+  ArrowLeft,
+  X,
 } from 'lucide-react';
 import {
   fetchVehicles,
@@ -1106,9 +1107,10 @@ interface VehicleDetailPanelProps {
   vehicle: Vehicle;
   onEditClicked: () => void;
   onVehicleUpdated: (updated: Partial<Vehicle>) => void;
+  onBackClicked: () => void;
 }
 
-function VehicleDetailPanel({ vehicle, onEditClicked, onVehicleUpdated }: VehicleDetailPanelProps) {
+function VehicleDetailPanel({ vehicle, onEditClicked, onVehicleUpdated, onBackClicked }: VehicleDetailPanelProps) {
   const [tab, setTab] = useState<'basic' | 'trip' | 'expenses'>('basic');
   const [detailModal, setDetailModal] = useState<DetailModal | null>(null);
 
@@ -1131,13 +1133,18 @@ function VehicleDetailPanel({ vehicle, onEditClicked, onVehicleUpdated }: Vehicl
   return (
     <div className="flex h-full flex-col bg-slate-50">
       {/* Header */}
-      <div className="flex items-center justify-between border-b border-slate-200 bg-white px-6 py-4 shrink-0">
-        <div>
-          <h3 className="text-xl font-bold text-slate-900">{vehicle.vehicleNumber}</h3>
-          <p className="text-sm text-slate-500">
-            {[vehicle.vehicleType, vehicle.vehicleModel].filter(Boolean).join(' – ')}
-            {vehicle.vehicleYear ? ` (${vehicle.vehicleYear})` : ''}
-          </p>
+      <div className="flex items-center justify-between border-b border-slate-200 bg-white px-4 lg:px-6 py-4 shrink-0">
+        <div className="flex items-center gap-3">
+          <button type="button" onClick={onBackClicked} className="lg:hidden p-1.5 -ml-2 text-slate-500 hover:bg-slate-100 rounded-lg">
+            <ArrowLeft className="h-5 w-5" />
+          </button>
+          <div>
+            <h3 className="text-xl font-bold text-slate-900">{vehicle.vehicleNumber}</h3>
+            <p className="text-sm text-slate-500">
+              {[vehicle.vehicleType, vehicle.vehicleModel].filter(Boolean).join(' – ')}
+              {vehicle.vehicleYear ? ` (${vehicle.vehicleYear})` : ''}
+            </p>
+          </div>
         </div>
         <div className="flex items-center gap-2 shrink-0">
           <span className={`rounded-full border px-3 py-0.5 text-xs font-semibold capitalize ${statusBadgeCls(getDisplayStatus())}`}>
@@ -1227,17 +1234,17 @@ export function VehiclesPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
-  const [selectedIdx, setSelectedIdx] = useState<number>(0);
+  const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
   const [pageModal, setPageModal] = useState<PageModal>(null);
 
-  const selectedVehicle = vehicles[selectedIdx] ?? null;
+  const selectedVehicle = selectedIdx !== null ? vehicles[selectedIdx] ?? null : null;
 
   const load = useCallback(async (q: string) => {
     setLoading(true); setError(null);
     try {
       const data = await fetchVehicles({ page: 1, limit: 50, search: q });
       setVehicles(data.items);
-      setSelectedIdx(0);
+      setSelectedIdx(null);
     } catch (e: any) {
       setError(e?.response?.data?.message ?? 'Failed to load vehicles');
     } finally { setLoading(false); }
@@ -1262,9 +1269,9 @@ export function VehiclesPage() {
   };
 
   return (
-    <div className="flex h-full overflow-hidden">
+    <div className="flex h-full overflow-hidden relative">
       {/* LEFT: vehicle list panel */}
-      <div className="flex w-72 shrink-0 flex-col border-r border-slate-200 bg-white xl:w-80">
+      <div className={`flex w-full lg:w-72 xl:w-80 shrink-0 flex-col border-r border-slate-200 bg-white transition-all ${selectedIdx !== null ? 'hidden lg:flex' : 'flex'}`}>
         {/* Header */}
         <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
           <h2 className="text-sm font-semibold text-slate-900">Vehicles</h2>
@@ -1307,12 +1314,13 @@ export function VehiclesPage() {
       </div>
 
       {/* RIGHT: detail panel */}
-      <div className="flex-1 overflow-hidden">
+      <div className={`flex-1 overflow-hidden transition-all ${selectedIdx !== null ? 'flex flex-col' : 'hidden lg:flex flex-col'}`}>
         {selectedVehicle ? (
           <VehicleDetailPanel
             vehicle={selectedVehicle}
             onEditClicked={() => setPageModal('edit')}
             onVehicleUpdated={handleVehicleUpdated}
+            onBackClicked={() => setSelectedIdx(null)}
           />
         ) : !loading ? (
           <div className="flex h-full items-center justify-center">

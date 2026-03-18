@@ -9,6 +9,7 @@ import {
   Bell,
   History,
   TrendingUp,
+  X,
 } from 'lucide-react';
 
 const menuItems = [
@@ -23,15 +24,22 @@ const menuItems = [
   { label: 'History', path: '/history', icon: History },
 ];
 
-export function Sidebar() {
+export function Sidebar({ onClose }: { onClose?: () => void }) {
   return (
-    <aside className="flex h-screen w-56 shrink-0 flex-col border-r border-slate-200 bg-white xl:w-60">
+    <aside className="flex h-full w-64 shrink-0 flex-col border-r border-slate-200 bg-white">
       {/* Logo */}
-      <div className="flex h-14 items-center gap-2.5 border-b border-slate-100 px-4">
-        <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-500 text-white">
-          <Car className="h-4 w-4" />
-        </span>
-        <span className="text-sm font-bold text-slate-900">Tripwise</span>
+      <div className="flex h-14 items-center justify-between border-b border-slate-100 px-4">
+        <div className="flex items-center gap-2.5">
+          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-500 text-white">
+            <Car className="h-4 w-4" />
+          </span>
+          <span className="text-sm font-bold text-slate-900">Tripwise</span>
+        </div>
+        {onClose && (
+          <button onClick={onClose} className="lg:hidden p-1 text-slate-400 hover:text-slate-600 rounded-lg">
+            <X className="h-5 w-5" />
+          </button>
+        )}
       </div>
 
       {/* Nav */}
@@ -50,6 +58,7 @@ export function Sidebar() {
                     : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
                 }`
               }
+              onClick={onClose} // close mobile menu on nav click
             >
               {({ isActive }) => (
                 <>

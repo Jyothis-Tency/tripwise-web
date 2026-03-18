@@ -388,7 +388,11 @@ export async function createTrip(payload: {
   notes?: string;
   careOf?: { name?: string; phone?: string };
 }): Promise<TripItem> {
-  const res = await apiClient.post(ApiEndpoints.trips, payload);
+  const { vehicleId, ...rest } = payload;
+  const res = await apiClient.post(ApiEndpoints.trips, {
+    ...rest,
+    vehicle: vehicleId,
+  });
   const raw: any = res.data ?? {};
   const data = raw.data ?? raw;
   return mapTrip(data);

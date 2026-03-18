@@ -60,6 +60,7 @@ export const ApiEndpoints = {
   normalEntry: '/owners/normal-entry',
   normalEntryTrips: '/owners/normal-entry/trips',
   normalEntryTripById: (id: string) => `/owners/normal-entry/trips/${id}`,
+  normalEntrySync: '/owners/normal-entry/sync',
 
   // REMINDERS
   reminders: '/owners/reminders',

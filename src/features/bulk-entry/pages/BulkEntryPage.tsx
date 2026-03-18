@@ -1,12 +1,13 @@
 import { memo, useCallback, useEffect, useRef, useState, useMemo, type Dispatch, type SetStateAction } from 'react';
 import {
-  Plus, Trash2, ChevronDown, Send, FileSpreadsheet,
-  Building2, X, AlertTriangle, RefreshCw, Loader2, Cloud, CloudOff, Share2,
+  Plus, Trash2, ChevronDown, FileSpreadsheet,
+  Building2, X, RefreshCw, Loader2, Cloud, CloudOff, Copy,
 } from 'lucide-react';
 import {
-  fetchAgencies, createAgency, fetchBulkEntryTrips, createBulkTrips,
-  fetchNormalEntryTrips, createNormalEntries,
-  syncBulkEntry,
+  fetchAgencies, createAgency, fetchBulkEntryTrips,
+  fetchNormalEntryTrips,
+  deleteBulkEntryTrip, deleteNormalEntryTrip,
+  syncBulkEntry, syncNormalEntry,
   type Agency, type DriverGroup, type BulkTripRow, type NormalEntryRow, type AgencyTrip,
 } from '../api';
 
@@ -30,7 +31,7 @@ function emptyDriverGroup(): DriverGroup {
 }
 
 function emptyNormalRow(): NormalEntryRow {
-  return { date: '', driverName: '', mobileNumber: '', vehicleNumber: '', vehicleType: '', notes: '' };
+  return { clientRowId: nextRowId(), date: '', driverName: '', mobileNumber: '', vehicleNumber: '', vehicleType: '', notes: '' };
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -41,7 +42,26 @@ type SyncStatus = 'idle' | 'saving' | 'saved' | 'error';
 
 const LS_BULK_PREFIX = 'tripwise_bulk_';
 const LS_NORMAL_PREFIX = 'tripwise_normal_';
+const LS_SELECTED_AGENCY = 'tripwise_bulk_selected_agency';
+const LS_ENTRY_MODE = 'tripwise_bulk_entry_mode'; // 'bulk' | 'normal'
 const AUTOSAVE_DELAY = 800; // ms after last keystroke
+
+// Mirror of backend AgencyTrip.calculateBalance (non-negative balance)
+function calculateBalanceAmount(grandTotal: number, advancePaid: number): number {
+  const gt = typeof grandTotal === 'number' ? grandTotal : parseFloat(String(grandTotal)) || 0;
+  const adv = typeof advancePaid === 'number' ? advancePaid : parseFloat(String(advancePaid)) || 0;
+
+  if (gt > 0 && adv > 0) {
+    return Math.max(gt - adv, 0);
+  }
+  if (gt > 0 && adv === 0) {
+    return gt;
+  }
+  if (gt === 0 && adv > 0) {
+    return adv;
+  }
+  return 0;
+}
 
 /** Simple hash for fast equality check */
 function quickHash(s: string): string {
@@ -233,9 +253,10 @@ const CellInput = memo(function CellInput({ value, onChange, placeholder, type =
 // BULK ENTRY TABLE
 // ═══════════════════════════════════════════════════════════════════════════════
 
-function BulkEntryTable({ groups, onChange }: {
+function BulkEntryTable({ groups, onChange, onDeleteTrip }: {
   groups: DriverGroup[];
   onChange: Dispatch<SetStateAction<DriverGroup[]>>;
+  onDeleteTrip: (id: string) => Promise<void> | void;
 }) {
   const updateGroupField = useCallback((gi: number, field: keyof DriverGroup, val: any) => {
     onChange(prev => {
@@ -292,6 +313,17 @@ function BulkEntryTable({ groups, onChange }: {
     });
   }, [onChange]);
 
+  const deleteServerRow = useCallback(async (gi: number, ri: number, id: string) => {
+    if (!id) return;
+    try {
+      await onDeleteTrip(id);
+      // remove locally after successful delete
+      removeRow(gi, ri);
+    } catch {
+      // silent
+    }
+  }, [onDeleteTrip, removeRow]);
+
   const addGroup = useCallback(() => {
     onChange(prev => [...prev, emptyDriverGroup()]);
   }, [onChange]);
@@ -299,6 +331,17 @@ function BulkEntryTable({ groups, onChange }: {
   const removeGroup = useCallback((gi: number) => {
     onChange(prev => prev.filter((_: DriverGroup, i: number) => i !== gi));
   }, [onChange]);
+
+  const deleteServerGroup = useCallback(async (gi: number) => {
+    const ids = (groups[gi]?.rows ?? []).map(r => r._id).filter(Boolean) as string[];
+    if (ids.length === 0) {
+      removeGroup(gi);
+      return;
+    }
+    // Best-effort: delete saved rows, then remove group locally
+    await Promise.allSettled(ids.map(id => Promise.resolve(onDeleteTrip(String(id)))));
+    removeGroup(gi);
+  }, [groups, onDeleteTrip, removeGroup]);
 
   return (
     <div className="space-y-4">
@@ -320,7 +363,7 @@ function BulkEntryTable({ groups, onChange }: {
               <span className="text-xs font-semibold text-slate-600 shrink-0">Advance: ₹</span>
               <CellInput value={g.advancePaid || ''} onChange={v => updateGroupField(gi, 'advancePaid', Number(v) || 0)} placeholder="0" type="number" className="w-[100px]" />
             </div>
-            <button type="button" onClick={() => removeGroup(gi)}
+            <button type="button" onClick={() => deleteServerGroup(gi)}
               className="text-red-400 hover:text-red-600 p-1 shrink-0"><Trash2 className="h-4 w-4" /></button>
           </div>
 
@@ -366,10 +409,15 @@ function BulkEntryTable({ groups, onChange }: {
                       />
                     </td>
                     <td className="px-2 py-1.5">
-                      {g.rows.length > 1 && (
-                        <button type="button" onClick={() => removeRow(gi, ri)}
+                      {r._id ? (
+                        <button type="button" onClick={() => deleteServerRow(gi, ri, String(r._id))}
+                          title="Delete saved trip"
                           className="text-red-400 hover:text-red-600"><Trash2 className="h-3.5 w-3.5" /></button>
-                      )}
+                      ) : g.rows.length > 1 ? (
+                        <button type="button" onClick={() => removeRow(gi, ri)}
+                          title="Remove row"
+                          className="text-red-400 hover:text-red-600"><Trash2 className="h-3.5 w-3.5" /></button>
+                      ) : null}
                     </td>
                   </tr>
                 ))}
@@ -383,11 +431,26 @@ function BulkEntryTable({ groups, onChange }: {
               className="flex items-center gap-1.5 text-xs font-medium text-indigo-600 hover:text-indigo-700">
               <Plus className="h-3.5 w-3.5" /> Add Trip
             </button>
-            <div className="flex items-center gap-4 text-xs">
-              <span className="text-slate-500">Total: <strong className="text-slate-800">₹{g.rows.reduce((s, r) => s + (r.grandTotal || 0), 0).toLocaleString('en-IN')}</strong></span>
-              <span className="text-slate-500">Advance: <strong className="text-slate-800">₹{(g.advancePaid || 0).toLocaleString('en-IN')}</strong></span>
-              <span className="text-slate-500">Balance: <strong className="text-emerald-600">₹{(g.rows.reduce((s, r) => s + (r.grandTotal || 0), 0) - (g.advancePaid || 0)).toLocaleString('en-IN')}</strong></span>
-            </div>
+          <div className="flex items-center gap-4 text-xs">
+            {(() => {
+              const totalGrand = g.rows.reduce((s, r) => s + (r.grandTotal || 0), 0);
+              const advance = g.advancePaid || 0;
+              const balance = calculateBalanceAmount(totalGrand, advance);
+              return (
+                <>
+                  <span className="text-slate-500">
+                    Total: <strong className="text-slate-800">₹{totalGrand.toLocaleString('en-IN')}</strong>
+                  </span>
+                  <span className="text-slate-500">
+                    Advance: <strong className="text-slate-800">₹{advance.toLocaleString('en-IN')}</strong>
+                  </span>
+                  <span className="text-slate-500">
+                    Balance: <strong className="text-emerald-600">₹{balance.toLocaleString('en-IN')}</strong>
+                  </span>
+                </>
+              );
+            })()}
+          </div>
           </div>
         </div>
       ))}
@@ -401,7 +464,7 @@ function BulkEntryTable({ groups, onChange }: {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// WHATSAPP HELPERS
+// COPY HELPERS
 // ═══════════════════════════════════════════════════════════════════════════════
 
 function formatSingleNormalEntry(e: NormalEntryRow | AgencyTrip): string {
@@ -417,40 +480,59 @@ function formatSingleNormalEntry(e: NormalEntryRow | AgencyTrip): string {
   ].filter(Boolean).join('\n');
 }
 
-function buildWhatsAppUrl(text: string): string {
-  return `https://wa.me/?text=${encodeURIComponent(text)}`;
+async function copyToClipboard(text: string): Promise<boolean> {
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch {
+    try {
+      const el = document.createElement('textarea');
+      el.value = text;
+      el.style.position = 'fixed';
+      el.style.left = '-9999px';
+      document.body.appendChild(el);
+      el.focus();
+      el.select();
+      const ok = document.execCommand('copy');
+      document.body.removeChild(el);
+      return ok;
+    } catch {
+      return false;
+    }
+  }
 }
 
-function shareSingleEntry(e: NormalEntryRow | AgencyTrip) {
+async function copySingleEntry(e: NormalEntryRow | AgencyTrip) {
   const msg = [
-    '*Vehicle Details*',
+    'Vehicle Details',
     '─────────────────',
     formatSingleNormalEntry(e),
     '─────────────────',
   ].join('\n');
-  window.open(buildWhatsAppUrl(msg), '_blank');
+  await copyToClipboard(msg);
 }
 
-function shareAllEntries(entries: (NormalEntryRow | AgencyTrip)[], agencyName?: string) {
+async function copyAllEntries(entries: (NormalEntryRow | AgencyTrip)[], agencyName?: string) {
   const filled = entries.filter(e => (e as any).driverName?.trim());
   if (filled.length === 0) return;
-  const header = agencyName ? `*${agencyName} — Vehicle Summary*` : '*Vehicle Summary*';
+  const header = agencyName ? `${agencyName} — Vehicle Summary` : 'Vehicle Summary';
   const msg = [
     header,
     `Total Vehicles: ${filled.length}`,
     '─────────────────',
     ...filled.map((e) => formatSingleNormalEntry(e) + '\n─────────────────'),
   ].join('\n');
-  window.open(buildWhatsAppUrl(msg), '_blank');
+  await copyToClipboard(msg);
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // NORMAL ENTRY TABLE
 // ═══════════════════════════════════════════════════════════════════════════════
 
-function NormalEntryTable({ entries, onChange, agencyName }: {
+function NormalEntryTable({ entries, onChange, onDeleteTrip, agencyName }: {
   entries: NormalEntryRow[];
   onChange: Dispatch<SetStateAction<NormalEntryRow[]>>;
+  onDeleteTrip: (id: string) => Promise<void> | void;
   agencyName?: string;
 }) {
   const update = useCallback((idx: number, field: keyof NormalEntryRow, val: string) => {
@@ -467,10 +549,20 @@ function NormalEntryTable({ entries, onChange, agencyName }: {
 
   const removeEntry = useCallback((idx: number) => {
     onChange(prev => {
-      if (prev.length <= 1) return prev;
+      if (prev.length <= 1) return [emptyNormalRow()];
       return prev.filter((_: NormalEntryRow, i: number) => i !== idx);
     });
   }, [onChange]);
+
+  const deleteServerEntry = useCallback(async (idx: number, id: string) => {
+    if (!id) return;
+    try {
+      await onDeleteTrip(id);
+      removeEntry(idx);
+    } catch {
+      // silent
+    }
+  }, [onDeleteTrip, removeEntry]);
 
   return (
     <div className="space-y-4">
@@ -509,14 +601,22 @@ function NormalEntryTable({ entries, onChange, agencyName }: {
                   <td className="px-2 py-1.5">
                     <div className="flex flex-col gap-1">
                       {e.driverName?.trim() && (
-                        <button type="button" onClick={() => shareSingleEntry(e)}
-                          title="Share this entry via WhatsApp"
-                          className="flex items-center gap-1 text-emerald-600 hover:text-emerald-800 text-[10px] font-semibold transition">
-                          <Share2 className="h-3 w-3" /> Share
+                        <button
+                          type="button"
+                          onClick={() => copySingleEntry(e)}
+                          title="Copy this entry"
+                          className="flex items-center gap-1 text-indigo-600 hover:text-indigo-800 text-[10px] font-semibold transition"
+                        >
+                          <Copy className="h-3 w-3" /> Copy
                         </button>
                       )}
-                      {entries.length > 1 && (
+                      {(e as any)._id ? (
+                        <button type="button" onClick={() => deleteServerEntry(i, String((e as any)._id))}
+                          title="Delete saved entry"
+                          className="text-red-400 hover:text-red-600"><Trash2 className="h-3.5 w-3.5" /></button>
+                      ) : (
                         <button type="button" onClick={() => removeEntry(i)}
+                          title={entries.length > 1 ? 'Remove row' : 'Clear row'}
                           className="text-red-400 hover:text-red-600"><Trash2 className="h-3.5 w-3.5" /></button>
                       )}
                     </div>
@@ -533,10 +633,13 @@ function NormalEntryTable({ entries, onChange, agencyName }: {
           className="flex items-center gap-2 text-sm font-medium text-indigo-600 hover:text-indigo-700 border border-dashed border-indigo-300 rounded-xl px-4 py-3 flex-1 justify-center hover:bg-indigo-50/50 transition">
           <Plus className="h-4 w-4" /> Add Entry
         </button>
-        <button type="button" onClick={() => shareAllEntries(entries, agencyName)}
-          title="Share all entries via WhatsApp"
-          className="flex items-center gap-2 text-sm font-semibold text-emerald-700 bg-emerald-50 border border-emerald-300 hover:bg-emerald-100 rounded-xl px-4 py-3 transition">
-          <Share2 className="h-4 w-4" /> Share All via WhatsApp
+        <button
+          type="button"
+          onClick={() => copyAllEntries(entries, agencyName)}
+          title="Copy all entries"
+          className="flex items-center gap-2 text-sm font-semibold text-indigo-700 bg-indigo-50 border border-indigo-300 hover:bg-indigo-100 rounded-xl px-4 py-3 transition"
+        >
+          <Copy className="h-4 w-4" /> Copy All
         </button>
       </div>
     </div>
@@ -556,7 +659,14 @@ export function BulkEntryPage() {
   const [showDropdown, setShowDropdown] = useState(false);
 
   // State — mode
-  const [isBulkMode, setIsBulkMode] = useState(true);
+  const [isBulkMode, setIsBulkMode] = useState(() => {
+    try {
+      const v = localStorage.getItem(LS_ENTRY_MODE);
+      return v !== 'normal';
+    } catch {
+      return true;
+    }
+  });
 
   // State — bulk data (functional updater pattern for perf)
   const [bulkGroups, setBulkGroupsRaw] = useState<DriverGroup[]>([emptyDriverGroup()]);
@@ -573,9 +683,7 @@ export function BulkEntryPage() {
     setNormalEntriesRaw(typeof updater === 'function' ? updater : () => updater);
   }, []);
 
-  // State — submit
-  const [submitting, setSubmitting] = useState(false);
-  const [submitMsg, setSubmitMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  // No manual submit — MS Office style autosync only
 
   const selectedAgency = agencies.find(a => (a._id ?? a.id) === selectedId) ?? null;
 
@@ -588,14 +696,37 @@ export function BulkEntryPage() {
     if (!selectedAgency) return;
     const validGroups = groups.filter(g => g.driverName.trim() && g.vehicleNumber.trim());
     if (validGroups.length === 0) return;
-    await syncBulkEntry({ agencyName: selectedAgency.name, driverGroups: validGroups });
+    const res = await syncBulkEntry({ agencyName: selectedAgency.name, driverGroups: validGroups });
+
+    // Patch returned _id mappings back into state so refresh doesn't duplicate server rows.
+    const mappings = (res.rows ?? []).filter(r => r.clientRowId && r._id) as Array<{ clientRowId: string; _id: string }>;
+    if (mappings.length === 0) return;
+    const map = new Map(mappings.map(m => [m.clientRowId, m._id]));
+
+    setBulkGroupsRaw(prev => prev.map(g => ({
+      ...g,
+      rows: g.rows.map(r => {
+        if (r._id) return r;
+        const id = map.get(r.clientRowId);
+        return id ? { ...r, _id: id } : r;
+      }),
+    })));
   }, [selectedAgency]);
 
   const syncNormalToBackend = useCallback(async (entries: NormalEntryRow[]) => {
     if (!selectedAgency) return;
     const validEntries = entries.filter(e => e.driverName.trim() && e.vehicleNumber.trim());
     if (validEntries.length === 0) return;
-    await createNormalEntries({ agencyName: selectedAgency.name, entries: validEntries });
+    const res = await syncNormalEntry({ agencyName: selectedAgency.name, entries: validEntries });
+
+    const mappings = (res.rows ?? []).filter(r => r.clientRowId && r._id) as Array<{ clientRowId: string; _id: string }>;
+    if (mappings.length === 0) return;
+    const map = new Map(mappings.map(m => [m.clientRowId, m._id]));
+    setNormalEntriesRaw(prev => prev.map(e => {
+      if (e._id) return e;
+      const id = map.get(e.clientRowId || '');
+      return id ? { ...e, _id: id } : e;
+    }));
   }, [selectedAgency]);
 
   // ── Autosave hooks ──
@@ -610,16 +741,36 @@ export function BulkEntryPage() {
   // ── Calculate selected agency total balance ──
   const agencyTotalBalance = useMemo(() => {
     if (!isBulkMode) return 0;
-    let totalGrandTotal = 0;
-    let totalAdvance = 0;
+
+    let totalBalance = 0;
+
     for (const group of bulkGroups) {
-      if (!group.driverName.trim() && !group.vehicleNumber.trim() && group.rows.every(r => !r.startDate && !r.startKm && !r.grandTotal)) continue;
-      totalAdvance += (group.advancePaid || 0);
-      for (const row of group.rows) {
-        totalGrandTotal += (row.grandTotal || 0);
+      if (
+        !group.driverName.trim() &&
+        !group.vehicleNumber.trim() &&
+        group.rows.every(r => !r.startDate && !r.startKm && !r.grandTotal)
+      ) {
+        continue;
       }
+
+      let remainingGroupAdvance = group.advancePaid || 0;
+
+      group.rows.forEach((row) => {
+        const gt = row.grandTotal || 0;
+        let rowAdvance = 0;
+
+        // Backend logic: if row-level advance is ever added, it overrides group advance.
+        // For now we only support group-level advance applied once per driver/vehicle group.
+        if (remainingGroupAdvance > 0) {
+          rowAdvance = remainingGroupAdvance;
+          remainingGroupAdvance = 0;
+        }
+
+        totalBalance += calculateBalanceAmount(gt, rowAdvance);
+      });
     }
-    return totalGrandTotal - totalAdvance;
+
+    return totalBalance;
   }, [bulkGroups, isBulkMode]);
 
   // ── Load agencies ──
@@ -628,19 +779,29 @@ export function BulkEntryPage() {
     try {
       const data = await fetchAgencies();
       setAgencies(data.agencies);
-      if (data.agencies.length > 0 && !selectedId) {
-        const firstId = data.agencies[0]._id ?? data.agencies[0].id ?? null;
-        setSelectedId(firstId);
-        // Restore from localStorage if available
-        if (firstId) {
-          const savedBulk = loadFromLocalStorage<DriverGroup[]>(`${LS_BULK_PREFIX}${firstId}`, []);
+      if (data.agencies.length > 0) {
+        // Restore last selected agency if it still exists, else fallback to first.
+        let preferredId: string | null = null;
+        try { preferredId = localStorage.getItem(LS_SELECTED_AGENCY); } catch { /* ignore */ }
+        const resolvedPreferred = preferredId
+          ? data.agencies.find(a => (a._id ?? a.id) === preferredId)?._id ?? data.agencies.find(a => (a._id ?? a.id) === preferredId)?.id
+          : null;
+
+        const initialId = (resolvedPreferred ?? selectedId ?? data.agencies[0]._id ?? data.agencies[0].id ?? null) as string | null;
+        if (initialId && initialId !== selectedId) {
+          setSelectedId(initialId);
+        }
+
+        // Restore draft state for the chosen agency (bulk + normal), if present.
+        if (initialId) {
+          const savedBulk = loadFromLocalStorage<DriverGroup[]>(`${LS_BULK_PREFIX}${initialId}`, []);
           if (savedBulk.length > 0) setBulkGroupsRaw(savedBulk);
-          const savedNormal = loadFromLocalStorage<NormalEntryRow[]>(`${LS_NORMAL_PREFIX}${firstId}`, []);
+          const savedNormal = loadFromLocalStorage<NormalEntryRow[]>(`${LS_NORMAL_PREFIX}${initialId}`, []);
           if (savedNormal.length > 0) setNormalEntriesRaw(savedNormal);
         }
       }
     } catch { /* silent */ } finally { setAgencyLoading(false); }
-  }, []);
+  }, [selectedId]);
 
   useEffect(() => { loadAgencies(); }, [loadAgencies]);
 
@@ -665,7 +826,8 @@ export function BulkEntryPage() {
               vehicleNumber: first.vehicleNumber || '',
               advancePaid: Number(first.advancePaid ?? 0),
               rows: grp.map(t => ({
-                clientRowId: nextRowId(),
+                // Preserve server clientRowId so refresh can dedupe against local drafts
+                clientRowId: (t as any).clientRowId ?? nextRowId(),
                 _id: t._id ?? t.id,
                 startDate: t.startDate ? t.startDate.split('T')[0] : '',
                 endDate: t.endDate ? t.endDate.split('T')[0] : '',
@@ -682,16 +844,60 @@ export function BulkEntryPage() {
             };
           });
           setBulkGroupsRaw(prev => {
-            // Ensure we don't append duplicate server groups if they already exist in state
-            const existingIds = new Set(prev.flatMap(g => g.rows.map(r => r._id)).filter(Boolean));
-            const newServerGroups = serverGroups.filter(g => !g.rows.every(r => existingIds.has(r._id)));
-            if (newServerGroups.length === 0) return prev;
+            // Canonical merge: one group per (driverName, vehicleNumber).
+            // Start from server state, then merge in any local unsaved rows (no _id) that aren't already on server.
+            const keyOf = (g: Pick<DriverGroup, 'driverName' | 'vehicleNumber'>) =>
+              `${(g.driverName || '').trim().toLowerCase()}|||${(g.vehicleNumber || '').trim().toUpperCase()}`;
 
-            const hasUserData = prev.some(g =>
+            const rowKey = (r: any) => (r?._id ? `id:${String(r._id)}` : `cr:${String(r.clientRowId || '')}`);
+
+            const outByKey = new Map<string, DriverGroup>();
+            for (const sg of serverGroups) {
+              const k = keyOf(sg);
+              outByKey.set(k, {
+                ...sg,
+                rows: [...sg.rows],
+              });
+            }
+
+            // Track row keys already present per group
+            const existingRowKeysByGroup = new Map<string, Set<string>>();
+            for (const [k, g] of outByKey.entries()) {
+              existingRowKeysByGroup.set(k, new Set(g.rows.map(rowKey).filter(Boolean)));
+            }
+
+            // Merge local rows/groups
+            for (const lg of prev) {
+              const k = keyOf(lg);
+              const target = outByKey.get(k) ?? {
+                driverName: lg.driverName,
+                vehicleNumber: lg.vehicleNumber,
+                advancePaid: lg.advancePaid || 0,
+                rows: [],
+              };
+
+              const seen = existingRowKeysByGroup.get(k) ?? new Set<string>();
+              for (const r of lg.rows) {
+                const rk = rowKey(r);
+                if (!rk) continue;
+                if (!seen.has(rk)) {
+                  target.rows.push(r);
+                  seen.add(rk);
+                }
+              }
+
+              outByKey.set(k, target);
+              existingRowKeysByGroup.set(k, seen);
+            }
+
+            const merged = Array.from(outByKey.values());
+            const hasAnyData = merged.some(g =>
               g.driverName.trim() || g.vehicleNumber.trim() || g.rows.some(r => r.startDate || r.startKm || r.grandTotal)
             );
-            return hasUserData ? [...newServerGroups, ...prev] : [...newServerGroups, emptyDriverGroup()];
-          });        }
+
+            return hasAnyData ? merged : [emptyDriverGroup()];
+          });
+        }
       } else {
         const trips = await fetchNormalEntryTrips(selectedId);
         // Convert server trips into editable NormalEntryRow[] format
@@ -706,17 +912,33 @@ export function BulkEntryPage() {
             notes: t.notes || '',
           }));
           setNormalEntriesRaw(prev => {
-            const existingIds = new Set(prev.map(e => e._id).filter(Boolean));
-            const newServerEntries = serverEntries.filter(e => !existingIds.has(e._id));
-            if (newServerEntries.length === 0) return prev;
+            // Canonical merge: prefer server entries, then keep local-only entries that aren't on server.
+            const key = (e: any) => (e?._id ? `id:${String(e._id)}` : `local:${String(e.driverName || '')}|${String(e.vehicleNumber || '')}|${String(e.date || '')}`);
+            const seen = new Set<string>();
+            const out: NormalEntryRow[] = [];
 
-            const hasUserData = prev.some(e => e.driverName.trim() || e.vehicleNumber.trim());
-            return hasUserData ? [...newServerEntries, ...prev] : [...newServerEntries, emptyNormalRow()];
+            for (const se of serverEntries) {
+              const k = key(se);
+              if (!seen.has(k)) { out.push(se); seen.add(k); }
+            }
+            for (const le of prev) {
+              const k = key(le);
+              if (!seen.has(k)) { out.push(le); seen.add(k); }
+            }
+
+            const hasAny = out.some(e => e.driverName.trim() || e.vehicleNumber.trim());
+            return hasAny ? out : [emptyNormalRow()];
           });
         }
       }
     } catch { /* silent */ }
   }, [selectedId, isBulkMode, selectedAgency]);
+  const handleDeleteTrip = useCallback(async (id: string) => {
+    if (!id) return;
+    if (isBulkMode) await deleteBulkEntryTrip(id);
+    else await deleteNormalEntryTrip(id);
+    await loadTrips();
+  }, [isBulkMode, loadTrips]);
 
   useEffect(() => { loadTrips(); }, [loadTrips]);
 
@@ -724,7 +946,7 @@ export function BulkEntryPage() {
   const selectAgency = useCallback((id: string) => {
     setSelectedId(id);
     setShowDropdown(false);
-    setSubmitMsg(null);
+    try { localStorage.setItem(LS_SELECTED_AGENCY, id); } catch {}
     // Restore from localStorage
     const savedBulk = loadFromLocalStorage<DriverGroup[]>(`${LS_BULK_PREFIX}${id}`, []);
     setBulkGroupsRaw(savedBulk.length > 0 ? savedBulk : [emptyDriverGroup()]);
@@ -735,7 +957,7 @@ export function BulkEntryPage() {
   // ── Mode toggle ──
   const toggleMode = useCallback((bulk: boolean) => {
     setIsBulkMode(bulk);
-    setSubmitMsg(null);
+    try { localStorage.setItem(LS_ENTRY_MODE, bulk ? 'bulk' : 'normal'); } catch {}
   }, []);
 
   // Close dropdown on outside click
@@ -746,41 +968,7 @@ export function BulkEntryPage() {
     return () => document.removeEventListener('click', close);
   }, [showDropdown]);
 
-  // ── Submit bulk ──
-  const submitBulk = useCallback(async () => {
-    if (!selectedAgency) return;
-    const validGroups = bulkGroups.filter(g => g.driverName.trim() && g.vehicleNumber.trim());
-    if (validGroups.length === 0) { setSubmitMsg({ type: 'error', text: 'Add at least one driver with a vehicle number.' }); return; }
-    setSubmitting(true); setSubmitMsg(null);
-    try {
-      const result = await createBulkTrips({ agencyName: selectedAgency.name, driverGroups: validGroups });
-      setSubmitMsg({ type: 'success', text: `${result.created} created, ${result.updated} updated${result.failed ? `, ${result.failed} failed` : ''}` });
-      setBulkGroupsRaw([emptyDriverGroup()]);
-      // Clear localStorage after successful submit
-      if (selectedId) { try { localStorage.removeItem(`${LS_BULK_PREFIX}${selectedId}`); } catch {} }
-      loadTrips();
-    } catch (e: any) {
-      setSubmitMsg({ type: 'error', text: e?.response?.data?.message ?? 'Failed to submit bulk trips' });
-    } finally { setSubmitting(false); }
-  }, [selectedAgency, bulkGroups, selectedId, loadTrips]);
-
-  // ── Submit normal ──
-  const submitNormal = useCallback(async () => {
-    if (!selectedAgency) return;
-    const validEntries = normalEntries.filter(e => e.driverName.trim() && e.vehicleNumber.trim());
-    if (validEntries.length === 0) { setSubmitMsg({ type: 'error', text: 'Add at least one entry with driver and vehicle.' }); return; }
-    setSubmitting(true); setSubmitMsg(null);
-    try {
-      const result = await createNormalEntries({ agencyName: selectedAgency.name, entries: validEntries });
-      setSubmitMsg({ type: 'success', text: `${result.created} created, ${result.updated} updated${result.failed ? `, ${result.failed} failed` : ''}` });
-      setNormalEntriesRaw([emptyNormalRow()]);
-      // Clear localStorage after successful submit
-      if (selectedId) { try { localStorage.removeItem(`${LS_NORMAL_PREFIX}${selectedId}`); } catch {} }
-      loadTrips();
-    } catch (e: any) {
-      setSubmitMsg({ type: 'error', text: e?.response?.data?.message ?? 'Failed to submit entries' });
-    } finally { setSubmitting(false); }
-  }, [selectedAgency, normalEntries, selectedId, loadTrips]);
+  // No manual submit handlers — autosync only
 
   // ══════════════════════════════════════════════════════════════════════════════
   // RENDER
@@ -861,26 +1049,12 @@ export function BulkEntryPage() {
           <button type="button" onClick={loadTrips}
             className="flex h-8 w-8 items-center justify-center text-slate-500 hover:bg-slate-100 rounded-full transition active:rotate-180"
             title="Refresh"><RefreshCw className="h-4 w-4" /></button>
-
-          <button type="button" onClick={isBulkMode ? submitBulk : submitNormal} disabled={submitting || !selectedAgency}
-            className="flex items-center gap-1.5 rounded-lg bg-emerald-500 px-4 py-2 text-xs font-bold text-white hover:bg-emerald-600 disabled:opacity-50 transition shadow-sm">
-            <Send className="h-3.5 w-3.5" />
-            {submitting ? 'Submitting…' : 'Submit'}
-          </button>
+          {/* No manual submit (autosync only) */}
         </div>
       </div>
 
       {/* ─── FEEDBACK BAR ─── */}
-      {submitMsg && (
-        <div className={`px-5 py-2.5 text-xs font-medium flex items-center gap-2 shrink-0 ${
-          submitMsg.type === 'success' ? 'bg-emerald-50 text-emerald-700 border-b border-emerald-100'
-            : 'bg-red-50 text-red-700 border-b border-red-100'
-        }`}>
-          {submitMsg.type === 'error' ? <AlertTriangle className="h-4 w-4 shrink-0" /> : <FileSpreadsheet className="h-4 w-4 shrink-0" />}
-          {submitMsg.text}
-          <button type="button" onClick={() => setSubmitMsg(null)} className="ml-auto opacity-60 hover:opacity-100"><X className="h-3.5 w-3.5" /></button>
-        </div>
-      )}
+      {/* No submit feedback bar (autosync only) */}
 
       {/* ─── CONTENT ─── */}
       <div className="flex-1 overflow-y-auto p-4 lg:p-6">
@@ -891,9 +1065,9 @@ export function BulkEntryPage() {
             <p className="text-xs text-slate-400">Choose from the dropdown above, or create a new agency.</p>
           </div>
         ) : isBulkMode ? (
-          <BulkEntryTable groups={bulkGroups} onChange={setBulkGroups} />
+          <BulkEntryTable groups={bulkGroups} onChange={setBulkGroups} onDeleteTrip={handleDeleteTrip} />
         ) : (
-          <NormalEntryTable entries={normalEntries} onChange={setNormalEntries} />
+          <NormalEntryTable entries={normalEntries} onChange={setNormalEntries} onDeleteTrip={handleDeleteTrip} />
         )}
       </div>
 

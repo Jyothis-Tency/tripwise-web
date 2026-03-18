@@ -64,6 +64,7 @@ export interface DriverGroup {
 
 export interface NormalEntryRow {
   _id?: string;
+  clientRowId?: string;
   date: string;
   driverName: string;
   mobileNumber: string;
@@ -132,7 +133,13 @@ export async function syncBulkEntry(payload: {
   agencyName: string;
   idempotencyKey?: string;
   driverGroups: DriverGroup[];
-}): Promise<{ created: number; updated: number; deleted: number; failed: number }> {
+}): Promise<{
+  created: number;
+  updated: number;
+  deleted: number;
+  failed: number;
+  rows?: Array<{ clientRowId?: string; _id?: string; status?: string; result?: string }>;
+}> {
   const res = await apiClient.post(ApiEndpoints.bulkEntrySync, payload);
   const raw: any = res.data ?? {};
   const d = raw.data ?? raw;
@@ -141,6 +148,7 @@ export async function syncBulkEntry(payload: {
     updated: d.updated ?? 0,
     deleted: d.deleted ?? 0,
     failed: d.failed ?? 0,
+    rows: d.rows ?? undefined,
   };
 }
 
@@ -192,6 +200,30 @@ export async function createNormalEntries(payload: {
     created: d.created ?? 0,
     updated: d.updated ?? 0,
     failed: d.failed ?? 0,
+  };
+}
+
+/** Sync normal entry (autosave endpoint) */
+export async function syncNormalEntry(payload: {
+  agencyName: string;
+  idempotencyKey?: string;
+  entries: NormalEntryRow[];
+}): Promise<{
+  created: number;
+  updated: number;
+  deleted: number;
+  failed: number;
+  rows?: Array<{ clientRowId?: string; _id?: string; status?: string; result?: string }>;
+}> {
+  const res = await apiClient.post(ApiEndpoints.normalEntrySync, payload);
+  const raw: any = res.data ?? {};
+  const d = raw.data ?? raw;
+  return {
+    created: d.created ?? 0,
+    updated: d.updated ?? 0,
+    deleted: d.deleted ?? 0,
+    failed: d.failed ?? 0,
+    rows: d.rows ?? undefined,
   };
 }
 

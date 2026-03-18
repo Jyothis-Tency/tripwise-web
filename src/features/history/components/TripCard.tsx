@@ -63,9 +63,9 @@ const NUMBER_FIELDS = new Set([
 
 function DetailRow({ label, value, highlight }: { label: string; value: string; highlight?: boolean }) {
   return (
-    <div className="flex items-baseline py-[3px]">
-      <span className="w-[110px] shrink-0 text-[11px] text-slate-500">{label}</span>
-      <span className={`text-[11px] font-medium ${highlight ? 'text-indigo-600' : 'text-slate-800'}`}>{value}</span>
+    <div className="flex items-baseline py-1">
+      <span className="w-[130px] sm:w-[150px] shrink-0 text-sm text-slate-500">{label}</span>
+      <span className={`text-sm font-medium ${highlight ? 'text-indigo-600' : 'text-slate-800'}`}>{value}</span>
     </div>
   );
 }
@@ -114,37 +114,37 @@ function EditableRow({
 
   if (editing) {
     return (
-      <div className="flex items-center py-[2px] gap-0.5">
-        <span className="w-[110px] shrink-0 text-[11px] text-slate-500">{label}</span>
+      <div className="flex items-center py-0.5 gap-1.5">
+        <span className="w-[130px] sm:w-[150px] shrink-0 text-sm text-slate-500">{label}</span>
         <input
           autoFocus
           type={NUMBER_FIELDS.has(fieldKey) ? 'number' : 'text'}
           value={editValue}
           onChange={e => setEditValue(e.target.value)}
           onKeyDown={e => { if (e.key === 'Enter') handleSave(); if (e.key === 'Escape') handleCancel(); }}
-          className="w-[120px] max-w-[45%] border border-indigo-300 rounded px-1 py-0 text-[11px] leading-tight outline-none focus:ring-1 focus:ring-indigo-200 bg-white h-[20px]"
+          className="w-[140px] sm:w-[180px] max-w-[50%] border border-indigo-300 rounded-md px-2 py-1 text-sm leading-tight outline-none focus:ring-1 focus:ring-indigo-200 bg-white h-[28px]"
           disabled={saving}
         />
-        <button onClick={handleSave} disabled={saving} className="p-0 text-emerald-600 hover:text-emerald-700 disabled:opacity-40">
-          {saving ? <div className="h-2.5 w-2.5 border-[1.5px] border-emerald-400 border-t-transparent rounded-full animate-spin" /> : <Check className="h-2.5 w-2.5" />}
+        <button onClick={handleSave} disabled={saving} className="p-1 text-emerald-600 hover:text-emerald-700 disabled:opacity-40">
+          {saving ? <div className="h-4 w-4 border-2 border-emerald-400 border-t-transparent rounded-full animate-spin" /> : <Check className="h-4 w-4" />}
         </button>
-        <button onClick={handleCancel} className="p-0 text-slate-400 hover:text-slate-600">
-          <X className="h-2.5 w-2.5" />
+        <button onClick={handleCancel} className="p-1 text-slate-400 hover:text-slate-600">
+          <X className="h-4 w-4" />
         </button>
       </div>
     );
   }
 
   return (
-    <div className="group flex items-baseline py-[3px]">
-      <span className="w-[110px] shrink-0 text-[11px] text-slate-500">{label}</span>
-      <span className={`text-[11px] font-medium ${highlight ? 'text-indigo-600' : 'text-slate-800'}`}>{displayValue}</span>
+    <div className="group flex items-baseline py-1">
+      <span className="w-[130px] sm:w-[150px] shrink-0 text-sm text-slate-500">{label}</span>
+      <span className={`text-sm font-medium ${highlight ? 'text-indigo-600' : 'text-slate-800'}`}>{displayValue}</span>
       <button
         onClick={() => { setEditValue(displayValue === '—' ? '' : displayValue.replace(/^₹/, '').replace(/,/g, '')); setEditing(true); }}
-        className="ml-1 opacity-0 group-hover:opacity-100 text-slate-400 hover:text-indigo-500 transition-opacity p-0.5"
+        className="ml-1.5 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 text-slate-400 hover:text-indigo-500 transition-opacity p-0.5"
         title={`Edit ${label}`}
       >
-        <Pencil className="h-2.5 w-2.5" />
+        <Pencil className="h-3.5 w-3.5" />
       </button>
     </div>
   );
@@ -298,55 +298,58 @@ export function TripCard({ trip, onDeleted, onPaymentRecorded }: TripCardProps) 
 
   return (
     <>
-      <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+      <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden hover:shadow-md transition-shadow">
         {/* Header row */}
-        <div className="flex items-start gap-3 px-4 py-3 cursor-pointer hover:bg-slate-50/60 transition"
+        <div className="flex items-start gap-3 px-4 sm:px-5 py-3.5 sm:py-4 cursor-pointer hover:bg-slate-50/60 transition"
           onClick={() => setExpanded(e => !e)}>
 
           {/* Status badge */}
-          <span className={`shrink-0 mt-0.5 rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide ${getTripStatusStyle(trip.status)}`}>
+          <span className={`shrink-0 mt-1 rounded-full px-3 py-1 text-[11px] sm:text-xs font-bold uppercase tracking-wide ${getTripStatusStyle(trip.status)}`}>
             {trip.status}
           </span>
 
           {/* Trip info */}
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-sm font-semibold text-slate-800 truncate">
+              <span className="text-base sm:text-base font-semibold text-slate-800 truncate">
                 {trip.tripNumber ?? trip._id}
               </span>
-              <span className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold ${paymentBadge.bg} ${paymentBadge.color}`}>
+              <span className={`rounded-full border px-2.5 py-0.5 text-[11px] sm:text-xs font-semibold ${paymentBadge.bg} ${paymentBadge.color}`}>
                 {paymentBadge.label}
               </span>
             </div>
-            <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-slate-500">
+            <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-sm text-slate-500">
               {(trip.from || trip.pickup) && (trip.to || trip.drop) && (
                 <span className="truncate">{trip.from ?? trip.pickup} → {trip.to ?? trip.drop}</span>
               )}
-              <span className="flex items-center gap-1"><Calendar className="h-3 w-3" />{fmtDate(trip.startDate ?? trip.date)}</span>
+              <span className="flex items-center gap-1"><Calendar className="h-4 w-4" />{fmtDate(trip.startDate ?? trip.date)}</span>
             </div>
-            <div className="mt-0.5 flex flex-wrap items-center gap-x-3 text-xs text-slate-500">
-              <span className="flex items-center gap-1"><User className="h-3 w-3" />{driverName(trip.driver)}</span>
-              <span className="flex items-center gap-1"><Car className="h-3 w-3" />{vehicleNum(trip.vehicle)}{travelledKm != null ? ` · ${travelledKm} km` : ''}</span>
+            <div className="mt-0.5 flex flex-wrap items-center gap-x-3 text-sm text-slate-500">
+              <span className="flex items-center gap-1"><User className="h-4 w-4" />{driverName(trip.driver)}</span>
+              <span className="flex items-center gap-1"><Car className="h-4 w-4" />{vehicleNum(trip.vehicle)}{travelledKm != null ? ` · ${travelledKm} km` : ''}</span>
             </div>
           </div>
 
           {/* Right side */}
-          <div className="shrink-0 flex flex-col items-end gap-1">
+          <div className="shrink-0 flex flex-col items-end gap-1.5">
             <button onClick={e => { e.stopPropagation(); handleDelete(); }} disabled={deleting}
-              className="text-red-400 hover:text-red-600 transition disabled:opacity-40">
-              <Trash2 className="h-3.5 w-3.5" />
+              className="text-red-400 hover:text-red-600 transition disabled:opacity-40 p-1">
+              <Trash2 className="h-4 w-4" />
             </button>
-            {expanded ? <ChevronUp className="h-4 w-4 text-slate-400" /> : <ChevronDown className="h-4 w-4 text-slate-400" />}
+            {expanded ? <ChevronUp className="h-5 w-5 text-slate-400" /> : <ChevronDown className="h-5 w-5 text-slate-400" />}
           </div>
         </div>
 
         {/* Expanded details */}
         {expanded && (
-          <div className="border-t border-slate-100 px-4 py-2.5 space-y-3 text-sm">
+          <div className="border-t border-slate-100 px-4 sm:px-5 py-4 sm:py-5 space-y-5 sm:space-y-6">
             {/* Trip Details */}
             <section>
-              <h4 className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">Trip Details</h4>
-              <div>
+              <h4 className="text-sm font-bold text-indigo-500 uppercase tracking-wider mb-2 flex items-center gap-2">
+                <span className="w-1 h-4 bg-indigo-400 rounded-full"></span>
+                Trip Details
+              </h4>
+              <div className="bg-slate-50/50 rounded-lg px-4 sm:px-5 py-3 sm:py-4">
                 <DetailRow label="Trip Number" value={fmt(trip.tripNumber)} />
                 <DetailRow label="Status" value={fmt(trip.status)} />
                 {E('Start Date', fmtDate(trip.startDate ?? trip.date), 'startDate')}
@@ -376,8 +379,11 @@ export function TripCard({ trip, onDeleted, onPaymentRecorded }: TripCardProps) 
 
             {/* Financial Details */}
             <section>
-              <h4 className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">Financial Details</h4>
-              <div>
+              <h4 className="text-sm font-bold text-emerald-600 uppercase tracking-wider mb-2 flex items-center gap-2">
+                <span className="w-1 h-4 bg-emerald-400 rounded-full"></span>
+                Financial Details
+              </h4>
+              <div className="bg-emerald-50/30 rounded-lg px-4 sm:px-5 py-3 sm:py-4">
                 {E('Agency Cost', fmtCurrency(trip.agencyCost), 'agencyCost')}
                 {E('Cab Cost', fmtCurrency(trip.cabCost), 'cabCost')}
                 {E('Driver Salary', fmtCurrency(trip.driver_salary), 'driver_salary')}
@@ -388,28 +394,35 @@ export function TripCard({ trip, onDeleted, onPaymentRecorded }: TripCardProps) 
 
             {/* Payment Status */}
             <section>
-              <h4 className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">Payment Status</h4>
+              <h4 className="text-sm font-bold text-amber-600 uppercase tracking-wider mb-2 flex items-center gap-2">
+                <span className="w-1 h-4 bg-amber-400 rounded-full"></span>
+                Payment Status
+              </h4>
               {/* Progress bar */}
-              <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden mb-2">
-                <div className="h-full rounded-full transition-all"
+              <div className="h-2.5 bg-slate-100 rounded-full overflow-hidden mb-3 shadow-inner">
+                <div className="h-full rounded-full transition-all duration-500"
                   style={{
                     width: `${progress}%`,
-                    background: progress >= 100 ? '#10b981' : progress > 0 ? '#f59e0b' : '#ef4444',
+                    background: progress >= 100
+                      ? 'linear-gradient(90deg, #10b981, #059669)'
+                      : progress > 0
+                        ? 'linear-gradient(90deg, #f59e0b, #d97706)'
+                        : '#ef4444',
                   }} />
               </div>
-              <div className="mb-2">
+              <div className="mb-3 bg-slate-50/50 rounded-lg px-4 sm:px-5 py-3 sm:py-4">
                 <DetailRow label="Total Amount" value={fmtCurrency(totalAmount)} />
                 <DetailRow label="Paid Amount" value={fmtCurrency(paidAmount)} highlight={paidAmount > 0} />
                 <DetailRow label="Remaining" value={fmtCurrency(remaining)} highlight={remaining > 0} />
               </div>
-              <div className="flex flex-wrap gap-2">
+              <div className="flex flex-col sm:flex-row gap-2.5">
                 <button onClick={() => setShowPaymentModal(true)}
-                  className="flex-1 min-w-[140px] flex items-center justify-center gap-1.5 border border-indigo-300 text-indigo-600 hover:bg-indigo-50 rounded-lg py-1.5 text-xs font-semibold transition">
-                  <DollarSign className="h-3.5 w-3.5" /> Record Payment
+                  className="flex-1 flex items-center justify-center gap-2 bg-indigo-50 border border-indigo-200 text-indigo-600 hover:bg-indigo-100 rounded-lg py-3 sm:py-2.5 text-sm font-semibold transition">
+                  <DollarSign className="h-4.5 w-4.5" /> Record Payment
                 </button>
                 <button onClick={handleOpenHistory} disabled={loadingHistory}
-                  className="flex-1 min-w-[120px] flex items-center justify-center gap-1.5 border border-slate-200 text-slate-600 hover:bg-slate-50 rounded-lg py-1.5 text-xs font-semibold transition disabled:opacity-50">
-                  {loadingHistory ? <div className="h-3.5 w-3.5 border-2 border-slate-400 border-t-transparent rounded-full animate-spin" /> : <Clock className="h-3.5 w-3.5" />}
+                  className="flex-1 flex items-center justify-center gap-2 border border-slate-200 text-slate-600 hover:bg-slate-50 rounded-lg py-3 sm:py-2.5 text-sm font-semibold transition disabled:opacity-50">
+                  {loadingHistory ? <div className="h-4 w-4 border-2 border-slate-400 border-t-transparent rounded-full animate-spin" /> : <Clock className="h-4.5 w-4.5" />}
                   History
                 </button>
               </div>

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import {
-  User, Mail, MapPin, Eye, EyeOff, Trash2, Plus,
+  User, Mail, MapPin, Eye, EyeOff, Trash2, Plus, ArrowLeft,
   Briefcase, DollarSign, TrendingUp, Calendar,
 } from 'lucide-react';
 import type { Driver, DriverSalaryData, SalaryTransaction, DriverTrip } from '../api';
@@ -39,11 +39,12 @@ function InfoRow({ label, value }: { label: string; value: string }) {
 
 interface DriverDetailProps {
   driver: Driver;
+  onBack?: () => void;
   onDeleted: () => void;
   onUpdated: () => void;
 }
 
-export function DriverDetail({ driver, onDeleted }: DriverDetailProps) {
+export function DriverDetail({ driver, onBack, onDeleted }: DriverDetailProps) {
   const [tab, setTab] = useState<'details' | 'salary'>('details');
   const [deleting, setDeleting] = useState(false);
 
@@ -65,11 +66,17 @@ export function DriverDetail({ driver, onDeleted }: DriverDetailProps) {
   return (
     <div className="h-full flex flex-col bg-white rounded-xl border border-slate-200 overflow-hidden">
       {/* Header */}
-      <div className="flex items-center gap-3 px-5 py-4 border-b border-slate-100">
+      <div className="flex items-center gap-3 px-5 py-4 border-b border-slate-100 shrink-0">
+        {onBack && (
+          <button type="button" onClick={onBack}
+            className="lg:hidden flex h-10 w-10 items-center justify-center -ml-2 text-slate-500 hover:bg-slate-100 rounded-full transition-colors active:scale-95">
+            <ArrowLeft className="h-5 w-5" />
+          </button>
+        )}
         {driver.profileImg ? (
-          <img src={driver.profileImg} alt="" className="h-11 w-11 rounded-full object-cover" />
+          <img src={driver.profileImg} alt="" className="h-11 w-11 rounded-full object-cover shrink-0" />
         ) : (
-          <div className="h-11 w-11 rounded-full bg-indigo-100 flex items-center justify-center">
+          <div className="h-11 w-11 rounded-full bg-indigo-100 flex items-center justify-center shrink-0">
             <User className="h-6 w-6 text-indigo-500" />
           </div>
         )}

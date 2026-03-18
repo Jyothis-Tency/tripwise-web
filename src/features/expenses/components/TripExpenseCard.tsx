@@ -35,50 +35,52 @@ const TripExpenseCard: React.FC<Props> = ({ trip, onRefresh }) => {
   };
 
   return (
-    <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #f1f5f9', marginBottom: 10, overflow: 'hidden' }}>
+    <div className="bg-white rounded-xl border border-slate-100 mb-2.5 overflow-hidden shadow-sm transition-shadow hover:shadow-md">
       {/* Trip header */}
-      <div onClick={() => setExpanded(!expanded)} style={{ padding: '12px 16px', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <div onClick={() => setExpanded(!expanded)} className="p-3 sm:p-4 cursor-pointer flex justify-between items-center transition-colors hover:bg-slate-50">
         <div>
-          <div style={{ fontWeight: 700, fontSize: 14, color: '#1e293b' }}>{trip.tripNumber || (tripId ? tripId.slice(-6) : 'Trip')}</div>
-          <div style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>
+          <div className="font-bold text-sm text-slate-800">{trip.tripNumber || (tripId ? tripId.slice(-6) : 'Trip')}</div>
+          <div className="text-xs text-slate-500 mt-0.5">
             {trip.customer && <span>{trip.customer} · </span>}
             {trip.fromLocation || '?'} → {trip.toLocation || '?'}
             {trip.startDate && <span> · {fmtDate(trip.startDate)}</span>}
           </div>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={{ fontWeight: 700, fontSize: 14, color: '#ef4444' }}>₹{total.toLocaleString('en-IN')}</span>
-          <span style={{ fontSize: 11, color: '#94a3b8' }}>{expenses.length} items</span>
-          <span style={{ transform: expanded ? 'rotate(180deg)' : 'none', transition: '.2s', fontSize: 14 }}>▾</span>
+        <div className="flex items-center gap-2 sm:gap-3">
+          <span className="font-bold text-sm sm:text-[15px] text-red-500">₹{total.toLocaleString('en-IN')}</span>
+          <span className="text-[11px] sm:text-xs text-slate-400 hidden xs:inline">{expenses.length} items</span>
+          <span className="text-sm text-slate-400 transition-transform duration-200" style={{ transform: expanded ? 'rotate(180deg)' : 'none' }}>▾</span>
         </div>
       </div>
 
       {/* Expense list (expandable) */}
       {expanded && (
-        <div style={{ borderTop: '1px solid #f1f5f9', padding: '8px 16px 12px' }}>
+        <div className="border-t border-slate-100 px-3 pb-3 pt-2 sm:px-4 sm:pb-4">
           {expenses.length > 0 ? expenses.map((exp, idx) => (
-            <div key={exp._id || idx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid #f8fafc' }}>
-              <div style={{ fontSize: 13, color: '#334155' }}>
+            <div key={exp._id || idx} className="flex items-center justify-between py-1.5 border-b border-slate-50 last:border-0">
+              <div className="text-[13px] text-slate-700">
                 {exp.description || exp.category || 'Expense'}
-                {exp.date && <span style={{ color: '#94a3b8', marginLeft: 6, fontSize: 11 }}>{fmtDate(exp.date)}</span>}
+                {exp.date && <span className="text-slate-400 ml-1.5 text-[11px]">{fmtDate(exp.date)}</span>}
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span style={{ fontWeight: 600, fontSize: 13, color: '#ef4444' }}>₹{Number(exp.amount).toLocaleString('en-IN')}</span>
-                <button onClick={() => handleDeleteExp(exp._id)} style={{ background: '#fee2e2', color: '#ef4444', border: 'none', borderRadius: 6, padding: '2px 6px', fontSize: 10, cursor: 'pointer' }}>✕</button>
+              <div className="flex items-center gap-2">
+                <span className="font-semibold text-[13px] text-red-500">₹{Number(exp.amount).toLocaleString('en-IN')}</span>
+                <button onClick={() => handleDeleteExp(exp._id)} className="bg-red-50 hover:bg-red-100 text-red-500 border-0 rounded-md px-1.5 py-0.5 text-[10px] cursor-pointer transition-colors" title="Delete">✕</button>
               </div>
             </div>
-          )) : <div style={{ fontSize: 12, color: '#94a3b8', textAlign: 'center', padding: 8 }}>No expenses</div>}
+          )) : <div className="text-xs text-slate-400 text-center p-2">No expenses</div>}
 
           {/* Add inline */}
           {adding ? (
-            <div style={{ marginTop: 8, display: 'flex', gap: 6, alignItems: 'flex-end' }}>
-              <input placeholder="Description" value={newExp.description} onChange={e => setNewExp(p => ({ ...p, description: e.target.value }))} style={{ flex: 2, padding: '6px 8px', borderRadius: 6, border: '1px solid #e2e8f0', fontSize: 12 }} />
-              <input placeholder="₹" type="number" value={newExp.amount} onChange={e => setNewExp(p => ({ ...p, amount: e.target.value }))} style={{ width: 70, padding: '6px 8px', borderRadius: 6, border: '1px solid #e2e8f0', fontSize: 12 }} />
-              <button onClick={handleAddExp} disabled={saving} style={{ padding: '6px 12px', borderRadius: 6, border: 'none', background: '#6366f1', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>{saving ? '…' : 'Add'}</button>
-              <button onClick={() => setAdding(false)} style={{ padding: '6px 8px', borderRadius: 6, border: '1px solid #e2e8f0', background: '#fff', fontSize: 11, cursor: 'pointer' }}>✕</button>
+            <div className="mt-2 flex flex-wrap xs:flex-nowrap gap-1.5 sm:gap-2 items-center">
+              <input placeholder="Description" value={newExp.description} onChange={e => setNewExp(p => ({ ...p, description: e.target.value }))} className="flex-1 min-w-[100px] px-2.5 py-1.5 rounded-md border border-slate-200 text-xs outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-200" />
+              <input placeholder="₹" type="number" value={newExp.amount} onChange={e => setNewExp(p => ({ ...p, amount: e.target.value }))} className="w-16 px-2.5 py-1.5 rounded-md border border-slate-200 text-xs outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-200" />
+              <div className="flex gap-1.5 ml-auto xs:ml-0">
+                <button onClick={handleAddExp} disabled={saving} className="px-3 py-1.5 rounded-md border-0 bg-indigo-600 hover:bg-indigo-700 text-white text-[11px] font-semibold cursor-pointer transition-colors disabled:opacity-60">{saving ? '…' : 'Add'}</button>
+                <button onClick={() => setAdding(false)} className="px-2 py-1.5 rounded-md border border-slate-200 bg-white hover:bg-slate-50 text-[11px] cursor-pointer transition-colors">✕</button>
+              </div>
             </div>
           ) : (
-            <button onClick={() => setAdding(true)} style={{ marginTop: 8, width: '100%', padding: '6px', borderRadius: 6, border: '1px dashed #cbd5e1', background: '#f8fafc', color: '#64748b', fontSize: 12, cursor: 'pointer' }}>
+            <button onClick={() => setAdding(true)} className="mt-2 w-full p-1.5 rounded-md border border-dashed border-slate-300 bg-slate-50 hover:bg-slate-100 text-slate-500 text-xs cursor-pointer transition-colors">
               + Add expense to this trip
             </button>
           )}

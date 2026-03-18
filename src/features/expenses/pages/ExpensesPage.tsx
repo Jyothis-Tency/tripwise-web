@@ -49,54 +49,63 @@ const ExpensesPage: React.FC = () => {
   const totalAmt = useMemo(() => expenses.reduce((s, e) => s + (e.amount || 0), 0), [expenses]);
   const avgAmt = useMemo(() => expenses.length ? totalAmt / expenses.length : 0, [totalAmt, expenses.length]);
 
-  const toggleStyle = (active: boolean): React.CSSProperties => ({
-    flex: 1, padding: '7px 0', textAlign: 'center', borderRadius: 8, fontWeight: 600, fontSize: 13,
-    cursor: 'pointer', transition: '.2s',
-    background: active ? '#6366f1' : 'transparent',
-    color: active ? '#fff' : '#64748b',
-  });
 
   return (
-    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', background: '#f8fafc' }}>
+    <div className="flex flex-col h-full bg-slate-50">
       {/* Header */}
-      <div style={{ padding: '20px 24px 12px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <span style={{ fontSize: 22 }}>💰</span>
-            <h2 style={{ margin: 0, fontSize: 22, fontWeight: 700, color: '#1e293b' }}>Expenses</h2>
+      <div className="px-4 py-4 sm:px-6 sm:py-5 lg:px-6 lg:py-5 border-b border-slate-200/50">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-2.5">
+            <span className="text-2xl">💰</span>
+            <h2 className="text-xl sm:text-2xl font-bold text-slate-800 m-0">Expenses</h2>
           </div>
 
-          {/* Toggle */}
-          <div style={{ display: 'flex', background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10, padding: 3, width: 220 }}>
-            <div style={toggleStyle(!isTripMode)} onClick={() => setIsTripMode(false)}>Personal</div>
-            <div style={toggleStyle(isTripMode)} onClick={() => setIsTripMode(true)}>Trip Expense</div>
-          </div>
+          {/* Controls row */}
+          <div className="flex flex-col xs:flex-row items-stretch sm:items-center gap-3">
+            {/* Toggle */}
+            <div className="flex bg-white border border-slate-200 rounded-xl p-1 w-full sm:w-[220px]">
+              <button
+                type="button"
+                className={`flex-1 py-1.5 sm:py-2 text-center rounded-lg font-semibold text-xs sm:text-sm transition-colors ${!isTripMode ? 'bg-indigo-500 text-white shadow-sm' : 'bg-transparent text-slate-500 hover:text-slate-700'}`}
+                onClick={() => setIsTripMode(false)}
+              >
+                Personal
+              </button>
+              <button
+                type="button"
+                className={`flex-1 py-1.5 sm:py-2 text-center rounded-lg font-semibold text-xs sm:text-sm transition-colors ${isTripMode ? 'bg-indigo-500 text-white shadow-sm' : 'bg-transparent text-slate-500 hover:text-slate-700'}`}
+                onClick={() => setIsTripMode(true)}
+              >
+                Trip Expense
+              </button>
+            </div>
 
-          {!isTripMode && (
-            <button onClick={() => setShowAdd(true)} style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#6366f1', color: '#fff', border: 'none', borderRadius: 10, padding: '8px 18px', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
-              + Add Expense
-            </button>
-          )}
+            {!isTripMode && (
+              <button onClick={() => setShowAdd(true)} className="flex items-center justify-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white border-0 rounded-xl px-4 py-2 sm:py-2.5 text-xs sm:text-sm font-semibold cursor-pointer transition-colors shadow-sm">
+                + Add Expense
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
       {/* Content */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '0 24px 24px' }}>
+      <div className="flex-1 overflow-y-auto p-4 sm:p-6 pb-24">
         {isTripMode ? (
           /* ── Trip Expenses ── */
           <>
-            <div style={{ marginBottom: 12 }}>
+            <div className="mb-4">
               <input
                 placeholder="Search trips…" value={search} onChange={e => setSearch(e.target.value)}
-                style={{ width: '100%', maxWidth: 340, padding: '8px 12px', borderRadius: 8, border: '1px solid #e2e8f0', fontSize: 13, outline: 'none' }}
+                className="w-full sm:max-w-[340px] px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-200"
               />
             </div>
             {loading ? (
-              Array.from({ length: 4 }).map((_, i) => <div key={i} style={{ height: 64, borderRadius: 10, background: '#e2e8f0', marginBottom: 8 }} />)
+              Array.from({ length: 4 }).map((_, i) => <div key={i} className="h-16 rounded-xl bg-slate-200 animate-pulse mb-2.5" />)
             ) : trips.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '50px 0', color: '#94a3b8' }}>
-                <div style={{ fontSize: 44 }}>📦</div>
-                <p style={{ fontSize: 14 }}>No trips with expenses found</p>
+              <div className="text-center py-16 text-slate-400">
+                <div className="text-5xl mb-2">📦</div>
+                <p className="text-sm">No trips with expenses found</p>
               </div>
             ) : (
               trips.map((t, i) => <TripExpenseCard key={t._id || (t as any).id || i} trip={t} onRefresh={loadTrips} />)
@@ -106,13 +115,13 @@ const ExpensesPage: React.FC = () => {
           /* ── Personal Expenses ── */
           <>
             {/* Month selector */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12, flexWrap: 'wrap' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 8, padding: '6px 12px' }}>
-                <span style={{ fontSize: 14 }}>📅</span>
+            <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 mb-4">
+              <div className="flex items-center gap-2 bg-white border border-slate-200 rounded-lg px-3 py-2 w-full sm:w-auto">
+                <span className="text-sm">📅</span>
                 <select
                   value={`${month.getFullYear()}-${month.getMonth()}`}
                   onChange={e => { const [y, m] = e.target.value.split('-').map(Number); setMonth(new Date(y, m)); }}
-                  style={{ border: 'none', outline: 'none', fontSize: 13, cursor: 'pointer', background: 'transparent' }}
+                  className="border-0 outline-none text-sm cursor-pointer bg-transparent w-full sm:w-auto font-medium text-slate-700"
                 >
                   {Array.from({ length: 12 }, (_, i) => {
                     const y = new Date().getFullYear();
@@ -122,36 +131,38 @@ const ExpensesPage: React.FC = () => {
                   })}
                 </select>
               </div>
-              <div style={{ background: '#eef2ff', color: '#4f46e5', padding: '4px 12px', borderRadius: 8, fontSize: 13, fontWeight: 700 }}>
+              <div className="bg-indigo-50 text-indigo-600 px-4 py-2 rounded-lg text-sm font-bold w-full sm:w-auto text-center sm:text-left">
                 Total: ₹{totalAmt.toLocaleString('en-IN')}
               </div>
             </div>
 
             {/* Summary cards */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 10, marginBottom: 14 }}>
+            <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 mb-5">
               {[
-                { label: 'Total Expenses', value: `₹${totalAmt.toLocaleString('en-IN')}`, color: '#ef4444', bg: '#fef2f2' },
-                { label: 'Count', value: String(expenses.length), color: '#6366f1', bg: '#eef2ff' },
-                { label: 'Average', value: `₹${Math.round(avgAmt).toLocaleString('en-IN')}`, color: '#f59e0b', bg: '#fffbeb' },
+                { label: 'Total Expenses', value: `₹${totalAmt.toLocaleString('en-IN')}`, color: 'text-red-500', bg: 'bg-red-50 border border-red-100' },
+                { label: 'Count', value: String(expenses.length), color: 'text-indigo-500', bg: 'bg-indigo-50 border border-indigo-100' },
+                { label: 'Average', value: `₹${Math.round(avgAmt).toLocaleString('en-IN')}`, color: 'text-amber-500', bg: 'bg-amber-50 border border-amber-100' },
               ].map(c => (
-                <div key={c.label} style={{ background: c.bg, borderRadius: 10, padding: '12px 14px' }}>
-                  <div style={{ fontSize: 11, color: '#64748b', fontWeight: 600 }}>{c.label}</div>
-                  <div style={{ fontSize: 18, fontWeight: 800, color: c.color, marginTop: 2 }}>{c.value}</div>
+                <div key={c.label} className={`${c.bg} rounded-xl p-3.5 sm:p-4`}>
+                  <div className="text-xs sm:text-xs text-slate-500 font-semibold uppercase tracking-wider">{c.label}</div>
+                  <div className={`text-lg sm:text-xl font-bold ${c.color} mt-1`}>{c.value}</div>
                 </div>
               ))}
             </div>
 
             {/* Expense list */}
             {loading ? (
-              Array.from({ length: 4 }).map((_, i) => <div key={i} style={{ height: 56, borderRadius: 10, background: '#e2e8f0', marginBottom: 6 }} />)
+              Array.from({ length: 4 }).map((_, i) => <div key={i} className="h-14 rounded-xl bg-slate-200 animate-pulse mb-2" />)
             ) : expenses.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '50px 0', color: '#94a3b8' }}>
-                <div style={{ fontSize: 44 }}>📋</div>
-                <p style={{ fontSize: 14 }}>No expenses this month</p>
-                <button onClick={() => setShowAdd(true)} style={{ marginTop: 6, background: '#6366f1', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 16px', fontSize: 13, cursor: 'pointer' }}>Add one</button>
+              <div className="text-center py-12 text-slate-400">
+                <div className="text-5xl mb-2">📋</div>
+                <p className="text-sm">No expenses this month</p>
+                <button onClick={() => setShowAdd(true)} className="mt-3 bg-indigo-600 hover:bg-indigo-700 text-white border-0 rounded-lg px-4 py-2 text-sm font-semibold cursor-pointer transition-colors shadow-sm">Add one</button>
               </div>
             ) : (
-              expenses.map(e => <ExpenseCard key={e._id} expense={e} onRefresh={loadPersonal} />)
+              <div className="space-y-2.5">
+                {expenses.map(e => <ExpenseCard key={e._id} expense={e} onRefresh={loadPersonal} />)}
+              </div>
             )}
           </>
         )}

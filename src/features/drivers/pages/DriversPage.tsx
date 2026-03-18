@@ -11,7 +11,7 @@ export default function DriversPage() {
   const [drivers, setDrivers] = useState<Driver[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const [selectedIdx, setSelectedIdx] = useState(0);
+  const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingDriver, setEditingDriver] = useState<Driver | null>(null);
 
@@ -21,7 +21,7 @@ export default function DriversPage() {
       const res = await fetchDrivers({ search: search || undefined, limit: 100 });
       const list = res.drivers ?? (res as any) ?? [];
       setDrivers(Array.isArray(list) ? list : []);
-      setSelectedIdx(0);
+      setSelectedIdx(null);
     } catch {
       setDrivers([]);
     } finally {
@@ -34,12 +34,14 @@ export default function DriversPage() {
     return () => clearTimeout(t);
   }, [loadDrivers, search]);
 
-  const selectedDriver = drivers[selectedIdx] ?? null;
+  const selectedDriver = selectedIdx !== null ? (drivers[selectedIdx] ?? null) : null;
 
   return (
-    <div className="flex h-full gap-4 p-4">
+    <div className="flex h-full gap-4 p-4 overflow-hidden relative">
       {/* Left: Driver List */}
-      <div className="w-[320px] shrink-0 flex flex-col bg-white rounded-xl border border-slate-200 overflow-hidden">
+      <div className={`w-full lg:w-[320px] xl:w-[360px] shrink-0 flex-col bg-white rounded-xl border border-slate-200 overflow-hidden transition-all ${
+        selectedDriver ? 'hidden lg:flex' : 'flex'
+      }`}>
         {/* Search + Add */}
         <div className="px-3 py-3 border-b border-slate-100 space-y-2">
           <div className="flex items-center justify-between">
@@ -93,11 +95,14 @@ export default function DriversPage() {
       </div>
 
       {/* Right: Detail Panel */}
-      <div className="flex-1 min-w-0">
+      <div className={`flex-1 min-w-0 overflow-hidden transition-all ${
+        selectedDriver ? 'flex flex-col' : 'hidden lg:flex flex-col'
+      }`}>
         {selectedDriver ? (
           <DriverDetail
             key={selectedDriver._id}
             driver={selectedDriver}
+            onBack={() => setSelectedIdx(null)}
             onDeleted={() => loadDrivers()}
             onUpdated={() => loadDrivers()}
           />

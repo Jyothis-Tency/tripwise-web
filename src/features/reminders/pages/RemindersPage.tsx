@@ -24,29 +24,31 @@ const RemindersPage: React.FC = () => {
   const completed = reminders.filter(r => r.isCompleted);
 
   return (
-    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', background: '#f8fafc' }}>
+    <div className="flex flex-col h-full bg-slate-50">
       {/* Header */}
-      <div style={{ padding: '20px 24px 12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <span style={{ fontSize: 22 }}>🔔</span>
-          <h2 style={{ margin: 0, fontSize: 22, fontWeight: 700, color: '#1e293b' }}>Reminders</h2>
+      <div className="flex items-center justify-between px-4 py-4 sm:px-6 sm:py-5 lg:px-6 lg:py-4 border-b border-slate-200/50">
+        <div className="flex items-center gap-2.5">
+          <span className="text-2xl">🔔</span>
+          <h2 className="text-xl sm:text-2xl font-bold text-slate-800 m-0">Reminders</h2>
         </div>
-        <button onClick={() => setShowCreate(true)} style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#6366f1', color: '#fff', border: 'none', borderRadius: 10, padding: '8px 18px', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
-          + Create Reminder
+        <button onClick={() => setShowCreate(true)} className="flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white border-0 rounded-xl px-4 py-2 sm:py-2.5 text-sm font-semibold cursor-pointer transition-colors shadow-sm whitespace-nowrap">
+          <span className="hidden sm:inline">+ Create Reminder</span>
+          <span className="sm:hidden">+ Create</span>
         </button>
       </div>
 
       {/* Content */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '0 24px 24px' }}>
+      {/* Content */}
+      <div className="flex-1 overflow-y-auto px-4 pb-4 sm:px-6 sm:pb-6 lg:px-6 pt-4 sm:pt-6">
         {loading ? (
           Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} style={{ height: 90, borderRadius: 10, background: '#e2e8f0', marginBottom: 8, animation: 'pulse 1.5s infinite' }} />
+            <div key={i} className="h-24 rounded-xl bg-slate-200 animate-pulse mb-2.5" />
           ))
         ) : reminders.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '60px 0', color: '#94a3b8' }}>
-            <div style={{ fontSize: 48 }}>📋</div>
-            <p style={{ fontSize: 15, marginTop: 8 }}>No reminders yet</p>
-            <button onClick={() => setShowCreate(true)} style={{ marginTop: 8, background: '#6366f1', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 16px', fontSize: 13, cursor: 'pointer' }}>
+          <div className="text-center py-16 text-slate-400">
+            <div className="text-5xl mb-2">📋</div>
+            <p className="text-sm mt-3">No reminders yet</p>
+            <button onClick={() => setShowCreate(true)} className="mt-3 bg-indigo-600 hover:bg-indigo-700 text-white border-0 rounded-lg px-4 py-2 text-sm font-semibold cursor-pointer transition-colors shadow-sm">
               Create your first reminder
             </button>
           </div>
@@ -54,11 +56,11 @@ const RemindersPage: React.FC = () => {
           <>
             {/* Active */}
             {active.length > 0 && (
-              <div style={{ marginBottom: 20 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-                  <span style={{ width: 20, height: 20, borderRadius: '50%', background: '#6366f1', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, color: '#fff' }}>⏰</span>
-                  <span style={{ fontWeight: 700, fontSize: 15, color: '#334155' }}>Active Reminders</span>
-                  <span style={{ background: '#e0e7ff', color: '#4f46e5', fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 10 }}>{active.length}</span>
+              <div className="mb-6">
+                <div className="flex items-center gap-2 mb-3">
+                  <span className="w-5 h-5 rounded-full bg-indigo-500 flex items-center justify-center text-[10px] sm:text-xs text-white">⏰</span>
+                  <span className="font-bold text-[15px] sm:text-base text-slate-700">Active Reminders</span>
+                  <span className="bg-indigo-100 text-indigo-600 text-[11px] sm:text-xs font-bold px-2 py-0.5 rounded-full">{active.length}</span>
                 </div>
                 {active.map(r => <ReminderCard key={r._id} reminder={r} onRefresh={load} />)}
               </div>
@@ -67,10 +69,10 @@ const RemindersPage: React.FC = () => {
             {/* Completed */}
             {completed.length > 0 && (
               <div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-                  <span style={{ width: 20, height: 20, borderRadius: '50%', background: '#10b981', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, color: '#fff' }}>✓</span>
-                  <span style={{ fontWeight: 700, fontSize: 15, color: '#334155' }}>Completed</span>
-                  <span style={{ background: '#d1fae5', color: '#059669', fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 10 }}>{completed.length}</span>
+                <div className="flex items-center gap-2 mb-3">
+                  <span className="w-5 h-5 rounded-full bg-emerald-500 flex items-center justify-center text-[10px] sm:text-xs text-white">✓</span>
+                  <span className="font-bold text-[15px] sm:text-base text-slate-700">Completed</span>
+                  <span className="bg-emerald-100 text-emerald-600 text-[11px] sm:text-xs font-bold px-2 py-0.5 rounded-full">{completed.length}</span>
                 </div>
                 {completed.map(r => <ReminderCard key={r._id} reminder={r} onRefresh={load} />)}
               </div>

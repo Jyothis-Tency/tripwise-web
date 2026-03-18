@@ -81,8 +81,8 @@ function ModalShell({ title, onClose, children, maxWidth = 'max-w-md' }: {
 
 function InfoCard({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-5">
-      <h4 className="text-sm font-semibold text-slate-800 mb-3">{title}</h4>
+    <div className="rounded-xl border border-slate-200 bg-white p-5 sm:p-6">
+      <h4 className="text-base font-semibold text-slate-800 mb-3">{title}</h4>
       <div className="space-y-2">{children}</div>
     </div>
   );
@@ -90,9 +90,9 @@ function InfoCard({ title, children }: { title: string; children: React.ReactNod
 
 function InfoRow({ label, value, valueColor }: { label: string; value?: string | number | null; valueColor?: string }) {
   return (
-    <div className="flex items-start justify-between py-1.5 border-b border-slate-50 last:border-0">
-      <span className="text-xs text-slate-500 shrink-0 mr-4">{label}</span>
-      <span className={`text-xs font-medium text-right ${valueColor ?? 'text-slate-800'}`}>{value ?? '—'}</span>
+    <div className="flex items-start justify-between py-2 border-b border-slate-50 last:border-0">
+      <span className="text-sm text-slate-500 shrink-0 mr-4">{label}</span>
+      <span className={`text-sm font-medium text-right ${valueColor ?? 'text-slate-800'}`}>{value ?? '—'}</span>
     </div>
   );
 }
@@ -103,16 +103,16 @@ function InfoRow({ label, value, valueColor }: { label: string; value?: string |
 
 function TrackingCardSkeleton() {
   return (
-    <div className="w-full rounded-xl border border-slate-100 p-3.5 animate-pulse bg-white">
+    <div className="w-full rounded-xl border border-slate-100 p-4 animate-pulse bg-white">
       <div className="flex items-center gap-3">
-        <div className="h-11 w-11 shrink-0 rounded-lg bg-slate-50" />
+        <div className="h-12 w-12 shrink-0 rounded-lg bg-slate-50" />
         <div className="flex-1 space-y-2">
-          <div className="h-4 w-24 rounded bg-slate-50" />
-          <div className="h-3 w-16 rounded bg-slate-50" />
+          <div className="h-5 w-28 rounded bg-slate-50" />
+          <div className="h-4 w-20 rounded bg-slate-50" />
         </div>
       </div>
-      <div className="h-3 w-2/3 mt-3 rounded bg-slate-50" />
-      <div className="h-3 w-1/2 mt-1 rounded bg-slate-50" />
+      <div className="h-4 w-2/3 mt-3 rounded bg-slate-50" />
+      <div className="h-4 w-1/2 mt-1.5 rounded bg-slate-50" />
     </div>
   );
 }
@@ -127,7 +127,7 @@ function TrackingCard({ item, isSelected, onSelect }: {
 
   return (
     <button type="button" onClick={onSelect}
-      className={`w-full text-left rounded-xl border p-3.5 transition-all ${
+      className={`w-full text-left rounded-xl border p-4 transition-all ${
         isSelected
           ? 'border-indigo-400 bg-indigo-50 ring-1 ring-indigo-200 shadow-sm'
           : 'border-slate-200 bg-white hover:border-slate-300 hover:shadow-sm'
@@ -135,14 +135,14 @@ function TrackingCard({ item, isSelected, onSelect }: {
 
       {/* Top row: icon + vehicle number + status */}
       <div className="flex items-center gap-3">
-        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-indigo-50">
-          <Car className="h-5 w-5 text-indigo-500" />
+        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-indigo-50">
+          <Car className="h-6 w-6 text-indigo-500" />
         </div>
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-semibold text-slate-800 truncate">{v.vehicleNumber ?? 'N/A'}</p>
+          <p className="text-base font-semibold text-slate-800 truncate">{v.vehicleNumber ?? 'N/A'}</p>
           <div className="flex items-center gap-1.5 mt-0.5">
-            <span className={`h-2 w-2 rounded-full ${tripStatus === 'in_progress' ? 'bg-green-500' : 'bg-indigo-400'}`} />
-            <span className={`text-[11px] font-medium ${tripStatus === 'in_progress' ? 'text-green-600' : 'text-indigo-500'}`}>
+            <span className={`h-2.5 w-2.5 rounded-full ${tripStatus === 'in_progress' ? 'bg-green-500' : 'bg-indigo-400'}`} />
+            <span className={`text-sm font-medium ${tripStatus === 'in_progress' ? 'text-green-600' : 'text-indigo-500'}`}>
               {statusLabel(trip?.status)}
             </span>
           </div>
@@ -150,16 +150,16 @@ function TrackingCard({ item, isSelected, onSelect }: {
       </div>
 
       {/* Driver */}
-      <div className="flex items-center gap-1.5 mt-2.5 text-slate-600">
-        <User className="h-3.5 w-3.5 shrink-0 text-slate-400" />
-        <span className="text-xs truncate font-medium">{driverName(drv)}</span>
+      <div className="flex items-center gap-2 mt-3 text-slate-600">
+        <User className="h-4 w-4 shrink-0 text-slate-400" />
+        <span className="text-sm truncate font-medium">{driverName(drv)}</span>
       </div>
 
       {/* Route */}
       {trip?.from && trip?.to && (
-        <div className="flex items-center gap-1.5 mt-1 text-slate-500">
-          <MapPin className="h-3.5 w-3.5 shrink-0 text-slate-400" />
-          <span className="text-[11px] truncate">{trip.from} → {trip.to}</span>
+        <div className="flex items-center gap-2 mt-1.5 text-slate-500">
+          <MapPin className="h-4 w-4 shrink-0 text-slate-400" />
+          <span className="text-sm truncate">{trip.from} → {trip.to}</span>
         </div>
       )}
     </button>
@@ -210,11 +210,11 @@ function TripInfoTab({ item, onComplete }: { item: TrackingVehicle; onComplete: 
         <div className="md:col-span-2">
           <InfoCard title="Trip Actions">
             <button type="button" onClick={onComplete}
-              className="w-full flex items-center justify-center gap-2 rounded-lg bg-emerald-500 px-4 py-3 text-sm font-semibold text-white hover:bg-emerald-600 transition shadow-sm hover:shadow-md">
-              <CheckCircle2 className="h-4 w-4" />
+              className="w-full flex items-center justify-center gap-2 rounded-lg bg-emerald-500 px-4 py-3.5 text-base font-semibold text-white hover:bg-emerald-600 transition shadow-sm hover:shadow-md">
+              <CheckCircle2 className="h-5 w-5" />
               Complete Trip
             </button>
-            <div className="flex items-start gap-2 mt-2 px-3 py-2 rounded-lg bg-indigo-50 text-[11px] text-slate-600">
+            <div className="flex items-start gap-2 mt-3 px-4 py-3 rounded-lg bg-indigo-50 text-xs text-slate-600">
               <Info className="h-4 w-4 shrink-0 text-indigo-400 mt-0.5" />
               <span>This will mark the trip as completed. The vehicle will be available for new trips.</span>
             </div>
@@ -296,10 +296,10 @@ function ExpenseInfoTab({ item }: { item: TrackingVehicle }) {
 
 function ExpenseRow({ icon, label, amount }: { icon: string; label: string; amount: number }) {
   return (
-    <div className="flex items-center gap-3 py-1.5 border-b border-slate-50 last:border-0">
-      <span className="flex h-7 w-7 items-center justify-center rounded-md bg-indigo-50 text-sm">{icon}</span>
-      <span className="flex-1 text-xs text-slate-500">{label}</span>
-      <span className="text-xs font-semibold text-slate-800">₹{amount.toLocaleString('en-IN')}</span>
+    <div className="flex items-center gap-3 py-2 border-b border-slate-50 last:border-0">
+      <span className="flex h-8 w-8 items-center justify-center rounded-md bg-indigo-50 text-base">{icon}</span>
+      <span className="flex-1 text-sm text-slate-500">{label}</span>
+      <span className="text-sm font-semibold text-slate-800">₹{amount.toLocaleString('en-IN')}</span>
     </div>
   );
 }
@@ -351,7 +351,7 @@ function CompleteTripModal({ tripId, startKm, onClose, onCompleted }: {
           {err && <p className="text-xs text-red-600">{err}</p>}
         </div>
 
-        <p className="text-[11px] text-slate-400">
+        <p className="text-xs text-slate-400">
           Please enter the ending odometer reading to complete the trip.
         </p>
 
@@ -398,21 +398,21 @@ function DetailPanel({ item, onBack, onRefresh }: {
             <ArrowLeft className="h-5 w-5" />
           </button>
           <div>
-            <h3 className="text-xl font-bold text-slate-900 leading-tight">{v.vehicleNumber}</h3>
+            <h3 className="text-2xl font-bold text-slate-900 leading-tight">{v.vehicleNumber}</h3>
             {trip?.from && trip?.to && (
-              <p className="text-xs text-slate-500 flex items-center gap-1 opacity-80">
-                {trip.from} <ChevronRight className="h-3 w-3" /> {trip.to}
+              <p className="text-sm text-slate-500 flex items-center gap-1.5 mt-0.5">
+                {trip.from} <ChevronRight className="h-3.5 w-3.5" /> {trip.to}
               </p>
             )}
           </div>
         </div>
         <div className="flex items-center gap-3">
-          <span className={`rounded-full border px-3 py-1 text-[10px] uppercase tracking-wider font-bold ${statusBadgeCls(tripStatus)}`}>
+          <span className={`rounded-full border px-3.5 py-1.5 text-xs uppercase tracking-wider font-bold ${statusBadgeCls(tripStatus)}`}>
             {statusLabel(tripStatus)}
           </span>
           <button type="button" onClick={onRefresh} 
             className="flex h-10 w-10 items-center justify-center text-slate-500 hover:bg-slate-100 rounded-full transition-colors active:rotate-180">
-            <RefreshCw className="h-4 w-4" />
+            <RefreshCw className="h-5 w-5" />
           </button>
         </div>
       </div>
@@ -421,7 +421,7 @@ function DetailPanel({ item, onBack, onRefresh }: {
       <div className="sticky top-[73px] z-10 flex border-b border-slate-200 bg-white/90 backdrop-blur-md shrink-0 overflow-x-auto no-scrollbar">
         {tabs.map(t => (
           <button key={t.key} type="button" onClick={() => setTab(t.key)}
-            className={`whitespace-nowrap px-5 py-3.5 text-[11px] font-bold tracking-widest transition-all border-b-2 relative ${
+            className={`whitespace-nowrap px-6 py-4 text-xs font-bold tracking-widest transition-all border-b-2 relative ${
               tab === t.key
                 ? 'border-indigo-500 text-indigo-600'
                 : 'border-transparent text-slate-400 hover:text-slate-600'
@@ -433,7 +433,7 @@ function DetailPanel({ item, onBack, onRefresh }: {
       </div>
 
       {/* Tab content */}
-      <div className="flex-1 overflow-y-auto p-4">
+      <div className="flex-1 overflow-y-auto p-4 sm:p-5">
         {tab === 'trip' && <TripInfoTab item={item} onComplete={() => setShowComplete(true)} />}
         {tab === 'driver' && <DriverInfoTab item={item} />}
         {tab === 'expense' && <ExpenseInfoTab item={item} />}
@@ -480,43 +480,43 @@ export function TrackingPage() {
   return (
     <div className="flex h-full overflow-hidden relative">
       {/* LEFT: list panel */}
-      <div className={`flex w-full lg:w-72 xl:w-80 shrink-0 flex-col border-r border-slate-200 bg-white transition-all ${
+      <div className={`flex w-full lg:w-80 xl:w-96 shrink-0 flex-col border-r border-slate-200 bg-white transition-all ${
         selectedIdx !== null ? 'hidden lg:flex' : 'flex'
       }`}>
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-slate-200 px-5 py-3.5 shrink-0">
+        <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4 shrink-0">
           <div className="flex items-center gap-2">
-            <h2 className="text-[13px] font-bold text-slate-800 uppercase tracking-wider">Active Trips</h2>
+            <h2 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Active Trips</h2>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2.5">
             <button type="button" onClick={load} 
-              className="flex h-8 w-8 items-center justify-center text-indigo-500 hover:bg-indigo-50 rounded-full transition-all active:scale-95 active:rotate-180"
+              className="flex h-9 w-9 items-center justify-center text-indigo-500 hover:bg-indigo-50 rounded-full transition-all active:scale-95 active:rotate-180"
               title="Refresh tracking data">
-              <RefreshCw className="h-4 w-4" />
+              <RefreshCw className="h-5 w-5" />
             </button>
-            <span className="rounded-full bg-indigo-50 px-2.5 py-0.5 text-xs font-bold text-indigo-600">
+            <span className="rounded-full bg-indigo-50 px-3 py-1 text-sm font-bold text-indigo-600">
               {vehicles.length}
             </span>
           </div>
         </div>
 
         {/* List */}
-        <div className="flex-1 space-y-2 overflow-y-auto p-3">
+        <div className="flex-1 space-y-2.5 overflow-y-auto p-4">
           {loading ? (
             Array.from({ length: 6 }).map((_, i) => (
               <TrackingCardSkeleton key={i} />
             ))
           ) : error ? (
             <div className="flex flex-col items-center gap-3 py-12">
-              <AlertTriangle className="h-10 w-10 text-red-300" />
-              <p className="text-sm text-red-500">{error}</p>
-              <button type="button" onClick={load} className="text-xs text-indigo-500 underline">Retry</button>
+              <AlertTriangle className="h-12 w-12 text-red-300" />
+              <p className="text-base text-red-500">{error}</p>
+              <button type="button" onClick={load} className="text-sm text-indigo-500 underline">Retry</button>
             </div>
           ) : vehicles.length === 0 ? (
-            <div className="flex flex-col items-center gap-3 py-16 text-center">
-              <Navigation className="h-12 w-12 text-slate-300" />
-              <p className="text-sm font-medium text-slate-500">No active trips</p>
-              <p className="text-xs text-slate-400">Vehicles with in-progress or scheduled trips will appear here</p>
+            <div className="flex flex-col items-center gap-4 py-16 text-center">
+              <Navigation className="h-14 w-14 text-slate-300" />
+              <p className="text-base font-medium text-slate-500">No active trips</p>
+              <p className="text-sm text-slate-400">Vehicles with in-progress or scheduled trips will appear here</p>
             </div>
           ) : (
             vehicles.map((v, i) => (
@@ -536,9 +536,9 @@ export function TrackingPage() {
         ) : !loading ? (
           <div className="flex h-full items-center justify-center">
             <div className="text-center">
-              <Navigation className="mx-auto h-12 w-12 text-slate-300" />
-              <p className="mt-3 text-sm font-medium text-slate-500">No vehicle selected</p>
-              <p className="mt-1 text-xs text-slate-400">Select a vehicle from the list to view tracking details</p>
+              <Navigation className="mx-auto h-16 w-16 text-slate-300" />
+              <p className="mt-4 text-base font-medium text-slate-500">No vehicle selected</p>
+              <p className="mt-1.5 text-sm text-slate-400">Select a vehicle from the list to view tracking details</p>
             </div>
           </div>
         ) : null}

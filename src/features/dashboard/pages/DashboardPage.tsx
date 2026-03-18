@@ -96,29 +96,29 @@ export function DashboardPage() {
   return (
     <div className="space-y-6">
       {/* Welcome header */}
-      <div className="flex items-center justify-between rounded-xl border border-slate-200 bg-white px-5 py-4 shadow-sm">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-xl border border-slate-200 bg-white px-5 py-4 shadow-sm">
         <div className="flex items-center gap-4">
-          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-indigo-50">
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-indigo-50">
             <span className="text-xl text-indigo-500">📊</span>
           </div>
           <div>
-            <h2 className="text-lg font-semibold text-slate-900">
+            <h2 className="text-base sm:text-lg font-semibold text-slate-900 leading-tight">
               Welcome back{user?.name ? `, ${user.name}` : ''}!
             </h2>
-            <p className="text-xs text-slate-500">
+            <p className="text-xs text-slate-500 mt-0.5">
               Here&apos;s what&apos;s happening with your fleet today.
             </p>
           </div>
         </div>
-        <div className="text-xs text-slate-500">
-          {new Date().toLocaleString()}
+        <div className="text-[11px] sm:text-xs text-slate-400 font-medium bg-slate-50 px-3 py-1.5 rounded-lg self-start sm:self-auto border border-slate-100">
+          {new Date().toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}
         </div>
       </div>
 
       {error && <p className="text-xs text-red-600">{error}</p>}
 
       {/* Quick stats */}
-      <div className="grid gap-4 md:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-4">
         <StatCard
           label="Total Drivers"
           value={Number(drivers.total ?? 0)}
@@ -144,11 +144,11 @@ export function DashboardPage() {
       {/* Earnings summary + trips + alerts */}
       <div className="grid gap-4 lg:grid-cols-3">
         {/* Earnings summary */}
-        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm lg:col-span-1">
-          <div className="mb-3 flex items-center gap-2">
+        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm lg:col-span-1 flex flex-col">
+          <div className="mb-4 flex items-center gap-2">
             <span className="text-sm font-semibold text-slate-800">Earnings Summary</span>
           </div>
-          <div className="grid gap-3 md:grid-cols-3">
+          <div className="grid grid-cols-3 gap-2 sm:gap-3 flex-1">
             <EarningCard label="Today" amount={Number(earnings.today ?? 0)} />
             <EarningCard label="This Week" amount={Number(earnings.thisWeek ?? 0)} />
             <EarningCard label="This Month" amount={Number(earnings.thisMonth ?? 0)} />

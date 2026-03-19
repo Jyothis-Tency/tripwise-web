@@ -10,7 +10,10 @@ import {
   History,
   TrendingUp,
   X,
+  LogOut,
+  User,
 } from 'lucide-react';
+import { useAuth } from '../hooks/useAuth';
 
 const menuItems = [
   { label: 'Dashboard', path: '/', icon: LayoutDashboard },
@@ -25,6 +28,8 @@ const menuItems = [
 ];
 
 export function Sidebar({ onClose }: { onClose?: () => void }) {
+  const { user, logout } = useAuth();
+  
   return (
     <aside className="flex h-full w-64 shrink-0 flex-col border-r border-slate-200 bg-white">
       {/* Logo */}
@@ -72,6 +77,31 @@ export function Sidebar({ onClose }: { onClose?: () => void }) {
           );
         })}
       </nav>
+
+      {/* User & Sign Out Footer */}
+      <div className="border-t border-slate-200 p-4 shrink-0">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2 overflow-hidden">
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-indigo-100 text-indigo-600">
+              <User className="h-4 w-4" />
+            </span>
+            <div className="truncate text-sm font-medium text-slate-700">
+              {user?.name ?? user?.email ?? 'Owner'}
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              logout();
+              onClose?.();
+            }}
+            title="Sign out"
+            className="flex shrink-0 items-center justify-center rounded-lg p-2 text-slate-400 hover:bg-red-50 hover:text-red-600 transition-colors"
+          >
+            <LogOut className="h-4 w-4" />
+          </button>
+        </div>
+      </div>
     </aside>
   );
 }

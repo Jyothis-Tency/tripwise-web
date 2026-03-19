@@ -279,6 +279,7 @@ function ExpenseInfoTab({ item }: { item: TrackingVehicle }) {
         <InfoRow label="Cab Cost" value={`₹${cabCost.toLocaleString('en-IN')}`} />
         <div className="border-t border-slate-100 my-1" />
         <InfoRow label="Owner Profit" value={`₹${ownerProfit.toLocaleString('en-IN')}`} valueColor="text-emerald-600 font-bold" />
+        <InfoRow label="Advance" value={`₹${(trip.advance != null ? Number(trip.advance) : 0).toLocaleString('en-IN')}`} />
       </InfoCard>
 
       <InfoCard title="Cab Expenses Breakdown">

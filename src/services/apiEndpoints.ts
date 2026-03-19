@@ -19,8 +19,8 @@ export const ApiEndpoints = {
   vehicleHistory: (id: string) => `/owners/vehicles/${id}/history`,
   vehicleExpenses: (id: string) => `/owners/vehicles/${id}/expenses`,
   vehicleExpenseAction: (vehicleId: string, expenseId: string) => `/owners/vehicles/${vehicleId}/expenses/${expenseId}`,
-  assignDriver: (vehicleId: string) => `/owners/vehicles/${vehicleId}/assign-driver`,
-  unassignDriver: (vehicleId: string) => `/owners/vehicles/${vehicleId}/unassign-driver`,
+  assignDriver: (vehicleId: string) => `/owners/vehicles/assign-driver/${vehicleId}`,
+  unassignDriver: (vehicleId: string) => `/owners/vehicles/unassign-driver/${vehicleId}`,
 
   // DRIVERS
   drivers: '/owners/drivers',

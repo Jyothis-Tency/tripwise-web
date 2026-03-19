@@ -49,6 +49,7 @@ export interface TripItem {
   cabCost?: number;
   agencyName?: string;
   ownerProfit?: number | string;
+  advance?: number;
   notes?: string;
   careOf?: {
     name?: string;
@@ -91,10 +92,31 @@ export interface HistoryTripItem {
   from?: string;
   to?: string;
   status?: string;
-  amount?: number;
   departureDate?: string;
+  startDate?: string;
   completedAt?: string;
   driverName?: string;
+  distance?: string | number;
+  startKilometers?: number;
+  endKilometers?: number;
+  totalExpenses?: number;
+  driver_salary?: number;
+  ownerProfit?: number;
+  agencyCost?: number;
+  cabCost?: number;
+  driver?: {
+    _id?: string;
+    firstName?: string;
+    lastName?: string;
+    phone?: string;
+    email?: string;
+  } | string | null;
+  vehicle?: {
+    _id?: string;
+    vehicleNumber?: string;
+    vehicleModel?: string;
+    vehicleType?: string;
+  } | string | null;
 }
 
 // ─── Mappers ──────────────────────────────────────────────────────────────────
@@ -117,6 +139,7 @@ function mapTrip(t: any): TripItem {
     cabCost: t.cabCost,
     agencyName: t.agencyName,
     ownerProfit: t.ownerProfit,
+    advance: t.advance,
     notes: t.notes,
     careOf: t.careOf,
     driver: t.driver ?? null,
@@ -238,27 +261,90 @@ export async function updateVehicle(
 
 // ─── Vehicle History & Expenses ───────────────────────────────────────────────
 
-export async function fetchVehicleHistory(vehicleId: string): Promise<HistoryTripItem[]> {
-  const res = await apiClient.get(ApiEndpoints.vehicleHistory(vehicleId));
+export interface VehicleHistoryResponse {
+  vehicle?: any;
+  trips: HistoryTripItem[];
+  tripStats?: {
+    total?: number;
+    scheduled?: number;
+    inProgress?: number;
+    completed?: number;
+    cancelled?: number;
+  };
+  financialStats?: {
+    totalRevenue?: number;
+    totalDriverSalary?: number;
+    ownerRevenue?: number;
+    totalExpenses?: number;
+    vehicleExpenses?: number;
+  };
+  pagination?: {
+    current?: number;
+    pages?: number;
+    total?: number;
+  };
+}
+
+export async function fetchVehicleHistoryDetailed(params: {
+  vehicleId: string;
+  page?: number;
+  limit?: number;
+  status?: string;
+  startDate?: string; // YYYY-MM-DD
+  endDate?: string; // YYYY-MM-DD
+}): Promise<VehicleHistoryResponse> {
+  const {
+    vehicleId,
+    page = 1,
+    limit = 10,
+    status,
+    startDate,
+    endDate,
+  } = params;
+
+  const clean: Record<string, string | number> = { page, limit };
+  if (status && status !== 'all') clean.status = status;
+  if (startDate) clean.startDate = startDate;
+  if (endDate) clean.endDate = endDate;
+
+  const res = await apiClient.get(ApiEndpoints.vehicleHistory(vehicleId), { params: clean });
   const raw: any = res.data ?? {};
-  const root = raw.data ?? raw;
-  const list: any[] = Array.isArray(root) ? root : root.trips ?? root.history ?? root.documents ?? [];
-  return list.map((t: any) => ({
-    _id: t._id ?? t.id ?? '',
-    tripNumber: t.tripNumber,
-    from: t.from,
-    to: t.to,
-    status: t.status,
-    amount: t.amount ?? t.fare,
-    departureDate: t.departureDate ?? t.date,
-    completedAt: t.completedAt ?? t.updatedAt,
-    driverName:
-      (
-        t.driver?.fullName ??
-        t.driver?.name ??
-        `${t.driver?.firstName ?? ''} ${t.driver?.lastName ?? ''}`.trim()
-      ) || t.driverName,
-  }));
+  const data = raw.data ?? raw;
+
+  const tripsRaw: any[] = Array.isArray(data.trips) ? data.trips : [];
+
+  return {
+    vehicle: data.vehicle,
+    tripStats: data.tripStats,
+    financialStats: data.financialStats,
+    pagination: data.pagination,
+    trips: tripsRaw.map((t: any) => ({
+      _id: t._id ?? t.id ?? '',
+      tripNumber: t.tripNumber,
+      from: t.from,
+      to: t.to,
+      status: t.status,
+      startDate: t.startDate ?? t.departureDate ?? t.date,
+      departureDate: t.departureDate ?? t.date,
+      completedAt: t.completedAt ?? t.updatedAt,
+      distance: t.distance,
+      startKilometers: t.startKilometers,
+      endKilometers: t.endKilometers,
+      totalExpenses: t.totalExpenses,
+      driver_salary: t.driver_salary,
+      ownerProfit: t.ownerProfit,
+      agencyCost: t.agencyCost,
+      cabCost: t.cabCost,
+      driverName:
+        (
+          t.driver?.fullName ??
+          t.driver?.name ??
+          `${t.driver?.firstName ?? ''} ${t.driver?.lastName ?? ''}`.trim()
+        ) || t.driverName,
+      driver: t.driver ?? null,
+      vehicle: t.vehicle ?? null,
+    })),
+  };
 }
 
 export async function fetchVehicleExpenses(vehicleId: string): Promise<ExpenseItem[]> {
@@ -353,7 +439,7 @@ export async function fetchDriversList(): Promise<DriverItem[]> {
 }
 
 export async function assignDriverToVehicle(vehicleId: string, driverId: string): Promise<void> {
-  await apiClient.post(ApiEndpoints.assignDriver(vehicleId), { driverId });
+  await apiClient.put(ApiEndpoints.assignDriver(vehicleId), { driverId });
 }
 
 export async function unassignDriverFromVehicle(vehicleId: string): Promise<void> {
@@ -384,6 +470,7 @@ export async function createTrip(payload: {
   cabCost?: number | string;
   agencyName?: string;
   ownerProfit?: number | string;
+  advance?: number | string;
   amount?: number;
   notes?: string;
   careOf?: { name?: string; phone?: string };
@@ -393,6 +480,13 @@ export async function createTrip(payload: {
     ...rest,
     vehicle: vehicleId,
   });
+  const raw: any = res.data ?? {};
+  const data = raw.data ?? raw;
+  return mapTrip(data);
+}
+
+export async function fetchTripById(tripId: string): Promise<TripItem> {
+  const res = await apiClient.get(ApiEndpoints.tripById(tripId));
   const raw: any = res.data ?? {};
   const data = raw.data ?? raw;
   return mapTrip(data);
@@ -413,6 +507,7 @@ export async function updateTrip(
     cabCost?: number | string;
     agencyName?: string;
     ownerProfit?: number | string;
+    advance?: number | string;
     amount?: number;
     notes?: string;
     status?: string;

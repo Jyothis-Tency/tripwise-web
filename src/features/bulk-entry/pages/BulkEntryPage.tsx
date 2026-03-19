@@ -50,17 +50,7 @@ const AUTOSAVE_DELAY = 800; // ms after last keystroke
 function calculateBalanceAmount(grandTotal: number, advancePaid: number): number {
   const gt = typeof grandTotal === 'number' ? grandTotal : parseFloat(String(grandTotal)) || 0;
   const adv = typeof advancePaid === 'number' ? advancePaid : parseFloat(String(advancePaid)) || 0;
-
-  if (gt > 0 && adv > 0) {
-    return Math.max(gt - adv, 0);
-  }
-  if (gt > 0 && adv === 0) {
-    return gt;
-  }
-  if (gt === 0 && adv > 0) {
-    return adv;
-  }
-  return 0;
+  return Math.max(gt - adv, 0);
 }
 
 /** Simple hash for fast equality check */
@@ -253,10 +243,11 @@ const CellInput = memo(function CellInput({ value, onChange, placeholder, type =
 // BULK ENTRY TABLE
 // ═══════════════════════════════════════════════════════════════════════════════
 
-function BulkEntryTable({ groups, onChange, onDeleteTrip }: {
+function BulkEntryTable({ groups, onChange, onDeleteTrip, onDeleteTrips }: {
   groups: DriverGroup[];
   onChange: Dispatch<SetStateAction<DriverGroup[]>>;
   onDeleteTrip: (id: string) => Promise<void> | void;
+  onDeleteTrips?: (ids: string[]) => Promise<void> | void;
 }) {
   const updateGroupField = useCallback((gi: number, field: keyof DriverGroup, val: any) => {
     onChange(prev => {
@@ -338,10 +329,19 @@ function BulkEntryTable({ groups, onChange, onDeleteTrip }: {
       removeGroup(gi);
       return;
     }
-    // Best-effort: delete saved rows, then remove group locally
-    await Promise.allSettled(ids.map(id => Promise.resolve(onDeleteTrip(String(id)))));
-    removeGroup(gi);
-  }, [groups, onDeleteTrip, removeGroup]);
+    try {
+      // Prefer batch delete confirmation (single modal) for saved groups.
+      if (onDeleteTrips) {
+        await onDeleteTrips(ids.map(String));
+      } else {
+        // Fallback: sequential delete to reduce chance of missed deletes.
+        for (const id of ids) await Promise.resolve(onDeleteTrip(String(id)));
+      }
+      removeGroup(gi);
+    } catch {
+      // Silent: cancellation or failure means we keep local group.
+    }
+  }, [groups, onDeleteTrip, removeGroup, onDeleteTrips]);
 
   return (
     <div className="space-y-4">
@@ -789,6 +789,12 @@ export function BulkEntryPage() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showDropdown, setShowDropdown] = useState(false);
 
+  // Delete confirmations (prevents rapid double-deletes & gives server time)
+  type PendingDelete = { ids: string[]; title: string; message: string };
+  const [pendingDelete, setPendingDelete] = useState<PendingDelete | null>(null);
+  const [deleteInFlight, setDeleteInFlight] = useState(false);
+  const deletePromiseRef = useRef<{ resolve: () => void; reject: (err?: any) => void } | null>(null);
+
   // State — mode
   const [isBulkMode, setIsBulkMode] = useState(() => {
     try {
@@ -1064,12 +1070,65 @@ export function BulkEntryPage() {
       }
     } catch { /* silent */ }
   }, [selectedId, isBulkMode, selectedAgency]);
-  const handleDeleteTrip = useCallback(async (id: string) => {
-    if (!id) return;
-    if (isBulkMode) await deleteBulkEntryTrip(id);
-    else await deleteNormalEntryTrip(id);
+
+  const performDeleteTrips = useCallback(async (ids: string[]) => {
+    const uniq = Array.from(new Set((ids ?? []).map(String).filter(Boolean)));
+    for (const id of uniq) {
+      if (isBulkMode) await deleteBulkEntryTrip(id);
+      else await deleteNormalEntryTrip(id);
+    }
     await loadTrips();
   }, [isBulkMode, loadTrips]);
+
+  const requestDeleteTrips = useCallback((ids: string[], title: string, message: string) => {
+    const cleanIds = Array.from(new Set((ids ?? []).map(String).filter(Boolean)));
+    if (cleanIds.length === 0) return Promise.reject(new Error('No items to delete'));
+    if (deleteInFlight || deletePromiseRef.current) {
+      return Promise.reject(new Error('Deletion already in progress'));
+    }
+    return new Promise<void>((resolve, reject) => {
+      deletePromiseRef.current = { resolve, reject };
+      setPendingDelete({ ids: cleanIds, title, message });
+    });
+  }, [deleteInFlight]);
+
+  const confirmDelete = useCallback(async () => {
+    const req = pendingDelete;
+    const pending = deletePromiseRef.current;
+    if (!req || !pending) return;
+    setDeleteInFlight(true);
+    try {
+      await performDeleteTrips(req.ids);
+      pending.resolve();
+    } catch (e: any) {
+      pending.reject(e);
+      const msg = e?.response?.data?.message ?? e?.message ?? 'Failed to delete';
+      alert(msg);
+    } finally {
+      deletePromiseRef.current = null;
+      setDeleteInFlight(false);
+      setPendingDelete(null);
+    }
+  }, [pendingDelete, performDeleteTrips]);
+
+  const cancelDelete = useCallback(() => {
+    const pending = deletePromiseRef.current;
+    deletePromiseRef.current = null;
+    setDeleteInFlight(false);
+    setPendingDelete(null);
+    pending?.reject(new Error('cancelled'));
+  }, []);
+
+  const handleDeleteTrip = useCallback(
+    (id: string) => requestDeleteTrips([id], 'Delete saved trip', 'Delete this trip? This cannot be undone.'),
+    [requestDeleteTrips],
+  );
+
+  const handleDeleteTrips = useCallback(
+    (ids: string[]) =>
+      requestDeleteTrips(ids, 'Delete saved trips', `Delete ${ids.length} trip(s)? This cannot be undone.`),
+    [requestDeleteTrips],
+  );
 
   useEffect(() => { loadTrips(); }, [loadTrips]);
 
@@ -1206,7 +1265,7 @@ export function BulkEntryPage() {
             <p className="text-sm text-slate-400">Choose from the dropdown above, or create a new agency.</p>
           </div>
         ) : isBulkMode ? (
-          <BulkEntryTable groups={bulkGroups} onChange={setBulkGroups} onDeleteTrip={handleDeleteTrip} />
+          <BulkEntryTable groups={bulkGroups} onChange={setBulkGroups} onDeleteTrip={handleDeleteTrip} onDeleteTrips={handleDeleteTrips} />
         ) : (
           <NormalEntryTable entries={normalEntries} onChange={setNormalEntries} onDeleteTrip={handleDeleteTrip} />
         )}
@@ -1222,6 +1281,31 @@ export function BulkEntryPage() {
             selectAgency(a._id ?? a.id ?? '');
           }}
         />
+      )}
+      {pendingDelete && (
+        <ModalShell title={pendingDelete.title} onClose={cancelDelete} maxWidth="max-w-sm">
+          <div className="p-6 space-y-4">
+            <p className="text-sm text-slate-700">{pendingDelete.message}</p>
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={cancelDelete}
+                disabled={deleteInFlight}
+                className="rounded-lg border border-slate-200 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={confirmDelete}
+                disabled={deleteInFlight}
+                className="rounded-lg bg-red-500 px-5 py-2 text-sm font-semibold text-white hover:bg-red-600 disabled:opacity-50"
+              >
+                {deleteInFlight ? 'Deleting…' : 'Delete'}
+              </button>
+            </div>
+          </div>
+        </ModalShell>
       )}
     </div>
   );

@@ -33,7 +33,10 @@ export const TopRoutes: React.FC<TopRoutesProps> = ({ routes }) => {
 
             <div className="flex-1 min-w-0">
               <h4 className="truncate text-xs sm:text-sm font-semibold text-slate-900">{route.route}</h4>
-              <p className="text-[10px] sm:text-xs text-slate-500 whitespace-nowrap overflow-hidden text-ellipsis">
+              <p className="text-[10px] sm:text-[11px] font-medium text-indigo-500 truncate mb-0.5">
+                {route.driverName || 'Driver N/A'} • {route.vehicleName || 'Vehicle N/A'}
+              </p>
+              <p className="text-[10px] sm:text-xs text-slate-500 whitespace-nowrap overflow-hidden text-ellipsis mt-0.5">
                 {route.trips} {route.trips === 1 ? 'trip' : 'trips'} <span className="hidden sm:inline">• Avg: ₹{Math.round(route.avgRevenue).toLocaleString()}</span>
               </p>
             </div>

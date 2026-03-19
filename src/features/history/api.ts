@@ -42,6 +42,7 @@ export interface HistoryTrip {
   agencyCost?: number;
   cabCost?: number;
   driver_salary?: number;
+  advance?: number;
   totalExpenses?: number;
   ownerProfit?: number;
   paidAmount?: number;

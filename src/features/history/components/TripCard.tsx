@@ -55,7 +55,7 @@ function getTripStatusStyle(status: string): string {
 }
 
 const NUMBER_FIELDS = new Set([
-  'distance', 'agencyCost', 'cabCost', 'driver_salary',
+  'distance', 'agencyCost', 'cabCost', 'driver_salary', 'advance',
   'startKilometers', 'endKilometers',
 ]);
 
@@ -88,7 +88,14 @@ function EditableRow({
     try {
       let val: string | number = editValue;
       if (NUMBER_FIELDS.has(fieldKey)) {
-        val = parseFloat(editValue) || 0;
+        const parsed = Number(editValue);
+        if (editValue.trim() === '' || !Number.isFinite(parsed)) {
+          throw new Error('Enter a valid number');
+        }
+        if (parsed < 0) {
+          throw new Error('Negative values are not allowed');
+        }
+        val = parsed;
       }
       await updateTripFields(tripId, { [fieldKey]: val } as any);
       // Update locally — no full page reload
@@ -101,7 +108,7 @@ function EditableRow({
       setEditing(false);
       onSaved();
     } catch (err: any) {
-      alert(err?.response?.data?.message || 'Failed to update field');
+      alert(err?.message || err?.response?.data?.message || 'Failed to update field');
     } finally {
       setSaving(false);
     }
@@ -387,6 +394,7 @@ export function TripCard({ trip, onDeleted, onPaymentRecorded }: TripCardProps) 
                 {E('Agency Cost', fmtCurrency(trip.agencyCost), 'agencyCost')}
                 {E('Cab Cost', fmtCurrency(trip.cabCost), 'cabCost')}
                 {E('Driver Salary', fmtCurrency(trip.driver_salary), 'driver_salary')}
+                {E('Advance', fmtCurrency(trip.advance), 'advance')}
                 <DetailRow label="Total Expenses" value={fmtCurrency(trip.totalExpenses)} />
                 <DetailRow label="Owner Profit" value={fmtCurrency(trip.ownerProfit)} highlight />
               </div>

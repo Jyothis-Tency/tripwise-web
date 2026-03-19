@@ -2,14 +2,11 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Car,
   ChevronRight,
-  ClipboardList,
   History,
   Pencil,
   Plus,
-  Route,
   Search,
   UserCheck,
-  UserMinus,
   UserPlus,
   AlertTriangle,
   CheckCircle2,
@@ -18,10 +15,12 @@ import {
   Trash2,
   ArrowLeft,
   X,
+  Loader2,
 } from 'lucide-react';
 import {
   fetchVehicles,
-  fetchVehicleHistory,
+  fetchVehicleById,
+  fetchVehicleHistoryDetailed,
   fetchVehicleExpenses,
   fetchDriversList,
   createVehicle,
@@ -32,6 +31,7 @@ import {
   unassignDriverFromTripApi,
   createTrip,
   updateTrip,
+  fetchTripById,
   cancelTrip,
   createVehicleExpense,
   updateVehicleExpense,
@@ -41,6 +41,7 @@ import {
   type DriverItem,
   type ExpenseItem,
   type HistoryTripItem,
+  type VehicleHistoryResponse,
 } from '../api';
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -157,8 +158,12 @@ function VehicleCard({ vehicle, isSelected, onSelect, onEdit }: {
   const tripTo = vehicle.tripTo ?? trip?.to;
 
   return (
-    <button type="button" onClick={onSelect}
-      className={`w-full rounded-xl border p-3 text-left transition-all ${isSelected ? 'border-indigo-400 bg-indigo-50 shadow-sm' : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'}`}
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={onSelect}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onSelect(); }}
+      className={`w-full rounded-xl border p-3 text-left transition-all cursor-pointer ${isSelected ? 'border-indigo-400 bg-indigo-50 shadow-sm' : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'}`}
     >
       <div className="flex items-start gap-3">
         <div className="flex h-10 w-12 shrink-0 items-center justify-center rounded-lg bg-indigo-100">
@@ -190,7 +195,7 @@ function VehicleCard({ vehicle, isSelected, onSelect, onEdit }: {
           )}
         </div>
       </div>
-    </button>
+    </div>
   );
 }
 
@@ -297,6 +302,36 @@ function VehicleModal({ vehicle, onClose, onSaved }: { vehicle?: Vehicle | null;
 // TRIP FORM MODAL (Start / Update)
 // ═══════════════════════════════════════════════════════════════════════════════
 
+function UpdateTripWrapper({ vehicleId, tripId, onClose, onSaved }: {
+  vehicleId: string; tripId: string; onClose: () => void; onSaved: (t: TripItem) => void;
+}) {
+  const [trip, setTrip] = useState<TripItem | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetchTripById(tripId)
+      .then(setTrip)
+      .catch((err: any) => setError(err?.response?.data?.message ?? 'Failed to load trip details'));
+  }, [tripId]);
+
+  if (error) {
+    return (
+      <ModalShell title="Error" onClose={onClose} maxWidth="max-w-md">
+        <div className="p-6 text-center text-red-600">{error}</div>
+      </ModalShell>
+    );
+  }
+  if (!trip) {
+    return (
+      <ModalShell title="Loading..." onClose={onClose} maxWidth="max-w-md">
+        <div className="p-8 flex justify-center"><Loader2 className="h-6 w-6 animate-spin text-indigo-500" /></div>
+      </ModalShell>
+    );
+  }
+
+  return <TripFormModal vehicleId={vehicleId} trip={trip} onClose={onClose} onSaved={onSaved} />;
+}
+
 function TripFormModal({ vehicleId, trip, onClose, onSaved }: {
   vehicleId: string; trip?: TripItem | null; onClose: () => void;
   onSaved: (t: TripItem) => void;
@@ -318,6 +353,7 @@ function TripFormModal({ vehicleId, trip, onClose, onSaved }: {
     agencyName: trip?.agencyName ?? '',
     agencyCost: trip?.agencyCost?.toString() ?? trip?.amount?.toString() ?? '',
     cabCost: trip?.cabCost?.toString() ?? '',
+    advance: trip?.advance?.toString() ?? '',
     notes: trip?.notes ?? '',
   });
 
@@ -344,6 +380,7 @@ function TripFormModal({ vehicleId, trip, onClose, onSaved }: {
         agencyName: form.agencyName.trim() || undefined,
         agencyCost: form.agencyCost ? parseFloat(form.agencyCost) : undefined,
         cabCost: form.cabCost ? parseFloat(form.cabCost) : undefined,
+        advance: form.advance ? parseFloat(form.advance) : undefined,
         ownerProfit: profit,
         amount: form.agencyCost ? parseFloat(form.agencyCost) : undefined, // Fallback
         notes: form.notes.trim() || undefined,
@@ -399,7 +436,7 @@ function TripFormModal({ vehicleId, trip, onClose, onSaved }: {
           </div>
 
           <fieldset className="rounded-lg border border-slate-200 p-4">
-            <legend className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 px-1 -ml-1 text-indigo-500 flex items-center gap-1">
+            <legend className="text-[11px] font-semibold uppercase tracking-wide px-1 -ml-1 text-indigo-500 flex items-center gap-1">
               <UserCheck className="h-3.5 w-3.5" /> Care Of Details
             </legend>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 mt-2">
@@ -418,6 +455,9 @@ function TripFormModal({ vehicleId, trip, onClose, onSaved }: {
             </Field>
             <Field label="Cab Cost (₹)" id="tcabC">
               <input id="tcabC" type="number" step="0.01" value={form.cabCost} onChange={set('cabCost')} className={inputCls} placeholder="0.00" />
+            </Field>
+            <Field label="Advance (₹)" id="tadvance">
+              <input id="tadvance" type="number" step="0.01" value={form.advance} onChange={set('advance')} className={inputCls} placeholder="0.00" />
             </Field>
           </div>
 
@@ -591,57 +631,275 @@ function DriverAssignModal({ vehicleId, tripId, currentDriverName, onClose, onAs
 // ═══════════════════════════════════════════════════════════════════════════════
 
 function VehicleHistoryModal({ vehicle, onClose }: { vehicle: Vehicle; onClose: () => void }) {
-  const [history, setHistory] = useState<HistoryTripItem[]>([]);
-  const [loading, setLoading] = useState(true);
+  const STATUS_OPTIONS = ['all', 'completed', 'in_progress', 'scheduled', 'cancelled'] as const;
+
+  const [selectedStatus, setSelectedStatus] = useState<(typeof STATUS_OPTIONS)[number]>('all');
+  const [startDate, setStartDate] = useState<string>(''); // YYYY-MM-DD
+  const [endDate, setEndDate] = useState<string>(''); // YYYY-MM-DD
+
+  const [page, setPage] = useState<number>(1);
+  const limit = 10;
+
+  const [historyData, setHistoryData] = useState<VehicleHistoryResponse | null>(null);
+  const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
+  const loadHistory = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetchVehicleHistoryDetailed({
+        vehicleId: vehicle._id,
+        page,
+        limit,
+        status: selectedStatus,
+        startDate: startDate || undefined,
+        endDate: endDate || undefined,
+      });
+      setHistoryData(res);
+    } catch (e: any) {
+      setError(e?.response?.data?.message ?? e?.message ?? 'Failed to load history');
+    } finally {
+      setLoading(false);
+    }
+  }, [vehicle._id, page, limit, selectedStatus, startDate, endDate]);
+
   useEffect(() => {
-    fetchVehicleHistory(vehicle._id)
-      .then(setHistory)
-      .catch(() => setError('Failed to load history'))
-      .finally(() => setLoading(false));
-  }, [vehicle._id]);
+    loadHistory();
+  }, [loadHistory]);
+
+  const trips = historyData?.trips ?? [];
+  const pagination = historyData?.pagination;
+  const tripStats = historyData?.tripStats;
+  const financialStats = historyData?.financialStats;
+
+  const formatMoney0 = (v: any) => {
+    const n = Number(v);
+    if (!Number.isFinite(n)) return '—';
+    return `₹${Math.round(n).toLocaleString('en-IN')}`;
+  };
+
+  const resolveDriverName = (t: HistoryTripItem) => {
+    if (typeof t.driverName === 'string' && t.driverName.trim()) return t.driverName;
+    const dr = t.driver;
+    if (!dr) return '—';
+    if (typeof dr === 'string') return dr;
+    const first = dr.firstName ?? '';
+    const last = dr.lastName ?? '';
+    const nm = `${first} ${last}`.trim();
+    return nm || '—';
+  };
+
+  const kmTravelledText = (t: HistoryTripItem) => {
+    const s = Number(t.startKilometers);
+    const e = Number(t.endKilometers);
+    const hasS = Number.isFinite(s);
+    const hasE = Number.isFinite(e);
+    if (hasS && hasE) return `${Math.max(e - s, 0)} km travelled`;
+    if (hasS) return `Start: ${s} km`;
+    if (hasE) return `End: ${e} km`;
+    return '—';
+  };
+
+  const canPrev = (pagination?.current ?? 1) > 1;
+  const canNext = pagination?.pages != null ? (pagination.current ?? 1) < pagination.pages : false;
 
   return (
     <ModalShell title={`Vehicle History — ${vehicle.vehicleNumber}`} onClose={onClose} maxWidth="max-w-2xl">
-      <div className="p-4">
+      <div className="p-4 space-y-4">
+        {/* Filters (old Flutter parity) */}
+        <div className="space-y-3">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
+            <div className="w-full sm:w-40">
+              <label className="text-xs font-medium text-slate-600">Status</label>
+              <select
+                value={selectedStatus}
+                onChange={(e) => {
+                  setSelectedStatus(e.target.value as any);
+                  setPage(1);
+                }}
+                className={inputCls}
+                style={{ paddingTop: 8, paddingBottom: 8 }}
+              >
+                <option value="all">All</option>
+                <option value="completed">Completed</option>
+                <option value="in_progress">In Progress</option>
+                <option value="scheduled">Scheduled</option>
+                <option value="cancelled">Cancelled</option>
+              </select>
+            </div>
+
+            <div className="w-full sm:flex-1">
+              <label className="text-xs font-medium text-slate-600">From Date</label>
+              <input
+                type="date"
+                value={startDate}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  setStartDate(v);
+                  setPage(1);
+                  if (v && endDate && new Date(endDate) < new Date(v)) setEndDate('');
+                }}
+                className={inputCls}
+              />
+            </div>
+
+            <div className="w-full sm:flex-1">
+              <label className="text-xs font-medium text-slate-600">To Date</label>
+              <input
+                type="date"
+                value={endDate}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  setEndDate(v);
+                  setPage(1);
+                  if (v && startDate && new Date(v) < new Date(startDate)) setStartDate('');
+                }}
+                className={inputCls}
+              />
+            </div>
+          </div>
+
+          {tripStats?.completed != null && (
+            <p className="text-xs text-slate-500">
+              {tripStats?.completed ?? 0} completed trips
+            </p>
+          )}
+        </div>
+
+        {/* Statistics banner */}
+        {financialStats && (
+          <section className="rounded-xl border border-slate-200 bg-indigo-50 p-4">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              <div className="rounded-lg border border-indigo-200 bg-white p-3">
+                <div className="text-[11px] font-semibold uppercase tracking-wide text-indigo-700">Total Revenue</div>
+                <div className="text-sm font-bold text-slate-900 mt-1">{formatMoney0(financialStats.totalRevenue)}</div>
+              </div>
+              <div className="rounded-lg border border-indigo-200 bg-white p-3">
+                <div className="text-[11px] font-semibold uppercase tracking-wide text-indigo-700">Driver Salary</div>
+                <div className="text-sm font-bold text-slate-900 mt-1">{formatMoney0(financialStats.totalDriverSalary)}</div>
+              </div>
+              <div className="rounded-lg border border-indigo-200 bg-white p-3">
+                <div className="text-[11px] font-semibold uppercase tracking-wide text-indigo-700">Owner Revenue</div>
+                <div className="text-sm font-bold text-slate-900 mt-1">{formatMoney0(financialStats.ownerRevenue)}</div>
+              </div>
+              <div className="rounded-lg border border-indigo-200 bg-white p-3 sm:col-span-2 lg:col-span-1">
+                <div className="text-[11px] font-semibold uppercase tracking-wide text-indigo-700">Trip Expense</div>
+                <div className="text-sm font-bold text-slate-900 mt-1">{formatMoney0(financialStats.totalExpenses)}</div>
+              </div>
+              <div className="rounded-lg border border-indigo-200 bg-white p-3 sm:col-span-2 lg:col-span-2">
+                <div className="text-[11px] font-semibold uppercase tracking-wide text-indigo-700">Vehicle Expenses</div>
+                <div className="text-sm font-bold text-slate-900 mt-1">{formatMoney0(financialStats.vehicleExpenses ?? 0)}</div>
+              </div>
+            </div>
+          </section>
+        )}
+
+        {/* Content */}
         {loading ? (
-          <div className="space-y-2">{Array.from({ length: 5 }).map((_, i) => <div key={i} className="h-10 animate-pulse rounded-lg bg-slate-100" />)}</div>
+          <div className="space-y-3">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <div key={i} className="animate-pulse rounded-xl border border-slate-200 bg-white p-4">
+                <div className="h-4 bg-slate-100 rounded w-1/2" />
+                <div className="h-3 bg-slate-100 rounded w-2/3 mt-3" />
+                <div className="h-3 bg-slate-100 rounded w-1/3 mt-3" />
+              </div>
+            ))}
+          </div>
         ) : error ? (
           <p className="py-6 text-center text-xs text-red-500">{error}</p>
-        ) : history.length === 0 ? (
+        ) : trips.length === 0 ? (
           <div className="flex flex-col items-center py-10 text-center">
             <History className="h-10 w-10 text-slate-300" />
             <p className="mt-2 text-sm text-slate-400">No trip history found</p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="min-w-full text-xs text-left">
-              <thead>
-                <tr className="border-b border-slate-200 text-[11px] uppercase tracking-wide text-slate-400">
-                  <th className="pb-2 pr-4">Trip #</th>
-                  <th className="pb-2 pr-4">Route</th>
-                  <th className="pb-2 pr-4">Date</th>
-                  <th className="pb-2 pr-4">Driver</th>
-                  <th className="pb-2 pr-4">Amount</th>
-                  <th className="pb-2">Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {history.map(t => (
-                  <tr key={t._id} className="border-b border-slate-100 last:border-0">
-                    <td className="py-2 pr-4 font-medium">{t.tripNumber ?? '—'}</td>
-                    <td className="py-2 pr-4">{t.from && t.to ? `${t.from} → ${t.to}` : '—'}</td>
-                    <td className="py-2 pr-4 whitespace-nowrap">{formatDate(t.departureDate)}</td>
-                    <td className="py-2 pr-4">{t.driverName ?? '—'}</td>
-                    <td className="py-2 pr-4">{t.amount != null ? `₹${t.amount.toLocaleString('en-IN')}` : '—'}</td>
-                    <td className="py-2">
-                      <span className={`rounded-full border px-2 py-0.5 capitalize ${statusBadgeCls(t.status)}`}>{t.status ?? '—'}</span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="space-y-3">
+            {trips.map((t, idx) => {
+              const currentPage = pagination?.current ?? page;
+              const offset = (currentPage - 1) * limit;
+              const rowNumber = offset + idx + 1;
+              const status = (t.status ?? '—').toString();
+              return (
+                <section key={t._id} className="rounded-xl border border-slate-200 bg-white p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-3">
+                        <div className="h-7 w-7 rounded-full bg-indigo-50 border border-indigo-200 flex items-center justify-center text-[11px] font-bold text-indigo-700 shrink-0">
+                          {rowNumber}
+                        </div>
+                        <div className="min-w-0">
+                          <div className="text-sm font-semibold text-slate-900 truncate">
+                            {t.tripNumber ?? '—'}
+                          </div>
+                          <div className="mt-0.5 text-[12px] text-slate-500">
+                            {t.from && t.to ? `${t.from} → ${t.to}` : '—'}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <span className={`rounded-full border px-2 py-0.5 capitalize text-[11px] ${statusBadgeCls(status)}`}>
+                      {status.replaceAll('_', ' ')}
+                    </span>
+                  </div>
+
+                  <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                    <div className="text-xs text-slate-600">
+                      <div>Distance: {t.distance ?? '—'}</div>
+                      <div className="text-indigo-700 font-medium mt-1">{kmTravelledText(t)}</div>
+                    </div>
+                    <div className="text-xs text-slate-600">
+                      <div>Date: {formatDate(t.startDate ?? t.departureDate)}</div>
+                      <div className="mt-1 flex items-center gap-2">
+                        <UserCheck className="h-4 w-4 text-slate-400" />
+                        <span className="truncate">Driver: {resolveDriverName(t)}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3">
+                    <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-2">
+                      <div className="text-[11px] font-semibold text-emerald-800">Driver Salary</div>
+                      <div className="text-sm font-bold text-slate-900 mt-1">{formatMoney0(t.driver_salary)}</div>
+                    </div>
+                    <div className="rounded-lg border border-amber-200 bg-amber-50 p-2">
+                      <div className="text-[11px] font-semibold text-amber-800">Trip Expense</div>
+                      <div className="text-sm font-bold text-slate-900 mt-1">{formatMoney0(t.totalExpenses)}</div>
+                    </div>
+                    <div className="rounded-lg border border-indigo-200 bg-indigo-50 p-2">
+                      <div className="text-[11px] font-semibold text-indigo-800">Owner Profit</div>
+                      <div className="text-sm font-bold text-slate-900 mt-1">{formatMoney0(t.ownerProfit)}</div>
+                    </div>
+                  </div>
+                </section>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Pagination */}
+        {pagination && (pagination.pages ?? 1) > 1 && (
+          <div className="flex items-center justify-between pt-2">
+            <button
+              type="button"
+              onClick={() => canPrev && setPage((p) => Math.max(1, p - 1))}
+              disabled={!canPrev}
+              className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+            >
+              Prev
+            </button>
+            <div className="text-xs text-slate-500">
+              Page {pagination.current ?? page} of {pagination.pages ?? 1}
+            </div>
+            <button
+              type="button"
+              onClick={() => canNext && setPage((p) => p + 1)}
+              disabled={!canNext}
+              className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+            >
+              Next
+            </button>
           </div>
         )}
       </div>
@@ -676,22 +934,36 @@ function BasicInfoTab({ vehicle }: { vehicle: Vehicle }) {
 interface TripDriverTabProps {
   vehicle: Vehicle;
   onStartTrip: () => void;
-  onUpdateTrip: (trip: TripItem) => void;
+  onUpdateTrip: (tripId: string) => void;
   onCancelTrip: (tripId: string) => void;
   onAssignDriver: (tripId?: string) => void;
   onUnassignDriver: (tripId?: string) => void;
 }
 
 function TripDriverTab({ vehicle, onStartTrip, onUpdateTrip, onCancelTrip, onAssignDriver, onUnassignDriver }: TripDriverTabProps) {
-  const [mode, setMode] = useState<'single' | 'multi'>('single');
   const [unassigning, setUnassigning] = useState(false);
   const [uErr, setUErr] = useState<string | null>(null);
 
-  const activeTrip: any = vehicle.activeTrip ?? vehicle.currentTrip ?? null;
-  const hasActiveTrip = activeTrip && typeof activeTrip === 'object' &&
+  const allTrips: TripItem[] = Array.isArray(vehicle.trips) ? vehicle.trips : [];
+
+  // Derive active trip on the client by preferring the most recent in_progress trip,
+  // then fall back to server-provided activeTrip/currentTrip for backward compatibility.
+  const inProgressTrips = allTrips
+    .filter(t => (t.status ?? '').toLowerCase() === 'in_progress')
+    .sort((a, b) => {
+      const da = a.departureDate ? new Date(a.departureDate).getTime() : 0;
+      const db = b.departureDate ? new Date(b.departureDate).getTime() : 0;
+      return db - da;
+    });
+
+  const derivedActive: any = inProgressTrips[0] ?? null;
+  const activeTrip: any = derivedActive ?? vehicle.activeTrip ?? vehicle.currentTrip ?? null;
+  const hasActiveTrip =
+    activeTrip &&
+    typeof activeTrip === 'object' &&
     !['cancelled', 'completed'].includes((activeTrip.status ?? '').toLowerCase());
 
-  const scheduledTrips: TripItem[] = (vehicle.trips ?? []).filter(t =>
+  const scheduledTrips: TripItem[] = allTrips.filter(t =>
     !['cancelled', 'completed'].includes((t.status ?? '').toLowerCase())
   );
 
@@ -709,159 +981,119 @@ function TripDriverTab({ vehicle, onStartTrip, onUpdateTrip, onCancelTrip, onAss
     } finally { setUnassigning(false); }
   };
 
+  const upcomingTrips = scheduledTrips.filter(t => t._id !== activeTrip?._id);
+  const activeTripDriver = activeTrip ? tripDriverName(activeTrip as TripItem) : null;
+
   return (
     <div className="space-y-4">
-      {/* Mode Toggle */}
-      <div className="flex rounded-lg border border-slate-200 bg-white overflow-hidden">
-        {([['single', 'Single Trip', Route], ['multi', 'Multiple Trips', ClipboardList]] as const).map(([val, label, Icon]) => (
-          <button key={val} type="button" onClick={() => setMode(val)}
-            className={`flex flex-1 items-center justify-center gap-2 py-2.5 text-sm font-medium transition ${
-              mode === val
-                ? 'bg-indigo-500 text-white'
-                : 'text-slate-500 hover:bg-slate-50'
-            }`}>
-            <Icon className="h-4 w-4" />
-            {label}
-          </button>
-        ))}
+      {uErr && <p className="text-xs text-red-500">{uErr}</p>}
+      {/* Active Trip Card */}
+      {hasActiveTrip && (
+        <section className="rounded-xl border border-indigo-100 bg-indigo-50 p-4">
+          <div className="flex items-start justify-between mb-2">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-indigo-400">Active Trip</p>
+              {activeTrip.tripNumber && <p className="text-sm font-bold text-slate-800 mt-0.5">Trip #{activeTrip.tripNumber}</p>}
+            </div>
+            <span className={`text-xs rounded-full border px-2 py-0.5 capitalize ${statusBadgeCls(activeTrip.status)}`}>
+              {activeTrip.status ?? '—'}
+            </span>
+          </div>
+          <div className="space-y-1 text-xs text-slate-600">
+            {activeTrip.from && activeTrip.to && (
+              <p className="flex items-center gap-1 font-medium">
+                <span>{activeTrip.from}</span>
+                <ChevronRight className="h-3.5 w-3.5 text-indigo-400" />
+                <span>{activeTrip.to}</span>
+              </p>
+            )}
+            {activeTrip.departureDate && <p>📅 {formatDate(activeTrip.departureDate)}</p>}
+            {activeTrip.amount != null && <p>💰 ₹{Number(activeTrip.amount).toLocaleString('en-IN')}</p>}
+            <p>👤 Driver: {activeTripDriver ?? 'Unassigned'}</p>
+          </div>
+          <div className="flex flex-wrap gap-2 mt-3">
+            <button type="button" onClick={() => onUpdateTrip(activeTrip._id ?? activeTrip.id ?? activeTrip.tripId)}
+              className="flex-1 rounded-lg border border-indigo-300 bg-white px-3 py-1.5 text-xs font-medium text-indigo-700 hover:bg-indigo-50">
+              Update
+            </button>
+            <button type="button" onClick={() => onCancelTrip(activeTrip._id ?? activeTrip.id ?? activeTrip.tripId)}
+              className="flex-1 rounded-lg border border-red-200 bg-white px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50">
+              Cancel Trip
+            </button>
+            {activeTripDriver ? (
+              <button
+                type="button"
+                onClick={() => handleUnassign(activeTrip._id ?? activeTrip.id ?? activeTrip.tripId)}
+                disabled={unassigning}
+                className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50"
+              >
+                Unassign Driver
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => onAssignDriver(activeTrip._id ?? activeTrip.id ?? activeTrip.tripId)}
+                className="rounded-lg border border-indigo-200 bg-white px-3 py-1.5 text-xs font-medium text-indigo-600 hover:bg-indigo-50"
+              >
+                Assign Driver
+              </button>
+            )}
+          </div>
+        </section>
+      )}
+
+      {/* Scheduled / Upcoming Trips Header */}
+      <div className="flex items-center justify-between pt-2">
+        <h4 className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Scheduled Trips</h4>
+        <button type="button" onClick={onStartTrip} className="flex items-center gap-1.5 rounded-lg bg-indigo-50 px-2.5 py-1.5 text-xs font-semibold text-indigo-600 hover:bg-indigo-100">
+          <Plus className="h-3.5 w-3.5" /> New Trip
+        </button>
       </div>
 
-      {mode === 'single' ? (
-        <div className="space-y-3">
-          {/* Active trip card or Start Trip */}
-          {hasActiveTrip ? (
-            <section className="rounded-xl border border-indigo-100 bg-indigo-50 p-4">
-              <div className="flex items-start justify-between mb-2">
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-indigo-400">Active Trip</p>
-                  {activeTrip.tripNumber && <p className="text-sm font-bold text-slate-800 mt-0.5">Trip #{activeTrip.tripNumber}</p>}
-                </div>
-                <span className={`text-xs rounded-full border px-2 py-0.5 capitalize ${statusBadgeCls(activeTrip.status)}`}>
-                  {activeTrip.status ?? '—'}
-                </span>
-              </div>
-              <div className="space-y-1 text-xs text-slate-600">
-                {activeTrip.from && activeTrip.to && (
-                  <p className="flex items-center gap-1 font-medium">
-                    <span>{activeTrip.from}</span>
-                    <ChevronRight className="h-3.5 w-3.5 text-indigo-400" />
-                    <span>{activeTrip.to}</span>
-                  </p>
-                )}
-                {activeTrip.departureDate && <p>📅 {formatDate(activeTrip.departureDate)}</p>}
-                {activeTrip.amount != null && <p>💰 ₹{Number(activeTrip.amount).toLocaleString('en-IN')}</p>}
-              </div>
-              <div className="flex gap-2 mt-3">
-                <button type="button" onClick={() => onUpdateTrip(activeTrip as TripItem)}
-                  className="flex-1 rounded-lg border border-indigo-300 bg-white px-3 py-1.5 text-xs font-medium text-indigo-700 hover:bg-indigo-50">
-                  Update
-                </button>
-                <button type="button" onClick={() => onCancelTrip(activeTrip._id ?? activeTrip.id ?? activeTrip.tripId)}
-                  className="flex-1 rounded-lg border border-red-200 bg-white px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50">
-                  Cancel Trip
-                </button>
-              </div>
-            </section>
-          ) : (
-            <section className="rounded-xl border border-dashed border-slate-300 bg-white p-4 text-center">
-              <Route className="mx-auto h-8 w-8 text-slate-300" />
-              <p className="mt-1 text-sm text-slate-400">No active trip</p>
-              <button type="button" onClick={onStartTrip}
-                className="mt-2 rounded-lg bg-indigo-500 px-4 py-2 text-xs font-semibold text-white hover:bg-indigo-600">
-                + Start Trip
-              </button>
-            </section>
-          )}
-
-          {/* Driver Assignment Card */}
-          <section className="rounded-xl border border-slate-200 bg-white p-4">
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400 mb-2">Driver Assignment</p>
-            {uErr && <p className="mb-2 text-xs text-red-500">{uErr}</p>}
-            {vehicle.currentDriverName && vehicle.currentDriverName.toLowerCase() !== 'unassigned' ? (
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <UserCheck className="h-5 w-5 text-indigo-500" />
-                  <div>
-                    <p className="text-sm font-medium text-slate-800">{vehicle.currentDriverName}</p>
-                    <p className="text-xs text-slate-400">Assigned Driver</p>
-                  </div>
-                </div>
-                <div className="flex gap-2">
-                  <button type="button" onClick={() => onAssignDriver()}
-                    className="rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50">
-                    Change
-                  </button>
-                  <button type="button" onClick={() => handleUnassign()} disabled={unassigning}
-                    className="rounded-lg border border-red-200 px-2.5 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 disabled:opacity-50">
-                    {unassigning ? '…' : <UserMinus className="h-3.5 w-3.5" />}
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <div className="flex items-center justify-between">
-                <p className="text-sm text-slate-400">No driver assigned</p>
-                <button type="button" onClick={() => onAssignDriver()}
-                  className="flex items-center gap-1.5 rounded-lg bg-indigo-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-600">
-                  <UserPlus className="h-3.5 w-3.5" />
-                  Assign Driver
-                </button>
-              </div>
-            )}
-          </section>
-        </div>
+      {upcomingTrips.length === 0 ? (
+        <p className="py-4 text-center text-xs text-slate-400">No scheduled trips</p>
       ) : (
-        /* Multiple Trips View */
         <div className="space-y-3">
-          <button type="button" onClick={onStartTrip}
-            className="flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-indigo-300 bg-indigo-50 py-3 text-sm font-medium text-indigo-600 hover:bg-indigo-100">
-            <Plus className="h-4 w-4" />
-            Add New Trip
-          </button>
-
-          {scheduledTrips.length === 0 ? (
-            <p className="py-4 text-center text-xs text-slate-400">No scheduled trips</p>
-          ) : (
-            scheduledTrips.map(trip => {
-              const drName = tripDriverName(trip);
-              return (
-                <section key={trip._id} className="rounded-xl border border-slate-200 bg-white p-4">
-                  <div className="flex items-start justify-between mb-2">
-                    <div>
-                      {trip.tripNumber && <p className="text-sm font-bold text-slate-800">Trip #{trip.tripNumber}</p>}
-                      {trip.from && trip.to && (
-                        <p className="flex items-center gap-1 text-xs text-slate-600 mt-0.5">
-                          <span>{trip.from}</span>
-                          <ChevronRight className="h-3 w-3 text-slate-400" />
-                          <span>{trip.to}</span>
-                        </p>
-                      )}
-                    </div>
-                    <span className={`text-xs rounded-full border px-2 py-0.5 capitalize ${statusBadgeCls(trip.status)}`}>
-                      {trip.status ?? '—'}
-                    </span>
-                  </div>
-                  <div className="text-xs text-slate-500 space-y-0.5 mb-3">
-                    {trip.departureDate && <p>📅 {formatDate(trip.departureDate)}</p>}
-                    {trip.amount != null && <p>💰 ₹{Number(trip.amount).toLocaleString('en-IN')}</p>}
-                    <p>👤 {drName ?? 'Unassigned'}</p>
-                  </div>
-                  <div className="flex flex-wrap gap-1.5">
-                    <button type="button" onClick={() => onUpdateTrip(trip)}
-                      className="rounded border border-indigo-200 px-2.5 py-1 text-xs text-indigo-600 hover:bg-indigo-50">Update</button>
-                    <button type="button" onClick={() => onCancelTrip(trip._id)}
-                      className="rounded border border-red-200 px-2.5 py-1 text-xs text-red-600 hover:bg-red-50">Cancel</button>
-                    {drName ? (
-                      <button type="button" onClick={() => handleUnassign(trip._id)} disabled={unassigning}
-                        className="rounded border border-slate-200 px-2.5 py-1 text-xs text-slate-600 hover:bg-slate-50">Unassign Driver</button>
-                    ) : (
-                      <button type="button" onClick={() => onAssignDriver(trip._id)}
-                        className="rounded border border-indigo-200 px-2.5 py-1 text-xs text-indigo-600 hover:bg-indigo-50">Assign Driver</button>
+          {upcomingTrips.map(trip => {
+            const drName = tripDriverName(trip);
+            return (
+              <section key={trip._id} className="rounded-xl border border-slate-200 bg-white p-4">
+                <div className="flex items-start justify-between mb-2">
+                  <div>
+                    {trip.tripNumber && <p className="text-sm font-bold text-slate-800">Trip #{trip.tripNumber}</p>}
+                    {trip.from && trip.to && (
+                      <p className="flex items-center gap-1 text-xs text-slate-600 mt-0.5">
+                        <span>{trip.from}</span>
+                        <ChevronRight className="h-3 w-3 text-slate-400" />
+                        <span>{trip.to}</span>
+                      </p>
                     )}
                   </div>
-                </section>
-              );
-            })
-          )}
+                  <span className={`text-xs rounded-full border px-2 py-0.5 capitalize ${statusBadgeCls(trip.status)}`}>
+                    {trip.status ?? '—'}
+                  </span>
+                </div>
+                <div className="text-xs text-slate-500 space-y-0.5 mb-3">
+                  {trip.departureDate && <p>📅 {formatDate(trip.departureDate)}</p>}
+                  {trip.amount != null && <p>💰 ₹{Number(trip.amount).toLocaleString('en-IN')}</p>}
+                  <p>👤 {drName ?? 'Unassigned'}</p>
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  <button type="button" onClick={() => onUpdateTrip(trip._id)}
+                    className="rounded border border-indigo-200 px-2.5 py-1 text-xs text-indigo-600 hover:bg-indigo-50">Update</button>
+                  <button type="button" onClick={() => onCancelTrip(trip._id)}
+                    className="rounded border border-red-200 px-2.5 py-1 text-xs text-red-600 hover:bg-red-50">Cancel</button>
+                  {drName ? (
+                    <button type="button" onClick={() => handleUnassign(trip._id)} disabled={unassigning}
+                      className="rounded border border-slate-200 px-2.5 py-1 text-xs text-slate-600 hover:bg-slate-50">Unassign Driver</button>
+                  ) : (
+                    <button type="button" onClick={() => onAssignDriver(trip._id)}
+                      className="rounded border border-indigo-200 px-2.5 py-1 text-xs text-indigo-600 hover:bg-indigo-50">Assign Driver</button>
+                  )}
+                </div>
+              </section>
+            );
+          })}
         </div>
       )}
     </div>
@@ -1098,7 +1330,7 @@ function ExpenseFormModal({ vehicleId, expense, onClose, onSaved }: {
 
 type DetailModal =
   | { kind: 'startTrip' }
-  | { kind: 'updateTrip'; trip: TripItem }
+  | { kind: 'updateTrip'; tripId: string }
   | { kind: 'cancelTrip'; tripId: string }
   | { kind: 'assignDriver'; tripId?: string }
   | { kind: 'history' };
@@ -1185,10 +1417,13 @@ function VehicleDetailPanel({ vehicle, onEditClicked, onVehicleUpdated, onBackCl
           <TripDriverTab
             vehicle={vehicle}
             onStartTrip={() => setDetailModal({ kind: 'startTrip' })}
-            onUpdateTrip={(trip) => setDetailModal({ kind: 'updateTrip', trip })}
+            onUpdateTrip={(tripId) => setDetailModal({ kind: 'updateTrip', tripId })}
             onCancelTrip={(tripId) => setDetailModal({ kind: 'cancelTrip', tripId })}
             onAssignDriver={(tripId) => setDetailModal({ kind: 'assignDriver', tripId })}
-            onUnassignDriver={() => onVehicleUpdated({ currentDriverName: undefined })}
+            onUnassignDriver={(tripId) => {
+              if (tripId) onVehicleUpdated({ _updatedAt: Date.now() } as any);
+              else onVehicleUpdated({ currentDriverName: undefined });
+            }}
           />
         )}
         {tab === 'expenses' && <ExpensesTab vehicle={vehicle} />}
@@ -1197,15 +1432,22 @@ function VehicleDetailPanel({ vehicle, onEditClicked, onVehicleUpdated, onBackCl
       {/* Detail-level modals */}
       {detailModal?.kind === 'startTrip' && (
         <TripFormModal vehicleId={vehicle._id} onClose={closeDetailModal}
-          onSaved={() => { closeDetailModal(); onVehicleUpdated({ status: 'On Trip' }); }} />
+          onSaved={() => {
+            closeDetailModal();
+            onVehicleUpdated({ status: 'On Trip', _updatedAt: Date.now() } as any);
+          }} />
       )}
       {detailModal?.kind === 'updateTrip' && (
-        <TripFormModal vehicleId={vehicle._id} trip={detailModal.trip} onClose={closeDetailModal}
-          onSaved={() => closeDetailModal()} />
+        <UpdateTripWrapper vehicleId={vehicle._id} tripId={detailModal.tripId} onClose={closeDetailModal}
+          onSaved={() => {
+            closeDetailModal();
+            // Trigger a minor update to force a re-fetch of the vehicle data
+            onVehicleUpdated({ _updatedAt: Date.now() } as any);
+          }} />
       )}
       {detailModal?.kind === 'cancelTrip' && (
         <CancelTripModal tripId={detailModal.tripId} onClose={closeDetailModal}
-          onCancelled={() => onVehicleUpdated({ status: 'Available' })} />
+          onCancelled={() => onVehicleUpdated({ status: 'Available', _updatedAt: Date.now() } as any)} />
       )}
       {detailModal?.kind === 'assignDriver' && (
         <DriverAssignModal
@@ -1213,7 +1455,15 @@ function VehicleDetailPanel({ vehicle, onEditClicked, onVehicleUpdated, onBackCl
           tripId={detailModal.tripId}
           currentDriverName={vehicle.currentDriverName}
           onClose={closeDetailModal}
-          onAssigned={(name) => onVehicleUpdated({ currentDriverName: name })}
+          onAssigned={(name) => {
+            if (detailModal.tripId) {
+              // Assigned to a specific trip -> full refresh
+              onVehicleUpdated({ _updatedAt: Date.now() } as any);
+            } else {
+              // Assigned to the vehicle -> partial update
+              onVehicleUpdated({ currentDriverName: name });
+            }
+          }}
         />
       )}
       {detailModal?.kind === 'history' && (
@@ -1263,9 +1513,18 @@ export function VehiclesPage() {
     });
   };
 
-  const handleVehicleUpdated = (updated: Partial<Vehicle>) => {
+  const handleVehicleUpdated = async (updated: Partial<Vehicle>) => {
     if (!selectedVehicle) return;
-    setVehicles(prev => prev.map((v, i) => i === selectedIdx ? { ...v, ...updated } : v));
+    if ('_updatedAt' in updated) {
+      try {
+        const fullVehicle = await fetchVehicleById(selectedVehicle._id);
+        setVehicles(prev => prev.map((v, i) => i === selectedIdx ? fullVehicle : v));
+      } catch (e) {
+        console.error('Failed to refetch vehicle after update', e);
+      }
+    } else {
+      setVehicles(prev => prev.map((v, i) => i === selectedIdx ? { ...v, ...updated } : v));
+    }
   };
 
   return (

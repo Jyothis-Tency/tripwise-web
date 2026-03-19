@@ -31,6 +31,7 @@ export function EditTripModal({
     agencyCost: trip.agencyCost?.toString() || '',
     cabCost: trip.cabCost?.toString() || '',
     driver_salary: trip.driver_salary?.toString() || '',
+    advance: trip.advance?.toString() || '',
     notes: trip.notes || trip.completionNote || ''
   });
 
@@ -55,7 +56,7 @@ export function EditTripModal({
       for (const [k, v] of Object.entries(fields)) {
         if (v !== '') {
           // Parse numbers
-          if (['startKilometers', 'endKilometers', 'distance', 'agencyCost', 'cabCost', 'driver_salary'].includes(k)) {
+          if (['startKilometers', 'endKilometers', 'distance', 'agencyCost', 'cabCost', 'driver_salary', 'advance'].includes(k)) {
             (payload as any)[k] = parseFloat(v);
           } else {
             (payload as any)[k] = v;
@@ -185,6 +186,14 @@ export function EditTripModal({
                 <div className="flex border border-slate-200 rounded-lg overflow-hidden focus-within:border-indigo-400 focus-within:ring-1">
                   <span className="px-3 bg-slate-50 border-r border-slate-200 py-2 text-sm text-slate-500">₹</span>
                   <input type="number" value={fields.driver_salary} onChange={e => handleChange('driver_salary', e.target.value)}
+                    className="flex-1 w-full px-3 py-2 text-sm outline-none" />
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1">Advance</label>
+                <div className="flex border border-slate-200 rounded-lg overflow-hidden focus-within:border-indigo-400 focus-within:ring-1">
+                  <span className="px-3 bg-slate-50 border-r border-slate-200 py-2 text-sm text-slate-500">₹</span>
+                  <input type="number" value={fields.advance} onChange={e => handleChange('advance', e.target.value)}
                     className="flex-1 w-full px-3 py-2 text-sm outline-none" />
                 </div>
               </div>

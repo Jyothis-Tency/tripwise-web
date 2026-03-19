@@ -1,7 +1,6 @@
 import { Outlet, useLocation } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
-import { useAuth } from '../hooks/useAuth';
-import { LogOut, User, Menu } from 'lucide-react';
+import { Menu } from 'lucide-react';
 import { useState } from 'react';
 
 const routeTitle: Record<string, string> = {
@@ -24,7 +23,6 @@ const routeTitle: Record<string, string> = {
 const fullHeightPaths = ['/vehicles', '/drivers', '/tracking'];
 
 export function DashboardLayout() {
-  const { user, logout } = useAuth();
   const { pathname } = useLocation();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
@@ -63,24 +61,6 @@ export function DashboardLayout() {
               <Menu className="h-5 w-5" />
             </button>
             <h1 className="text-base font-semibold text-slate-900 truncate">{title}</h1>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2 text-sm text-slate-600">
-              <span className="flex h-7 w-7 items-center justify-center rounded-full bg-indigo-100 text-indigo-600">
-                <User className="h-4 w-4" />
-              </span>
-              <span className="hidden sm:block">{user?.name ?? user?.email ?? 'Owner'}</span>
-            </div>
-            <button
-              type="button"
-              onClick={() => logout()}
-              title="Sign out"
-              className="flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs text-slate-600 hover:bg-slate-50"
-            >
-              <LogOut className="h-3.5 w-3.5" />
-              <span className="hidden sm:block">Sign out</span>
-            </button>
           </div>
         </header>
 

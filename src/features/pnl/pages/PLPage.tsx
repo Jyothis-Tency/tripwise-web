@@ -13,7 +13,6 @@ import type { PLDataResponse } from '../api';
 import { RevenueBreakdown } from '../components/RevenueBreakdown';
 import { TripStatistics } from '../components/TripStatistics';
 import { TopRoutes } from '../components/TopRoutes';
-import { AdditionalMetrics } from '../components/AdditionalMetrics';
 
 export const PLPage: React.FC = () => {
   const [data, setData] = useState<PLDataResponse | null>(null);
@@ -171,13 +170,9 @@ export const PLPage: React.FC = () => {
 
       {data && (
         <div className="space-y-4 sm:space-y-6 lg:space-y-8">
-          <RevenueBreakdown revenue={data.revenue} />
+          <RevenueBreakdown revenue={data.revenue} summary={data.summary} />
           <TripStatistics trips={data.trips} />
           <TopRoutes routes={data.topRoutes} />
-          <AdditionalMetrics 
-            revenue={data.revenue} 
-            summary={data.summary} 
-          />
         </div>
       )}
     </div>

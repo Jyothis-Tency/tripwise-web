@@ -408,7 +408,7 @@ function generateBulkTripsPDF(
      return;
   }
 
-  validGroups.forEach((g, gi) => {
+  validGroups.forEach((g) => {
     if (y > doc.internal.pageSize.getHeight() - 40) {
       doc.addPage();
       y = 20;

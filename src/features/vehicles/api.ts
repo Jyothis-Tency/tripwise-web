@@ -50,6 +50,7 @@ export interface TripItem {
   agencyName?: string;
   ownerProfit?: number | string;
   advance?: number;
+  driver_salary?: number;
   notes?: string;
   careOf?: {
     name?: string;

@@ -2,6 +2,8 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Car,
   ChevronRight,
+  ChevronDown,
+  ChevronUp,
   History,
   Pencil,
   Plus,
@@ -943,6 +945,8 @@ interface TripDriverTabProps {
 function TripDriverTab({ vehicle, onStartTrip, onUpdateTrip, onCancelTrip, onAssignDriver, onUnassignDriver }: TripDriverTabProps) {
   const [unassigning, setUnassigning] = useState(false);
   const [uErr, setUErr] = useState<string | null>(null);
+  const [expandedTripId, setExpandedTripId] = useState<string | null>(null);
+  const toggleExpand = (id: string) => setExpandedTripId(p => p === id ? null : id);
 
   const allTrips: TripItem[] = Array.isArray(vehicle.trips) ? vehicle.trips : [];
 
@@ -989,56 +993,78 @@ function TripDriverTab({ vehicle, onStartTrip, onUpdateTrip, onCancelTrip, onAss
       {uErr && <p className="text-xs text-red-500">{uErr}</p>}
       {/* Active Trip Card */}
       {hasActiveTrip && (
-        <section className="rounded-xl border border-indigo-100 bg-indigo-50 p-4">
-          <div className="flex items-start justify-between mb-2">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-wide text-indigo-400">Active Trip</p>
-              {activeTrip.tripNumber && <p className="text-sm font-bold text-slate-800 mt-0.5">Trip #{activeTrip.tripNumber}</p>}
+        <section className={`rounded-xl border overflow-hidden ${expandedTripId === activeTrip._id ? 'border-indigo-300 shadow-sm' : 'border-indigo-100'} bg-indigo-50`}>
+          <div
+            className="p-4 cursor-pointer hover:bg-indigo-100/50 transition-colors"
+            onClick={() => toggleExpand(activeTrip._id)}
+          >
+            <div className="flex items-start justify-between mb-2">
+              <div>
+                <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-indigo-400">
+                  {expandedTripId === activeTrip._id ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+                  Active Trip
+                </p>
+                {activeTrip.tripNumber && <p className="text-sm font-bold text-slate-800 mt-0.5">Trip #{activeTrip.tripNumber}</p>}
+              </div>
+              <span className={`text-xs rounded-full border px-2 py-0.5 capitalize ${statusBadgeCls(activeTrip.status)}`}>
+                {activeTrip.status ?? '—'}
+              </span>
             </div>
-            <span className={`text-xs rounded-full border px-2 py-0.5 capitalize ${statusBadgeCls(activeTrip.status)}`}>
-              {activeTrip.status ?? '—'}
-            </span>
+            <div className="space-y-1 text-xs text-slate-600">
+              {activeTrip.from && activeTrip.to && (
+                <p className="flex items-center gap-1 font-medium">
+                  <span>{activeTrip.from}</span>
+                  <ChevronRight className="h-3.5 w-3.5 text-indigo-400" />
+                  <span>{activeTrip.to}</span>
+                </p>
+              )}
+              {activeTrip.departureDate && <p>📅 {formatDate(activeTrip.departureDate)}</p>}
+              <p>👤 Driver: {activeTripDriver ?? 'Unassigned'}</p>
+            </div>
           </div>
-          <div className="space-y-1 text-xs text-slate-600">
-            {activeTrip.from && activeTrip.to && (
-              <p className="flex items-center gap-1 font-medium">
-                <span>{activeTrip.from}</span>
-                <ChevronRight className="h-3.5 w-3.5 text-indigo-400" />
-                <span>{activeTrip.to}</span>
-              </p>
-            )}
-            {activeTrip.departureDate && <p>📅 {formatDate(activeTrip.departureDate)}</p>}
-            {activeTrip.amount != null && <p>💰 ₹{Number(activeTrip.amount).toLocaleString('en-IN')}</p>}
-            <p>👤 Driver: {activeTripDriver ?? 'Unassigned'}</p>
-          </div>
-          <div className="flex flex-wrap gap-2 mt-3">
-            <button type="button" onClick={() => onUpdateTrip(activeTrip._id ?? activeTrip.id ?? activeTrip.tripId)}
-              className="flex-1 rounded-lg border border-indigo-300 bg-white px-3 py-1.5 text-xs font-medium text-indigo-700 hover:bg-indigo-50">
-              Update
-            </button>
-            <button type="button" onClick={() => onCancelTrip(activeTrip._id ?? activeTrip.id ?? activeTrip.tripId)}
-              className="flex-1 rounded-lg border border-red-200 bg-white px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50">
-              Cancel Trip
-            </button>
-            {activeTripDriver ? (
-              <button
-                type="button"
-                onClick={() => handleUnassign(activeTrip._id ?? activeTrip.id ?? activeTrip.tripId)}
-                disabled={unassigning}
-                className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50"
-              >
-                Unassign Driver
-              </button>
-            ) : (
-              <button
-                type="button"
-                onClick={() => onAssignDriver(activeTrip._id ?? activeTrip.id ?? activeTrip.tripId)}
-                className="rounded-lg border border-indigo-200 bg-white px-3 py-1.5 text-xs font-medium text-indigo-600 hover:bg-indigo-50"
-              >
-                Assign Driver
-              </button>
-            )}
-          </div>
+
+          {expandedTripId === activeTrip._id && (
+            <div className="px-4 pb-4 pt-1 border-t border-indigo-100/50">
+              <div className="grid grid-cols-2 gap-y-2 gap-x-4 mb-3 text-xs text-slate-600 pt-3">
+                {activeTrip.customer && <div><span className="text-slate-400 block mb-0.5">Customer</span>{activeTrip.customer}</div>}
+                {activeTrip.distance && <div><span className="text-slate-400 block mb-0.5">Distance</span>{activeTrip.distance}</div>}
+                <div className="col-span-2 grid grid-cols-4 gap-2 mt-2 border-t border-indigo-100/30 pt-3">
+                  <div><span className="text-slate-400 block mb-0.5 text-[10px] uppercase">Advance</span><span className="font-semibold">₹{Number(activeTrip.advance || 0).toLocaleString('en-IN')}</span></div>
+                  <div><span className="text-slate-400 block mb-0.5 text-[10px] uppercase">Bata</span><span className="font-semibold">₹{Number(activeTrip.driver_salary || 0).toLocaleString('en-IN')}</span></div>
+                  <div><span className="text-slate-400 block mb-0.5 text-[10px] uppercase">Cab Cost</span><span className="font-semibold text-slate-700">₹{Number(activeTrip.cabCost || 0).toLocaleString('en-IN')}</span></div>
+                  <div><span className="text-slate-400 block mb-0.5 text-[10px] uppercase text-indigo-500">Owner Profit</span><span className="font-bold text-indigo-700">₹{Number(activeTrip.ownerProfit || 0).toLocaleString('en-IN')}</span></div>
+                </div>
+              </div>
+              <div className="flex flex-wrap gap-2 pt-2 border-t border-indigo-100/50">
+                <button type="button" onClick={() => onUpdateTrip(activeTrip._id ?? activeTrip.id ?? activeTrip.tripId)}
+                  className="flex-1 rounded-lg border border-indigo-300 bg-white px-3 py-1.5 text-xs font-medium text-indigo-700 hover:bg-indigo-50">
+                  Update
+                </button>
+                <button type="button" onClick={() => onCancelTrip(activeTrip._id ?? activeTrip.id ?? activeTrip.tripId)}
+                  className="flex-1 rounded-lg border border-red-200 bg-white px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50">
+                  Cancel Trip
+                </button>
+                {activeTripDriver ? (
+                  <button
+                    type="button"
+                    onClick={() => handleUnassign(activeTrip._id ?? activeTrip.id ?? activeTrip.tripId)}
+                    disabled={unassigning}
+                    className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50"
+                  >
+                    Unassign Driver
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => onAssignDriver(activeTrip._id ?? activeTrip.id ?? activeTrip.tripId)}
+                    className="rounded-lg border border-indigo-200 bg-white px-3 py-1.5 text-xs font-medium text-indigo-600 hover:bg-indigo-50"
+                  >
+                    Assign Driver
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
         </section>
       )}
 
@@ -1057,40 +1083,62 @@ function TripDriverTab({ vehicle, onStartTrip, onUpdateTrip, onCancelTrip, onAss
           {upcomingTrips.map(trip => {
             const drName = tripDriverName(trip);
             return (
-              <section key={trip._id} className="rounded-xl border border-slate-200 bg-white p-4">
-                <div className="flex items-start justify-between mb-2">
-                  <div>
-                    {trip.tripNumber && <p className="text-sm font-bold text-slate-800">Trip #{trip.tripNumber}</p>}
-                    {trip.from && trip.to && (
-                      <p className="flex items-center gap-1 text-xs text-slate-600 mt-0.5">
-                        <span>{trip.from}</span>
-                        <ChevronRight className="h-3 w-3 text-slate-400" />
-                        <span>{trip.to}</span>
-                      </p>
-                    )}
+              <section key={trip._id} className={`rounded-xl border overflow-hidden transition-all ${expandedTripId === trip._id ? 'border-slate-300 shadow-sm' : 'border-slate-200'} bg-white`}>
+                <div
+                  className="p-4 cursor-pointer hover:bg-slate-50 transition-colors"
+                  onClick={() => toggleExpand(trip._id)}
+                >
+                  <div className="flex items-start justify-between mb-2">
+                    <div className="flex items-start gap-2">
+                      {expandedTripId === trip._id ? <ChevronUp className="h-4 w-4 text-slate-400 mt-0.5 shrink-0" /> : <ChevronDown className="h-4 w-4 text-slate-400 mt-0.5 shrink-0" />}
+                      <div>
+                        {trip.tripNumber && <p className="text-sm font-bold text-slate-800">Trip #{trip.tripNumber}</p>}
+                        {trip.from && trip.to && (
+                          <p className="flex items-center gap-1 text-xs text-slate-600 mt-0.5">
+                            <span>{trip.from}</span>
+                            <ChevronRight className="h-3 w-3 text-slate-400" />
+                            <span>{trip.to}</span>
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                    <span className={`text-xs rounded-full border px-2 py-0.5 capitalize ${statusBadgeCls(trip.status)} whitespace-nowrap ml-2`}>
+                      {trip.status ?? '—'}
+                    </span>
                   </div>
-                  <span className={`text-xs rounded-full border px-2 py-0.5 capitalize ${statusBadgeCls(trip.status)}`}>
-                    {trip.status ?? '—'}
-                  </span>
+                  <div className="text-xs text-slate-500 space-y-0.5 pl-6">
+                    {trip.departureDate && <p>📅 {formatDate(trip.departureDate)}</p>}
+                    <p>👤 {drName ?? 'Unassigned'}</p>
+                  </div>
                 </div>
-                <div className="text-xs text-slate-500 space-y-0.5 mb-3">
-                  {trip.departureDate && <p>📅 {formatDate(trip.departureDate)}</p>}
-                  {trip.amount != null && <p>💰 ₹{Number(trip.amount).toLocaleString('en-IN')}</p>}
-                  <p>👤 {drName ?? 'Unassigned'}</p>
-                </div>
-                <div className="flex flex-wrap gap-1.5">
-                  <button type="button" onClick={() => onUpdateTrip(trip._id)}
-                    className="rounded border border-indigo-200 px-2.5 py-1 text-xs text-indigo-600 hover:bg-indigo-50">Update</button>
-                  <button type="button" onClick={() => onCancelTrip(trip._id)}
-                    className="rounded border border-red-200 px-2.5 py-1 text-xs text-red-600 hover:bg-red-50">Cancel</button>
-                  {drName ? (
-                    <button type="button" onClick={() => handleUnassign(trip._id)} disabled={unassigning}
-                      className="rounded border border-slate-200 px-2.5 py-1 text-xs text-slate-600 hover:bg-slate-50">Unassign Driver</button>
-                  ) : (
-                    <button type="button" onClick={() => onAssignDriver(trip._id)}
-                      className="rounded border border-indigo-200 px-2.5 py-1 text-xs text-indigo-600 hover:bg-indigo-50">Assign Driver</button>
-                  )}
-                </div>
+                
+                {expandedTripId === trip._id && (
+                  <div className="px-4 pb-4 pt-1 border-t border-slate-100">
+                    <div className="grid grid-cols-2 gap-y-2 gap-x-4 mb-3 text-xs text-slate-600 pt-3 pl-2">
+                      {trip.customer && <div><span className="text-slate-400 block mb-0.5">Customer</span>{trip.customer}</div>}
+                      {trip.distance && <div><span className="text-slate-400 block mb-0.5">Distance</span>{trip.distance}</div>}
+                      <div className="col-span-2 grid grid-cols-4 gap-2 mt-2 border-t border-slate-100 pt-3">
+                        <div><span className="text-slate-400 block mb-0.5 text-[10px] uppercase">Advance</span><span className="font-semibold text-slate-700">₹{Number(trip.advance || 0).toLocaleString('en-IN')}</span></div>
+                        <div><span className="text-slate-400 block mb-0.5 text-[10px] uppercase">Bata</span><span className="font-semibold text-slate-700">₹{Number(trip.driver_salary || 0).toLocaleString('en-IN')}</span></div>
+                        <div><span className="text-slate-400 block mb-0.5 text-[10px] uppercase">Cab Cost</span><span className="font-semibold text-slate-700">₹{Number(trip.cabCost || 0).toLocaleString('en-IN')}</span></div>
+                        <div><span className="text-slate-400 block mb-0.5 text-[10px] uppercase">Profit</span><span className="font-bold text-slate-800">₹{Number(trip.ownerProfit || 0).toLocaleString('en-IN')}</span></div>
+                      </div>
+                    </div>
+                    <div className="flex flex-wrap gap-2 pt-2 border-t border-slate-100 pl-2 mt-3">
+                      <button type="button" onClick={() => onUpdateTrip(trip._id)}
+                        className="flex-1 rounded-lg border border-slate-200 px-3 py-1.5 text-[11px] font-medium text-slate-700 hover:bg-slate-50">Update</button>
+                      <button type="button" onClick={() => onCancelTrip(trip._id)}
+                        className="flex-1 rounded-lg border border-red-200 px-3 py-1.5 text-[11px] font-medium text-red-600 hover:bg-red-50">Cancel</button>
+                      {drName ? (
+                        <button type="button" onClick={() => handleUnassign(trip._id)} disabled={unassigning}
+                          className="flex-1 rounded-lg border border-slate-200 px-3 py-1.5 text-[11px] font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50">Unassign Driver</button>
+                      ) : (
+                        <button type="button" onClick={() => onAssignDriver(trip._id)}
+                          className="flex-1 rounded-lg bg-slate-900 px-3 py-1.5 text-[11px] font-medium text-white hover:bg-slate-800">Assign Driver</button>
+                      )}
+                    </div>
+                  </div>
+                )}
               </section>
             );
           })}

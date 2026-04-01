@@ -177,20 +177,21 @@ function SalaryTab({ driver }: { driver: Driver }) {
   const [advanceAmount, setAdvanceAmount] = useState('');
   const [advanceDesc, setAdvanceDesc] = useState('');
   const [addingSalary, setAddingSalary] = useState(false);
+  const [monthFilter, setMonthFilter] = useState('');
 
   const driverId = driver._id ?? (driver as any).id;
 
   useEffect(() => {
     loadData();
-  }, [driverId]);
+  }, [driverId, monthFilter]);
 
   const loadData = async () => {
     setLoading(true);
     setError('');
     try {
       const [salaryRes, tripsRes] = await Promise.all([
-        fetchDriverSalary(driverId).catch(() => null),
-        fetchDriverTrips(driverId, { limit: 20 }).catch(() => ({ trips: [] })),
+        fetchDriverSalary(driverId, monthFilter || undefined).catch(() => null),
+        fetchDriverTrips(driverId, { limit: 20, month: monthFilter || undefined }).catch(() => ({ trips: [] })),
       ]);
       if (salaryRes) setSalaryData(salaryRes);
       setTrips((tripsRes as any)?.trips ?? []);
@@ -246,6 +247,17 @@ function SalaryTab({ driver }: { driver: Driver }) {
 
   return (
     <div className="space-y-4">
+      {/* Header and Filter */}
+      <div className="flex items-center justify-between">
+        <h4 className="text-sm font-semibold text-slate-800">Financial Summary</h4>
+        <input
+          type="month"
+          value={monthFilter}
+          onChange={e => setMonthFilter(e.target.value)}
+          className="rounded-lg border border-slate-200 px-2.5 py-1.5 text-sm text-slate-700 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+        />
+      </div>
+
       {/* Summary Cards */}
       <div className="grid grid-cols-2 gap-2">
         <StatCard icon={<DollarSign className="h-4 w-4 text-emerald-500" />} label="Total Earnings" value={fmtCurrency(salaryData?.totalEarnings)} />

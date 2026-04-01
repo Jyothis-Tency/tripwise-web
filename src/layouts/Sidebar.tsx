@@ -34,11 +34,11 @@ export function Sidebar({ onClose }: { onClose?: () => void }) {
     <aside className="flex h-full w-64 shrink-0 flex-col border-r border-slate-200 bg-white">
       {/* Logo */}
       <div className="flex h-14 items-center justify-between border-b border-slate-100 px-4">
-        <div className="flex items-center gap-2.5">
-          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-500 text-white">
+        <div className="flex items-center gap-2.5 min-w-0 pr-2">
+          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-indigo-500 text-white">
             <Car className="h-4 w-4" />
           </span>
-          <span className="text-sm font-bold text-slate-900">Tripwise</span>
+          <span className="text-sm font-bold text-slate-900 truncate">{user?.name || 'Owner'}</span>
         </div>
         {onClose && (
           <button onClick={onClose} className="lg:hidden p-1 text-slate-400 hover:text-slate-600 rounded-lg">

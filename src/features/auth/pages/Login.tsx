@@ -37,8 +37,8 @@ export function LoginPage() {
           <div className="mx-auto mb-6 flex h-24 w-24 sm:mb-8 sm:h-28 sm:w-28 items-center justify-center rounded-[40px] sm:rounded-[56px] bg-white/20 lg:h-32 lg:w-32 shadow-inner backdrop-blur-sm">
             <span className="text-3xl sm:text-4xl lg:text-5xl">🚚</span>
           </div>
-          <h1 className="mb-2 text-2xl font-bold sm:text-3xl lg:text-4xl tracking-tight">Tripwise</h1>
-          <p className="mb-4 sm:mb-6 text-xs sm:text-sm lg:text-base text-indigo-100/90 font-medium tracking-wide uppercase">Trip Management System</p>
+          <h1 className="mb-2 text-2xl font-bold sm:text-3xl lg:text-4xl tracking-tight">Trip Management</h1>
+          <p className="mb-4 sm:mb-6 text-xs sm:text-sm lg:text-base text-indigo-100/90 font-medium tracking-wide uppercase">System</p>
           <p className="hidden text-sm text-indigo-100/80 sm:block sm:max-w-xs sm:mx-auto lg:max-w-none">
             Comprehensive trip management solution for
             <br className="hidden lg:block"/> owners and drivers

@@ -2,6 +2,7 @@ import { Outlet, useLocation } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { Menu } from 'lucide-react';
 import { useState } from 'react';
+import { useAuth } from '../hooks/useAuth';
 
 const routeTitle: Record<string, string> = {
   '/': 'Dashboard',
@@ -25,8 +26,9 @@ const fullHeightPaths = ['/vehicles', '/drivers', '/tracking'];
 export function DashboardLayout() {
   const { pathname } = useLocation();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const { user } = useAuth();
 
-  const title = routeTitle[pathname] ?? 'Tripwise';
+  const title = routeTitle[pathname] ?? (user?.name || 'Dashboard');
   const isFull = fullHeightPaths.some((p) => pathname.startsWith(p));
 
   const closeMobileMenu = () => setIsMobileMenuOpen(false);

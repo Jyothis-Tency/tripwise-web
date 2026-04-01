@@ -231,3 +231,59 @@ export async function syncNormalEntry(payload: {
 export async function deleteNormalEntryTrip(id: string): Promise<void> {
   await apiClient.delete(ApiEndpoints.normalEntryTripById(id));
 }
+
+// ── Payout ──
+
+export interface PayoutPayment {
+  _id: string;
+  amount: number;
+  paymentDate: string;
+  paymentMethod: string;
+  notes?: string;
+}
+
+export interface AgencyPayoutSummary {
+  grandTotal: number;
+  totalReceived: number;
+  remaining: number;
+  payments: PayoutPayment[];
+}
+
+export interface DriverPayoutSummary {
+  totalAdvance: number;
+  totalPaid: number;
+  remaining: number;
+  payments: PayoutPayment[];
+}
+
+export async function fetchAgencyPayoutSummary(agencyId: string): Promise<AgencyPayoutSummary> {
+  const res = await apiClient.get(`/owners/agencies/${agencyId}/payout-summary`);
+  const raw: any = res.data ?? {};
+  return raw.data ?? raw;
+}
+
+export async function addAgencyPayoutPayment(agencyId: string, payload: {
+  amount: number; paymentDate?: string; paymentMethod?: string; notes?: string;
+}): Promise<PayoutPayment> {
+  const res = await apiClient.post(`/owners/agencies/${agencyId}/payout-payments`, payload);
+  const raw: any = res.data ?? {};
+  return raw.data ?? raw;
+}
+
+export async function deletePayoutPayment(paymentId: string): Promise<void> {
+  await apiClient.delete(`/owners/payout-payments/${paymentId}`);
+}
+
+export async function fetchDriverPayoutSummary(agencyId: string, driverName: string): Promise<DriverPayoutSummary> {
+  const res = await apiClient.get(`/owners/agencies/${agencyId}/driver-payout-summary?driverName=${encodeURIComponent(driverName)}`);
+  const raw: any = res.data ?? {};
+  return raw.data ?? raw;
+}
+
+export async function addDriverPayoutPayment(agencyId: string, payload: {
+  driverName: string; amount: number; paymentDate?: string; paymentMethod?: string; notes?: string;
+}): Promise<PayoutPayment> {
+  const res = await apiClient.post(`/owners/agencies/${agencyId}/driver-payout-payments`, payload);
+  const raw: any = res.data ?? {};
+  return raw.data ?? raw;
+}

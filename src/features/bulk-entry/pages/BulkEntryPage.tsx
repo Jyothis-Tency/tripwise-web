@@ -1,14 +1,19 @@
 import { memo, useCallback, useEffect, useRef, useState, useMemo, type Dispatch, type SetStateAction } from 'react';
 import {
   Plus, Trash2, ChevronDown, FileSpreadsheet,
-  Building2, X, RefreshCw, Loader2, Cloud, CloudOff, Copy,
+  Building2, X, RefreshCw, Loader2, Cloud, CloudOff, Copy, Wallet, FileDown,
 } from 'lucide-react';
+import jsPDF from 'jspdf';
+import { useAuth } from '../../../hooks/useAuth';
 import {
   fetchAgencies, createAgency, fetchBulkEntryTrips,
   fetchNormalEntryTrips,
   deleteBulkEntryTrip, deleteNormalEntryTrip,
   syncBulkEntry, syncNormalEntry,
+  fetchAgencyPayoutSummary, addAgencyPayoutPayment, deletePayoutPayment,
+  fetchDriverPayoutSummary, addDriverPayoutPayment,
   type Agency, type DriverGroup, type BulkTripRow, type NormalEntryRow, type AgencyTrip,
+  type AgencyPayoutSummary, type DriverPayoutSummary, type PayoutPayment,
 } from '../api';
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -176,8 +181,657 @@ function ModalShell({ title, onClose, children, maxWidth = 'max-w-md' }: {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// CREATE AGENCY MODAL
+// PDF REPORT GENERATORS
 // ═══════════════════════════════════════════════════════════════════════════════
+
+const INR = (v: number) => `Rs. ${v.toLocaleString('en-IN')}`;
+const fmtDate = (d: string | Date | undefined) =>
+  d ? new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
+
+function drawPDFHeader(doc: jsPDF, title: string, ownerName: string, y: number): number {
+  const pw = doc.internal.pageSize.getWidth();
+  
+  // Generation Date
+  doc.setFontSize(9);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(148, 163, 184); // slate-400
+  doc.text(`Generated: ${fmtDate(new Date())}`, pw - 20, 20, { align: 'right' });
+
+  // Title
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(14);
+  doc.setTextColor(30, 41, 59); // slate-800
+  doc.text(title, 20, y + 35);
+
+  // Owner Name
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(10);
+  doc.setTextColor(100, 116, 139); // slate-500
+  doc.text(`Owner: ${ownerName}`, 20, y + 43);
+
+  return y + 53;
+}
+
+function drawSummaryRow(doc: jsPDF, label: string, value: string, y: number, bold = false) {
+  const pw = doc.internal.pageSize.getWidth();
+  doc.setFont('helvetica', bold ? 'bold' : 'normal');
+  doc.setFontSize(11);
+  doc.setTextColor(51, 65, 85); // slate-700
+  doc.text(label, 20, y);
+  doc.setFont('helvetica', 'bold');
+  doc.text(value, pw - 20, y, { align: 'right' });
+  return y + 8;
+}
+
+function drawPaymentTable(doc: jsPDF, payments: PayoutPayment[], y: number): number {
+  const pw = doc.internal.pageSize.getWidth();
+  if (payments.length === 0) return y;
+
+  // Table header
+  doc.setFillColor(241, 245, 249); // slate-100
+  doc.rect(20, y - 5, pw - 40, 10, 'F');
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(8);
+  doc.setTextColor(100, 116, 139);
+  doc.text('#', 25, y + 2);
+  doc.text('DATE', 38, y + 2);
+  doc.text('METHOD', 95, y + 2);
+  doc.text('NOTES', 135, y + 2);
+  doc.text('AMOUNT', pw - 25, y + 2, { align: 'right' });
+  y += 12;
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(9);
+  doc.setTextColor(51, 65, 85);
+
+  payments.forEach((p, i) => {
+    // Page break if near bottom
+    if (y > doc.internal.pageSize.getHeight() - 30) {
+      doc.addPage();
+      y = 20;
+    }
+    // Alternate row bg
+    if (i % 2 === 0) {
+      doc.setFillColor(248, 250, 252); // slate-50
+      doc.rect(20, y - 5, pw - 40, 9, 'F');
+    }
+    doc.setTextColor(51, 65, 85);
+    doc.text(String(i + 1), 25, y + 1);
+    doc.text(fmtDate(p.paymentDate), 38, y + 1);
+    doc.text((p.paymentMethod || 'cash').replace('_', ' '), 95, y + 1);
+    doc.text((p.notes || '—').substring(0, 25), 135, y + 1);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(16, 185, 129); // emerald-500
+    doc.text(INR(p.amount), pw - 25, y + 1, { align: 'right' });
+    doc.setFont('helvetica', 'normal');
+    y += 9;
+  });
+
+  return y;
+}
+
+function drawFooter(doc: jsPDF) {
+  const ph = doc.internal.pageSize.getHeight();
+  const pw = doc.internal.pageSize.getWidth();
+  doc.setDrawColor(226, 232, 240);
+  doc.line(20, ph - 18, pw - 20, ph - 18);
+  doc.setFont('helvetica', 'italic');
+  doc.setFontSize(7);
+  doc.setTextColor(148, 163, 184);
+  doc.text('This is a computer-generated document. No signature required.', pw / 2, ph - 10, { align: 'center' });
+}
+
+function generateAgencyPayoutPDF(
+  ownerName: string,
+  agencyName: string,
+  data: AgencyPayoutSummary,
+) {
+  const doc = new jsPDF('p', 'mm', 'a4');
+  let y = drawPDFHeader(doc, `Agency Payout Report`, ownerName, 0);
+
+  // Agency name
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(12);
+  doc.setTextColor(49, 46, 129);
+  doc.text(`Agency: ${agencyName}`, 20, y);
+  y += 14;
+
+  // Separator
+  const pw = doc.internal.pageSize.getWidth();
+  doc.setDrawColor(226, 232, 240);
+  doc.line(20, y - 4, pw - 20, y - 4);
+
+  // Summary
+  y = drawSummaryRow(doc, 'Grand Total', INR(data.grandTotal), y, true);
+  y = drawSummaryRow(doc, 'Total Received', INR(data.totalReceived), y);
+  y = drawSummaryRow(doc, 'Remaining Balance', INR(data.remaining), y, true);
+  y += 6;
+
+  // Status
+  const status = data.remaining <= 0 ? 'FULLY PAID' : data.totalReceived > 0 ? 'PARTIALLY PAID' : 'UNPAID';
+  const statusColor: [number, number, number] = data.remaining <= 0 ? [16, 185, 129] : data.totalReceived > 0 ? [245, 158, 11] : [239, 68, 68];
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(10);
+  doc.setTextColor(...statusColor);
+  doc.text(`Status: ${status}`, 20, y);
+  y += 14;
+
+  // Payments table
+  if (data.payments.length > 0) {
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(11);
+    doc.setTextColor(30, 41, 59);
+    doc.text('Payment History', 20, y);
+    y += 8;
+    y = drawPaymentTable(doc, data.payments, y);
+  }
+
+  drawFooter(doc);
+  doc.save(`Payout_${agencyName.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`);
+}
+
+function generateDriverPayoutPDF(
+  ownerName: string,
+  agencyName: string,
+  driverName: string,
+  data: DriverPayoutSummary,
+) {
+  const doc = new jsPDF('p', 'mm', 'a4');
+  let y = drawPDFHeader(doc, `Driver Payout Report`, ownerName, 0);
+
+  // Agency + Driver
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(12);
+  doc.setTextColor(49, 46, 129);
+  doc.text(`Agency: ${agencyName}`, 20, y);
+  y += 8;
+  doc.setTextColor(30, 41, 59);
+  doc.text(`Driver: ${driverName}`, 20, y);
+  y += 14;
+
+  const pw = doc.internal.pageSize.getWidth();
+  doc.setDrawColor(226, 232, 240);
+  doc.line(20, y - 4, pw - 20, y - 4);
+
+  // Summary
+  y = drawSummaryRow(doc, 'Total Driver Salary (Advance)', INR(data.totalAdvance), y, true);
+  y = drawSummaryRow(doc, 'Total Paid', INR(data.totalPaid), y);
+  y = drawSummaryRow(doc, 'Remaining to Pay', INR(data.remaining), y, true);
+  y += 6;
+
+  const status = data.remaining <= 0 ? 'FULLY PAID' : data.totalPaid > 0 ? 'PARTIALLY PAID' : 'UNPAID';
+  const statusColor: [number, number, number] = data.remaining <= 0 ? [16, 185, 129] : data.totalPaid > 0 ? [245, 158, 11] : [239, 68, 68];
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(10);
+  doc.setTextColor(...statusColor);
+  doc.text(`Status: ${status}`, 20, y);
+  y += 14;
+
+  if (data.payments.length > 0) {
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(11);
+    doc.setTextColor(30, 41, 59);
+    doc.text('Payment History', 20, y);
+    y += 8;
+    y = drawPaymentTable(doc, data.payments, y);
+  }
+
+  drawFooter(doc);
+  doc.save(`DriverPayout_${driverName.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`);
+}
+
+function generateBulkTripsPDF(
+  ownerName: string,
+  agencyName: string,
+  fileName: string,
+  groups: DriverGroup[]
+) {
+  const doc = new jsPDF('l', 'mm', 'a4'); // 'l' for landscape
+  let y = drawPDFHeader(doc, `Bulk Trips Report`, ownerName, 0);
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(12);
+  doc.setTextColor(49, 46, 129);
+  doc.text(`Agency: ${agencyName}`, 20, y);
+  y += 14;
+
+  const pw = doc.internal.pageSize.getWidth();
+  
+  const validGroups = groups.filter(g => g.rows.length > 0);
+  
+  if (validGroups.length === 0) {
+     doc.setFont('helvetica', 'normal');
+     doc.setFontSize(10);
+     doc.text("No trips recorded.", 20, y);
+     drawFooter(doc);
+     doc.save(fileName);
+     return;
+  }
+
+  validGroups.forEach((g, gi) => {
+    if (y > doc.internal.pageSize.getHeight() - 40) {
+      doc.addPage();
+      y = 20;
+    }
+
+    doc.setFillColor(241, 245, 249);
+    doc.rect(20, y - 5, pw - 40, 10, 'F');
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(10);
+    doc.setTextColor(30, 41, 59);
+    doc.text(`Driver: ${g.driverName || 'Unknown'}  |  Vehicle: ${g.vehicleNumber || 'Unknown'}`, 25, y+2);
+    
+    y += 12;
+
+    doc.setFontSize(8);
+    doc.setTextColor(100, 116, 139);
+    doc.setFont('helvetica', 'bold');
+    doc.text('START DATE', 22, y);
+    doc.text('START TIME', 45, y);
+    doc.text('END DATE', 68, y);
+    doc.text('END TIME', 90, y);
+    doc.text('START KM', 110, y);
+    doc.text('END KM', 130, y);
+    doc.text('DIST', 150, y);
+    doc.text('HOURS', 165, y);
+    doc.text('TOLL', 180, y);
+    doc.text('NOTES', 195, y);
+    doc.text('TOTAL', pw - 20, y, { align: 'right' });
+    y += 6;
+
+    let groupGrandTotal = 0;
+    
+    g.rows.forEach(r => {
+      groupGrandTotal += r.grandTotal || 0;
+      if (y > doc.internal.pageSize.getHeight() - 25) {
+         doc.addPage();
+         y = 20;
+      }
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(9);
+      doc.setTextColor(51, 65, 85);
+      
+      doc.text(fmtDate(r.startDate), 22, y);
+      doc.text(r.startTime || '—', 45, y);
+      doc.text(fmtDate(r.endDate), 68, y);
+      doc.text(r.endTime || '—', 90, y);
+
+      doc.text(String(r.startKm || '—'), 110, y);
+      doc.text(String(r.endKm || '—'), 130, y);
+      doc.text(`${r.distance || 0} km`, 150, y);
+      doc.text(`${r.hours || 0} hr`, 165, y);
+      doc.text(INR(r.toll || 0), 180, y);
+      doc.text((r.notes || '').substring(0, 35), 195, y);
+      
+      // Total column
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(16, 185, 129);
+      doc.text(INR(r.grandTotal || 0), pw - 20, y, { align: 'right' });
+      
+      y += 8;
+    });
+
+    y += 2;
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(10);
+    doc.setTextColor(100, 116, 139);
+    const balance = Math.max(0, groupGrandTotal - (g.advancePaid || 0));
+    doc.text(`Subtotal: ${INR(groupGrandTotal)}  |  Advance: ${INR(g.advancePaid || 0)}  |  Balance: ${INR(balance)}`, pw - 25, y, { align: 'right' });
+    
+    y += 18;
+  });
+
+  drawFooter(doc);
+  doc.save(fileName);
+}
+
+function generateNormalTripsPDF(
+  ownerName: string,
+  agencyName: string,
+  fileName: string,
+  entries: NormalEntryRow[]
+) {
+  const doc = new jsPDF('l', 'mm', 'a4'); // landscape
+  let y = drawPDFHeader(doc, `Normal Trips Report`, ownerName, 0);
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(12);
+  doc.setTextColor(49, 46, 129);
+  doc.text(`Agency: ${agencyName}`, 20, y);
+  y += 14;
+
+  const pw = doc.internal.pageSize.getWidth();
+  
+  if (entries.length === 0) {
+     doc.setFont('helvetica', 'normal');
+     doc.setFontSize(10);
+     doc.text("No entries recorded.", 20, y);
+     drawFooter(doc);
+     doc.save(fileName);
+     return;
+  }
+
+  doc.setFillColor(241, 245, 249);
+  doc.rect(20, y - 5, pw - 40, 10, 'F');
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(8);
+  doc.setTextColor(100, 116, 139);
+  
+  doc.text('DATE', 25, y+2);
+  doc.text('DRIVER', 50, y+2);
+  doc.text('MOBILE', 90, y+2);
+  doc.text('VEHICLE', 125, y+2);
+  doc.text('TYPE', 155, y+2);
+  doc.text('NOTES', 185, y+2);
+  
+  y += 12;
+
+  entries.forEach((r, i) => {
+    if (y > doc.internal.pageSize.getHeight() - 25) {
+       doc.addPage();
+       y = 20;
+    }
+    
+    if (i % 2 === 0) {
+      doc.setFillColor(248, 250, 252);
+      doc.rect(20, y - 5, pw - 40, 9, 'F');
+    }
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+    doc.setTextColor(51, 65, 85);
+    
+    doc.text(fmtDate(r.date), 25, y);
+    doc.text((r.driverName || '—').substring(0, 20), 50, y);
+    doc.text(r.mobileNumber || '—', 90, y);
+    doc.text((r.vehicleNumber || '—').substring(0, 15), 125, y);
+    doc.text((r.vehicleType || '—').substring(0, 15), 155, y);
+    doc.text((r.notes || '').substring(0, 45), 185, y);
+    
+    y += 9;
+  });
+
+  drawFooter(doc);
+  doc.save(fileName);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// AGENCY PAYOUT TAB
+// ═══════════════════════════════════════════════════════════════════════════════
+
+function AgencyPayoutTab({ agencyId, agencyName }: { agencyId: string; agencyName: string }) {
+  const { user } = useAuth();
+  const [data, setData] = useState<AgencyPayoutSummary | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [amount, setAmount] = useState('');
+  const [paymentMethod, setPaymentMethod] = useState('cash');
+  const [notes, setNotes] = useState('');
+  const [paymentDate, setPaymentDate] = useState(new Date().toISOString().split('T')[0]);
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try { setData(await fetchAgencyPayoutSummary(agencyId)); }
+    catch { setData(null); }
+    finally { setLoading(false); }
+  }, [agencyId]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const handleAdd = async () => {
+    const amt = parseFloat(amount);
+    if (!amt || amt <= 0) { setErr('Enter a valid amount'); return; }
+    setSaving(true); setErr(null);
+    try {
+      await addAgencyPayoutPayment(agencyId, { amount: amt, paymentDate, paymentMethod, notes });
+      setAmount(''); setNotes('');
+      await load();
+    } catch (e: any) { setErr(e?.response?.data?.message ?? 'Failed to add payment'); }
+    finally { setSaving(false); }
+  };
+
+  const handleDelete = async (paymentId: string) => {
+    if (!confirm('Delete this payment record?')) return;
+    try { await deletePayoutPayment(paymentId); await load(); }
+    catch { alert('Failed to delete'); }
+  };
+
+  if (loading) return <div className="flex items-center justify-center py-16"><Loader2 className="h-6 w-6 animate-spin text-indigo-400" /></div>;
+
+  const gt = data?.grandTotal ?? 0;
+  const received = data?.totalReceived ?? 0;
+  const remaining = data?.remaining ?? 0;
+  const pct = gt > 0 ? Math.min((received / gt) * 100, 100) : 0;
+
+  return (
+    <div className="space-y-5">
+      {/* Summary cards */}
+      <div className="grid grid-cols-3 gap-3">
+        {[
+          { label: 'Grand Total', value: gt, color: 'text-slate-800', bg: 'bg-slate-50 border-slate-200' },
+          { label: 'Received', value: received, color: 'text-emerald-700', bg: 'bg-emerald-50 border-emerald-200' },
+          { label: 'Remaining', value: remaining, color: remaining > 0 ? 'text-amber-700' : 'text-slate-400', bg: remaining > 0 ? 'bg-amber-50 border-amber-200' : 'bg-slate-50 border-slate-200' },
+        ].map(c => (
+          <div key={c.label} className={`rounded-xl border px-4 py-3 ${c.bg}`}>
+            <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">{c.label}</div>
+            <div className={`text-lg font-bold ${c.color}`}>₹{c.value.toLocaleString('en-IN')}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Progress bar */}
+      {gt > 0 && (
+        <div>
+          <div className="flex justify-between text-xs text-slate-500 mb-1">
+            <span>Payment Progress</span><span>{pct.toFixed(0)}%</span>
+          </div>
+          <div className="h-2.5 rounded-full bg-slate-100 overflow-hidden">
+            <div className="h-full rounded-full bg-emerald-500 transition-all" style={{ width: `${pct}%` }} />
+          </div>
+        </div>
+      )}
+
+      {/* Add payment form */}
+      <div className="rounded-xl border border-indigo-100 bg-indigo-50/60 p-4 space-y-3">
+        <h4 className="text-sm font-semibold text-slate-700">Record Payment Received</h4>
+        {err && <p className="text-xs text-red-600 bg-red-50 px-3 py-1.5 rounded-lg">{err}</p>}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+          <div>
+            <label className="text-[10px] font-bold uppercase text-slate-400 mb-1 block">Amount (₹) *</label>
+            <input type="number" min="0" step="0.01" placeholder="0" value={amount}
+              onChange={e => setAmount(e.target.value)}
+              className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-indigo-400" />
+          </div>
+          <div>
+            <label className="text-[10px] font-bold uppercase text-slate-400 mb-1 block">Date</label>
+            <input type="date" value={paymentDate} onChange={e => setPaymentDate(e.target.value)}
+              className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-indigo-400" />
+          </div>
+          <div>
+            <label className="text-[10px] font-bold uppercase text-slate-400 mb-1 block">Method</label>
+            <select value={paymentMethod} onChange={e => setPaymentMethod(e.target.value)}
+              className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-indigo-400">
+              <option value="cash">Cash</option>
+              <option value="bank_transfer">Bank Transfer</option>
+              <option value="cheque">Cheque</option>
+              <option value="online">Online</option>
+              <option value="other">Other</option>
+            </select>
+          </div>
+          <div>
+            <label className="text-[10px] font-bold uppercase text-slate-400 mb-1 block">Notes</label>
+            <input placeholder="Optional" value={notes} onChange={e => setNotes(e.target.value)}
+              className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-indigo-400" />
+          </div>
+        </div>
+        <button onClick={handleAdd} disabled={saving}
+          className="flex items-center gap-2 rounded-lg bg-indigo-500 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-600 disabled:opacity-50">
+          <Plus className="h-4 w-4" />{saving ? 'Adding…' : 'Add Payment'}
+        </button>
+      </div>
+
+      {/* Payment history */}
+      <div>
+        <h4 className="text-sm font-semibold text-slate-600 mb-2">Payment History ({data?.payments?.length ?? 0})</h4>
+        {!data?.payments?.length ? (
+          <p className="text-sm text-slate-400 text-center py-6">No payments recorded yet</p>
+        ) : (
+          <div className="space-y-2">
+            {data.payments.map(p => (
+              <div key={p._id} className="flex items-center gap-3 rounded-xl border border-slate-100 bg-white px-4 py-3 shadow-sm">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold text-emerald-600 text-sm">₹{p.amount.toLocaleString('en-IN')}</span>
+                    <span className="text-[10px] bg-slate-100 text-slate-500 px-2 py-0.5 rounded capitalize">{p.paymentMethod?.replace('_', ' ')}</span>
+                  </div>
+                  <div className="text-[11px] text-slate-400 mt-0.5">
+                    {p.paymentDate ? new Date(p.paymentDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}
+                    {p.notes && <span className="ml-2 italic">{p.notes}</span>}
+                  </div>
+                </div>
+                <button onClick={() => handleDelete(p._id)}
+                  className="text-red-400 hover:text-red-600 p-1">
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Download PDF */}
+      {data && (
+        <button
+          onClick={() => generateAgencyPayoutPDF(user?.name || 'Owner', agencyName, data)}
+          className="flex items-center gap-2 rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-2.5 text-sm font-semibold text-indigo-700 hover:bg-indigo-100 transition w-full justify-center"
+        >
+          <FileDown className="h-4 w-4" /> Download Agency Report (PDF)
+        </button>
+      )}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// DRIVER PAYOUT PANEL (inside each DriverGroup card)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+function DriverPayoutPanel({ agencyId, driverName, agencyName }: { agencyId: string; driverName: string; agencyName: string }) {
+  const { user } = useAuth();
+  const [data, setData] = useState<DriverPayoutSummary | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [amount, setAmount] = useState('');
+  const [paymentDate, setPaymentDate] = useState(new Date().toISOString().split('T')[0]);
+  const [paymentMethod, setPaymentMethod] = useState('cash');
+  const [notes, setNotes] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    if (!driverName.trim()) return;
+    setLoading(true);
+    try { setData(await fetchDriverPayoutSummary(agencyId, driverName)); }
+    catch { setData(null); }
+    finally { setLoading(false); }
+  }, [agencyId, driverName]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const handleAdd = async () => {
+    const amt = parseFloat(amount);
+    if (!amt || amt <= 0) { setErr('Enter a valid amount'); return; }
+    setSaving(true); setErr(null);
+    try {
+      await addDriverPayoutPayment(agencyId, { driverName, amount: amt, paymentDate, paymentMethod, notes });
+      setAmount(''); setNotes('');
+      await load();
+    } catch (e: any) { setErr(e?.response?.data?.message ?? 'Failed'); }
+    finally { setSaving(false); }
+  };
+
+  const handleDelete = async (paymentId: string) => {
+    if (!confirm('Delete this payment?')) return;
+    try { await deletePayoutPayment(paymentId); await load(); }
+    catch { alert('Failed to delete'); }
+  };
+
+  if (!driverName.trim()) return <p className="text-xs text-slate-400 px-4 py-3">Enter driver name first</p>;
+  if (loading) return <div className="flex items-center justify-center py-8"><Loader2 className="h-5 w-5 animate-spin text-indigo-400" /></div>;
+
+  const total = data?.totalAdvance ?? 0;
+  const paid = data?.totalPaid ?? 0;
+  const remaining = data?.remaining ?? 0;
+
+  return (
+    <div className="px-4 py-3 space-y-3">
+      {/* Summary row */}
+      <div className="grid grid-cols-3 gap-2">
+        {[
+          { label: 'Advance Owed', val: total, cls: 'text-slate-700' },
+          { label: 'Paid', val: paid, cls: 'text-emerald-700' },
+          { label: 'Remaining', val: remaining, cls: remaining > 0 ? 'text-amber-700' : 'text-slate-400' },
+        ].map(c => (
+          <div key={c.label} className="rounded-lg bg-slate-50 border border-slate-100 px-3 py-2">
+            <div className="text-[9px] font-bold uppercase tracking-wider text-slate-400">{c.label}</div>
+            <div className={`text-sm font-bold ${c.cls}`}>₹{c.val.toLocaleString('en-IN')}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Add payment */}
+      {err && <p className="text-xs text-red-600">{err}</p>}
+      <div className="flex flex-wrap gap-2">
+        <input type="number" min="0" step="0.01" placeholder="Amount" value={amount}
+          onChange={e => setAmount(e.target.value)}
+          className="flex-1 min-w-[80px] rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs outline-none focus:border-indigo-400" />
+        <input type="date" value={paymentDate} onChange={e => setPaymentDate(e.target.value)}
+          className="rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs outline-none focus:border-indigo-400" />
+        <select value={paymentMethod} onChange={e => setPaymentMethod(e.target.value)}
+          className="rounded-lg border border-slate-200 px-2 py-1.5 text-xs outline-none focus:border-indigo-400">
+          <option value="cash">Cash</option>
+          <option value="bank_transfer">Bank Transfer</option>
+          <option value="online">Online</option>
+          <option value="other">Other</option>
+        </select>
+        <input placeholder="Notes" value={notes} onChange={e => setNotes(e.target.value)}
+          className="flex-1 min-w-[80px] rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs outline-none focus:border-indigo-400" />
+        <button onClick={handleAdd} disabled={saving}
+          className="flex items-center gap-1.5 rounded-lg bg-emerald-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-600 disabled:opacity-50">
+          <Plus className="h-3.5 w-3.5" />{saving ? '…' : 'Pay'}
+        </button>
+      </div>
+
+      {/* History */}
+      {(data?.payments?.length ?? 0) > 0 && (
+        <div className="space-y-1.5">
+          {data!.payments.map(p => (
+            <div key={p._id} className="flex items-center gap-2 rounded-lg border border-slate-100 bg-white px-3 py-2">
+              <span className="font-semibold text-emerald-600 text-xs">₹{p.amount.toLocaleString('en-IN')}</span>
+              <span className="text-[10px] text-slate-400 flex-1">
+                {p.paymentDate ? new Date(p.paymentDate).toLocaleDateString('en-IN') : ''}
+                {p.notes && ` · ${p.notes}`}
+              </span>
+              <button onClick={() => handleDelete(p._id)} className="text-red-400 hover:text-red-600">
+                <Trash2 className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Download PDF */}
+      {data && total > 0 && (
+        <button
+          onClick={() => generateDriverPayoutPDF(user?.name || 'Owner', agencyName, driverName, data)}
+          className="flex items-center gap-1.5 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-1.5 text-xs font-semibold text-indigo-700 hover:bg-indigo-100 transition w-full justify-center"
+        >
+          <FileDown className="h-3.5 w-3.5" /> Download Report
+        </button>
+      )}
+    </div>
+  );
+}
 
 function CreateAgencyModal({ onClose, onCreated }: {
   onClose: () => void; onCreated: (a: Agency) => void;
@@ -243,12 +897,16 @@ const CellInput = memo(function CellInput({ value, onChange, placeholder, type =
 // BULK ENTRY TABLE
 // ═══════════════════════════════════════════════════════════════════════════════
 
-function BulkEntryTable({ groups, onChange, onDeleteTrip, onDeleteTrips }: {
+function BulkEntryTable({ groups, onChange, onDeleteTrip, onDeleteTrips, agencyId, agencyName }: {
   groups: DriverGroup[];
   onChange: Dispatch<SetStateAction<DriverGroup[]>>;
   onDeleteTrip: (id: string) => Promise<void> | void;
   onDeleteTrips?: (ids: string[]) => Promise<void> | void;
+  agencyId?: string;
+  agencyName?: string;
 }) {
+  const { user } = useAuth();
+  const [expandedPayoutGi, setExpandedPayoutGi] = useState<number | null>(null);
   const updateGroupField = useCallback((gi: number, field: keyof DriverGroup, val: any) => {
     onChange(prev => {
       const next = [...prev];
@@ -345,6 +1003,24 @@ function BulkEntryTable({ groups, onChange, onDeleteTrip, onDeleteTrips }: {
 
   return (
     <div className="space-y-4">
+      {/* Top Actions */}
+      {groups.length > 0 && groups.some(g => g.rows.length > 0) && (
+        <div className="flex justify-end mb-2">
+          <button
+            onClick={() => {
+              const defaultName = `BulkTrips_${(agencyName || 'Agency').replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`;
+              const fileName = window.prompt("Enter file name for Report:", defaultName);
+              if (fileName) {
+                generateBulkTripsPDF(user?.name || 'Owner', agencyName || 'Agency', fileName.endsWith('.pdf') ? fileName : `${fileName}.pdf`, groups);
+              }
+            }}
+            className="flex items-center gap-2 rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-2 text-sm font-semibold text-indigo-700 hover:bg-indigo-100 transition shadow-sm"
+          >
+            <FileDown className="h-4 w-4" /> Download Bulk Trips Report (PDF)
+          </button>
+        </div>
+      )}
+
       {/* All groups are editable — server trips are merged into groups[] */}
       {groups.map((g, gi) => (
         <div key={gi} className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
@@ -524,6 +1200,23 @@ function BulkEntryTable({ groups, onChange, onDeleteTrip, onDeleteTrips }: {
             })()}
           </div>
           </div>
+
+          {/* Driver Payout collapsible */}
+          {agencyId && g.driverName.trim() && (
+            <div className="border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setExpandedPayoutGi(expandedPayoutGi === gi ? null : gi)}
+                className="w-full flex items-center gap-2 px-4 py-2.5 text-xs font-semibold text-emerald-600 hover:bg-emerald-50/50 transition"
+              >
+                <Wallet className="h-3.5 w-3.5" />
+                {expandedPayoutGi === gi ? '▾' : '▸'} Driver Payout
+              </button>
+              {expandedPayoutGi === gi && (
+                <DriverPayoutPanel agencyId={agencyId} agencyName={agencyName || ''} driverName={g.driverName} />
+              )}
+            </div>
+          )}
         </div>
       ))}
 
@@ -607,6 +1300,7 @@ function NormalEntryTable({ entries, onChange, onDeleteTrip, agencyName }: {
   onDeleteTrip: (id: string) => Promise<void> | void;
   agencyName?: string;
 }) {
+  const { user } = useAuth();
   const update = useCallback((idx: number, field: keyof NormalEntryRow, val: string) => {
     onChange(prev => {
       const next = [...prev];
@@ -764,6 +1458,22 @@ function NormalEntryTable({ entries, onChange, onDeleteTrip, agencyName }: {
           className="flex items-center gap-2 text-sm font-medium text-indigo-600 hover:text-indigo-700 border border-dashed border-indigo-300 rounded-xl px-4 py-3.5 flex-1 justify-center hover:bg-indigo-50/50 transition">
           <Plus className="h-5 w-5" /> Add Entry
         </button>
+        {entries.length > 0 && entries.some(e => e.driverName || e.vehicleNumber || e.mobileNumber) && (
+          <button
+            type="button"
+            onClick={() => {
+              const defaultName = `NormalTrips_${(agencyName || 'Agency').replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`;
+              const fileName = window.prompt("Enter file name for Report:", defaultName);
+              if (fileName) {
+                generateNormalTripsPDF(user?.name || 'Owner', agencyName || 'Agency', fileName.endsWith('.pdf') ? fileName : `${fileName}.pdf`, entries.filter(e => e.driverName || e.vehicleNumber || e.mobileNumber));
+              }
+            }}
+            title="Download Normal Trips Report"
+            className="flex items-center gap-2 text-sm font-semibold text-indigo-700 bg-indigo-50 border border-indigo-300 hover:bg-indigo-100 rounded-xl px-4 py-3.5 transition"
+          >
+            <FileDown className="h-5 w-5" /> Download Report
+          </button>
+        )}
         <button
           type="button"
           onClick={() => copyAllEntries(entries, agencyName)}
@@ -796,13 +1506,12 @@ export function BulkEntryPage() {
   const deletePromiseRef = useRef<{ resolve: () => void; reject: (err?: any) => void } | null>(null);
 
   // State — mode
-  const [isBulkMode, setIsBulkMode] = useState(() => {
+  const [activeTab, setActiveTab] = useState<'bulk' | 'normal' | 'payout'>(() => {
     try {
-      const v = localStorage.getItem(LS_ENTRY_MODE);
-      return v !== 'normal';
-    } catch {
-      return true;
-    }
+      const v = localStorage.getItem(LS_ENTRY_MODE) as any;
+      if (v === 'normal' || v === 'payout') return v;
+      return 'bulk';
+    } catch { return 'bulk'; }
   });
 
   // State — bulk data (functional updater pattern for perf)
@@ -827,6 +1536,9 @@ export function BulkEntryPage() {
   // ── Serializers (stable refs) ──
   const serializeBulk = useCallback((groups: DriverGroup[]) => JSON.stringify(groups), []);
   const serializeNormal = useCallback((entries: NormalEntryRow[]) => JSON.stringify(entries), []);
+
+  // derive isBulkMode from activeTab
+  const isBulkMode = activeTab === 'bulk';
 
   // ── Backend sync callbacks (stable refs) ──
   const syncBulkToBackend = useCallback(async (groups: DriverGroup[]) => {
@@ -1145,9 +1857,9 @@ export function BulkEntryPage() {
   }, []);
 
   // ── Mode toggle ──
-  const toggleMode = useCallback((bulk: boolean) => {
-    setIsBulkMode(bulk);
-    try { localStorage.setItem(LS_ENTRY_MODE, bulk ? 'bulk' : 'normal'); } catch {}
+  const toggleMode = useCallback((tab: 'bulk' | 'normal' | 'payout') => {
+    setActiveTab(tab);
+    try { localStorage.setItem(LS_ENTRY_MODE, tab); } catch {}
   }, []);
 
   // Close dropdown on outside click
@@ -1209,6 +1921,18 @@ export function BulkEntryPage() {
             <Plus className="h-4 w-4" /> <span className="hidden sm:inline">Agency</span><span className="sm:hidden">New</span>
           </button>
 
+          {/* Payout Button */}
+          {selectedAgency && (
+            <button type="button" onClick={() => toggleMode('payout')}
+              className={`flex items-center gap-1.5 rounded-lg px-3 py-2.5 text-xs sm:text-sm font-semibold transition shadow-sm shrink-0 border ${
+                activeTab === 'payout' 
+                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
+                  : 'bg-white text-emerald-600 border-emerald-100 hover:bg-emerald-50'
+              }`}>
+              <Wallet className="h-4 w-4" /> <span className="hidden sm:inline">Payout</span>
+            </button>
+          )}
+
           {/* Agency Total Balance Display */}
           {selectedAgency && isBulkMode && (
             <div className="hidden sm:flex items-center gap-2 rounded-lg bg-emerald-50 px-3 py-2.5 border border-emerald-100 shadow-sm transition-all hover:shadow hover:bg-emerald-100/60 sm:ml-auto">
@@ -1236,13 +1960,13 @@ export function BulkEntryPage() {
 
           {/* Mode toggle */}
           <div className="flex items-center rounded-lg border border-slate-200 bg-slate-50 p-0.5">
-            <button type="button" onClick={() => toggleMode(true)}
+            <button type="button" onClick={() => toggleMode('bulk')}
               className={`rounded-md px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-semibold transition ${
-                isBulkMode ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                activeTab === 'bulk' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'
               }`}>Bulk</button>
-            <button type="button" onClick={() => toggleMode(false)}
+            <button type="button" onClick={() => toggleMode('normal')}
               className={`rounded-md px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-semibold transition ${
-                !isBulkMode ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                activeTab === 'normal' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'
               }`}>Normal</button>
           </div>
 
@@ -1264,10 +1988,18 @@ export function BulkEntryPage() {
             <p className="text-base font-medium text-slate-500">Select an agency to get started</p>
             <p className="text-sm text-slate-400">Choose from the dropdown above, or create a new agency.</p>
           </div>
-        ) : isBulkMode ? (
-          <BulkEntryTable groups={bulkGroups} onChange={setBulkGroups} onDeleteTrip={handleDeleteTrip} onDeleteTrips={handleDeleteTrips} />
+        ) : activeTab === 'payout' ? (
+          <div className="max-w-2xl mx-auto">
+            <div className="mb-5 flex items-center gap-2">
+              <Wallet className="h-5 w-5 text-emerald-500" />
+              <h2 className="text-base font-bold text-slate-800">{selectedAgency.name} — Payout</h2>
+            </div>
+            <AgencyPayoutTab agencyId={selectedAgency._id ?? selectedAgency.id ?? ''} agencyName={selectedAgency.name} />
+          </div>
+        ) : activeTab === 'bulk' ? (
+          <BulkEntryTable groups={bulkGroups} onChange={setBulkGroups} onDeleteTrip={handleDeleteTrip} onDeleteTrips={handleDeleteTrips} agencyId={selectedAgency._id ?? selectedAgency.id ?? ''} agencyName={selectedAgency.name} />
         ) : (
-          <NormalEntryTable entries={normalEntries} onChange={setNormalEntries} onDeleteTrip={handleDeleteTrip} />
+          <NormalEntryTable entries={normalEntries} onChange={setNormalEntries} onDeleteTrip={handleDeleteTrip} agencyName={selectedAgency.name} />
         )}
       </div>
 

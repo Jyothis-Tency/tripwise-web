@@ -21,6 +21,7 @@ const ExpensesPage: React.FC = () => {
   const [trips, setTrips] = useState<TripWithExpenses[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
+  const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
   const [search, setSearch] = useState('');
 
   const loadPersonal = useCallback(async () => {
@@ -161,7 +162,14 @@ const ExpensesPage: React.FC = () => {
               </div>
             ) : (
               <div className="space-y-2.5">
-                {expenses.map(e => <ExpenseCard key={e._id} expense={e} onRefresh={loadPersonal} />)}
+                {expenses.map(e => (
+                  <ExpenseCard
+                    key={e._id}
+                    expense={e}
+                    onRefresh={loadPersonal}
+                    onEdit={(expense) => setEditingExpense(expense)}
+                  />
+                ))}
               </div>
             )}
           </>
@@ -169,6 +177,12 @@ const ExpensesPage: React.FC = () => {
       </div>
 
       <AddExpenseModal open={showAdd} onClose={() => setShowAdd(false)} onCreated={loadPersonal} />
+      <AddExpenseModal
+        open={!!editingExpense}
+        onClose={() => setEditingExpense(null)}
+        onCreated={loadPersonal}
+        expense={editingExpense}
+      />
     </div>
   );
 };

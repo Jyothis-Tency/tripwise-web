@@ -108,10 +108,19 @@ export async function fetchDriverSalary(driverId: string, month?: string): Promi
   const params: Record<string, string> = {};
   if (month) params.month = month;
   const { data } = await apiClient.get(`/owners/drivers/${driverId}/salary`, { params });
-  return data.data ?? data;
+  const payload = data.data ?? data;
+  
+  return {
+    totalEarnings: payload.totalEarned ?? 0,
+    totalTrips: (payload.completedTrips ?? 0) + (payload.inProgressTrips ?? 0),
+    totalKm: payload.totalKm ?? 0,
+    totalAdvance: payload.advanceSalary ?? 0,
+    netSalary: payload.remainingBalance ?? 0,
+    advancePayments: payload.advancePayments || [],
+  };
 }
 
-export async function fetchDriverTrips(driverId: string, params?: { page?: number; limit?: number }): Promise<{
+export async function fetchDriverTrips(driverId: string, params?: { page?: number; limit?: number; month?: string }): Promise<{
   trips: DriverTrip[];
   totalPages: number;
   currentPage: number;

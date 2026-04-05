@@ -232,7 +232,7 @@ export function HistoryPage() {
     // Report Title
     doc.setFontSize(16);
     doc.setFont('helvetica', 'bold');
-    const ownerName = user?.company || user?.name || 'Tripwise';
+    const ownerName = (user as any)?.company || user?.name || 'Tripwise';
     doc.text(`${ownerName} History Report`, 14, y);
     
     doc.setFontSize(10);

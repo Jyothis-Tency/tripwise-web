@@ -1089,10 +1089,10 @@ function BulkEntryTable({ groups, onChange, onDeleteTrip, onDeleteTrips, agencyI
                         <CheckCircle className="h-4 w-4" />
                       </button>
                       {r._id ? (
-                      <button type="button" onClick={() => deleteServerRow(gi, ri, String(r._id))}
+                      <button type="button" onClick={() => deleteServerRow(gi, r.clientRowId, String(r._id))}
                         className="text-red-400 hover:text-red-600 p-1"><Trash2 className="h-4 w-4" /></button>
                     ) : g.rows.length > 1 ? (
-                      <button type="button" onClick={() => removeRow(gi, ri)}
+                      <button type="button" onClick={() => removeRow(gi, r.clientRowId)}
                         className="text-red-400 hover:text-red-600 p-1"><Trash2 className="h-4 w-4" /></button>
                     ) : null}
                   </div>

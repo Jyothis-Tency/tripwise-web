@@ -124,8 +124,8 @@ const TripExpenseCard: React.FC<Props> = ({ trip, onRefresh }) => {
                 <div className="flex items-center justify-between">
                   <div className="flex flex-col">
                     <div className="text-[13px] font-medium text-slate-700 flex items-center gap-1.5">
-                      <span className="capitalize">{exp.type || exp.category || 'Expense'}</span>
-                      {exp.description && exp.description.toLowerCase() !== (exp.type?.toLowerCase() || exp.category?.toLowerCase()) && (
+                      <span className="capitalize">{(exp as any).type || exp.category || 'Expense'}</span>
+                      {exp.description && exp.description.toLowerCase() !== ((exp as any).type?.toLowerCase() || exp.category?.toLowerCase()) && (
                         <span className="text-slate-500 font-normal truncate max-w-[120px] xs:max-w-[180px]">— {exp.description}</span>
                       )}
                     </div>

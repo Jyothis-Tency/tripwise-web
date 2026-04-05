@@ -64,6 +64,16 @@ export interface TripItem {
     name?: string;
     phone?: string;
   } | null;
+  startTime?: string | Date;
+  endTime?: string | Date;
+  actualStartTime?: string | Date;
+  actualEndTime?: string | Date;
+  startKilometers?: number;
+  endKilometers?: number;
+  startingNote?: string;
+  completionNote?: string;
+  totalPersonalExpense?: number;
+  totalExpenses?: number;
 }
 
 export interface DriverItem {
@@ -141,9 +151,20 @@ function mapTrip(t: any): TripItem {
     agencyName: t.agencyName,
     ownerProfit: t.ownerProfit,
     advance: t.advance,
+    driver_salary: t.driver_salary,
     notes: t.notes,
     careOf: t.careOf,
     driver: t.driver ?? null,
+    startTime: t.startTime,
+    endTime: t.endTime,
+    actualStartTime: t.actualStartTime,
+    actualEndTime: t.actualEndTime,
+    startKilometers: t.startKilometers,
+    endKilometers: t.endKilometers,
+    startingNote: t.startingNote,
+    completionNote: t.completionNote,
+    totalPersonalExpense: t.totalPersonalExpense,
+    totalExpenses: t.totalExpenses,
   };
 }
 

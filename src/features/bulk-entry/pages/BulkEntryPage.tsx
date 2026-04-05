@@ -1,7 +1,7 @@
 import { memo, useCallback, useEffect, useRef, useState, useMemo, type Dispatch, type SetStateAction } from 'react';
 import {
   Plus, Trash2, ChevronDown, FileSpreadsheet,
-  Building2, X, RefreshCw, Loader2, Cloud, CloudOff, Copy, Wallet, FileDown,
+  Building2, X, RefreshCw, Loader2, Cloud, CloudOff, Copy, CheckCircle, Wallet, FileDown,
 } from 'lucide-react';
 import jsPDF from 'jspdf';
 import { useAuth } from '../../../hooks/useAuth';
@@ -475,8 +475,7 @@ function generateBulkTripsPDF(
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(10);
     doc.setTextColor(100, 116, 139);
-    const balance = Math.max(0, groupGrandTotal - (g.advancePaid || 0));
-    doc.text(`Subtotal: ${INR(groupGrandTotal)}  |  Advance: ${INR(g.advancePaid || 0)}  |  Balance: ${INR(balance)}`, pw - 25, y, { align: 'right' });
+    doc.text(`Total: ${INR(groupGrandTotal)}`, pw - 20, y, { align: 'right' });
     
     y += 18;
   });
@@ -883,8 +882,15 @@ const CellInput = memo(function CellInput({ value, onChange, placeholder, type =
   value: string | number; onChange: (v: string) => void; placeholder?: string;
   type?: string; className?: string;
 }) {
+  const [localVal, setLocalVal] = useState(value);
+  useEffect(() => { setLocalVal(value); }, [value]);
+
   return (
-    <input value={value} onChange={e => onChange(e.target.value)}
+    <input value={localVal} 
+      onChange={e => {
+        setLocalVal(e.target.value);
+        onChange(e.target.value);
+      }}
       type={type} placeholder={placeholder}
       className={`w-full rounded-md border border-slate-200 px-2.5 py-2 text-sm outline-none
         focus:border-indigo-400 focus:ring-1 focus:ring-indigo-200 bg-white transition ${
@@ -897,20 +903,35 @@ const CellInput = memo(function CellInput({ value, onChange, placeholder, type =
 // BULK ENTRY TABLE
 // ═══════════════════════════════════════════════════════════════════════════════
 
-function BulkEntryTable({ groups, onChange, onDeleteTrip, onDeleteTrips, agencyId, agencyName }: {
+function BulkEntryTable({ groups, onChange, onDeleteTrip, onDeleteTrips, agencyId, agencyName, filterStatus = 'all' }: {
   groups: DriverGroup[];
   onChange: Dispatch<SetStateAction<DriverGroup[]>>;
   onDeleteTrip: (id: string) => Promise<void> | void;
   onDeleteTrips?: (ids: string[]) => Promise<void> | void;
   agencyId?: string;
   agencyName?: string;
+  filterStatus?: 'all' | 'pending' | 'completed';
 }) {
+  const isRowHidden = (isCompleted?: boolean) => {
+    if (filterStatus === 'pending') return !!isCompleted;
+    if (filterStatus === 'completed') return !isCompleted;
+    return false;
+  };
   const { user } = useAuth();
   const [expandedPayoutGi, setExpandedPayoutGi] = useState<number | null>(null);
   const updateGroupField = useCallback((gi: number, field: keyof DriverGroup, val: any) => {
     onChange(prev => {
       const next = [...prev];
-      (next[gi] as any)[field] = val;
+      next[gi] = { ...next[gi], [field]: val };
+      return next;
+    });
+  }, [onChange]);
+
+  const toggleComplete = useCallback((gi: number, ri: number) => {
+    onChange(prev => {
+      const next = [...prev];
+      next[gi] = { ...next[gi], rows: [...next[gi].rows] };
+      next[gi].rows[ri] = { ...next[gi].rows[ri], isCompleted: !next[gi].rows[ri].isCompleted };
       return next;
     });
   }, [onChange]);
@@ -918,8 +939,8 @@ function BulkEntryTable({ groups, onChange, onDeleteTrip, onDeleteTrips, agencyI
   const updateRow = useCallback((gi: number, ri: number, field: keyof BulkTripRow, val: any) => {
     onChange(prev => {
       const next = [...prev];
-      const row = next[gi].rows[ri];
-      (row as any)[field] = val;
+      next[gi] = { ...next[gi], rows: [...next[gi].rows] };
+      const row = { ...next[gi].rows[ri], [field]: val };
 
       // Auto-calculate distance
       if (field === 'startKm' || field === 'endKm') {
@@ -940,7 +961,8 @@ function BulkEntryTable({ groups, onChange, onDeleteTrip, onDeleteTrips, agencyI
           row.hours = 0;
         }
       }
-
+      
+      next[gi].rows[ri] = row;
       return next;
     });
   }, [onChange]);
@@ -953,21 +975,24 @@ function BulkEntryTable({ groups, onChange, onDeleteTrip, onDeleteTrips, agencyI
     });
   }, [onChange]);
 
-  const removeRow = useCallback((gi: number, ri: number) => {
+  const removeRow = useCallback((gi: number, rowId: string) => {
     onChange(prev => {
       const next = [...prev];
-      if (next[gi].rows.length <= 1) return prev;
-      next[gi] = { ...next[gi], rows: next[gi].rows.filter((_: BulkTripRow, i: number) => i !== ri) };
+      if (next[gi].rows.length <= 1) {
+        next[gi] = { ...next[gi], rows: [emptyBulkRow()] };
+        return next;
+      }
+      next[gi] = { ...next[gi], rows: next[gi].rows.filter(r => r.clientRowId !== rowId) };
       return next;
     });
   }, [onChange]);
 
-  const deleteServerRow = useCallback(async (gi: number, ri: number, id: string) => {
-    if (!id) return;
+  const deleteServerRow = useCallback(async (gi: number, rowId: string, serverId: string) => {
+    if (!serverId) return;
     try {
-      await onDeleteTrip(id);
+      await onDeleteTrip(serverId);
       // remove locally after successful delete
-      removeRow(gi, ri);
+      removeRow(gi, rowId);
     } catch {
       // silent
     }
@@ -1023,7 +1048,7 @@ function BulkEntryTable({ groups, onChange, onDeleteTrip, onDeleteTrips, agencyI
 
       {/* All groups are editable — server trips are merged into groups[] */}
       {groups.map((g, gi) => (
-        <div key={gi} className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+        <div key={gi} className={`rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden ${groups.length > 1 && g.rows.every(r => isRowHidden(r.isCompleted)) ? 'hidden' : ''}`}>
           {/* Group header */}
           <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-2.5 sm:gap-3 border-b border-slate-100 bg-indigo-50/50 px-4 sm:px-5 py-3 sm:py-3.5">
             <div className="flex items-center gap-2.5 sm:gap-3">
@@ -1052,13 +1077,18 @@ function BulkEntryTable({ groups, onChange, onDeleteTrip, onDeleteTrips, agencyI
           {/* Trip rows — MOBILE CARD VIEW (below md) */}
           <div className="md:hidden divide-y divide-slate-100">
             {g.rows.map((r, ri) => (
-              <div key={r.clientRowId} className="p-4 space-y-3">
+              <div key={r.clientRowId} className={`p-4 space-y-3 ${isRowHidden(r.isCompleted) ? 'hidden' : ''}`}>
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-bold text-indigo-500 uppercase">Trip {ri + 1}</span>
                   <div className="flex items-center gap-2.5">
                     {r.distance > 0 && <span className="text-xs bg-slate-100 px-2 py-0.5 rounded font-medium text-slate-600">{r.distance} km</span>}
                     {r.hours > 0 && <span className="text-xs bg-slate-100 px-2 py-0.5 rounded font-medium text-slate-600">{r.hours} hrs</span>}
-                    {r._id ? (
+                    <button type="button" onClick={() => toggleComplete(gi, ri)}
+                        title={r.isCompleted ? 'Mark as pending' : 'Mark as completed'}
+                        className={`p-1 transition ${r.isCompleted ? 'text-emerald-500 hover:text-emerald-600' : 'text-slate-300 hover:text-slate-400'}`}>
+                        <CheckCircle className="h-4 w-4" />
+                      </button>
+                      {r._id ? (
                       <button type="button" onClick={() => deleteServerRow(gi, ri, String(r._id))}
                         className="text-red-400 hover:text-red-600 p-1"><Trash2 className="h-4 w-4" /></button>
                     ) : g.rows.length > 1 ? (
@@ -1121,6 +1151,7 @@ function BulkEntryTable({ groups, onChange, onDeleteTrip, onDeleteTrips, agencyI
               <thead>
                 <tr className="bg-slate-50 text-left text-slate-500 font-semibold">
                   <th className="px-2 py-2 w-8">#</th>
+                  <th className="px-2 py-2 w-8" title="Completed">✓</th>
                   <th className="px-2 py-2 min-w-[120px]">Date (Start/End)</th>
                   <th className="px-2 py-2">Start KM</th><th className="px-2 py-2">End KM</th><th className="px-2 py-2">Dist.</th>
                   <th className="px-2 py-2 min-w-[110px]">Time (Start/End)</th><th className="px-2 py-2">Hrs.</th>
@@ -1131,9 +1162,17 @@ function BulkEntryTable({ groups, onChange, onDeleteTrip, onDeleteTrips, agencyI
               </thead>
               <tbody>
                 {g.rows.map((r, ri) => (
-                  <tr key={r.clientRowId} className="border-t border-slate-50 hover:bg-slate-50/30">
+                  <tr key={r.clientRowId} className={`border-t border-slate-50 hover:bg-slate-50/30 ${isRowHidden(r.isCompleted) ? 'hidden' : ''}`}>
                     <td className="px-2 py-1.5 text-slate-400 font-medium">{ri + 1}</td>
-                    <td className="px-2 py-1.5"><div className="flex flex-col gap-1">
+                    <td className="px-2 py-1.5">
+                      <button type="button" onClick={() => toggleComplete(gi, ri)}
+                        title={r.isCompleted ? 'Mark as pending' : 'Mark as completed'}
+                        className={`p-1.5 rounded-lg transition-all ${r.isCompleted ? 'text-emerald-500 bg-emerald-50 hover:bg-emerald-100' : 'text-slate-300 hover:text-slate-500 hover:bg-slate-100'}`}>
+                        <CheckCircle className="h-4 w-4" />
+                      </button>
+                    </td>
+                    <td className="px-2 py-1.5">
+                    <div className="flex flex-col gap-1">
                       <CellInput value={r.startDate} onChange={v => updateRow(gi, ri, 'startDate', v)} type="date" />
                       <CellInput value={r.endDate} onChange={v => updateRow(gi, ri, 'endDate', v)} type="date" />
                     </div></td>
@@ -1157,15 +1196,17 @@ function BulkEntryTable({ groups, onChange, onDeleteTrip, onDeleteTrips, agencyI
                       />
                     </td>
                     <td className="px-2 py-1.5">
-                      {r._id ? (
-                        <button type="button" onClick={() => deleteServerRow(gi, ri, String(r._id))}
-                          title="Delete saved trip"
-                          className="text-red-400 hover:text-red-600"><Trash2 className="h-3.5 w-3.5" /></button>
-                      ) : g.rows.length > 1 ? (
-                        <button type="button" onClick={() => removeRow(gi, ri)}
-                          title="Remove row"
-                          className="text-red-400 hover:text-red-600"><Trash2 className="h-3.5 w-3.5" /></button>
-                      ) : null}
+                      <div className="flex flex-col gap-1 items-center">
+                        {r._id ? (
+                          <button type="button" onClick={() => deleteServerRow(gi, r.clientRowId!, String(r._id))}
+                            title="Delete saved trip"
+                            className="text-red-400 hover:text-red-600"><Trash2 className="h-3.5 w-3.5" /></button>
+                        ) : g.rows.length > 1 ? (
+                          <button type="button" onClick={() => removeRow(gi, r.clientRowId!)}
+                            title="Remove row"
+                            className="text-red-400 hover:text-red-600"><Trash2 className="h-3.5 w-3.5" /></button>
+                        ) : null}
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -1294,12 +1335,26 @@ async function copyAllEntries(entries: (NormalEntryRow | AgencyTrip)[], agencyNa
 // NORMAL ENTRY TABLE
 // ═══════════════════════════════════════════════════════════════════════════════
 
-function NormalEntryTable({ entries, onChange, onDeleteTrip, agencyName }: {
+function NormalEntryTable({ entries, onChange, onDeleteTrip, agencyName, filterStatus = 'all' }: {
+  filterStatus?: 'all' | 'pending' | 'completed';
   entries: NormalEntryRow[];
   onChange: Dispatch<SetStateAction<NormalEntryRow[]>>;
   onDeleteTrip: (id: string) => Promise<void> | void;
   agencyName?: string;
 }) {
+  const isRowHidden = (isCompleted?: boolean) => {
+    if (filterStatus === 'pending') return !!isCompleted;
+    if (filterStatus === 'completed') return !isCompleted;
+    return false;
+  };
+
+  const toggleComplete = (i: number) => {
+    onChange(prev => {
+      const next = [...prev];
+      next[i] = { ...next[i], isCompleted: !next[i].isCompleted };
+      return next;
+    });
+  };
   const { user } = useAuth();
   const update = useCallback((idx: number, field: keyof NormalEntryRow, val: string) => {
     onChange(prev => {
@@ -1337,7 +1392,7 @@ function NormalEntryTable({ entries, onChange, onDeleteTrip, agencyName }: {
       {/* Editable entries — MOBILE CARD VIEW (below md) */}
       <div className="md:hidden space-y-3">
         {entries.map((e, i) => (
-          <div key={i} className="rounded-xl border border-slate-200 bg-white shadow-sm p-4 space-y-3">
+          <div key={i} className={`rounded-xl border border-slate-200 bg-white shadow-sm p-4 space-y-3 ${isRowHidden(e.isCompleted) ? 'hidden' : ''}`}>
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold text-indigo-500 uppercase">Entry {i + 1}</span>
               <div className="flex items-center gap-2.5">
@@ -1355,6 +1410,11 @@ function NormalEntryTable({ entries, onChange, onDeleteTrip, agencyName }: {
                   <button type="button" onClick={() => removeEntry(i)}
                     className="text-red-400 hover:text-red-600 p-1"><Trash2 className="h-4 w-4" /></button>
                 )}
+                <button type="button" onClick={() => toggleComplete(i)}
+                  title={e.isCompleted ? 'Mark as pending' : 'Mark as completed'}
+                  className={`p-1 transition ${e.isCompleted ? 'text-emerald-500 hover:text-emerald-600' : 'text-slate-300 hover:text-slate-400'}`}>
+                  <CheckCircle className="h-4.5 w-4.5" />
+                </button>
               </div>
             </div>
             <div className="grid grid-cols-2 gap-3">
@@ -1407,7 +1467,7 @@ function NormalEntryTable({ entries, onChange, onDeleteTrip, agencyName }: {
             </thead>
             <tbody>
               {entries.map((e, i) => (
-                <tr key={i} className="border-t border-slate-50 hover:bg-slate-50/30">
+                <tr key={i} className={`border-t border-slate-50 hover:bg-slate-50/30 ${isRowHidden(e.isCompleted) ? 'hidden' : ''}`}>
                   <td className="px-2 py-1.5 text-slate-400 font-medium">{i + 1}</td>
                   <td className="px-2 py-1.5"><CellInput value={e.date} onChange={v => update(i, 'date', v)} type="date" /></td>
                   <td className="px-2 py-1.5"><CellInput value={e.driverName} onChange={v => update(i, 'driverName', v)} placeholder="Driver Name" /></td>
@@ -1424,7 +1484,7 @@ function NormalEntryTable({ entries, onChange, onDeleteTrip, agencyName }: {
                     />
                   </td>
                   <td className="px-2 py-1.5">
-                    <div className="flex flex-col gap-1">
+                    <div className="flex flex-col gap-1 items-center">
                       {e.driverName?.trim() && (
                         <button
                           type="button"
@@ -1435,6 +1495,11 @@ function NormalEntryTable({ entries, onChange, onDeleteTrip, agencyName }: {
                           <Copy className="h-3 w-3" /> Copy
                         </button>
                       )}
+                      <button type="button" onClick={() => toggleComplete(i)}
+                        title={e.isCompleted ? 'Mark as pending' : 'Mark as completed'}
+                        className={`p-1 transition ${e.isCompleted ? 'text-emerald-500 hover:text-emerald-600' : 'text-slate-300 hover:text-slate-400'}`}>
+                        <CheckCircle className="h-4 w-4" />
+                      </button>
                       {(e as any)._id ? (
                         <button type="button" onClick={() => deleteServerEntry(i, String((e as any)._id))}
                           title="Delete saved entry"
@@ -1513,6 +1578,9 @@ export function BulkEntryPage() {
       return 'bulk';
     } catch { return 'bulk'; }
   });
+
+  // State — bulk data (functional updater pattern for perf)
+  const [filterStatus, setFilterStatus] = useState<'all' | 'pending' | 'completed'>('all');
 
   // State — bulk data (functional updater pattern for perf)
   const [bulkGroups, setBulkGroupsRaw] = useState<DriverGroup[]>([emptyDriverGroup()]);
@@ -1689,6 +1757,7 @@ export function BulkEntryPage() {
                 toll: Number(t.toll ?? 0),
                 grandTotal: Number(t.grandTotal ?? 0),
                 notes: t.notes || '',
+                isCompleted: !!t.isCompleted,
               })),
             };
           });
@@ -1759,6 +1828,7 @@ export function BulkEntryPage() {
             vehicleNumber: t.vehicleNumber || '',
             vehicleType: t.vehicleType || '',
             notes: t.notes || '',
+            isCompleted: !!t.isCompleted,
           }));
           setNormalEntriesRaw(prev => {
             // Canonical merge: prefer server entries, then keep local-only entries that aren't on server.
@@ -1813,9 +1883,14 @@ export function BulkEntryPage() {
       await performDeleteTrips(req.ids);
       pending.resolve();
     } catch (e: any) {
-      pending.reject(e);
-      const msg = e?.response?.data?.message ?? e?.message ?? 'Failed to delete';
-      alert(msg);
+      if (e?.response?.status === 404) {
+        // If it's already deleted in the backend (ghost row), treat it as a success
+        pending.resolve();
+      } else {
+        pending.reject(e);
+        const msg = e?.response?.data?.message ?? e?.message ?? 'Failed to delete';
+        alert(msg);
+      }
     } finally {
       deletePromiseRef.current = null;
       setDeleteInFlight(false);
@@ -1958,6 +2033,24 @@ export function BulkEntryPage() {
           {/* Sync status */}
           <SyncBadge status={currentSyncStatus} />
 
+          {/* Filter Status toggle */}
+          {activeTab !== 'payout' && (
+            <div className="hidden sm:flex items-center rounded-lg border border-slate-200 bg-slate-50 p-0.5">
+              <button type="button" onClick={() => setFilterStatus('all')}
+                className={`rounded-md px-2 sm:px-3 py-1.5 sm:py-2 text-xs font-semibold transition ${
+                  filterStatus === 'all' ? 'bg-white text-slate-700 shadow-sm' : 'text-slate-400 hover:text-slate-600'
+                }`}>All</button>
+              <button type="button" onClick={() => setFilterStatus('pending')}
+                className={`rounded-md px-2 sm:px-3 py-1.5 sm:py-2 text-xs font-semibold transition ${
+                  filterStatus === 'pending' ? 'bg-white text-orange-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'
+                }`}>Pending</button>
+              <button type="button" onClick={() => setFilterStatus('completed')}
+                className={`rounded-md px-2 sm:px-3 py-1.5 sm:py-2 text-xs font-semibold transition ${
+                  filterStatus === 'completed' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'
+                }`}>Done</button>
+            </div>
+          )}
+
           {/* Mode toggle */}
           <div className="flex items-center rounded-lg border border-slate-200 bg-slate-50 p-0.5">
             <button type="button" onClick={() => toggleMode('bulk')}
@@ -1997,9 +2090,15 @@ export function BulkEntryPage() {
             <AgencyPayoutTab agencyId={selectedAgency._id ?? selectedAgency.id ?? ''} agencyName={selectedAgency.name} />
           </div>
         ) : activeTab === 'bulk' ? (
-          <BulkEntryTable groups={bulkGroups} onChange={setBulkGroups} onDeleteTrip={handleDeleteTrip} onDeleteTrips={handleDeleteTrips} agencyId={selectedAgency._id ?? selectedAgency.id ?? ''} agencyName={selectedAgency.name} />
+          <BulkEntryTable
+              groups={bulkGroups}
+              onChange={setBulkGroups}
+              filterStatus={filterStatus} onDeleteTrip={handleDeleteTrip} onDeleteTrips={handleDeleteTrips} agencyId={selectedAgency._id ?? selectedAgency.id ?? ''} agencyName={selectedAgency.name} />
         ) : (
-          <NormalEntryTable entries={normalEntries} onChange={setNormalEntries} onDeleteTrip={handleDeleteTrip} agencyName={selectedAgency.name} />
+          <NormalEntryTable
+              entries={normalEntries}
+              onChange={setNormalEntries}
+              filterStatus={filterStatus} onDeleteTrip={handleDeleteTrip} agencyName={selectedAgency.name} />
         )}
       </div>
 

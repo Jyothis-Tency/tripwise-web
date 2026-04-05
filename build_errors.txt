@@ -1,0 +1,12 @@
+
+> tripwise-web@0.0.0 build
+> tsc -b && vite build
+
+src/features/bulk-entry/pages/BulkEntryPage.tsx(909,9): error TS2304: Cannot find name 'filterStatus'.
+src/features/bulk-entry/pages/BulkEntryPage.tsx(910,9): error TS2304: Cannot find name 'filterStatus'.
+src/features/bulk-entry/pages/BulkEntryPage.tsx(1157,60): error TS2554: Expected 2 arguments, but got 1.
+src/features/bulk-entry/pages/BulkEntryPage.tsx(1157,75): error TS2304: Cannot find name 'i'.
+src/features/bulk-entry/pages/BulkEntryPage.tsx(1158,32): error TS2304: Cannot find name 'e'.
+src/features/bulk-entry/pages/BulkEntryPage.tsx(1159,54): error TS2304: Cannot find name 'e'.
+src/features/bulk-entry/pages/BulkEntryPage.tsx(1342,9): error TS6133: 'toggleComplete' is declared but its value is never read.
+src/features/bulk-entry/pages/BulkEntryPage.tsx(1565,24): error TS6133: 'setFilterStatus' is declared but its value is never read.

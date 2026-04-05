@@ -35,6 +35,7 @@ export interface AgencyTrip {
   vehicleType?: string;
   date?: string;
   notes?: string;
+  isCompleted?: boolean;
 }
 
 // ─── Bulk Entry Row (local UI model) ─────────────────────────────────────────
@@ -53,6 +54,7 @@ export interface BulkTripRow {
   toll: number;
   grandTotal: number;
   notes: string;
+  isCompleted?: boolean;
 }
 
 export interface DriverGroup {
@@ -71,6 +73,7 @@ export interface NormalEntryRow {
   vehicleNumber: string;
   vehicleType: string;
   notes: string;
+  isCompleted?: boolean;
 }
 
 // ─── API Calls ───────────────────────────────────────────────────────────────

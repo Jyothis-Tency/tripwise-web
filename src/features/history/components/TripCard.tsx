@@ -25,6 +25,17 @@ function fmtDate(v: unknown): string {
   return String(v).split('T')[0];
 }
 
+function fmtTime(v: unknown): string {
+  if (!v) return '—';
+  const s = String(v);
+  if (s.includes('T')) {
+    // Extract HH:mm from "YYYY-MM-DDTHH:mm:ss.xxxZ"
+    const t = s.split('T')[1];
+    if (t) return t.substring(0, 5);
+  }
+  return s;
+}
+
 function driverName(d: HistoryTrip['driver']): string {
   if (!d) return '—';
   if (typeof d === 'string') return d;
@@ -125,7 +136,7 @@ function EditableRow({
         <span className="w-[130px] sm:w-[150px] shrink-0 text-sm text-slate-500">{label}</span>
         <input
           autoFocus
-          type={NUMBER_FIELDS.has(fieldKey) ? 'number' : 'text'}
+          type={NUMBER_FIELDS.has(fieldKey) ? 'number' : fieldKey.toLowerCase().includes('time') ? 'time' : 'text'}
           value={editValue}
           onChange={e => setEditValue(e.target.value)}
           onKeyDown={e => { if (e.key === 'Enter') handleSave(); if (e.key === 'Escape') handleCancel(); }}
@@ -166,7 +177,7 @@ function RecordPaymentModal({ trip, onClose, onSuccess }: {
 }) {
   const remaining = trip.paymentSummary?.remainingBalance ?? 0;
   const [amount, setAmount] = useState('');
-  const [method, setMethod] = useState('Cash');
+  const [method, setMethod] = useState('cash');
   const [reference, setReference] = useState('');
   const [notes, setNotes] = useState('');
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
@@ -213,8 +224,8 @@ function RecordPaymentModal({ trip, onClose, onSuccess }: {
             <label className="block text-xs font-medium text-slate-600 mb-1">Payment Method</label>
             <select value={method} onChange={e => setMethod(e.target.value)}
               className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-200">
-              {['Cash', 'Bank Transfer', 'UPI', 'Cheque', 'Other'].map(m => (
-                <option key={m} value={m}>{m}</option>
+              {[{v:'cash',l:'Cash'},{v:'bank_transfer',l:'Bank Transfer'},{v:'upi',l:'UPI'},{v:'cheque',l:'Cheque'},{v:'online',l:'Online'},{v:'other',l:'Other'}].map(m => (
+                <option key={m.v} value={m.v}>{m.l}</option>
               ))}
             </select>
           </div>
@@ -361,8 +372,8 @@ export function TripCard({ trip, onDeleted, onPaymentRecorded }: TripCardProps) 
                 <DetailRow label="Status" value={fmt(trip.status)} />
                 {E('Start Date', fmtDate(trip.startDate ?? trip.date), 'startDate')}
                 {trip.endDate && E('End Date', fmtDate(trip.endDate), 'expectedEndDate')}
-                {E('Start Time', fmt(trip.startTime || ''), 'startTime')}
-                {E('End Time', fmt(trip.endTime || ''), 'endTime')}
+                {E('Start Time', fmtTime(trip.startTime), 'startTime')}
+                {E('End Time', fmtTime(trip.endTime), 'endTime')}
                 <DetailRow label="Driver" value={driverName(trip.driver)} />
                 {typeof trip.driver !== 'string' && trip.driver?.phone && (
                   <DetailRow label="Driver Phone" value={fmt(trip.driver.phone)} />
@@ -446,7 +457,7 @@ export function TripCard({ trip, onDeleted, onPaymentRecorded }: TripCardProps) 
           onSuccess={() => { setShowPaymentModal(false); onPaymentRecorded(); }}
         />
       )}
-      
+
       {showHistoryModal && (
         <PaymentHistoryModal
           tripNumber={trip.tripNumber || trip._id}

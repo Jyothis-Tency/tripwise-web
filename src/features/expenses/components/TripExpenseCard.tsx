@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
 import type { TripWithExpenses } from '../api';
-import { deleteTripExpense, addTripExpense } from '../api';
+import { deleteTripExpense, addTripExpense, updateTripExpense } from '../api';
 
 function fmtDate(iso?: string) {
   if (!iso) return '';
   try { return new Date(iso).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }); } catch { return iso; }
 }
+
+const TRIP_EXPENSE_CATEGORIES = ['Fuel', 'Toll', 'Tax & Permit', 'Parking', 'Maintenance', 'Repair', 'Food', 'Cleaning', 'Fine', 'Other'];
 
 interface Props { trip: TripWithExpenses; onRefresh: () => void; }
 
@@ -13,6 +15,10 @@ const TripExpenseCard: React.FC<Props> = ({ trip, onRefresh }) => {
   const [expanded, setExpanded] = useState(false);
   const [adding, setAdding] = useState(false);
   const [newExp, setNewExp] = useState({ description: '', amount: '', category: 'Fuel' });
+  
+  // Edit State
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editExp, setEditExp] = useState({ description: '', amount: '', category: 'Fuel' });
   const [saving, setSaving] = useState(false);
 
   const tripId = trip._id || (trip as any).id || '';
@@ -25,14 +31,51 @@ const TripExpenseCard: React.FC<Props> = ({ trip, onRefresh }) => {
   };
 
   const handleAddExp = async () => {
-    if (!newExp.description || !newExp.amount) return;
+    if (!newExp.amount) return;
     setSaving(true);
     try {
-      await addTripExpense(tripId, { description: newExp.description, amount: Number(newExp.amount), category: newExp.category });
-      setNewExp({ description: '', amount: '', category: 'Fuel' }); setAdding(false); onRefresh();
+      await addTripExpense(tripId, { 
+        description: newExp.description || newExp.category, 
+        amount: Number(newExp.amount), 
+        category: newExp.category.toLowerCase() 
+      });
+      setNewExp({ description: '', amount: '', category: 'Fuel' }); 
+      setAdding(false); 
+      onRefresh();
     } catch (e) { console.error(e); }
     finally { setSaving(false); }
   };
+
+  const handleEditExp = async () => {
+    if (!editExp.amount || !editingId) return;
+    setSaving(true);
+    try {
+      await updateTripExpense(tripId, editingId, { 
+        description: editExp.description || editExp.category, 
+        amount: Number(editExp.amount), 
+        category: editExp.category.toLowerCase() 
+      });
+      setEditingId(null);
+      onRefresh();
+    } catch (e) { console.error(e); }
+    finally { setSaving(false); }
+  };
+
+  const startEdit = (exp: any) => {
+    setEditingId(exp._id);
+    const catFormatted = TRIP_EXPENSE_CATEGORIES.find(c => c.toLowerCase() === exp.category?.toLowerCase() || c.toLowerCase() === exp.type?.toLowerCase()) || 'Other';
+    setEditExp({
+      description: exp.description || '',
+      amount: String(exp.amount || ''),
+      category: catFormatted
+    });
+  };
+
+  const cancelEdit = () => {
+    setEditingId(null);
+  };
+
+  const inputCls = "px-2 py-1.5 rounded-md border border-slate-200 text-xs outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-200 bg-white";
 
   return (
     <div className="bg-white rounded-xl border border-slate-100 mb-2.5 overflow-hidden shadow-sm transition-shadow hover:shadow-md">
@@ -57,33 +100,72 @@ const TripExpenseCard: React.FC<Props> = ({ trip, onRefresh }) => {
       {expanded && (
         <div className="border-t border-slate-100 px-3 pb-3 pt-2 sm:px-4 sm:pb-4">
           {expenses.length > 0 ? expenses.map((exp, idx) => (
-            <div key={exp._id || idx} className="flex items-center justify-between py-1.5 border-b border-slate-50 last:border-0">
-              <div className="text-[13px] text-slate-700">
-                {exp.description || exp.category || 'Expense'}
-                {exp.date && <span className="text-slate-400 ml-1.5 text-[11px]">{fmtDate(exp.date)}</span>}
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="font-semibold text-[13px] text-red-500">₹{Number(exp.amount).toLocaleString('en-IN')}</span>
-                <button onClick={() => handleDeleteExp(exp._id)} className="bg-red-50 hover:bg-red-100 text-red-500 border-0 rounded-md px-1.5 py-0.5 text-[10px] cursor-pointer transition-colors" title="Delete">✕</button>
-              </div>
+            <div key={exp._id || idx} className="py-2 border-b border-slate-50 last:border-0 hover:bg-slate-50/50">
+              {editingId === exp._id ? (
+                // EDIT MODE
+                <div className="flex flex-wrap xs:flex-nowrap gap-1.5 sm:gap-2 items-center bg-slate-50 p-2 rounded-lg border border-slate-100">
+                  <select 
+                    value={editExp.category} 
+                    onChange={e => setEditExp(p => ({ ...p, category: e.target.value }))}
+                    className={`${inputCls} min-w-[90px]`}
+                  >
+                    {TRIP_EXPENSE_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                  <input placeholder="Desc" value={editExp.description} onChange={e => setEditExp(p => ({ ...p, description: e.target.value }))} className={`${inputCls} flex-1 min-w-[80px]`} />
+                  <input placeholder="₹" type="number" value={editExp.amount} onChange={e => setEditExp(p => ({ ...p, amount: e.target.value }))} className={`${inputCls} w-20`} />
+                  
+                  <div className="flex gap-1">
+                    <button onClick={handleEditExp} disabled={saving} className="px-2 py-1.5 rounded-md border-0 bg-indigo-600 hover:bg-indigo-700 text-white text-[11px] font-semibold cursor-pointer disabled:opacity-60">{saving ? '…' : 'Save'}</button>
+                    <button onClick={cancelEdit} className="px-1.5 py-1.5 rounded-md border border-slate-200 bg-white hover:bg-slate-100 text-slate-500 text-[11px] cursor-pointer">✕</button>
+                  </div>
+                </div>
+              ) : (
+                // VIEW MODE
+                <div className="flex items-center justify-between">
+                  <div className="flex flex-col">
+                    <div className="text-[13px] font-medium text-slate-700 flex items-center gap-1.5">
+                      <span className="capitalize">{exp.type || exp.category || 'Expense'}</span>
+                      {exp.description && exp.description.toLowerCase() !== (exp.type?.toLowerCase() || exp.category?.toLowerCase()) && (
+                        <span className="text-slate-500 font-normal truncate max-w-[120px] xs:max-w-[180px]">— {exp.description}</span>
+                      )}
+                    </div>
+                    {exp.date && <span className="text-slate-400 text-[11px]">{fmtDate(exp.date)}</span>}
+                  </div>
+                  <div className="flex items-center gap-2.5">
+                    <span className="font-semibold text-[13px] text-red-500">₹{Number(exp.amount).toLocaleString('en-IN')}</span>
+                    <div className="flex items-center gap-1">
+                      <button onClick={() => startEdit(exp)} className="text-indigo-500 hover:bg-indigo-50 rounded-md p-1 px-1.5 text-[11px] cursor-pointer" title="Edit">✎</button>
+                      <button onClick={() => handleDeleteExp(exp._id)} className="text-red-500 hover:bg-red-50 rounded-md p-1 px-1.5 text-[11px] cursor-pointer" title="Delete">✕</button>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           )) : <div className="text-xs text-slate-400 text-center p-2">No expenses</div>}
 
           {/* Add inline */}
-          {adding ? (
-            <div className="mt-2 flex flex-wrap xs:flex-nowrap gap-1.5 sm:gap-2 items-center">
-              <input placeholder="Description" value={newExp.description} onChange={e => setNewExp(p => ({ ...p, description: e.target.value }))} className="flex-1 min-w-[100px] px-2.5 py-1.5 rounded-md border border-slate-200 text-xs outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-200" />
-              <input placeholder="₹" type="number" value={newExp.amount} onChange={e => setNewExp(p => ({ ...p, amount: e.target.value }))} className="w-16 px-2.5 py-1.5 rounded-md border border-slate-200 text-xs outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-200" />
-              <div className="flex gap-1.5 ml-auto xs:ml-0">
-                <button onClick={handleAddExp} disabled={saving} className="px-3 py-1.5 rounded-md border-0 bg-indigo-600 hover:bg-indigo-700 text-white text-[11px] font-semibold cursor-pointer transition-colors disabled:opacity-60">{saving ? '…' : 'Add'}</button>
-                <button onClick={() => setAdding(false)} className="px-2 py-1.5 rounded-md border border-slate-200 bg-white hover:bg-slate-50 text-[11px] cursor-pointer transition-colors">✕</button>
+          {adding && !editingId ? (
+            <div className="mt-3 flex flex-wrap xs:flex-nowrap gap-1.5 sm:gap-2 items-center bg-indigo-50/50 p-2 rounded-lg border border-indigo-100 border-dashed">
+              <select 
+                value={newExp.category} 
+                onChange={e => setNewExp(p => ({ ...p, category: e.target.value }))}
+                className={`${inputCls} min-w-[90px] border-indigo-200 focus:border-indigo-500`}
+              >
+                {TRIP_EXPENSE_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+              <input placeholder="Desc (Optional)" value={newExp.description} onChange={e => setNewExp(p => ({ ...p, description: e.target.value }))} className={`${inputCls} flex-1 min-w-[80px] border-indigo-200 focus:border-indigo-500`} />
+              <input placeholder="₹ Amount" type="number" value={newExp.amount} onChange={e => setNewExp(p => ({ ...p, amount: e.target.value }))} className={`${inputCls} w-20 border-indigo-200 focus:border-indigo-500`} />
+              
+              <div className="flex gap-1 ml-auto xs:ml-0">
+                <button onClick={handleAddExp} disabled={saving} className="px-3 py-1.5 rounded-md border-0 bg-indigo-600 hover:bg-indigo-700 text-white text-[11px] font-semibold cursor-pointer disabled:opacity-60">{saving ? '…' : 'Add'}</button>
+                <button onClick={() => setAdding(false)} className="px-2 py-1.5 rounded-md border border-indigo-200 bg-white hover:bg-indigo-50 text-indigo-700 text-[11px] cursor-pointer">✕</button>
               </div>
             </div>
-          ) : (
-            <button onClick={() => setAdding(true)} className="mt-2 w-full p-1.5 rounded-md border border-dashed border-slate-300 bg-slate-50 hover:bg-slate-100 text-slate-500 text-xs cursor-pointer transition-colors">
+          ) : !editingId ? (
+            <button onClick={() => { setAdding(true); setEditingId(null); }} className="mt-2 w-full p-1.5 rounded-md border border-dashed border-slate-300 bg-slate-50 hover:bg-slate-100 text-slate-500 text-xs cursor-pointer transition-colors">
               + Add expense to this trip
             </button>
-          )}
+          ) : null}
         </div>
       )}
     </div>

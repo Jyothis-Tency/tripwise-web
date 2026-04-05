@@ -17,6 +17,7 @@ import {
   Trash2,
   ArrowLeft,
   X,
+  Check,
   Loader2,
 } from 'lucide-react';
 import {
@@ -143,6 +144,81 @@ function ModalShell({ title, onClose, children, maxWidth = 'max-w-lg' }: ModalSh
           <button type="button" onClick={onClose} className="text-slate-400 hover:text-slate-600"><X className="h-5 w-5" /></button>
         </div>
         <div className="overflow-y-auto flex-1">{children}</div>
+      </div>
+    </div>
+  );
+}
+
+const NUMBER_FIELDS = new Set([
+  'distance', 'agencyCost', 'cabCost', 'driver_salary', 'advance',
+  'startKilometers', 'endKilometers', 'amount', 'fare', 'ownerProfit', 'totalPersonalExpense', 'totalExpenses'
+]);
+
+function EditableGridField({
+  label, value, fieldKey, tripId, highlight, isCurrency
+}: {
+  label: string; value: string | number; fieldKey: string; tripId: string; highlight?: boolean; isCurrency?: boolean;
+}) {
+  const initialValue = value == null || value === '' ? '—' : String(value);
+  const [editing, setEditing] = useState(false);
+  const [displayValue, setDisplayValue] = useState(initialValue);
+  const [editValue, setEditValue] = useState(initialValue === '—' ? '' : initialValue);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    const v = value == null || value === '' ? '—' : String(value);
+    setDisplayValue(v);
+    setEditValue(v === '—' ? '' : v);
+  }, [value]);
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      let val: string | number = editValue;
+      if (NUMBER_FIELDS.has(fieldKey)) {
+        const parsed = Number(editValue);
+        if (editValue.trim() === '' || !Number.isFinite(parsed)) throw new Error('Enter a valid number');
+        if (parsed < 0) throw new Error('Negative values are not allowed');
+        val = parsed;
+      }
+      await updateTrip(tripId, { [fieldKey]: val });
+      setDisplayValue(NUMBER_FIELDS.has(fieldKey) ? String(val) : (editValue || '—'));
+      setEditing(false);
+    } catch (err: any) {
+      alert(err?.message || err?.response?.data?.message || 'Failed to update field');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const cancel = () => { setEditValue(displayValue === '—' ? '' : displayValue); setEditing(false); };
+
+  if (editing) {
+    return (
+      <div className="col-span-1">
+        <span className="text-slate-400 block mb-0.5 uppercase tracking-wide text-[10px] sm:text-[11px]">{label}</span>
+        <div className="flex items-center gap-1 mt-0.5">
+          <input autoFocus type={NUMBER_FIELDS.has(fieldKey) ? 'number' : fieldKey.toLowerCase().includes('time') ? 'time' : 'text'}
+            value={editValue} onChange={e => setEditValue(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter') handleSave(); if (e.key === 'Escape') cancel(); }}
+            className="w-full min-w-[70px] border border-indigo-300 rounded px-1.5 py-0.5 text-xs outline-none focus:ring-1 focus:ring-indigo-200 bg-white" disabled={saving}/>
+          <button type="button" onClick={handleSave} disabled={saving} className="text-emerald-600 p-0.5 hover:text-emerald-700">{saving ? '...' : <Check className="h-3.5 w-3.5"/>}</button>
+          <button type="button" onClick={cancel} className="text-slate-400 p-0.5 hover:text-slate-600"><X className="h-3.5 w-3.5"/></button>
+        </div>
+      </div>
+    );
+  }
+  return (
+    <div className="group col-span-1">
+      <span className="text-slate-400 block mb-0.5">{label}</span>
+      <div className="flex items-center gap-1">
+        <span className={`${highlight ? 'font-bold text-indigo-700' : 'font-medium text-slate-700'} truncate`}>
+          {isCurrency && displayValue !== '—' && !isNaN(Number(displayValue)) ? `₹${Number(displayValue).toLocaleString('en-IN')}` : displayValue}
+        </span>
+        <button type="button" onClick={() => { setEditValue(displayValue === '—' ? '' : String(displayValue).replace(/^₹/, '').replace(/,/g, '')); setEditing(true); }}
+          className="opacity-100 lg:opacity-0 lg:group-hover:opacity-100 text-slate-400 hover:text-indigo-500 transition-opacity p-0.5" title="Edit inline">
+          <Pencil className="h-3 w-3" />
+        </button>
       </div>
     </div>
   );
@@ -334,7 +410,7 @@ function UpdateTripWrapper({ vehicleId, tripId, onClose, onSaved }: {
   return <TripFormModal vehicleId={vehicleId} trip={trip} onClose={onClose} onSaved={onSaved} />;
 }
 
-function TripFormModal({ vehicleId, trip, onClose, onSaved }: {
+export function TripFormModal({ vehicleId, trip, onClose, onSaved }: {
   vehicleId: string; trip?: TripItem | null; onClose: () => void;
   onSaved: (t: TripItem) => void;
 }) {
@@ -1025,14 +1101,33 @@ function TripDriverTab({ vehicle, onStartTrip, onUpdateTrip, onCancelTrip, onAss
 
           {expandedTripId === activeTrip._id && (
             <div className="px-4 pb-4 pt-1 border-t border-indigo-100/50">
-              <div className="grid grid-cols-2 gap-y-2 gap-x-4 mb-3 text-xs text-slate-600 pt-3">
-                {activeTrip.customer && <div><span className="text-slate-400 block mb-0.5">Customer</span>{activeTrip.customer}</div>}
-                {activeTrip.distance && <div><span className="text-slate-400 block mb-0.5">Distance</span>{activeTrip.distance}</div>}
-                <div className="col-span-2 grid grid-cols-4 gap-2 mt-2 border-t border-indigo-100/30 pt-3">
-                  <div><span className="text-slate-400 block mb-0.5 text-[10px] uppercase">Advance</span><span className="font-semibold">₹{Number(activeTrip.advance || 0).toLocaleString('en-IN')}</span></div>
-                  <div><span className="text-slate-400 block mb-0.5 text-[10px] uppercase">Bata</span><span className="font-semibold">₹{Number(activeTrip.driver_salary || 0).toLocaleString('en-IN')}</span></div>
-                  <div><span className="text-slate-400 block mb-0.5 text-[10px] uppercase">Cab Cost</span><span className="font-semibold text-slate-700">₹{Number(activeTrip.cabCost || 0).toLocaleString('en-IN')}</span></div>
-                  <div><span className="text-slate-400 block mb-0.5 text-[10px] uppercase text-indigo-500">Owner Profit</span><span className="font-bold text-indigo-700">₹{Number(activeTrip.ownerProfit || 0).toLocaleString('en-IN')}</span></div>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-y-3 gap-x-4 mb-3 text-xs text-slate-600 pt-3">
+                <EditableGridField tripId={activeTrip._id} fieldKey="customer" label="Customer" value={activeTrip.customer || '—'} />
+                <EditableGridField tripId={activeTrip._id} fieldKey="agencyName" label="Agency" value={activeTrip.agencyName || '—'} />
+                <EditableGridField tripId={activeTrip._id} fieldKey="distance" label="Distance" value={activeTrip.distance ? String(activeTrip.distance) : '—'} />
+                <EditableGridField tripId={activeTrip._id} fieldKey="startDate" label="Start Date" value={activeTrip.startDate || '—'} />
+                <EditableGridField tripId={activeTrip._id} fieldKey="expectedEndDate" label="End Date" value={activeTrip.expectedEndDate || '—'} />
+                <EditableGridField tripId={activeTrip._id} fieldKey="startTime" label="Start Time" value={activeTrip.startTime ? (String(activeTrip.startTime).includes('T') ? new Date(activeTrip.startTime).toLocaleTimeString() : String(activeTrip.startTime)) : '—'} />
+                <EditableGridField tripId={activeTrip._id} fieldKey="endTime" label="End Time" value={activeTrip.endTime ? (String(activeTrip.endTime).includes('T') ? new Date(activeTrip.endTime).toLocaleTimeString() : String(activeTrip.endTime)) : '—'} />
+                {activeTrip.actualStartTime && <div><span className="text-slate-400 block mb-0.5">Actual Start</span><span>{new Date(activeTrip.actualStartTime).toLocaleString()}</span></div>}
+                {activeTrip.actualEndTime && <div><span className="text-slate-400 block mb-0.5">Actual End</span><span>{new Date(activeTrip.actualEndTime).toLocaleString()}</span></div>}
+                <EditableGridField tripId={activeTrip._id} fieldKey="startKilometers" label="Start KM" value={activeTrip.startKilometers != null ? String(activeTrip.startKilometers) : '—'} />
+                <EditableGridField tripId={activeTrip._id} fieldKey="endKilometers" label="End KM" value={activeTrip.endKilometers != null ? String(activeTrip.endKilometers) : '—'} />
+                {activeTrip.careOf?.name && <div><span className="text-slate-400 block mb-0.5">Care Of</span>{activeTrip.careOf.name} {activeTrip.careOf.phone ? `(${activeTrip.careOf.phone})` : ''}</div>}
+                <EditableGridField tripId={activeTrip._id} fieldKey="priority" label="Priority" value={activeTrip.priority || '—'} />
+                <div className="col-span-2 sm:col-span-3">
+                  <EditableGridField tripId={activeTrip._id} fieldKey="notes" label="Notes" value={activeTrip.notes || '—'} />
+                </div>
+                {activeTrip.startingNote && <div className="col-span-2 sm:col-span-3"><span className="text-slate-400 block mb-0.5">Starting Note</span><p className="whitespace-pre-wrap">{activeTrip.startingNote}</p></div>}
+                {activeTrip.completionNote && <div className="col-span-2 sm:col-span-3"><span className="text-slate-400 block mb-0.5">Completion Note</span><p className="whitespace-pre-wrap">{activeTrip.completionNote}</p></div>}
+                <div className="col-span-2 sm:col-span-3 grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-2 mt-2 border-t border-indigo-100/30 pt-3 text-[11px]">
+                  <EditableGridField tripId={activeTrip._id} fieldKey={activeTrip.fare ? "fare" : "amount"} label="AMOUNT" value={activeTrip.amount || activeTrip.fare || 0} isCurrency />
+                  <EditableGridField tripId={activeTrip._id} fieldKey="advance" label="ADVANCE" value={activeTrip.advance || 0} isCurrency />
+                  <EditableGridField tripId={activeTrip._id} fieldKey="driver_salary" label="BATA" value={activeTrip.driver_salary || 0} isCurrency />
+                  <div><span className="text-slate-400 block mb-0.5 uppercase">Personal Exp.</span><span className="font-semibold text-slate-700">₹{Number(activeTrip.totalPersonalExpense || 0).toLocaleString('en-IN')}</span></div>
+                  <div><span className="text-slate-400 block mb-0.5 uppercase">Trip Exp.</span><span className="font-semibold text-slate-700">₹{Number(activeTrip.totalExpenses || 0).toLocaleString('en-IN')}</span></div>
+                  <EditableGridField tripId={activeTrip._id} fieldKey="cabCost" label="CAB COST" value={activeTrip.cabCost || 0} isCurrency />
+                  <div><span className="text-slate-400 block mb-0.5 uppercase text-indigo-500">Owner Profit</span><span className="font-bold text-indigo-700">₹{Number(activeTrip.ownerProfit || 0).toLocaleString('en-IN')}</span></div>
                 </div>
               </div>
               <div className="flex flex-wrap gap-2 pt-2 border-t border-indigo-100/50">
@@ -1114,13 +1209,32 @@ function TripDriverTab({ vehicle, onStartTrip, onUpdateTrip, onCancelTrip, onAss
                 
                 {expandedTripId === trip._id && (
                   <div className="px-4 pb-4 pt-1 border-t border-slate-100">
-                    <div className="grid grid-cols-2 gap-y-2 gap-x-4 mb-3 text-xs text-slate-600 pt-3 pl-2">
-                      {trip.customer && <div><span className="text-slate-400 block mb-0.5">Customer</span>{trip.customer}</div>}
-                      {trip.distance && <div><span className="text-slate-400 block mb-0.5">Distance</span>{trip.distance}</div>}
-                      <div className="col-span-2 grid grid-cols-4 gap-2 mt-2 border-t border-slate-100 pt-3">
-                        <div><span className="text-slate-400 block mb-0.5 text-[10px] uppercase">Advance</span><span className="font-semibold text-slate-700">₹{Number(trip.advance || 0).toLocaleString('en-IN')}</span></div>
-                        <div><span className="text-slate-400 block mb-0.5 text-[10px] uppercase">Bata</span><span className="font-semibold text-slate-700">₹{Number(trip.driver_salary || 0).toLocaleString('en-IN')}</span></div>
-                        <div><span className="text-slate-400 block mb-0.5 text-[10px] uppercase">Cab Cost</span><span className="font-semibold text-slate-700">₹{Number(trip.cabCost || 0).toLocaleString('en-IN')}</span></div>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-y-3 gap-x-4 mb-3 text-xs text-slate-600 pt-3 pl-2">
+                      <EditableGridField tripId={trip._id} fieldKey="customer" label="Customer" value={trip.customer || '—'} />
+                      <EditableGridField tripId={trip._id} fieldKey="agencyName" label="Agency" value={trip.agencyName || '—'} />
+                      <EditableGridField tripId={trip._id} fieldKey="distance" label="Distance" value={trip.distance ? String(trip.distance) : '—'} />
+                      <EditableGridField tripId={trip._id} fieldKey="startDate" label="Start Date" value={trip.startDate || '—'} />
+                      <EditableGridField tripId={trip._id} fieldKey="expectedEndDate" label="End Date" value={trip.expectedEndDate || '—'} />
+                      <EditableGridField tripId={trip._id} fieldKey="startTime" label="Start Time" value={trip.startTime ? (String(trip.startTime).includes('T') ? new Date(trip.startTime).toLocaleTimeString() : String(trip.startTime)) : '—'} />
+                      <EditableGridField tripId={trip._id} fieldKey="endTime" label="End Time" value={trip.endTime ? (String(trip.endTime).includes('T') ? new Date(trip.endTime).toLocaleTimeString() : String(trip.endTime)) : '—'} />
+                      {trip.actualStartTime && <div><span className="text-slate-400 block mb-0.5">Actual Start</span><span>{new Date(trip.actualStartTime).toLocaleString()}</span></div>}
+                      {trip.actualEndTime && <div><span className="text-slate-400 block mb-0.5">Actual End</span><span>{new Date(trip.actualEndTime).toLocaleString()}</span></div>}
+                      <EditableGridField tripId={trip._id} fieldKey="startKilometers" label="Start KM" value={trip.startKilometers != null ? String(trip.startKilometers) : '—'} />
+                      <EditableGridField tripId={trip._id} fieldKey="endKilometers" label="End KM" value={trip.endKilometers != null ? String(trip.endKilometers) : '—'} />
+                      {trip.careOf?.name && <div><span className="text-slate-400 block mb-0.5">Care Of</span>{trip.careOf.name} {trip.careOf.phone ? `(${trip.careOf.phone})` : ''}</div>}
+                      <EditableGridField tripId={trip._id} fieldKey="priority" label="Priority" value={trip.priority || '—'} />
+                      <div className="col-span-2 sm:col-span-3">
+                        <EditableGridField tripId={trip._id} fieldKey="notes" label="Notes" value={trip.notes || '—'} />
+                      </div>
+                      {trip.startingNote && <div className="col-span-2 sm:col-span-3"><span className="text-slate-400 block mb-0.5">Starting Note</span><p className="whitespace-pre-wrap">{trip.startingNote}</p></div>}
+                      {trip.completionNote && <div className="col-span-2 sm:col-span-3"><span className="text-slate-400 block mb-0.5">Completion Note</span><p className="whitespace-pre-wrap">{trip.completionNote}</p></div>}
+                      <div className="col-span-2 sm:col-span-3 grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-2 mt-2 border-t border-slate-100 pt-3">
+                        <EditableGridField tripId={trip._id} fieldKey={(trip as any).fare ? "fare" : "amount"} label="AMOUNT" value={trip.amount || (trip as any).fare || 0} isCurrency />
+                        <EditableGridField tripId={trip._id} fieldKey="advance" label="ADVANCE" value={trip.advance || 0} isCurrency />
+                        <EditableGridField tripId={trip._id} fieldKey="driver_salary" label="BATA" value={trip.driver_salary || 0} isCurrency />
+                        <div><span className="text-slate-400 block mb-0.5 text-[10px] uppercase">Personal Exp.</span><span className="font-semibold text-slate-700">₹{Number(trip.totalPersonalExpense || 0).toLocaleString('en-IN')}</span></div>
+                        <div><span className="text-slate-400 block mb-0.5 text-[10px] uppercase">Trip Exp.</span><span className="font-semibold text-slate-700">₹{Number(trip.totalExpenses || 0).toLocaleString('en-IN')}</span></div>
+                        <EditableGridField tripId={trip._id} fieldKey="cabCost" label="CAB COST" value={trip.cabCost || 0} isCurrency />
                         <div><span className="text-slate-400 block mb-0.5 text-[10px] uppercase">Profit</span><span className="font-bold text-slate-800">₹{Number(trip.ownerProfit || 0).toLocaleString('en-IN')}</span></div>
                       </div>
                     </div>
@@ -1304,7 +1418,7 @@ function ExpenseFormModal({ vehicleId, expense, onClose, onSaved }: {
     description: expense?.description ?? expense?.notes ?? '',
   });
 
-  const CATEGORIES = ['Fuel', 'Maintenance', 'Insurance', 'Cleaning', 'Fine', 'Other'];
+  const CATEGORIES = ['Fuel', 'Maintenance', 'Insurance', 'Toll', 'Parking', 'Repair', 'Food', 'Cleaning', 'Fine', 'Tax & Permit', 'Other'];
 
   const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
     setForm(prev => ({ ...prev, [k]: e.target.value }));
@@ -1314,7 +1428,7 @@ function ExpenseFormModal({ vehicleId, expense, onClose, onSaved }: {
     setSaving(true); setError(null);
     try {
       const payload = {
-        category: form.category,
+        category: form.category.toLowerCase(), // Normalize for backend enum match
         amount: parseFloat(form.amount),
         date: form.date,
         vendor: form.vendor.trim() || undefined,

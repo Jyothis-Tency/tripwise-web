@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import type { CreateExpensePayload, Expense } from '../api';
 import { createExpense, updateExpense } from '../api';
 
-const CATEGORIES = ['Fuel', 'Maintenance', 'Insurance', 'Toll', 'Parking', 'Salary', 'Food', 'Office', 'Travel', 'Miscellaneous'];
+const CATEGORIES = ['Food', 'Transport', 'Utilities', 'Shopping', 'Entertainment', 'Health', 'Education', 'Other'];
 
 interface Props {
   open: boolean;
@@ -12,7 +12,7 @@ interface Props {
   expense?: Expense | null;
 }
 
-const BLANK: CreateExpensePayload = { title: '', amount: 0, category: 'Fuel', date: new Date().toISOString().split('T')[0], notes: '' };
+const BLANK: CreateExpensePayload = { title: '', amount: 0, category: 'Food', date: new Date().toISOString().split('T')[0], notes: '' };
 
 const AddExpenseModal: React.FC<Props> = ({ open, onClose, onCreated, expense }) => {
   const isEdit = !!expense;
@@ -26,7 +26,7 @@ const AddExpenseModal: React.FC<Props> = ({ open, onClose, onCreated, expense })
       setForm({
         title: expense.title || expense.description || '',
         amount: expense.amount ?? 0,
-        category: expense.category || 'Fuel',
+        category: expense.category || 'Food',
         date: expense.date ? expense.date.split('T')[0] : new Date().toISOString().split('T')[0],
         notes: expense.notes || '',
       });

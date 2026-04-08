@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
 import {
-  User, Mail, MapPin, Eye, EyeOff, Trash2, Plus, ArrowLeft,
-  Briefcase, DollarSign, TrendingUp, Calendar,
+  User, Mail, MapPin, Eye, EyeOff, Ban, ShieldCheck, Plus, ArrowLeft,
+  Briefcase, DollarSign, TrendingUp, Calendar, Trash2, History,
 } from 'lucide-react';
 import type { Driver, DriverSalaryData, SalaryTransaction, DriverTrip } from '../api';
-import { deleteDriver, fetchDriverSalary, fetchDriverTrips, createSalaryTransaction, deleteSalaryTransaction } from '../api';
+import { blockDriver, unblockDriver, fetchDriverSalary, fetchDriverTrips, createSalaryTransaction, deleteSalaryTransaction } from '../api';
+import { DriverHistoryModal } from './DriverHistoryModal';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -14,6 +15,9 @@ function driverName(d: Driver): string {
 }
 
 function statusBadge(d: Driver): { label: string; color: string; bg: string } {
+  if (d.isBlocked) {
+    return { label: 'Blocked', color: 'text-rose-800', bg: 'bg-rose-50 border-rose-200' };
+  }
   const statusVal = d.status || (d.isActive !== false ? 'Active' : 'Inactive');
   const s = String(statusVal).toLowerCase();
   if (s === 'active') return { label: 'Active', color: 'text-emerald-700', bg: 'bg-emerald-50 border-emerald-200' };
@@ -40,26 +44,30 @@ function InfoRow({ label, value }: { label: string; value: string }) {
 interface DriverDetailProps {
   driver: Driver;
   onBack?: () => void;
-  onDeleted: () => void;
+  onBlockChange: () => void;
   onUpdated: () => void;
 }
 
-export function DriverDetail({ driver, onBack, onDeleted }: DriverDetailProps) {
+export function DriverDetail({ driver, onBack, onBlockChange }: DriverDetailProps) {
   const [tab, setTab] = useState<'details' | 'salary'>('details');
-  const [deleting, setDeleting] = useState(false);
+  const [blockBusy, setBlockBusy] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
 
   const badge = statusBadge(driver);
+  const isBlocked = !!driver.isBlocked;
 
-  const handleDelete = async () => {
-    if (!confirm(`Delete driver ${driverName(driver)}? This cannot be undone.`)) return;
-    setDeleting(true);
+  const toggleBlock = async () => {
+    const action = isBlocked ? 'unblock' : 'block';
+    if (!confirm(`${action === 'block' ? 'Block' : 'Unblock'} driver ${driverName(driver)}?`)) return;
+    setBlockBusy(true);
     try {
-      await deleteDriver(driver._id);
-      onDeleted();
+      if (isBlocked) await unblockDriver(driver._id);
+      else await blockDriver(driver._id);
+      onBlockChange();
     } catch {
-      alert('Failed to delete driver.');
+      alert(`Failed to ${action} driver.`);
     } finally {
-      setDeleting(false);
+      setBlockBusy(false);
     }
   };
 
@@ -87,12 +95,26 @@ export function DriverDetail({ driver, onBack, onDeleted }: DriverDetailProps) {
           </span>
         </div>
         <button
-          onClick={handleDelete}
-          disabled={deleting}
-          className="text-red-400 hover:text-red-600 transition disabled:opacity-40 p-1"
-          title="Delete driver"
+          type="button"
+          onClick={() => setHistoryOpen(true)}
+          className="flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 px-2 py-1.5 text-[11px] font-semibold text-slate-600 hover:bg-slate-100 transition shrink-0"
+          title="Driver trip history"
         >
-          <Trash2 className="h-4 w-4" />
+          <History className="h-3.5 w-3.5" />
+          History
+        </button>
+        <button
+          type="button"
+          onClick={toggleBlock}
+          disabled={blockBusy}
+          className={`transition disabled:opacity-40 p-1 rounded-md ${
+            isBlocked
+              ? 'text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50'
+              : 'text-rose-500 hover:text-rose-600 hover:bg-rose-50'
+          }`}
+          title={isBlocked ? 'Unblock driver' : 'Block driver'}
+        >
+          {isBlocked ? <ShieldCheck className="h-4 w-4" /> : <Ban className="h-4 w-4" />}
         </button>
       </div>
 
@@ -115,6 +137,10 @@ export function DriverDetail({ driver, onBack, onDeleted }: DriverDetailProps) {
           <SalaryTab driver={driver} />
         )}
       </div>
+
+      {historyOpen && (
+        <DriverHistoryModal driver={driver} onClose={() => setHistoryOpen(false)} />
+      )}
     </div>
   );
 }

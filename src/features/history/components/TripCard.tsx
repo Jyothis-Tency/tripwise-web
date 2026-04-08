@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   ChevronDown, ChevronUp, Trash2, Car, User, Calendar,
   DollarSign, Clock, Pencil, Check, X,
@@ -6,6 +6,7 @@ import {
 import type { HistoryTrip, TripPayment } from '../api';
 import { recordPayment, deleteTrip, fetchPaymentHistory, updateTripFields } from '../api';
 import { PaymentHistoryModal } from './PaymentHistoryModal';
+import { fmtTimeAmPm, isoToTimeInputInTz, fmtTripDuration } from '../historyTimeUtils';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -23,17 +24,6 @@ function fmtCurrency(v: unknown): string {
 function fmtDate(v: unknown): string {
   if (!v) return '—';
   return String(v).split('T')[0];
-}
-
-function fmtTime(v: unknown): string {
-  if (!v) return '—';
-  const s = String(v);
-  if (s.includes('T')) {
-    // Extract HH:mm from "YYYY-MM-DDTHH:mm:ss.xxxZ"
-    const t = s.split('T')[1];
-    if (t) return t.substring(0, 5);
-  }
-  return s;
 }
 
 function driverName(d: HistoryTrip['driver']): string {
@@ -84,15 +74,21 @@ function DetailRow({ label, value, highlight }: { label: string; value: string; 
 // ─── Editable Detail Row ─────────────────────────────────────────────────────
 
 function EditableRow({
-  label, value, highlight, fieldKey, tripId, onSaved,
+  label, value, highlight, fieldKey, tripId, onSaved, timeEditSeed,
 }: {
   label: string; value: string; highlight?: boolean;
   fieldKey: string; tripId: string; onSaved: () => void;
+  /** For `type="time"` rows: HH:mm seed from ISO (not the AM/PM display string). */
+  timeEditSeed?: string;
 }) {
   const [editing, setEditing] = useState(false);
   const [displayValue, setDisplayValue] = useState(value);
   const [editValue, setEditValue] = useState(value === '—' ? '' : value);
   const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (!editing) setDisplayValue(value);
+  }, [value, editing]);
 
   const handleSave = async () => {
     setSaving(true);
@@ -158,7 +154,13 @@ function EditableRow({
       <span className="w-[130px] sm:w-[150px] shrink-0 text-sm text-slate-500">{label}</span>
       <span className={`text-sm font-medium ${highlight ? 'text-indigo-600' : 'text-slate-800'}`}>{displayValue}</span>
       <button
-        onClick={() => { setEditValue(displayValue === '—' ? '' : displayValue.replace(/^₹/, '').replace(/,/g, '')); setEditing(true); }}
+        onClick={() => {
+          const isTime = fieldKey.toLowerCase().includes('time');
+          let seed = displayValue === '—' ? '' : displayValue.replace(/^₹/, '').replace(/,/g, '');
+          if (isTime && timeEditSeed !== undefined) seed = timeEditSeed;
+          setEditValue(seed);
+          setEditing(true);
+        }}
         className="ml-1.5 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 text-slate-400 hover:text-indigo-500 transition-opacity p-0.5"
         title={`Edit ${label}`}
       >
@@ -310,8 +312,16 @@ export function TripCard({ trip, onDeleted, onPaymentRecorded }: TripCardProps) 
   };
 
   // Shorthand for editable rows
-  const E = (label: string, value: string, fieldKey: string, hl?: boolean) => (
-    <EditableRow label={label} value={value} fieldKey={fieldKey} tripId={trip._id} onSaved={onPaymentRecorded} highlight={hl} />
+  const E = (label: string, value: string, fieldKey: string, hl?: boolean, timeEditSeed?: string) => (
+    <EditableRow
+      label={label}
+      value={value}
+      fieldKey={fieldKey}
+      tripId={trip._id}
+      onSaved={onPaymentRecorded}
+      highlight={hl}
+      timeEditSeed={timeEditSeed}
+    />
   );
 
   return (
@@ -372,8 +382,9 @@ export function TripCard({ trip, onDeleted, onPaymentRecorded }: TripCardProps) 
                 <DetailRow label="Status" value={fmt(trip.status)} />
                 {E('Start Date', fmtDate(trip.startDate ?? trip.date), 'startDate')}
                 {trip.endDate && E('End Date', fmtDate(trip.endDate), 'expectedEndDate')}
-                {E('Start Time', fmtTime(trip.startTime), 'startTime')}
-                {E('End Time', fmtTime(trip.endTime), 'endTime')}
+                {E('Start Time', fmtTimeAmPm(trip.startTime), 'startTime', undefined, isoToTimeInputInTz(trip.startTime))}
+                {E('End Time', fmtTimeAmPm(trip.endTime), 'endTime', undefined, isoToTimeInputInTz(trip.endTime))}
+                <DetailRow label="Trip duration" value={fmtTripDuration(trip.startTime, trip.endTime)} highlight />
                 <DetailRow label="Driver" value={driverName(trip.driver)} />
                 {typeof trip.driver !== 'string' && trip.driver?.phone && (
                   <DetailRow label="Driver Phone" value={fmt(trip.driver.phone)} />

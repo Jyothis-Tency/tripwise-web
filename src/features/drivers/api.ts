@@ -1,4 +1,5 @@
 import { apiClient } from '../../services/axios';
+import type { HistoryTripItem, VehicleHistoryResponse } from '../vehicles/api';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -14,6 +15,8 @@ export interface Driver {
   profileImg?: string;
   licenseImg?: string;
   isActive?: boolean;
+  isBlocked?: boolean;
+  blockedAt?: string;
   status?: string;
   assignedVehicle?: string | { _id: string; vehicleNumber: string; vehicleModel?: string };
   currentTrip?: string;
@@ -57,7 +60,14 @@ export interface DriverTrip {
 
 // ─── Driver CRUD ─────────────────────────────────────────────────────────────
 
-export async function fetchDrivers(params?: { page?: number; limit?: number; search?: string }): Promise<{
+export type DriverBlockFilter = 'all' | 'blocked' | 'unblocked';
+
+export async function fetchDrivers(params?: {
+  page?: number;
+  limit?: number;
+  search?: string;
+  blockFilter?: DriverBlockFilter;
+}): Promise<{
   drivers: Driver[];
   pagination?: any;
 }> {
@@ -98,8 +108,14 @@ export async function updateDriver(id: string, updates: Partial<Driver>): Promis
   return data.data ?? data;
 }
 
-export async function deleteDriver(id: string): Promise<void> {
-  await apiClient.delete(`/owners/drivers/${id}`);
+export async function blockDriver(id: string): Promise<Driver> {
+  const { data } = await apiClient.put(`/owners/drivers/${id}/block`);
+  return data.data ?? data;
+}
+
+export async function unblockDriver(id: string): Promise<Driver> {
+  const { data } = await apiClient.put(`/owners/drivers/${id}/unblock`);
+  return data.data ?? data;
 }
 
 // ─── Driver Salary ───────────────────────────────────────────────────────────
@@ -127,6 +143,67 @@ export async function fetchDriverTrips(driverId: string, params?: { page?: numbe
 }> {
   const { data } = await apiClient.get(`/owners/drivers/${driverId}/trips`, { params });
   return data.data ?? data;
+}
+
+/** Full driver trip history (filters + stats) — same shape as vehicle history for UI reuse. */
+export type DriverHistoryResponse = VehicleHistoryResponse & {
+  driver?: { _id?: string; firstName?: string; lastName?: string; phone?: string };
+};
+
+export async function fetchDriverHistoryDetailed(params: {
+  driverId: string;
+  page?: number;
+  limit?: number;
+  status?: string;
+  startDate?: string;
+  endDate?: string;
+  month?: string;
+}): Promise<DriverHistoryResponse> {
+  const { driverId, page = 1, limit = 10, status, startDate, endDate, month } = params;
+  const clean: Record<string, string | number> = { page, limit };
+  if (status && status !== 'all') clean.status = status;
+  if (startDate) clean.startDate = startDate;
+  if (endDate) clean.endDate = endDate;
+  if (month) clean.month = month;
+
+  const res = await apiClient.get(`/owners/drivers/${driverId}/trips`, { params: clean });
+  const raw: any = res.data ?? {};
+  const data = raw.data ?? raw;
+  const tripsRaw: any[] = Array.isArray(data.trips) ? data.trips : [];
+
+  return {
+    driver: data.driver,
+    vehicle: data.vehicle,
+    tripStats: data.tripStats,
+    financialStats: data.financialStats,
+    pagination: data.pagination,
+    trips: tripsRaw.map((t: any) => ({
+      _id: t._id ?? t.id ?? '',
+      tripNumber: t.tripNumber,
+      from: t.from,
+      to: t.to,
+      status: t.status,
+      startDate: t.startDate ?? t.departureDate ?? t.date,
+      departureDate: t.departureDate ?? t.date,
+      completedAt: t.completedAt ?? t.updatedAt,
+      distance: t.distance,
+      startKilometers: t.startKilometers,
+      endKilometers: t.endKilometers,
+      totalExpenses: t.totalExpenses,
+      driver_salary: t.driver_salary,
+      ownerProfit: t.ownerProfit,
+      agencyCost: t.agencyCost,
+      cabCost: t.cabCost,
+      driverName:
+        (
+          t.driver?.fullName ??
+          t.driver?.name ??
+          `${t.driver?.firstName ?? ''} ${t.driver?.lastName ?? ''}`.trim()
+        ) || t.driverName,
+      driver: t.driver ?? null,
+      vehicle: t.vehicle ?? null,
+    })) as HistoryTripItem[],
+  };
 }
 
 // ─── Salary Transactions (Advance Payments) ──────────────────────────────────

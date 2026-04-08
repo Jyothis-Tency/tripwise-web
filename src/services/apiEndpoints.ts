@@ -25,6 +25,8 @@ export const ApiEndpoints = {
   // DRIVERS
   drivers: '/owners/drivers',
   driverById: (id: string) => `/owners/drivers/${id}`,
+  driverBlock: (id: string) => `/owners/drivers/${id}/block`,
+  driverUnblock: (id: string) => `/owners/drivers/${id}/unblock`,
   driverSalary: (id: string) => `/owners/drivers/${id}/salary`,
   driverTrips: (id: string) => `/owners/drivers/${id}/trips`,
   driverSalaryTransactions: (driverId: string) => `/owners/drivers/${driverId}/salary/transactions`,

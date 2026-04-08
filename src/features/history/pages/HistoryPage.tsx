@@ -4,7 +4,6 @@ import jsPDF from 'jspdf';
 import { fetchTripHistory, type HistoryTrip, type HistoryPagination, type HistoryPaymentSummary } from '../api';
 import { TripCard } from '../components/TripCard';
 import { ExportPdfModal } from '../components/ExportPdfModal';
-import { useAuth } from '../../../hooks/useAuth';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -104,7 +103,6 @@ function Pagination({ p, onChange }: { p: HistoryPagination; onChange: (page: nu
 // ─── History Page ─────────────────────────────────────────────────────────────
 
 export function HistoryPage() {
-  const { user } = useAuth();
   // Filter state
   const currentMonth = getCurrentMonthValue();
   const [search, setSearch]       = useState('');
@@ -212,88 +210,264 @@ export function HistoryPage() {
   const hasActiveFilters = status !== 'all' || month !== currentMonth || startDate || endDate || debouncedSearch;
 
   const handleExportPdf = async (start: string, end: string) => {
+    // Backend stores Trip.startDate as a string (often `D/M/YYYY`),
+    // so server-side date range filtering can miss matches depending on format.
+    // For PDF export we fetch and apply the selected range client-side.
     const result = await fetchTripHistory({
-      startDate: start,
-      endDate: end,
       limit: 10000, 
       sortBy: 'startDate',
       sortOrder: 'asc'
     });
     
-    const exportTrips = result.trips;
+    const parseLooseDate = (raw: any): Date | null => {
+      if (!raw) return null;
+      if (raw instanceof Date && !Number.isNaN(raw.getTime())) return raw;
+      const s = String(raw).trim();
+
+      // ISO-ish: YYYY-MM-DD
+      if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
+        const d = new Date(`${s}T00:00:00`);
+        return Number.isNaN(d.getTime()) ? null : d;
+      }
+
+      // D/M/YYYY or DD/MM/YYYY
+      const m = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+      if (m) {
+        const day = Number(m[1]);
+        const month = Number(m[2]);
+        const year = Number(m[3]);
+        const d = new Date(year, month - 1, day);
+        return Number.isNaN(d.getTime()) ? null : d;
+      }
+
+      const fallback = new Date(s);
+      return Number.isNaN(fallback.getTime()) ? null : fallback;
+    };
+
+    const startD = parseLooseDate(start);
+    const endD = parseLooseDate(end);
+    if (!startD || !endD) {
+      alert('Invalid date range.');
+      return;
+    }
+    startD.setHours(0, 0, 0, 0);
+    endD.setHours(23, 59, 59, 999);
+
+    const inRange = (d: Date | null): boolean => {
+      if (!d) return false;
+      const ts = d.getTime();
+      return ts >= startD.getTime() && ts <= endD.getTime();
+    };
+
+    const exportTrips = (result.trips || []).filter((t) => {
+      // Some records store logical trip date in `startDate` (string),
+      // while server-side filters historically used `createdAt`.
+      // To avoid "No trips" false negatives, accept if ANY of these dates match.
+      const logicalTripDate = parseLooseDate((t as any).startDate ?? (t as any).date);
+      const createdAtDate = parseLooseDate((t as any).createdAt);
+      const updatedAtDate = parseLooseDate((t as any).updatedAt);
+
+      return inRange(logicalTripDate) || inRange(createdAtDate) || inRange(updatedAtDate);
+    });
     if (!exportTrips || exportTrips.length === 0) {
       alert("No trips found in this date range.");
       return;
     }
 
     const doc = new jsPDF('p', 'mm', 'a4');
-    let y = 20;
+    const leftX = 14;
+    const rightX = 196;
+    const pageBottomY = 280;
+    let y = 16;
 
-    // Report Title
-    doc.setFontSize(16);
-    doc.setFont('helvetica', 'bold');
-    const ownerName = (user as any)?.company || user?.name || 'Tripwise';
-    doc.text(`${ownerName} History Report`, 14, y);
-    
-    doc.setFontSize(10);
-    doc.setFont('helvetica', 'normal');
-    doc.setTextColor(100, 116, 139);
-    doc.text(`Timeline: ${start} to ${end}`, 14, y + 6);
-    y += 16;
+    const fmtDate = (raw: any): string => {
+      const dt = raw ? new Date(raw) : null;
+      if (!dt || Number.isNaN(dt.getTime())) return 'N/A';
+      return `${dt.getDate()}/${dt.getMonth() + 1}/${dt.getFullYear()}`;
+    };
 
-    // Table Header
-    doc.setFillColor(241, 245, 249);
-    doc.rect(14, y - 5, 182, 8, 'F');
-    doc.setFontSize(9);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(51, 65, 85);
-    doc.text('DATE', 16, y);
-    doc.text('TRIP', 40, y);
-    doc.text('VEHICLE', 85, y);
-    doc.text('STATUS', 135, y);
-    doc.text('PROFIT', 170, y);
+    const fmtRs = (raw: any): string => {
+      const n = raw == null ? 0 : Number(raw);
+      const v = Number.isFinite(n) ? n : 0;
+      return `Rs. ${v.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    };
+
+    const getDriverName = (trip: HistoryTrip): string => {
+      const d: any = (trip as any).driver;
+      if (d && typeof d === 'object') {
+        const nm = `${d.firstName ?? ''} ${d.lastName ?? ''}`.trim();
+        return nm || d.name || 'N/A';
+      }
+      return (trip as any).driverName || 'N/A';
+    };
+
+    const getVehicleText = (trip: HistoryTrip): string => {
+      const v: any = (trip as any).vehicle;
+      if (v && typeof v === 'object') {
+        const num = v.vehicleNumber || 'N/A';
+        const model = v.vehicleModel || v.model || 'N/A';
+        return `${num} - ${model}`;
+      }
+      const num = (trip as any).vehicleNumber || 'N/A';
+      const model = (trip as any).vehicleModel || (trip as any).model || 'N/A';
+      return `${num} - ${model}`;
+    };
+
+    const pageWidth = rightX - leftX;
+    const lineH = 5;
+
+    const textWidth = (txt: string): number => doc.getTextWidth(txt);
+
+    const truncateToWidth = (txt: string, maxW: number): string => {
+      const s = String(txt ?? '');
+      if (textWidth(s) <= maxW) return s;
+      const ell = '…';
+      let lo = 0;
+      let hi = s.length;
+      while (lo < hi) {
+        const mid = Math.floor((lo + hi) / 2);
+        const candidate = s.slice(0, mid).trimEnd() + ell;
+        if (textWidth(candidate) <= maxW) lo = mid + 1;
+        else hi = mid;
+      }
+      const cut = Math.max(0, lo - 1);
+      return s.slice(0, cut).trimEnd() + ell;
+    };
+
+    const ensureSpace = (needed: number) => {
+      if (y + needed <= pageBottomY) return;
+      doc.addPage();
+      y = 16;
+    };
+
+    const writeText = (text: string, x: number, yPos: number, opts?: { size?: number; bold?: boolean; color?: [number, number, number] }) => {
+      const size = opts?.size ?? 10;
+      const bold = opts?.bold ?? false;
+      const color = opts?.color ?? [15, 23, 42];
+      doc.setFont('helvetica', bold ? 'bold' : 'normal');
+      doc.setFontSize(size);
+      doc.setTextColor(color[0], color[1], color[2]);
+      doc.text(text, x, yPos);
+    };
+
+    const writeDetailRow = (label: string, value: string, x: number, yPos: number, maxValueW: number) => {
+      // Use measured label width so longer labels (Customer/Distance) don't collide with values.
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(9);
+      const labelW = Math.max(18, textWidth(label) + 2);
+      writeText(label, x, yPos, { size: 9, bold: true });
+      writeText(truncateToWidth(value, maxValueW), x + labelW, yPos, { size: 9, bold: false });
+    };
+
+    // Header (match shared PDF)
+    writeText('Trip History Report', leftX, y, { size: 18, bold: true });
+    const totalTripsText = `Total Trips: ${exportTrips.length}`;
+    writeText(totalTripsText, rightX - textWidth(totalTripsText), y, { size: 11, bold: true });
+    y += 7;
+    writeText(`Generated on: ${fmtDate(new Date())}`, leftX, y, { size: 10, color: [51, 65, 85] });
+    y += 9;
+
+    // Divider line
+    doc.setDrawColor(60, 60, 60);
+    doc.line(leftX, y, rightX, y);
+    y += 12;
+
+    writeText('Trip Details', leftX, y, { size: 14, bold: true });
     y += 8;
 
-    doc.setFont('helvetica', 'normal');
-    doc.setTextColor(15, 23, 42); // slate-900
+    exportTrips.forEach((trip, idx) => {
+      const tripNo = (trip.tripNumber ? String(trip.tripNumber) : 'N/A');
+      const driverName = getDriverName(trip);
+      const vehicleText = getVehicleText(trip);
 
-    exportTrips.forEach(trip => {
-      if (y > 275) {
-        doc.addPage();
-        y = 20;
-      }
-      const rawDate = trip.startDate || trip.createdAt || '';
-      const d = rawDate ? new Date(rawDate).toLocaleDateString('en-IN', {day:'2-digit', month:'2-digit', year:'numeric'}) : '--';
-      const no = trip.tripNumber ? String(trip.tripNumber).substring(0, 15) : '--';
-      
-      let vh = '--';
-      if (typeof trip.vehicle === 'object' && trip.vehicle !== null) {
-        vh = trip.vehicle.vehicleNumber || '--';
-      }
+      const from = (trip as any).from ?? 'N/A';
+      const to = (trip as any).to ?? 'N/A';
+      const customer = (trip as any).customer ?? 'N/A';
+      const agency = (trip as any).agencyName ?? (trip as any).agency ?? 'N/A';
+      const date = fmtDate((trip as any).startDate ?? (trip as any).date ?? (trip as any).createdAt);
+      const st = String((trip as any).status ?? 'N/A').toUpperCase();
+      const distRaw = (trip as any).distance;
+      const distNum = distRaw == null ? null : Number(distRaw);
+      const distText = distNum != null && Number.isFinite(distNum) ? `${distNum} km` : (distRaw ?? 'N/A');
+      const cabCost = fmtRs((trip as any).cabCost ?? 0);
 
-      const st = (trip.status || '--').toUpperCase();
-      const rv = Number(trip.ownerProfit || 0).toLocaleString('en-IN');
-      
-      doc.text(d, 16, y);
-      doc.text(no, 40, y);
-      doc.text(vh.substring(0,25), 85, y);
-      doc.text(st, 135, y);
-      doc.text(`Rs. ${rv}`, 170, y);
-      y += 8;
+      // Card height becomes dynamic if Vehicle wraps.
+      // Most values fit in one line, but Vehicle can be long.
+      const cardPadX = 3;
+      const colTripX = leftX + cardPadX;
+      const colDriverX = leftX + 86;
+      const colVehicleX = leftX + 136;
+
+      // Pre-calc wrapped vehicle lines (up to 2 lines for layout stability)
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(9);
+      const vehicleValX = colVehicleX + textWidth('Vehicle:') + 3;
+      const vehicleMaxW = rightX - cardPadX - vehicleValX;
+      const vehicleLines = doc
+        .splitTextToSize(String(vehicleText), Math.max(10, vehicleMaxW))
+        .slice(0, 2) as string[];
+      const extraHeaderH = Math.max(0, vehicleLines.length - 1) * 4.6;
+      const cardH = 34 + extraHeaderH;
+
+      ensureSpace(cardH + 6);
+
+      // Card
+      doc.setDrawColor(200, 200, 200);
+      doc.setFillColor(255, 255, 255);
+      doc.roundedRect(leftX, y - 2, pageWidth, cardH, 2, 2, 'S');
+
+      // Card header line: Trip | Driver | Vehicle
+      const headerY = y + 4;
+      // Trip
+      writeText(`Trip ${idx + 1}: ${tripNo}`, colTripX, headerY, { size: 10, bold: true });
+
+      // Driver (truncate to driver column width)
+      writeText('Driver:', colDriverX, headerY, { size: 9, bold: true });
+      doc.setFontSize(9);
+      const driverValX = colDriverX + textWidth('Driver:') + 3;
+      const driverMaxW = colVehicleX - driverValX - 2;
+      writeText(truncateToWidth(driverName, driverMaxW), driverValX, headerY, { size: 9 });
+
+      // Vehicle (wrap up to 2 lines so values are visible)
+      writeText('Vehicle:', colVehicleX, headerY, { size: 9, bold: true });
+      vehicleLines.forEach((ln, i) => {
+        writeText(ln, vehicleValX, headerY + i * 4.6, { size: 9 });
+      });
+
+      // thin divider in card
+      doc.setDrawColor(220, 220, 220);
+      const dividerY = y + 7 + extraHeaderH;
+      doc.line(leftX + 3, dividerY, rightX - 3, dividerY);
+
+      // Left column (From/To/Customer/Agency)
+      const rowY1 = dividerY + 5;
+      const leftColX = leftX + 3;
+      const midColX = leftX + 82;
+      const rightColX = leftX + 132;
+
+      const leftValMaxW = midColX - (leftColX + 26) - 4;
+      const midValMaxW = rightColX - (midColX + 26) - 4;
+
+      writeDetailRow('From:', String(from), leftColX, rowY1, leftValMaxW);
+      writeDetailRow('To:', String(to), leftColX, rowY1 + lineH, leftValMaxW);
+      writeDetailRow('Customer:', String(customer), leftColX, rowY1 + lineH * 2, leftValMaxW);
+      writeDetailRow('Agency:', String(agency), leftColX, rowY1 + lineH * 3, leftValMaxW);
+
+      // Middle column (Date/Status/Distance)
+      writeDetailRow('Date:', String(date), midColX, rowY1, midValMaxW);
+      writeDetailRow('Status:', String(st), midColX, rowY1 + lineH, midValMaxW);
+      writeDetailRow('Distance:', String(distText), midColX, rowY1 + lineH * 2, midValMaxW);
+
+      // Right column (Cab Cost)
+      writeText('Cab Cost', rightColX, rowY1, { size: 9, bold: true });
+      // Cab cost should always be fully visible (no truncation).
+      writeText(String(cabCost), rightColX + textWidth('Cab Cost') + 4, rowY1, { size: 9 });
+
+      y += cardH + 6;
     });
 
-    // Summary footer
-    y += 5;
-    if (y > 275) { doc.addPage(); y = 20; }
-    doc.setDrawColor(200, 200, 200);
-    doc.line(14, y, 196, y);
-    y += 6;
-    doc.setFontSize(10);
-    doc.setFont('helvetica', 'bold');
-    const grandTotal = exportTrips.reduce((acc, t) => acc + Number(t.ownerProfit || 0), 0).toLocaleString('en-IN');
-    doc.text(`Total Owner Profit Generated: Rs. ${grandTotal}`, 14, y);
-
-    doc.save(`trips_report_${start}_to_${end}.pdf`);
+    const today = fmtDate(new Date()).replaceAll('/', '-');
+    doc.save(`Trip History Report ${today}.pdf`);
   };
 
   return (

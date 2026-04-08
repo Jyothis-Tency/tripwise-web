@@ -2,6 +2,7 @@ import { User } from 'lucide-react';
 import type { Driver } from '../api';
 
 function getStatusColor(driver: Driver): string {
+  if (driver.isBlocked) return 'bg-rose-500';
   const statusVal = driver.status || (driver.isActive !== false ? 'Active' : 'Inactive');
   const s = String(statusVal).toLowerCase();
   if (s === 'active') return 'bg-emerald-500';
@@ -10,6 +11,7 @@ function getStatusColor(driver: Driver): string {
 }
 
 function getStatusLabel(driver: Driver): string {
+  if (driver.isBlocked) return 'Blocked';
   return driver.status || (driver.isActive !== false ? 'Active' : 'Inactive');
 }
 

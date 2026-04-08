@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { HistoryTrip } from '../api';
 import { updateTripFields } from '../api';
+import { isoToTimeInputInTz } from '../historyTimeUtils';
 import { X, Save } from 'lucide-react';
 
 export function EditTripModal({
@@ -23,8 +24,8 @@ export function EditTripModal({
     customer: trip.customer || '',
     startDate: trip.startDate ? trip.startDate.split('T')[0] : (trip.date ? trip.date.split('T')[0] : ''),
     endDate: trip.endDate ? trip.endDate.split('T')[0] : '',
-    startTime: trip.startTime || '',
-    endTime: trip.endTime || '',
+    startTime: trip.startTime ? isoToTimeInputInTz(trip.startTime) : '',
+    endTime: trip.endTime ? isoToTimeInputInTz(trip.endTime) : '',
     startKilometers: trip.startKilometers?.toString() || '',
     endKilometers: trip.endKilometers?.toString() || '',
     distance: trip.distance?.toString() || '',

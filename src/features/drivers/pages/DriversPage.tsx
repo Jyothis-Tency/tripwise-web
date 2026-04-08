@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Search, UserPlus, Users } from 'lucide-react';
-import type { Driver } from '../api';
+import type { Driver, DriverBlockFilter } from '../api';
 import { fetchDrivers } from '../api';
 import { DriverCard } from '../components/DriverCard';
 import { DriverDetail } from '../components/DriverDetail';
@@ -11,6 +11,7 @@ export default function DriversPage() {
   const [drivers, setDrivers] = useState<Driver[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [blockFilter, setBlockFilter] = useState<DriverBlockFilter>('unblocked');
   const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingDriver, setEditingDriver] = useState<Driver | null>(null);
@@ -18,7 +19,11 @@ export default function DriversPage() {
   const loadDrivers = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetchDrivers({ search: search || undefined, limit: 100 });
+      const res = await fetchDrivers({
+        search: search || undefined,
+        limit: 100,
+        blockFilter,
+      });
       const list = res.drivers ?? (res as any) ?? [];
       setDrivers(Array.isArray(list) ? list : []);
       setSelectedIdx(null);
@@ -27,7 +32,7 @@ export default function DriversPage() {
     } finally {
       setLoading(false);
     }
-  }, [search]);
+  }, [search, blockFilter]);
 
   useEffect(() => {
     const t = setTimeout(loadDrivers, search ? 400 : 0);
@@ -66,6 +71,26 @@ export default function DriversPage() {
               className="w-full pl-8 pr-3 py-1.5 border border-slate-200 rounded-lg text-xs outline-none focus:border-indigo-300 focus:ring-1 focus:ring-indigo-200"
             />
           </div>
+          <div className="flex rounded-lg border border-slate-200 p-0.5 bg-slate-50">
+            {([
+              { v: 'unblocked' as const, label: 'Unblocked' },
+              { v: 'blocked' as const, label: 'Blocked' },
+              { v: 'all' as const, label: 'All' },
+            ]).map(({ v, label }) => (
+              <button
+                key={v}
+                type="button"
+                onClick={() => setBlockFilter(v)}
+                className={`flex-1 py-1 text-[10px] font-semibold rounded-md transition ${
+                  blockFilter === v
+                    ? 'bg-white text-indigo-700 shadow-sm border border-slate-200/80'
+                    : 'text-slate-500 hover:text-slate-700'
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* Driver List */}
@@ -103,7 +128,7 @@ export default function DriversPage() {
             key={selectedDriver._id}
             driver={selectedDriver}
             onBack={() => setSelectedIdx(null)}
-            onDeleted={() => loadDrivers()}
+            onBlockChange={() => loadDrivers()}
             onUpdated={() => loadDrivers()}
           />
         ) : (

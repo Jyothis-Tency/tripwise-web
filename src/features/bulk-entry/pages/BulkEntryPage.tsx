@@ -1580,7 +1580,7 @@ export function BulkEntryPage() {
   });
 
   // State — bulk data (functional updater pattern for perf)
-  const [filterStatus, setFilterStatus] = useState<'all' | 'pending' | 'completed'>('all');
+  const [filterStatus, setFilterStatus] = useState<'all' | 'pending' | 'completed'>('pending');
 
   // State — bulk data (functional updater pattern for perf)
   const [bulkGroups, setBulkGroupsRaw] = useState<DriverGroup[]>([emptyDriverGroup()]);

@@ -77,7 +77,7 @@ function EditableRow({
   label, value, highlight, fieldKey, tripId, onSaved, timeEditSeed,
 }: {
   label: string; value: string; highlight?: boolean;
-  fieldKey: string; tripId: string; onSaved: () => void;
+  fieldKey: string; tripId: string; onSaved: (updatedTrip: HistoryTrip) => void;
   /** For `type="time"` rows: HH:mm seed from ISO (not the AM/PM display string). */
   timeEditSeed?: string;
 }) {
@@ -104,7 +104,7 @@ function EditableRow({
         }
         val = parsed;
       }
-      await updateTripFields(tripId, { [fieldKey]: val } as any);
+      const updatedTrip = await updateTripFields(tripId, { [fieldKey]: val } as any);
       // Update locally — no full page reload
       const newDisplay = NUMBER_FIELDS.has(fieldKey)
         ? (fieldKey === 'agencyCost' || fieldKey === 'cabCost' || fieldKey === 'driver_salary'
@@ -113,7 +113,7 @@ function EditableRow({
         : editValue || '—';
       setDisplayValue(newDisplay);
       setEditing(false);
-      onSaved();
+      onSaved(updatedTrip);
     } catch (err: any) {
       alert(err?.message || err?.response?.data?.message || 'Failed to update field');
     } finally {
@@ -272,7 +272,13 @@ interface TripCardProps {
   onPaymentRecorded: () => void;
 }
 
-export function TripCard({ trip, onDeleted, onPaymentRecorded }: TripCardProps) {
+export function TripCard({ trip: initialTrip, onDeleted, onPaymentRecorded }: TripCardProps) {
+  const [trip, setTrip] = useState<HistoryTrip>(initialTrip);
+
+  useEffect(() => {
+    setTrip(initialTrip);
+  }, [initialTrip]);
+
   const [expanded, setExpanded] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [showHistoryModal, setShowHistoryModal] = useState(false);
@@ -318,7 +324,9 @@ export function TripCard({ trip, onDeleted, onPaymentRecorded }: TripCardProps) 
       value={value}
       fieldKey={fieldKey}
       tripId={trip._id}
-      onSaved={onPaymentRecorded}
+      onSaved={(updatedTrip) => {
+        setTrip(prev => ({ ...prev, ...updatedTrip }));
+      }}
       highlight={hl}
       timeEditSeed={timeEditSeed}
     />

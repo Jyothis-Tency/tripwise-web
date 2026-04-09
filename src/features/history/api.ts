@@ -138,6 +138,7 @@ export async function fetchPaymentHistory(tripId: string): Promise<{
   return res.data?.data ?? { payments: [], summary: {} };
 }
 
-export async function updateTripFields(tripId: string, fields: Partial<HistoryTrip>): Promise<void> {
-  await apiClient.patch(`/owners/trips/${tripId}/fields`, { fields });
+export async function updateTripFields(tripId: string, fields: Partial<HistoryTrip>): Promise<HistoryTrip> {
+  const res = await apiClient.patch(`/owners/trips/${tripId}/fields`, { fields });
+  return res.data?.data;
 }

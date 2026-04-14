@@ -90,6 +90,22 @@ function formatDate(d?: string) {
   catch { return d; }
 }
 
+function formatTimeIst(v?: string | Date | null) {
+  if (!v) return '—';
+  try {
+    const d = new Date(String(v));
+    if (Number.isNaN(d.getTime())) return String(v);
+    return d.toLocaleString('en-IN', {
+      timeZone: 'Asia/Kolkata',
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+    });
+  } catch {
+    return String(v);
+  }
+}
+
 function driverDisplayName(d: DriverItem) {
   return (d.fullName ?? d.name ?? `${d.firstName ?? ''} ${d.lastName ?? ''}`.trim()) || 'Unknown';
 }
@@ -1107,10 +1123,10 @@ function TripDriverTab({ vehicle, onStartTrip, onUpdateTrip, onCancelTrip, onAss
                 <EditableGridField tripId={activeTrip._id} fieldKey="distance" label="Distance" value={activeTrip.distance ? String(activeTrip.distance) : '—'} />
                 <EditableGridField tripId={activeTrip._id} fieldKey="startDate" label="Start Date" value={activeTrip.startDate || '—'} />
                 <EditableGridField tripId={activeTrip._id} fieldKey="expectedEndDate" label="End Date" value={activeTrip.expectedEndDate || '—'} />
-                <EditableGridField tripId={activeTrip._id} fieldKey="startTime" label="Start Time" value={activeTrip.startTime ? (String(activeTrip.startTime).includes('T') ? new Date(activeTrip.startTime).toLocaleTimeString() : String(activeTrip.startTime)) : '—'} />
-                <EditableGridField tripId={activeTrip._id} fieldKey="endTime" label="End Time" value={activeTrip.endTime ? (String(activeTrip.endTime).includes('T') ? new Date(activeTrip.endTime).toLocaleTimeString() : String(activeTrip.endTime)) : '—'} />
-                {activeTrip.actualStartTime && <div><span className="text-slate-400 block mb-0.5">Actual Start</span><span>{new Date(activeTrip.actualStartTime).toLocaleString()}</span></div>}
-                {activeTrip.actualEndTime && <div><span className="text-slate-400 block mb-0.5">Actual End</span><span>{new Date(activeTrip.actualEndTime).toLocaleString()}</span></div>}
+                <EditableGridField tripId={activeTrip._id} fieldKey="startTime" label="Start Time" value={formatTimeIst(activeTrip.startTime ?? null)} />
+                <EditableGridField tripId={activeTrip._id} fieldKey="endTime" label="End Time" value={formatTimeIst(activeTrip.endTime ?? null)} />
+                {activeTrip.actualStartTime && <div><span className="text-slate-400 block mb-0.5">Actual Start</span><span>{formatTimeIst(activeTrip.actualStartTime)}</span></div>}
+                {activeTrip.actualEndTime && <div><span className="text-slate-400 block mb-0.5">Actual End</span><span>{formatTimeIst(activeTrip.actualEndTime)}</span></div>}
                 <EditableGridField tripId={activeTrip._id} fieldKey="startKilometers" label="Start KM" value={activeTrip.startKilometers != null ? String(activeTrip.startKilometers) : '—'} />
                 <EditableGridField tripId={activeTrip._id} fieldKey="endKilometers" label="End KM" value={activeTrip.endKilometers != null ? String(activeTrip.endKilometers) : '—'} />
                 {activeTrip.careOf?.name && <div><span className="text-slate-400 block mb-0.5">Care Of</span>{activeTrip.careOf.name} {activeTrip.careOf.phone ? `(${activeTrip.careOf.phone})` : ''}</div>}
@@ -1215,10 +1231,10 @@ function TripDriverTab({ vehicle, onStartTrip, onUpdateTrip, onCancelTrip, onAss
                       <EditableGridField tripId={trip._id} fieldKey="distance" label="Distance" value={trip.distance ? String(trip.distance) : '—'} />
                       <EditableGridField tripId={trip._id} fieldKey="startDate" label="Start Date" value={trip.startDate || '—'} />
                       <EditableGridField tripId={trip._id} fieldKey="expectedEndDate" label="End Date" value={trip.expectedEndDate || '—'} />
-                      <EditableGridField tripId={trip._id} fieldKey="startTime" label="Start Time" value={trip.startTime ? (String(trip.startTime).includes('T') ? new Date(trip.startTime).toLocaleTimeString() : String(trip.startTime)) : '—'} />
-                      <EditableGridField tripId={trip._id} fieldKey="endTime" label="End Time" value={trip.endTime ? (String(trip.endTime).includes('T') ? new Date(trip.endTime).toLocaleTimeString() : String(trip.endTime)) : '—'} />
-                      {trip.actualStartTime && <div><span className="text-slate-400 block mb-0.5">Actual Start</span><span>{new Date(trip.actualStartTime).toLocaleString()}</span></div>}
-                      {trip.actualEndTime && <div><span className="text-slate-400 block mb-0.5">Actual End</span><span>{new Date(trip.actualEndTime).toLocaleString()}</span></div>}
+                      <EditableGridField tripId={trip._id} fieldKey="startTime" label="Start Time" value={formatTimeIst(trip.startTime ?? null)} />
+                      <EditableGridField tripId={trip._id} fieldKey="endTime" label="End Time" value={formatTimeIst(trip.endTime ?? null)} />
+                      {trip.actualStartTime && <div><span className="text-slate-400 block mb-0.5">Actual Start</span><span>{formatTimeIst(trip.actualStartTime)}</span></div>}
+                      {trip.actualEndTime && <div><span className="text-slate-400 block mb-0.5">Actual End</span><span>{formatTimeIst(trip.actualEndTime)}</span></div>}
                       <EditableGridField tripId={trip._id} fieldKey="startKilometers" label="Start KM" value={trip.startKilometers != null ? String(trip.startKilometers) : '—'} />
                       <EditableGridField tripId={trip._id} fieldKey="endKilometers" label="End KM" value={trip.endKilometers != null ? String(trip.endKilometers) : '—'} />
                       {trip.careOf?.name && <div><span className="text-slate-400 block mb-0.5">Care Of</span>{trip.careOf.name} {trip.careOf.phone ? `(${trip.careOf.phone})` : ''}</div>}

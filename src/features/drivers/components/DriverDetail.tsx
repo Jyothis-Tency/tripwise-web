@@ -1,10 +1,13 @@
 import { useState, useEffect } from 'react';
 import {
   User, Mail, MapPin, Eye, EyeOff, Ban, ShieldCheck, Plus, ArrowLeft,
-  Briefcase, DollarSign, TrendingUp, Calendar, Trash2, History,
+  Briefcase, DollarSign, TrendingUp, Calendar, Trash2, History, Wallet, Banknote,
 } from 'lucide-react';
 import type { Driver, DriverSalaryData, SalaryTransaction, DriverTrip } from '../api';
-import { blockDriver, unblockDriver, fetchDriverSalary, fetchDriverTrips, createSalaryTransaction, deleteSalaryTransaction } from '../api';
+import {
+  blockDriver, unblockDriver, fetchDriverSalary, fetchDriverTrips, fetchDriverSalaryLedger,
+  createSalaryTransaction, deleteSalaryTransaction,
+} from '../api';
 import { DriverHistoryModal } from './DriverHistoryModal';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -28,6 +31,15 @@ function statusBadge(d: Driver): { label: string; color: string; bg: string } {
 function fmtCurrency(v: number | undefined | null): string {
   const n = v ?? 0;
   return `₹${n.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+/** Month input value `YYYY-MM` → ISO range for ledger API */
+function monthInputToIsoRange(month: string): { startDate: string; endDate: string } | undefined {
+  if (!month || !/^\d{4}-\d{2}$/.test(month)) return undefined;
+  const [y, mo] = month.split('-').map(Number);
+  const start = new Date(y, mo - 1, 1);
+  const end = new Date(y, mo, 0, 23, 59, 59, 999);
+  return { startDate: start.toISOString(), endDate: end.toISOString() };
 }
 
 function InfoRow({ label, value }: { label: string; value: string }) {
@@ -194,16 +206,37 @@ function DetailsTab({ driver }: { driver: Driver }) {
 
 // ─── Salary Tab ──────────────────────────────────────────────────────────────
 
+function formatTxDisplayDate(tx: SalaryTransaction): string {
+  if (tx.date) {
+    if (/^\d{2}-\d{2}-\d{4}$/.test(tx.date)) return tx.date;
+    const d = new Date(tx.date);
+    if (!Number.isNaN(d.getTime())) return d.toLocaleDateString('en-IN');
+  }
+  if (tx.createdAt) {
+    const d = new Date(tx.createdAt);
+    if (!Number.isNaN(d.getTime())) return d.toLocaleDateString('en-IN');
+  }
+  return '—';
+}
+
+function txRowKey(tx: SalaryTransaction): string {
+  return tx._id || tx.id || `${tx.type}-${tx.amount}-${tx.date}`;
+}
+
 function SalaryTab({ driver }: { driver: Driver }) {
   const [loading, setLoading] = useState(true);
   const [salaryData, setSalaryData] = useState<DriverSalaryData | null>(null);
   const [trips, setTrips] = useState<DriverTrip[]>([]);
+  const [ledger, setLedger] = useState<SalaryTransaction[]>([]);
   const [error, setError] = useState('');
   const [showAddAdvance, setShowAddAdvance] = useState(false);
   const [advanceAmount, setAdvanceAmount] = useState('');
   const [advanceDesc, setAdvanceDesc] = useState('');
   const [addingSalary, setAddingSalary] = useState(false);
   const [monthFilter, setMonthFilter] = useState('');
+  const [paymentAmount, setPaymentAmount] = useState('');
+  const [paymentNote, setPaymentNote] = useState('');
+  const [recordingPayment, setRecordingPayment] = useState(false);
 
   const driverId = driver._id ?? (driver as any).id;
 
@@ -215,12 +248,20 @@ function SalaryTab({ driver }: { driver: Driver }) {
     setLoading(true);
     setError('');
     try {
-      const [salaryRes, tripsRes] = await Promise.all([
+      const range = monthFilter ? monthInputToIsoRange(monthFilter) : undefined;
+      const [salaryRes, tripsRes, ledgerRes] = await Promise.all([
         fetchDriverSalary(driverId, monthFilter || undefined).catch(() => null),
         fetchDriverTrips(driverId, { limit: 20, month: monthFilter || undefined }).catch(() => ({ trips: [] })),
+        fetchDriverSalaryLedger(driverId, {
+          page: 1,
+          limit: 50,
+          startDate: range?.startDate,
+          endDate: range?.endDate,
+        }).catch(() => ({ transactions: [], pagination: null })),
       ]);
       if (salaryRes) setSalaryData(salaryRes);
       setTrips((tripsRes as any)?.trips ?? []);
+      setLedger(ledgerRes.transactions ?? []);
     } catch {
       setError('Failed to load salary data');
     } finally {
@@ -236,7 +277,7 @@ function SalaryTab({ driver }: { driver: Driver }) {
       await createSalaryTransaction(driverId, {
         amount: amt,
         type: 'advance',
-        description: advanceDesc.trim() || 'Advance payment',
+        notes: advanceDesc.trim() || 'Advance payment',
       });
       setShowAddAdvance(false);
       setAdvanceAmount('');
@@ -247,6 +288,32 @@ function SalaryTab({ driver }: { driver: Driver }) {
     } finally {
       setAddingSalary(false);
     }
+  };
+
+  const handleRecordSalaryPayment = async () => {
+    const amt = parseFloat(paymentAmount);
+    if (!amt || amt <= 0) return;
+    setRecordingPayment(true);
+    try {
+      await createSalaryTransaction(driverId, {
+        amount: amt,
+        type: 'salary',
+        notes: paymentNote.trim() || 'Salary payment',
+      });
+      setPaymentAmount('');
+      setPaymentNote('');
+      loadData();
+    } catch {
+      alert('Failed to record salary payment');
+    } finally {
+      setRecordingPayment(false);
+    }
+  };
+
+  const handlePayFullPending = () => {
+    const pending = salaryData?.pendingTripSalary ?? 0;
+    if (pending <= 0) return;
+    setPaymentAmount(String(pending));
   };
 
   const handleDeleteTransaction = async (txId: string) => {
@@ -271,10 +338,12 @@ function SalaryTab({ driver }: { driver: Driver }) {
     return <p className="text-center text-red-500 text-sm py-8">{error}</p>;
   }
 
+  const pending = salaryData?.pendingTripSalary ?? 0;
+
   return (
     <div className="space-y-4">
       {/* Header and Filter */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-2">
         <h4 className="text-sm font-semibold text-slate-800">Financial Summary</h4>
         <input
           type="month"
@@ -283,21 +352,65 @@ function SalaryTab({ driver }: { driver: Driver }) {
           className="rounded-lg border border-slate-200 px-2.5 py-1.5 text-sm text-slate-700 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
         />
       </div>
+      <p className="text-[10px] text-slate-500 -mt-2">
+        Month filter applies to trip Bata totals, advances, salary paid, pending, and the ledger below.
+      </p>
 
       {/* Summary Cards */}
       <div className="grid grid-cols-2 gap-2">
-        <StatCard icon={<DollarSign className="h-4 w-4 text-emerald-500" />} label="Total Earnings" value={fmtCurrency(salaryData?.totalEarnings)} />
-        <StatCard icon={<TrendingUp className="h-4 w-4 text-blue-500" />} label="Total Trips" value={String(salaryData?.totalTrips ?? 0)} />
+        <StatCard icon={<DollarSign className="h-4 w-4 text-emerald-500" />} label="Trip Bata (earned)" value={fmtCurrency(salaryData?.totalEarnings)} />
+        <StatCard icon={<Wallet className="h-4 w-4 text-violet-500" />} label="Advances paid" value={fmtCurrency(salaryData?.totalAdvance)} />
+        <StatCard icon={<Banknote className="h-4 w-4 text-sky-600" />} label="Salary paid" value={fmtCurrency(salaryData?.salaryPaid)} />
+        <StatCard icon={<DollarSign className="h-4 w-4 text-amber-600" />} label="Pending payout" value={fmtCurrency(salaryData?.pendingTripSalary)} />
+        <StatCard icon={<TrendingUp className="h-4 w-4 text-blue-500" />} label="Trips" value={String(salaryData?.totalTrips ?? 0)} />
         <StatCard icon={<MapPin className="h-4 w-4 text-indigo-500" />} label="Total KM" value={`${salaryData?.totalKm ?? 0} km`} />
-        <StatCard icon={<DollarSign className="h-4 w-4 text-amber-500" />} label="Net Salary" value={fmtCurrency(salaryData?.netSalary)} />
       </div>
+
+      {/* Record salary payment */}
+      <Card title="Manage salary — mark as paid" icon={<Banknote className="h-3.5 w-3.5" />}>
+        <p className="text-[10px] text-slate-500 mb-2">
+          Record a payout toward trip Bata for this period. Pending = trip Bata − advances − salary payments already logged.
+        </p>
+        <div className="flex flex-wrap items-center gap-2 mb-2">
+          <input
+            type="number"
+            value={paymentAmount}
+            onChange={e => setPaymentAmount(e.target.value)}
+            placeholder="Amount paying now"
+            className="w-28 border border-slate-200 rounded px-2 py-1.5 text-xs outline-none focus:border-indigo-300"
+          />
+          <input
+            type="text"
+            value={paymentNote}
+            onChange={e => setPaymentNote(e.target.value)}
+            placeholder="Note (e.g. UPI ref, cash)"
+            className="flex-1 min-w-[120px] border border-slate-200 rounded px-2 py-1.5 text-xs outline-none focus:border-indigo-300"
+          />
+          <button
+            type="button"
+            onClick={handlePayFullPending}
+            disabled={pending <= 0}
+            className="px-2 py-1.5 rounded border border-slate-200 text-[11px] font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-40"
+          >
+            Use full pending
+          </button>
+          <button
+            type="button"
+            onClick={handleRecordSalaryPayment}
+            disabled={recordingPayment || !paymentAmount || parseFloat(paymentAmount) <= 0}
+            className="px-3 py-1.5 bg-emerald-600 text-white rounded text-[11px] font-semibold disabled:opacity-50"
+          >
+            {recordingPayment ? 'Saving…' : 'Record payment'}
+          </button>
+        </div>
+      </Card>
 
       {/* Advance Payments */}
       <Card
         title="Advance Payments"
         icon={<DollarSign className="h-3.5 w-3.5" />}
         action={
-          <button onClick={() => setShowAddAdvance(s => !s)} className="text-indigo-500 hover:text-indigo-700">
+          <button type="button" onClick={() => setShowAddAdvance(s => !s)} className="text-indigo-500 hover:text-indigo-700">
             <Plus className="h-3.5 w-3.5" />
           </button>
         }
@@ -318,7 +431,7 @@ function SalaryTab({ driver }: { driver: Driver }) {
               placeholder="Description"
               className="flex-1 border border-slate-200 rounded px-2 py-1 text-xs outline-none focus:border-indigo-300"
             />
-            <button onClick={handleAddAdvance} disabled={addingSalary}
+            <button type="button" onClick={handleAddAdvance} disabled={addingSalary}
               className="px-2 py-1 bg-indigo-600 text-white rounded text-xs font-semibold disabled:opacity-50">
               {addingSalary ? '…' : 'Add'}
             </button>
@@ -328,17 +441,64 @@ function SalaryTab({ driver }: { driver: Driver }) {
           <p className="text-[11px] text-slate-400 py-2">No advance payments</p>
         ) : (
           (salaryData?.advancePayments ?? []).map((tx: SalaryTransaction) => (
-            <div key={tx._id} className="flex items-center py-[3px] group">
+            <div key={txRowKey(tx)} className="flex items-center py-[3px] group">
               <span className="w-[110px] shrink-0 text-[11px] text-slate-500">
-                {tx.date ? new Date(tx.date).toLocaleDateString() : (tx.createdAt ? new Date(tx.createdAt).toLocaleDateString() : '—')}
+                {formatTxDisplayDate(tx)}
               </span>
               <span className="text-[11px] font-medium text-slate-800 flex-1">{fmtCurrency(tx.amount)}</span>
-              <span className="text-[10px] text-slate-400 mr-2">{tx.description ?? tx.type}</span>
-              <button onClick={() => handleDeleteTransaction(tx._id)} className="opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-600">
+              <span className="text-[10px] text-slate-400 mr-2 truncate max-w-[100px]">{tx.notes ?? tx.description ?? tx.type}</span>
+              <button type="button" onClick={() => handleDeleteTransaction(tx._id || tx.id || '')} className="opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-600">
                 <Trash2 className="h-2.5 w-2.5" />
               </button>
             </div>
           ))
+        )}
+      </Card>
+
+      {/* Salary & advance history (ledger) */}
+      <Card title="Salary & payment history" icon={<History className="h-3.5 w-3.5" />}>
+        {ledger.length === 0 ? (
+          <p className="text-[11px] text-slate-400 py-2">No transactions for this period</p>
+        ) : (
+          <div className="overflow-x-auto -mx-1">
+            <table className="w-full text-[11px]">
+              <thead>
+                <tr className="text-left text-slate-400 border-b border-slate-100">
+                  <th className="py-1.5 pr-2 font-medium">Date</th>
+                  <th className="py-1.5 pr-2 font-medium">Type</th>
+                  <th className="py-1.5 pr-2 font-medium">Amount</th>
+                  <th className="py-1.5 pr-2 font-medium">Note</th>
+                  <th className="py-1.5 w-8" />
+                </tr>
+              </thead>
+              <tbody>
+                {ledger.map(tx => (
+                  <tr key={txRowKey(tx)} className="border-b border-slate-50 last:border-0">
+                    <td className="py-1.5 pr-2 text-slate-600 whitespace-nowrap">{formatTxDisplayDate(tx)}</td>
+                    <td className="py-1.5 pr-2">
+                      <span className={`rounded px-1.5 py-0.5 text-[10px] font-semibold ${
+                        tx.type === 'salary' ? 'bg-emerald-100 text-emerald-800' : 'bg-violet-100 text-violet-800'
+                      }`}>
+                        {tx.type === 'salary' ? 'Salary paid' : 'Advance'}
+                      </span>
+                    </td>
+                    <td className="py-1.5 pr-2 font-medium text-slate-800">{fmtCurrency(tx.amount)}</td>
+                    <td className="py-1.5 pr-2 text-slate-500 truncate max-w-[140px]">{tx.notes ?? '—'}</td>
+                    <td className="py-1.5">
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteTransaction(tx._id || tx.id || '')}
+                        className="text-red-400 hover:text-red-600"
+                        title="Delete"
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </Card>
 

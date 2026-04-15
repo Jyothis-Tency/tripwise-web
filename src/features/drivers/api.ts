@@ -32,16 +32,23 @@ export interface DriverSalaryData {
   totalTrips: number;
   totalKm: number;
   totalAdvance: number;
+  /** Sum of `salary`-type settlement payments in the same period as the salary summary */
+  salaryPaid: number;
+  /** Trip Bata still owed after advances and recorded salary payments */
+  pendingTripSalary: number;
   netSalary: number;
   advancePayments?: SalaryTransaction[];
+  salaryPayments?: SalaryTransaction[];
   trips?: DriverTrip[];
 }
 
 export interface SalaryTransaction {
   _id: string;
+  id?: string;
   amount: number;
   type: string;
   description?: string;
+  notes?: string;
   date?: string;
   createdAt?: string;
 }
@@ -126,13 +133,22 @@ export async function fetchDriverSalary(driverId: string, month?: string): Promi
   const { data } = await apiClient.get(`/owners/drivers/${driverId}/salary`, { params });
   const payload = data.data ?? data;
   
+  const pending =
+    payload.pendingTripSalary ?? payload.remainingBalance ?? 0;
   return {
     totalEarnings: payload.totalEarned ?? 0,
-    totalTrips: (payload.completedTrips ?? 0) + (payload.inProgressTrips ?? 0),
+    totalTrips:
+      payload.totalTrips ??
+      (payload.completedTrips ?? 0) +
+        (payload.inProgressTrips ?? 0) +
+        (payload.scheduledTrips ?? 0),
     totalKm: payload.totalKm ?? 0,
     totalAdvance: payload.advanceSalary ?? 0,
-    netSalary: payload.remainingBalance ?? 0,
+    salaryPaid: payload.salaryPaid ?? 0,
+    pendingTripSalary: pending,
+    netSalary: pending,
     advancePayments: payload.advancePayments || [],
+    salaryPayments: payload.salaryPayments || [],
   };
 }
 
@@ -212,10 +228,70 @@ export async function createSalaryTransaction(driverId: string, payload: {
   amount: number;
   type: string;
   description?: string;
+  notes?: string;
   date?: string;
 }): Promise<SalaryTransaction> {
-  const { data } = await apiClient.post(`/owners/drivers/${driverId}/salary/transactions`, payload);
+  const body = {
+    amount: payload.amount,
+    type: payload.type,
+    notes: payload.notes ?? payload.description,
+    date: payload.date,
+  };
+  const { data } = await apiClient.post(`/owners/drivers/${driverId}/salary/transactions`, body);
   return data.data ?? data;
+}
+
+export interface SalaryLedgerPagination {
+  page: number;
+  limit: number;
+  total: number;
+  pages: number;
+  hasNext?: boolean;
+  hasPrev?: boolean;
+}
+
+function mapSalaryLedgerDoc(raw: Record<string, unknown>): SalaryTransaction {
+  const id = String(raw._id ?? raw.id ?? '');
+  return {
+    _id: id,
+    id,
+    amount: Number(raw.amount) || 0,
+    type: String(raw.type ?? ''),
+    notes: (raw.notes as string) || undefined,
+    date: raw.date as string | undefined,
+    createdAt: raw.createdAt as string | undefined,
+  };
+}
+
+/** Paginated salary + advance ledger for a driver (owner API). */
+export async function fetchDriverSalaryLedger(
+  driverId: string,
+  params?: {
+    page?: number;
+    limit?: number;
+    startDate?: string;
+    endDate?: string;
+    type?: 'salary' | 'advance';
+  },
+): Promise<{ transactions: SalaryTransaction[]; pagination: SalaryLedgerPagination | null }> {
+  const { data } = await apiClient.get(`/owners/drivers/${driverId}/salary/transactions`, {
+    params: {
+      page: params?.page ?? 1,
+      limit: params?.limit ?? 25,
+      startDate: params?.startDate,
+      endDate: params?.endDate,
+      type: params?.type,
+    },
+  });
+  const inner = (data?.data ?? data) as {
+    documents?: Record<string, unknown>[];
+    pagination?: SalaryLedgerPagination;
+  };
+  const docs = inner.documents ?? [];
+  return {
+    transactions: docs.map(mapSalaryLedgerDoc),
+    pagination: inner.pagination ?? null,
+  };
 }
 
 export async function deleteSalaryTransaction(transactionId: string): Promise<void> {

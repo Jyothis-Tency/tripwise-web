@@ -8,6 +8,7 @@ import { PLPage } from './features/pnl/pages/PLPage';
 import { TrackingPage } from './features/tracking/pages/TrackingPage';
 import { BulkEntryPage } from './features/bulk-entry/pages/BulkEntryPage';
 import { HistoryPage } from './features/history/pages/HistoryPage';
+import { HistoryPayoutPage } from './features/history/pages/HistoryPayoutPage';
 import DriversPage from './features/drivers/pages/DriversPage';
 import RemindersPage from './features/reminders/pages/RemindersPage';
 import ExpensesPage from './features/expenses/pages/ExpensesPage';
@@ -32,6 +33,7 @@ function App() {
         <Route path="bulk-entry" element={<BulkEntryPage />} />
         <Route path="expenses" element={<ExpensesPage />} />
         <Route path="history" element={<HistoryPage />} />
+        <Route path="history/payout" element={<HistoryPayoutPage />} />
         <Route path="analytics" element={<div>Analytics (coming soon)</div>} />
         <Route path="pl" element={<PLPage />} />
         <Route path="reminders" element={<RemindersPage />} />

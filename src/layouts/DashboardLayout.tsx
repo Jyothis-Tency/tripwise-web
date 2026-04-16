@@ -12,6 +12,7 @@ const routeTitle: Record<string, string> = {
   '/bulk-entry': 'Bulk Entry',
   '/expenses': 'Expenses',
   '/history': 'History',
+  '/history/payout': 'Agency Payout',
   '/analytics': 'Analytics',
   '/pl': 'P&L',
   '/reminders': 'Reminders',

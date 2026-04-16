@@ -26,6 +26,7 @@ import {
   fetchVehicleHistoryDetailed,
   fetchVehicleExpenses,
   fetchDriversList,
+  fetchAgencyNames,
   createVehicle,
   updateVehicle,
   assignDriverToVehicle,
@@ -433,6 +434,8 @@ export function TripFormModal({ vehicleId, trip, onClose, onSaved }: {
   const isUpdate = !!trip;
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [agencyNames, setAgencyNames] = useState<string[]>([]);
+  const [showAgencySuggestions, setShowAgencySuggestions] = useState(false);
   
   const [form, setForm] = useState({
     from: trip?.from ?? '',
@@ -451,8 +454,35 @@ export function TripFormModal({ vehicleId, trip, onClose, onSaved }: {
     notes: trip?.notes ?? '',
   });
 
+  useEffect(() => {
+    let active = true;
+    fetchAgencyNames()
+      .then((names) => {
+        if (!active) return;
+        setAgencyNames((prev) => {
+          const merged = new Set<string>([...prev, ...names]);
+          if (trip?.agencyName?.trim()) merged.add(trip.agencyName.trim());
+          return Array.from(merged);
+        });
+      })
+      .catch(() => {
+        // Keep form usable even if suggestions fail.
+      });
+    return () => {
+      active = false;
+    };
+  }, [trip?.agencyName]);
+
   const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
     setForm(prev => ({ ...prev, [k]: e.target.value }));
+
+  const filteredAgencyNames = agencyNames
+    .filter((name) => {
+      const query = form.agencyName.trim().toLowerCase();
+      if (!query) return true;
+      return name.toLowerCase().includes(query);
+    })
+    .slice(0, 8);
 
   const profit = (parseFloat(form.agencyCost || '0') - parseFloat(form.cabCost || '0')).toFixed(2);
 
@@ -513,8 +543,8 @@ export function TripFormModal({ vehicleId, trip, onClose, onSaved }: {
             <Field label="Distance (km)" id="tdist">
               <input id="tdist" type="number" value={form.distance} onChange={set('distance')} className={inputCls} placeholder="0" />
             </Field>
-            <Field label="Customer" id="tcus">
-              <input id="tcus" value={form.customer} onChange={set('customer')} className={inputCls} placeholder="Customer Name" />
+            <Field label="Customer (Optional)" id="tcus">
+              <input id="tcus" value={form.customer} onChange={set('customer')} className={inputCls} placeholder="Customer Name (Optional)" />
             </Field>
 
             <Field label="Priority" id="tprio">
@@ -525,7 +555,42 @@ export function TripFormModal({ vehicleId, trip, onClose, onSaved }: {
               </select>
             </Field>
             <Field label="Agency Name (Optional)" id="tagn">
-              <input id="tagn" value={form.agencyName} onChange={set('agencyName')} className={inputCls} placeholder="Agency Name" />
+              <div className="relative">
+                <input
+                  id="tagn"
+                  value={form.agencyName}
+                  onChange={(e) => {
+                    setForm((prev) => ({ ...prev, agencyName: e.target.value }));
+                    setShowAgencySuggestions(true);
+                  }}
+                  onFocus={() => setShowAgencySuggestions(true)}
+                  onBlur={() => {
+                    // Delay close so click on suggestion can register.
+                    setTimeout(() => setShowAgencySuggestions(false), 120);
+                  }}
+                  autoComplete="off"
+                  className={inputCls}
+                  placeholder="Agency Name"
+                />
+                {showAgencySuggestions && filteredAgencyNames.length > 0 && (
+                  <div className="absolute z-30 mt-1 w-full rounded-md border border-slate-200 bg-white shadow-lg max-h-44 overflow-auto">
+                    {filteredAgencyNames.map((name) => (
+                      <button
+                        key={name}
+                        type="button"
+                        className="w-full text-left px-3 py-2 text-sm hover:bg-indigo-50"
+                        onMouseDown={(e) => {
+                          e.preventDefault();
+                          setForm((prev) => ({ ...prev, agencyName: name }));
+                          setShowAgencySuggestions(false);
+                        }}
+                      >
+                        {name}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
             </Field>
           </div>
 
@@ -1143,7 +1208,7 @@ function TripDriverTab({ vehicle, onStartTrip, onUpdateTrip, onCancelTrip, onAss
                   <div><span className="text-slate-400 block mb-0.5 uppercase">Personal Exp.</span><span className="font-semibold text-slate-700">₹{Number(activeTrip.totalPersonalExpense || 0).toLocaleString('en-IN')}</span></div>
                   <div><span className="text-slate-400 block mb-0.5 uppercase">Trip Exp.</span><span className="font-semibold text-slate-700">₹{Number(activeTrip.totalExpenses || 0).toLocaleString('en-IN')}</span></div>
                   <EditableGridField tripId={activeTrip._id} fieldKey="cabCost" label="CAB COST" value={activeTrip.cabCost || 0} isCurrency />
-                  <div><span className="text-slate-400 block mb-0.5 uppercase text-indigo-500">Owner Profit</span><span className="font-bold text-indigo-700">₹{Number(activeTrip.ownerProfit || 0).toLocaleString('en-IN')}</span></div>
+                  <div><span className="block mb-0.5 uppercase text-indigo-500">Owner Profit</span><span className="font-bold text-indigo-700">₹{Number(activeTrip.ownerProfit || 0).toLocaleString('en-IN')}</span></div>
                 </div>
               </div>
               <div className="flex flex-wrap gap-2 pt-2 border-t border-indigo-100/50">

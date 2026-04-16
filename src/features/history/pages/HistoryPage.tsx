@@ -1,9 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Search, X, RefreshCw, ChevronLeft, ChevronRight, FileDown } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Search, X, RefreshCw, ChevronLeft, ChevronRight, FileDown, Wallet } from 'lucide-react';
 import jsPDF from 'jspdf';
-import { fetchTripHistory, type HistoryTrip, type HistoryPagination, type HistoryPaymentSummary } from '../api';
+import {
+  fetchTripHistory,
+  type HistoryTrip,
+  type HistoryPagination,
+  type HistoryPaymentSummary,
+} from '../api';
 import { TripCard } from '../components/TripCard';
-import { ExportPdfModal } from '../components/ExportPdfModal';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -103,6 +108,7 @@ function Pagination({ p, onChange }: { p: HistoryPagination; onChange: (page: nu
 // ─── History Page ─────────────────────────────────────────────────────────────
 
 export function HistoryPage() {
+  const navigate = useNavigate();
   // Filter state
   const currentMonth = getCurrentMonthValue();
   const [search, setSearch]       = useState('');
@@ -114,7 +120,6 @@ export function HistoryPage() {
   const [page, setPage]           = useState(1);
   const [filterMode, setFilterMode] = useState<'month' | 'daterange'>('month');
   const LIMIT = 10;
-  const [exportModalOpen, setExportModalOpen] = useState(false);
 
   // Data state
   const [trips, setTrips]               = useState<HistoryTrip[]>([]);
@@ -209,15 +214,24 @@ export function HistoryPage() {
 
   const hasActiveFilters = status !== 'all' || month !== currentMonth || startDate || endDate || debouncedSearch;
 
-  const handleExportPdf = async (start: string, end: string) => {
-    // Backend stores Trip.startDate as a string (often `D/M/YYYY`),
-    // so server-side date range filtering can miss matches depending on format.
-    // For PDF export we fetch and apply the selected range client-side.
-    const result = await fetchTripHistory({
-      limit: 10000, 
+  const handleExportPdf = async () => {
+    const params: Record<string, any> = {
+      page: 1,
+      limit: 10000,
+      status: status === 'all' ? undefined : status,
+      search: debouncedSearch || undefined,
       sortBy: 'startDate',
-      sortOrder: 'asc'
-    });
+      sortOrder: 'asc',
+    };
+
+    if (filterMode === 'month' && month && month !== 'all_time') {
+      params.month = month;
+    } else if (filterMode === 'daterange') {
+      params.startDate = startDate || undefined;
+      params.endDate = endDate || undefined;
+    }
+
+    const result = await fetchTripHistory(params);
     
     const parseLooseDate = (raw: any): Date | null => {
       if (!raw) return null;
@@ -244,33 +258,31 @@ export function HistoryPage() {
       return Number.isNaN(fallback.getTime()) ? null : fallback;
     };
 
-    const startD = parseLooseDate(start);
-    const endD = parseLooseDate(end);
-    if (!startD || !endD) {
-      alert('Invalid date range.');
-      return;
+    let exportTrips = result.trips || [];
+
+    // Extra defensive date-range filter on client side for inconsistent date storage.
+    if (filterMode === 'daterange' && startDate && endDate) {
+      const startD = parseLooseDate(startDate);
+      const endD = parseLooseDate(endDate);
+      if (startD && endD) {
+        startD.setHours(0, 0, 0, 0);
+        endD.setHours(23, 59, 59, 999);
+        const inRange = (d: Date | null): boolean => {
+          if (!d) return false;
+          const ts = d.getTime();
+          return ts >= startD.getTime() && ts <= endD.getTime();
+        };
+        exportTrips = exportTrips.filter((t) => {
+          const logicalTripDate = parseLooseDate((t as any).startDate ?? (t as any).date);
+          const createdAtDate = parseLooseDate((t as any).createdAt);
+          const updatedAtDate = parseLooseDate((t as any).updatedAt);
+          return inRange(logicalTripDate) || inRange(createdAtDate) || inRange(updatedAtDate);
+        });
+      }
     }
-    startD.setHours(0, 0, 0, 0);
-    endD.setHours(23, 59, 59, 999);
 
-    const inRange = (d: Date | null): boolean => {
-      if (!d) return false;
-      const ts = d.getTime();
-      return ts >= startD.getTime() && ts <= endD.getTime();
-    };
-
-    const exportTrips = (result.trips || []).filter((t) => {
-      // Some records store logical trip date in `startDate` (string),
-      // while server-side filters historically used `createdAt`.
-      // To avoid "No trips" false negatives, accept if ANY of these dates match.
-      const logicalTripDate = parseLooseDate((t as any).startDate ?? (t as any).date);
-      const createdAtDate = parseLooseDate((t as any).createdAt);
-      const updatedAtDate = parseLooseDate((t as any).updatedAt);
-
-      return inRange(logicalTripDate) || inRange(createdAtDate) || inRange(updatedAtDate);
-    });
     if (!exportTrips || exportTrips.length === 0) {
-      alert("No trips found in this date range.");
+      alert("No trips found for current filters.");
       return;
     }
 
@@ -480,7 +492,14 @@ export function HistoryPage() {
           <p className="text-sm text-slate-500 mt-1">View, filter and manage your trips</p>
         </div>
         <div className="flex gap-2">
-          <button onClick={() => setExportModalOpen(true)}
+          <button
+            onClick={() => navigate('/history/payout')}
+            className="flex items-center gap-2 rounded-lg border border-indigo-100 bg-indigo-50 text-indigo-600 px-4 py-2.5 text-sm font-medium hover:bg-indigo-100 transition shrink-0"
+          >
+            <Wallet className="h-4 w-4" />
+            Payout
+          </button>
+          <button onClick={handleExportPdf}
             className="flex items-center gap-2 rounded-lg bg-indigo-50 border border-indigo-100 text-indigo-600 px-4 py-2.5 text-sm font-medium hover:bg-indigo-100 transition shrink-0">
             <FileDown className="h-4 w-4" />
             Export PDF
@@ -588,12 +607,6 @@ export function HistoryPage() {
 
       {/* Pagination */}
       {!loading && <Pagination p={pagination} onChange={setPage} />}
-      
-      <ExportPdfModal 
-        open={exportModalOpen} 
-        onClose={() => setExportModalOpen(false)} 
-        onExport={handleExportPdf}
-      />
     </div>
   );
 }

@@ -460,6 +460,22 @@ export async function fetchDriversList(): Promise<DriverItem[]> {
   }));
 }
 
+export async function fetchAgencyNames(limit = 200): Promise<string[]> {
+  const res = await apiClient.get(ApiEndpoints.agencies, {
+    params: { page: 1, limit },
+  });
+  const raw: any = res.data ?? {};
+  const root = raw.data ?? raw;
+  const list: any[] =
+    root.agencies ?? root.documents ?? root.items ?? root.data?.agencies ?? [];
+
+  const names = list
+    .map((a: any) => (typeof a?.name === 'string' ? a.name.trim() : ''))
+    .filter(Boolean);
+
+  return Array.from(new Set(names));
+}
+
 export async function assignDriverToVehicle(vehicleId: string, driverId: string): Promise<void> {
   await apiClient.put(ApiEndpoints.assignDriver(vehicleId), { driverId });
 }

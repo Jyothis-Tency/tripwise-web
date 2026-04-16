@@ -95,6 +95,41 @@ export interface TripPayment {
   createdAt: string;
 }
 
+export interface HistoryPayoutAgency {
+  _id: string;
+  id?: string;
+  name: string;
+}
+
+export interface HistoryPayoutPayment {
+  _id: string;
+  amount: number;
+  paymentDate: string;
+  paymentMethod: string;
+  notes?: string;
+}
+
+export interface HistoryAgencyPayoutSummary {
+  grandTotal: number;
+  totalReceived: number;
+  remaining: number;
+  payments: HistoryPayoutPayment[];
+}
+
+export interface HistoryPayoutAgencyTrip {
+  _id: string;
+  tripNumber: string;
+  driverName: string;
+  from: string;
+  to: string;
+  startDate: string;
+  expectedEndDate?: string;
+  agencyCost: number;
+  cabCost: number;
+  ownerProfit: number;
+  advance: number;
+}
+
 // ─── API Calls ────────────────────────────────────────────────────────────────
 
 export async function fetchTripHistory(params: HistoryParams = {}): Promise<{
@@ -141,4 +176,59 @@ export async function fetchPaymentHistory(tripId: string): Promise<{
 export async function updateTripFields(tripId: string, fields: Partial<HistoryTrip>): Promise<HistoryTrip> {
   const res = await apiClient.patch(`/owners/trips/${tripId}/fields`, { fields });
   return res.data?.data;
+}
+
+export async function fetchMainTripPayoutAgencies(): Promise<HistoryPayoutAgency[]> {
+  const res = await apiClient.get('/owners/history/payout-agencies');
+  const raw: any = res.data ?? {};
+  const list: any[] = raw.data ?? [];
+  return list.map((a: any) => ({
+    _id: a._id ?? a.id,
+    id: a.id ?? a._id,
+    name: a.name ?? '',
+  }));
+}
+
+export async function fetchHistoryAgencyPayoutSummary(
+  agencyId: string,
+): Promise<HistoryAgencyPayoutSummary> {
+  const res = await apiClient.get(`/owners/agencies/${agencyId}/payout-summary`, {
+    params: { source: 'main' },
+  });
+  const raw: any = res.data ?? {};
+  return raw.data ?? {
+    grandTotal: 0,
+    totalReceived: 0,
+    remaining: 0,
+    payments: [],
+  };
+}
+
+export async function addHistoryAgencyPayoutPayment(
+  agencyId: string,
+  payload: {
+    amount: number;
+    paymentDate?: string;
+    paymentMethod?: string;
+    notes?: string;
+  },
+): Promise<HistoryPayoutPayment> {
+  const res = await apiClient.post(`/owners/agencies/${agencyId}/payout-payments`, {
+    ...payload,
+    source: 'main',
+  });
+  const raw: any = res.data ?? {};
+  return raw.data ?? raw;
+}
+
+export async function deleteHistoryPayoutPayment(paymentId: string): Promise<void> {
+  await apiClient.delete(`/owners/payout-payments/${paymentId}`);
+}
+
+export async function fetchMainTripPayoutAgencyTrips(
+  agencyId: string,
+): Promise<HistoryPayoutAgencyTrip[]> {
+  const res = await apiClient.get(`/owners/history/payout-agencies/${agencyId}/trips`);
+  const raw: any = res.data ?? {};
+  return raw.data ?? [];
 }

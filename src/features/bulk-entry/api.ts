@@ -1,5 +1,5 @@
-import apiClient from '../../services/axios';
-import { ApiEndpoints } from '../../services/apiEndpoints';
+import apiClient from "../../services/axios";
+import { ApiEndpoints } from "../../services/apiEndpoints";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -52,6 +52,7 @@ export interface BulkTripRow {
   distance: number;
   hours: number;
   toll: number;
+  advancePaid: number;
   grandTotal: number;
   notes: string;
   isCompleted?: boolean;
@@ -60,7 +61,6 @@ export interface BulkTripRow {
 export interface DriverGroup {
   driverName: string;
   vehicleNumber: string;
-  advancePaid: number;
   rows: BulkTripRow[];
 }
 
@@ -94,7 +94,7 @@ export async function fetchAgencies(
     agencies: list.map((a: any) => ({
       _id: a._id ?? a.id,
       id: a.id ?? a._id,
-      name: a.name ?? '',
+      name: a.name ?? "",
       owner: a.owner,
       createdAt: a.createdAt,
     })),
@@ -128,7 +128,13 @@ export async function fetchBulkEntryTrips(
   );
   const raw: any = res.data ?? {};
   const root = raw.data ?? raw;
-  return root.bulkEntryTrips ?? root.agencyTrips ?? root.documents ?? root.items ?? [];
+  return (
+    root.bulkEntryTrips ??
+    root.agencyTrips ??
+    root.documents ??
+    root.items ??
+    []
+  );
 }
 
 /** Sync bulk entry (autosave endpoint) */
@@ -141,7 +147,12 @@ export async function syncBulkEntry(payload: {
   updated: number;
   deleted: number;
   failed: number;
-  rows?: Array<{ clientRowId?: string; _id?: string; status?: string; result?: string }>;
+  rows?: Array<{
+    clientRowId?: string;
+    _id?: string;
+    status?: string;
+    result?: string;
+  }>;
 }> {
   const res = await apiClient.post(ApiEndpoints.bulkEntrySync, payload);
   const raw: any = res.data ?? {};
@@ -188,7 +199,13 @@ export async function fetchNormalEntryTrips(
   );
   const raw: any = res.data ?? {};
   const root = raw.data ?? raw;
-  return root.normalEntryTrips ?? root.agencyTrips ?? root.documents ?? root.items ?? [];
+  return (
+    root.normalEntryTrips ??
+    root.agencyTrips ??
+    root.documents ??
+    root.items ??
+    []
+  );
 }
 
 /** Create normal entries (submit) */
@@ -216,7 +233,12 @@ export async function syncNormalEntry(payload: {
   updated: number;
   deleted: number;
   failed: number;
-  rows?: Array<{ clientRowId?: string; _id?: string; status?: string; result?: string }>;
+  rows?: Array<{
+    clientRowId?: string;
+    _id?: string;
+    status?: string;
+    result?: string;
+  }>;
 }> {
   const res = await apiClient.post(ApiEndpoints.normalEntrySync, payload);
   const raw: any = res.data ?? {};
@@ -259,16 +281,29 @@ export interface DriverPayoutSummary {
   payments: PayoutPayment[];
 }
 
-export async function fetchAgencyPayoutSummary(agencyId: string): Promise<AgencyPayoutSummary> {
-  const res = await apiClient.get(`/owners/agencies/${agencyId}/payout-summary`);
+export async function fetchAgencyPayoutSummary(
+  agencyId: string,
+): Promise<AgencyPayoutSummary> {
+  const res = await apiClient.get(
+    `/owners/agencies/${agencyId}/payout-summary`,
+  );
   const raw: any = res.data ?? {};
   return raw.data ?? raw;
 }
 
-export async function addAgencyPayoutPayment(agencyId: string, payload: {
-  amount: number; paymentDate?: string; paymentMethod?: string; notes?: string;
-}): Promise<PayoutPayment> {
-  const res = await apiClient.post(`/owners/agencies/${agencyId}/payout-payments`, payload);
+export async function addAgencyPayoutPayment(
+  agencyId: string,
+  payload: {
+    amount: number;
+    paymentDate?: string;
+    paymentMethod?: string;
+    notes?: string;
+  },
+): Promise<PayoutPayment> {
+  const res = await apiClient.post(
+    `/owners/agencies/${agencyId}/payout-payments`,
+    payload,
+  );
   const raw: any = res.data ?? {};
   return raw.data ?? raw;
 }
@@ -277,16 +312,31 @@ export async function deletePayoutPayment(paymentId: string): Promise<void> {
   await apiClient.delete(`/owners/payout-payments/${paymentId}`);
 }
 
-export async function fetchDriverPayoutSummary(agencyId: string, driverName: string): Promise<DriverPayoutSummary> {
-  const res = await apiClient.get(`/owners/agencies/${agencyId}/driver-payout-summary?driverName=${encodeURIComponent(driverName)}`);
+export async function fetchDriverPayoutSummary(
+  agencyId: string,
+  driverName: string,
+): Promise<DriverPayoutSummary> {
+  const res = await apiClient.get(
+    `/owners/agencies/${agencyId}/driver-payout-summary?driverName=${encodeURIComponent(driverName)}`,
+  );
   const raw: any = res.data ?? {};
   return raw.data ?? raw;
 }
 
-export async function addDriverPayoutPayment(agencyId: string, payload: {
-  driverName: string; amount: number; paymentDate?: string; paymentMethod?: string; notes?: string;
-}): Promise<PayoutPayment> {
-  const res = await apiClient.post(`/owners/agencies/${agencyId}/driver-payout-payments`, payload);
+export async function addDriverPayoutPayment(
+  agencyId: string,
+  payload: {
+    driverName: string;
+    amount: number;
+    paymentDate?: string;
+    paymentMethod?: string;
+    notes?: string;
+  },
+): Promise<PayoutPayment> {
+  const res = await apiClient.post(
+    `/owners/agencies/${agencyId}/driver-payout-payments`,
+    payload,
+  );
   const raw: any = res.data ?? {};
   return raw.data ?? raw;
 }

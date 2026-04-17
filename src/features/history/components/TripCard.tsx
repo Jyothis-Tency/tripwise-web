@@ -378,9 +378,10 @@ export function TripCard({ trip: initialTrip, onDeleted, onPaymentRecorded }: Tr
 
         {/* Expanded details */}
         {expanded && (
-          <div className="border-t border-slate-100 px-4 sm:px-5 py-4 sm:py-5 space-y-5 sm:space-y-6">
+          <div className="border-t border-slate-100 px-4 sm:px-5 py-4 sm:py-5">
+            <div className="grid grid-cols-1 xl:grid-cols-3 gap-5 sm:gap-6">
             {/* Trip Details */}
-            <section>
+            <section className="xl:col-span-2">
               <h4 className="text-sm font-bold text-indigo-500 uppercase tracking-wider mb-2 flex items-center gap-2">
                 <span className="w-1 h-4 bg-indigo-400 rounded-full"></span>
                 Trip Details
@@ -414,57 +415,60 @@ export function TripCard({ trip: initialTrip, onDeleted, onPaymentRecorded }: Tr
               </div>
             </section>
 
-            {/* Financial Details */}
-            <section>
-              <h4 className="text-sm font-bold text-emerald-600 uppercase tracking-wider mb-2 flex items-center gap-2">
-                <span className="w-1 h-4 bg-emerald-400 rounded-full"></span>
-                Financial Details
-              </h4>
-              <div className="bg-emerald-50/30 rounded-lg px-4 sm:px-5 py-3 sm:py-4">
-                {E('Agency Cost', fmtCurrency(trip.agencyCost), 'agencyCost')}
-                {E('Cab Cost', fmtCurrency(trip.cabCost), 'cabCost')}
-                {E('Driver Salary', fmtCurrency(trip.driver_salary), 'driver_salary')}
-                {E('Advance', fmtCurrency(trip.advance), 'advance')}
-                <DetailRow label="Total Expenses" value={fmtCurrency(trip.totalExpenses)} />
-                <DetailRow label="Owner Profit" value={fmtCurrency(trip.ownerProfit)} highlight />
-              </div>
-            </section>
+            <div className="xl:col-span-1 space-y-5 sm:space-y-6">
+              {/* Financial Details */}
+              <section>
+                <h4 className="text-sm font-bold text-emerald-600 uppercase tracking-wider mb-2 flex items-center gap-2">
+                  <span className="w-1 h-4 bg-emerald-400 rounded-full"></span>
+                  Financial Details
+                </h4>
+                <div className="bg-emerald-50/30 rounded-lg px-4 sm:px-5 py-3 sm:py-4">
+                  {E('Agency Cost', fmtCurrency(trip.agencyCost), 'agencyCost')}
+                  {E('Cab Cost', fmtCurrency(trip.cabCost), 'cabCost')}
+                  {E('Driver Salary', fmtCurrency(trip.driver_salary), 'driver_salary')}
+                  {E('Advance', fmtCurrency(trip.advance), 'advance')}
+                  <DetailRow label="Total Expenses" value={fmtCurrency(trip.totalExpenses)} />
+                  <DetailRow label="Owner Profit" value={fmtCurrency(trip.ownerProfit)} highlight />
+                </div>
+              </section>
 
-            {/* Payment Status */}
-            <section>
-              <h4 className="text-sm font-bold text-amber-600 uppercase tracking-wider mb-2 flex items-center gap-2">
-                <span className="w-1 h-4 bg-amber-400 rounded-full"></span>
-                Payment Status
-              </h4>
-              {/* Progress bar */}
-              <div className="h-2.5 bg-slate-100 rounded-full overflow-hidden mb-3 shadow-inner">
-                <div className="h-full rounded-full transition-all duration-500"
-                  style={{
-                    width: `${progress}%`,
-                    background: progress >= 100
-                      ? 'linear-gradient(90deg, #10b981, #059669)'
-                      : progress > 0
-                        ? 'linear-gradient(90deg, #f59e0b, #d97706)'
-                        : '#ef4444',
-                  }} />
-              </div>
-              <div className="mb-3 bg-slate-50/50 rounded-lg px-4 sm:px-5 py-3 sm:py-4">
-                <DetailRow label="Total Amount" value={fmtCurrency(totalAmount)} />
-                <DetailRow label="Paid Amount" value={fmtCurrency(paidAmount)} highlight={paidAmount > 0} />
-                <DetailRow label="Remaining" value={fmtCurrency(remaining)} highlight={remaining > 0} />
-              </div>
-              <div className="flex flex-col sm:flex-row gap-2.5">
-                <button onClick={() => setShowPaymentModal(true)}
-                  className="flex-1 flex items-center justify-center gap-2 bg-indigo-50 border border-indigo-200 text-indigo-600 hover:bg-indigo-100 rounded-lg py-3 sm:py-2.5 text-sm font-semibold transition">
-                  <DollarSign className="h-4.5 w-4.5" /> Record Payment
-                </button>
-                <button onClick={handleOpenHistory} disabled={loadingHistory}
-                  className="flex-1 flex items-center justify-center gap-2 border border-slate-200 text-slate-600 hover:bg-slate-50 rounded-lg py-3 sm:py-2.5 text-sm font-semibold transition disabled:opacity-50">
-                  {loadingHistory ? <div className="h-4 w-4 border-2 border-slate-400 border-t-transparent rounded-full animate-spin" /> : <Clock className="h-4.5 w-4.5" />}
-                  History
-                </button>
-              </div>
-            </section>
+              {/* Payment Status */}
+              <section>
+                <h4 className="text-sm font-bold text-amber-600 uppercase tracking-wider mb-2 flex items-center gap-2">
+                  <span className="w-1 h-4 bg-amber-400 rounded-full"></span>
+                  Payment Status
+                </h4>
+                {/* Progress bar */}
+                <div className="h-2.5 bg-slate-100 rounded-full overflow-hidden mb-3 shadow-inner">
+                  <div className="h-full rounded-full transition-all duration-500"
+                    style={{
+                      width: `${progress}%`,
+                      background: progress >= 100
+                        ? 'linear-gradient(90deg, #10b981, #059669)'
+                        : progress > 0
+                          ? 'linear-gradient(90deg, #f59e0b, #d97706)'
+                          : '#ef4444',
+                    }} />
+                </div>
+                <div className="mb-3 bg-slate-50/50 rounded-lg px-4 sm:px-5 py-3 sm:py-4">
+                  <DetailRow label="Total Amount" value={fmtCurrency(totalAmount)} />
+                  <DetailRow label="Paid Amount" value={fmtCurrency(paidAmount)} highlight={paidAmount > 0} />
+                  <DetailRow label="Remaining" value={fmtCurrency(remaining)} highlight={remaining > 0} />
+                </div>
+                <div className="flex flex-col sm:flex-row xl:flex-col gap-2.5">
+                  <button onClick={() => setShowPaymentModal(true)}
+                    className="flex-1 flex items-center justify-center gap-2 bg-indigo-50 border border-indigo-200 text-indigo-600 hover:bg-indigo-100 rounded-lg py-3 sm:py-2.5 text-sm font-semibold transition">
+                    <DollarSign className="h-4.5 w-4.5" /> Record Payment
+                  </button>
+                  <button onClick={handleOpenHistory} disabled={loadingHistory}
+                    className="flex-1 flex items-center justify-center gap-2 border border-slate-200 text-slate-600 hover:bg-slate-50 rounded-lg py-3 sm:py-2.5 text-sm font-semibold transition disabled:opacity-50">
+                    {loadingHistory ? <div className="h-4 w-4 border-2 border-slate-400 border-t-transparent rounded-full animate-spin" /> : <Clock className="h-4.5 w-4.5" />}
+                    History
+                  </button>
+                </div>
+              </section>
+            </div>
+            </div>
           </div>
         )}
       </div>

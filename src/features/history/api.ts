@@ -99,6 +99,9 @@ export interface HistoryPayoutAgency {
   _id: string;
   id?: string;
   name: string;
+  totalAmount?: number;
+  paidAmount?: number;
+  remainingAmount?: number;
 }
 
 export interface HistoryPayoutPayment {
@@ -118,6 +121,7 @@ export interface HistoryAgencyPayoutSummary {
 
 export interface HistoryPayoutAgencyTrip {
   _id: string;
+  tripId?: string;
   tripNumber: string;
   driverName: string;
   from: string;
@@ -128,6 +132,9 @@ export interface HistoryPayoutAgencyTrip {
   cabCost: number;
   ownerProfit: number;
   advance: number;
+  paidAmount?: number;
+  remainingAmount?: number;
+  paymentStatus?: 'paid' | 'partial' | 'unpaid';
 }
 
 // ─── API Calls ────────────────────────────────────────────────────────────────
@@ -170,7 +177,18 @@ export async function fetchPaymentHistory(tripId: string): Promise<{
   summary: { totalAmount: number; totalPaid: number; remainingBalance: number; paymentStatus: string };
 }> {
   const res = await apiClient.get(`/owners/trips/${tripId}/payments`);
-  return res.data?.data ?? { payments: [], summary: {} };
+  const raw = res.data?.data ?? {};
+  const summary = raw.summary ?? {};
+  return {
+    payments: raw.payments ?? [],
+    summary: {
+      totalAmount: Number(summary.totalAmount) || 0,
+      // Backend currently returns `paidAmount`; keep fallback for compatibility.
+      totalPaid: Number(summary.totalPaid ?? summary.paidAmount) || 0,
+      remainingBalance: Number(summary.remainingBalance) || 0,
+      paymentStatus: summary.paymentStatus ?? 'unpaid',
+    },
+  };
 }
 
 export async function updateTripFields(tripId: string, fields: Partial<HistoryTrip>): Promise<HistoryTrip> {
@@ -186,6 +204,9 @@ export async function fetchMainTripPayoutAgencies(): Promise<HistoryPayoutAgency
     _id: a._id ?? a.id,
     id: a.id ?? a._id,
     name: a.name ?? '',
+    totalAmount: Number(a.totalAmount) || 0,
+    paidAmount: Number(a.paidAmount) || 0,
+    remainingAmount: Number(a.remainingAmount) || 0,
   }));
 }
 

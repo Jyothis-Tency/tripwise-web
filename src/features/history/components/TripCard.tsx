@@ -128,31 +128,46 @@ function EditableRow({
 
   if (editing) {
     return (
-      <div className="flex items-center py-0.5 gap-1.5">
-        <span className="w-[130px] sm:w-[150px] shrink-0 text-sm text-slate-500">{label}</span>
-        <input
-          autoFocus
-          type={NUMBER_FIELDS.has(fieldKey) ? 'number' : fieldKey.toLowerCase().includes('time') ? 'time' : 'text'}
-          value={editValue}
-          onChange={e => setEditValue(e.target.value)}
-          onKeyDown={e => { if (e.key === 'Enter') handleSave(); if (e.key === 'Escape') handleCancel(); }}
-          className="w-[140px] sm:w-[180px] max-w-[50%] border border-indigo-300 rounded-md px-2 py-1 text-sm leading-tight outline-none focus:ring-1 focus:ring-indigo-200 bg-white h-[28px]"
-          disabled={saving}
-        />
-        <button onClick={handleSave} disabled={saving} className="p-1 text-emerald-600 hover:text-emerald-700 disabled:opacity-40">
-          {saving ? <div className="h-4 w-4 border-2 border-emerald-400 border-t-transparent rounded-full animate-spin" /> : <Check className="h-4 w-4" />}
-        </button>
-        <button onClick={handleCancel} className="p-1 text-slate-400 hover:text-slate-600">
-          <X className="h-4 w-4" />
-        </button>
+      <div className="flex w-full min-w-0 flex-col gap-2 py-1 sm:flex-row sm:items-center sm:gap-2">
+        <span className="w-full shrink-0 text-sm text-slate-500 sm:w-[130px] sm:max-w-[150px]">{label}</span>
+        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
+          <input
+            autoFocus
+            type={NUMBER_FIELDS.has(fieldKey) ? 'number' : fieldKey.toLowerCase().includes('time') ? 'time' : 'text'}
+            value={editValue}
+            onChange={e => setEditValue(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter') handleSave(); if (e.key === 'Escape') handleCancel(); }}
+            className="min-h-[28px] min-w-0 flex-1 basis-[6rem] rounded-md border border-indigo-300 bg-white px-2 py-1 text-sm leading-tight outline-none focus:ring-1 focus:ring-indigo-200 sm:basis-[8rem]"
+            disabled={saving}
+          />
+          <div className="flex shrink-0 items-center gap-0.5 rounded-md border border-slate-200/80 bg-white/80 p-0.5 shadow-sm">
+            <button
+              type="button"
+              onClick={handleSave}
+              disabled={saving}
+              className="rounded p-1 text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700 disabled:opacity-40"
+              aria-label="Save"
+            >
+              {saving ? <div className="h-4 w-4 border-2 border-emerald-400 border-t-transparent rounded-full animate-spin" /> : <Check className="h-4 w-4" />}
+            </button>
+            <button
+              type="button"
+              onClick={handleCancel}
+              className="rounded p-1 text-slate-500 hover:bg-slate-100 hover:text-slate-700"
+              aria-label="Cancel"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="group flex items-baseline py-1">
+    <div className="group flex min-w-0 items-baseline gap-1 py-1">
       <span className="w-[130px] sm:w-[150px] shrink-0 text-sm text-slate-500">{label}</span>
-      <span className={`text-sm font-medium ${highlight ? 'text-indigo-600' : 'text-slate-800'}`}>{displayValue}</span>
+      <span className={`min-w-0 flex-1 break-words text-sm font-medium ${highlight ? 'text-indigo-600' : 'text-slate-800'}`}>{displayValue}</span>
       <button
         onClick={() => {
           const isTime = fieldKey.toLowerCase().includes('time');
@@ -379,7 +394,7 @@ export function TripCard({ trip: initialTrip, onDeleted, onPaymentRecorded }: Tr
         {/* Expanded details */}
         {expanded && (
           <div className="border-t border-slate-100 px-4 sm:px-5 py-4 sm:py-5">
-            <div className="grid grid-cols-1 xl:grid-cols-3 gap-5 sm:gap-6">
+            <div className="grid min-w-0 grid-cols-1 gap-5 sm:gap-6 xl:grid-cols-3">
             {/* Trip Details */}
             <section className="xl:col-span-2">
               <h4 className="text-sm font-bold text-indigo-500 uppercase tracking-wider mb-2 flex items-center gap-2">
@@ -415,14 +430,14 @@ export function TripCard({ trip: initialTrip, onDeleted, onPaymentRecorded }: Tr
               </div>
             </section>
 
-            <div className="xl:col-span-1 space-y-5 sm:space-y-6">
+            <div className="min-w-0 space-y-5 sm:space-y-6 xl:col-span-1">
               {/* Financial Details */}
-              <section>
+              <section className="min-w-0">
                 <h4 className="text-sm font-bold text-emerald-600 uppercase tracking-wider mb-2 flex items-center gap-2">
                   <span className="w-1 h-4 bg-emerald-400 rounded-full"></span>
                   Financial Details
                 </h4>
-                <div className="bg-emerald-50/30 rounded-lg px-4 sm:px-5 py-3 sm:py-4">
+                <div className="min-w-0 overflow-x-auto rounded-lg bg-emerald-50/30 px-4 py-3 sm:px-5 sm:py-4">
                   {E('Agency Cost', fmtCurrency(trip.agencyCost), 'agencyCost')}
                   {E('Cab Cost', fmtCurrency(trip.cabCost), 'cabCost')}
                   {E('Driver Salary', fmtCurrency(trip.driver_salary), 'driver_salary')}

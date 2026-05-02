@@ -60,13 +60,8 @@ function AgencyPayoutManager({
   const handleTripPayout = async (trip: HistoryPayoutAgencyTrip) => {
     const tripId = trip.tripId ?? trip._id;
     const amt = Number(tripPayAmount[tripId] || '');
-    const remaining = Number(trip.remainingAmount) || 0;
     if (!amt || amt <= 0) {
       setError('Enter a valid amount');
-      return;
-    }
-    if (remaining > 0 && amt > remaining) {
-      setError('Amount cannot be greater than remaining');
       return;
     }
     setSavingTripId(tripId);
@@ -268,7 +263,7 @@ function AgencyPayoutManager({
                                 />
                                 <button
                                   type="button"
-                                  disabled={(t.remainingAmount || 0) <= 0 || savingTripId === tripId}
+                                  disabled={savingTripId === tripId}
                                   onClick={() => handleTripPayout(t)}
                                   className="ml-0.5 rounded-sm bg-indigo-500 px-1.5 py-0.5 text-[10px] font-medium text-white hover:bg-indigo-600 disabled:opacity-50 transition-colors disabled:pointer-events-none"
                                 >

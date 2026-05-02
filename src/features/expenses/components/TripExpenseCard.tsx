@@ -20,6 +20,7 @@ const TripExpenseCard: React.FC<Props> = ({ trip, onRefresh }) => {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editExp, setEditExp] = useState({ description: '', amount: '', category: 'Fuel' });
   const [saving, setSaving] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
 
   const tripId = trip._id || (trip as any).id || '';
   const expenses = trip.expenses ?? [];
@@ -30,35 +31,62 @@ const TripExpenseCard: React.FC<Props> = ({ trip, onRefresh }) => {
     try { await deleteTripExpense(tripId, expId); onRefresh(); } catch (e) { console.error(e); }
   };
 
+  const categoryToType = (label: string) => label.trim().toLowerCase();
+
   const handleAddExp = async () => {
-    if (!newExp.amount) return;
+    setFormError(null);
+    const amt = Number(newExp.amount);
+    if (!newExp.amount || !Number.isFinite(amt) || amt <= 0) {
+      setFormError('Enter a valid amount greater than 0.');
+      return;
+    }
+    if (!tripId) {
+      setFormError('Missing trip id. Refresh the page and try again.');
+      return;
+    }
     setSaving(true);
     try {
-      await addTripExpense(tripId, { 
-        description: newExp.description || newExp.category, 
-        amount: Number(newExp.amount), 
-        category: newExp.category.toLowerCase() 
+      await addTripExpense(tripId, {
+        description: newExp.description || newExp.category,
+        amount: amt,
+        type: categoryToType(newExp.category),
       });
-      setNewExp({ description: '', amount: '', category: 'Fuel' }); 
-      setAdding(false); 
+      setNewExp({ description: '', amount: '', category: 'Fuel' });
+      setAdding(false);
       onRefresh();
-    } catch (e) { console.error(e); }
-    finally { setSaving(false); }
+    } catch (e: any) {
+      const msg = e?.response?.data?.message || e?.message || 'Could not add expense';
+      setFormError(msg);
+      console.error(e);
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleEditExp = async () => {
+    setFormError(null);
     if (!editExp.amount || !editingId) return;
+    const amt = Number(editExp.amount);
+    if (!Number.isFinite(amt) || amt <= 0) {
+      setFormError('Enter a valid amount.');
+      return;
+    }
     setSaving(true);
     try {
-      await updateTripExpense(tripId, editingId, { 
-        description: editExp.description || editExp.category, 
-        amount: Number(editExp.amount), 
-        category: editExp.category.toLowerCase() 
+      await updateTripExpense(tripId, editingId, {
+        description: editExp.description || editExp.category,
+        amount: amt,
+        type: categoryToType(editExp.category),
       });
       setEditingId(null);
       onRefresh();
-    } catch (e) { console.error(e); }
-    finally { setSaving(false); }
+    } catch (e: any) {
+      const msg = e?.response?.data?.message || e?.message || 'Could not update expense';
+      setFormError(msg);
+      console.error(e);
+    } finally {
+      setSaving(false);
+    }
   };
 
   const startEdit = (exp: any) => {
@@ -115,8 +143,8 @@ const TripExpenseCard: React.FC<Props> = ({ trip, onRefresh }) => {
                   <input placeholder="₹" type="number" value={editExp.amount} onChange={e => setEditExp(p => ({ ...p, amount: e.target.value }))} className={`${inputCls} w-20`} />
                   
                   <div className="flex gap-1">
-                    <button onClick={handleEditExp} disabled={saving} className="px-2 py-1.5 rounded-md border-0 bg-indigo-600 hover:bg-indigo-700 text-white text-[11px] font-semibold cursor-pointer disabled:opacity-60">{saving ? '…' : 'Save'}</button>
-                    <button onClick={cancelEdit} className="px-1.5 py-1.5 rounded-md border border-slate-200 bg-white hover:bg-slate-100 text-slate-500 text-[11px] cursor-pointer">✕</button>
+                    <button type="button" onClick={handleEditExp} disabled={saving} className="px-2 py-1.5 rounded-md border-0 bg-indigo-600 hover:bg-indigo-700 text-white text-[11px] font-semibold cursor-pointer disabled:opacity-60">{saving ? '…' : 'Save'}</button>
+                    <button type="button" onClick={() => { cancelEdit(); setFormError(null); }} className="px-1.5 py-1.5 rounded-md border border-slate-200 bg-white hover:bg-slate-100 text-slate-500 text-[11px] cursor-pointer">✕</button>
                   </div>
                 </div>
               ) : (
@@ -134,8 +162,8 @@ const TripExpenseCard: React.FC<Props> = ({ trip, onRefresh }) => {
                   <div className="flex items-center gap-2.5">
                     <span className="font-semibold text-[13px] text-red-500">₹{Number(exp.amount).toLocaleString('en-IN')}</span>
                     <div className="flex items-center gap-1">
-                      <button onClick={() => startEdit(exp)} className="text-indigo-500 hover:bg-indigo-50 rounded-md p-1 px-1.5 text-[11px] cursor-pointer" title="Edit">✎</button>
-                      <button onClick={() => handleDeleteExp(exp._id)} className="text-red-500 hover:bg-red-50 rounded-md p-1 px-1.5 text-[11px] cursor-pointer" title="Delete">✕</button>
+                      <button type="button" onClick={() => { setFormError(null); startEdit(exp); }} className="text-indigo-500 hover:bg-indigo-50 rounded-md p-1 px-1.5 text-[11px] cursor-pointer" title="Edit">✎</button>
+                      <button type="button" onClick={() => handleDeleteExp(exp._id)} className="text-red-500 hover:bg-red-50 rounded-md p-1 px-1.5 text-[11px] cursor-pointer" title="Delete">✕</button>
                     </div>
                   </div>
                 </div>
@@ -144,6 +172,12 @@ const TripExpenseCard: React.FC<Props> = ({ trip, onRefresh }) => {
           )) : <div className="text-xs text-slate-400 text-center p-2">No expenses</div>}
 
           {/* Add inline */}
+          {formError && (adding || editingId) && (
+            <div className="mt-2 rounded-md border border-red-200 bg-red-50 px-2 py-1.5 text-[11px] text-red-700">
+              {formError}
+            </div>
+          )}
+
           {adding && !editingId ? (
             <div className="mt-3 flex flex-wrap xs:flex-nowrap gap-1.5 sm:gap-2 items-center bg-indigo-50/50 p-2 rounded-lg border border-indigo-100 border-dashed">
               <select 
@@ -157,12 +191,12 @@ const TripExpenseCard: React.FC<Props> = ({ trip, onRefresh }) => {
               <input placeholder="₹ Amount" type="number" value={newExp.amount} onChange={e => setNewExp(p => ({ ...p, amount: e.target.value }))} className={`${inputCls} w-20 border-indigo-200 focus:border-indigo-500`} />
               
               <div className="flex gap-1 ml-auto xs:ml-0">
-                <button onClick={handleAddExp} disabled={saving} className="px-3 py-1.5 rounded-md border-0 bg-indigo-600 hover:bg-indigo-700 text-white text-[11px] font-semibold cursor-pointer disabled:opacity-60">{saving ? '…' : 'Add'}</button>
-                <button onClick={() => setAdding(false)} className="px-2 py-1.5 rounded-md border border-indigo-200 bg-white hover:bg-indigo-50 text-indigo-700 text-[11px] cursor-pointer">✕</button>
+                <button type="button" onClick={handleAddExp} disabled={saving} className="px-3 py-1.5 rounded-md border-0 bg-indigo-600 hover:bg-indigo-700 text-white text-[11px] font-semibold cursor-pointer disabled:opacity-60">{saving ? '…' : 'Add'}</button>
+                <button type="button" onClick={() => { setAdding(false); setFormError(null); }} className="px-2 py-1.5 rounded-md border border-indigo-200 bg-white hover:bg-indigo-50 text-indigo-700 text-[11px] cursor-pointer">✕</button>
               </div>
             </div>
           ) : !editingId ? (
-            <button onClick={() => { setAdding(true); setEditingId(null); }} className="mt-2 w-full p-1.5 rounded-md border border-dashed border-slate-300 bg-slate-50 hover:bg-slate-100 text-slate-500 text-xs cursor-pointer transition-colors">
+            <button type="button" onClick={() => { setFormError(null); setAdding(true); setEditingId(null); }} className="mt-2 w-full p-1.5 rounded-md border border-dashed border-slate-300 bg-slate-50 hover:bg-slate-100 text-slate-500 text-xs cursor-pointer transition-colors">
               + Add expense to this trip
             </button>
           ) : null}

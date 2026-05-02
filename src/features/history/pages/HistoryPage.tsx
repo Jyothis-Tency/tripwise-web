@@ -7,6 +7,7 @@ import {
   type HistoryTrip,
   type HistoryPagination,
   type HistoryPaymentSummary,
+  type RecordPaymentTripSummary,
 } from '../api';
 import { TripCard } from '../components/TripCard';
 
@@ -58,10 +59,10 @@ function PaymentBanner({ summary }: { summary: HistoryPaymentSummary }) {
         <div key={item.label} className={`rounded-xl bg-gradient-to-br ${item.gradient} border ${item.border} px-5 py-4 sm:py-5 shadow-sm`}>
           <div className="flex items-center justify-between sm:block">
             <div className="flex items-center gap-2">
-              <span className="text-lg sm:hidden">{item.icon}</span>
-              <span className="text-sm font-semibold text-slate-500 uppercase tracking-wider">{item.label}</span>
+              <span className="text-xl sm:hidden">{item.icon}</span>
+              <span className="text-sm sm:text-base font-bold text-slate-600 uppercase tracking-wide">{item.label}</span>
             </div>
-            <div className={`text-xl sm:text-2xl font-bold ${item.color} sm:mt-1.5 tabular-nums`}>{fmtCurrency(item.value)}</div>
+            <div className={`text-2xl sm:text-3xl font-extrabold ${item.color} sm:mt-2 tabular-nums tracking-tight`}>{fmtCurrency(item.value)}</div>
           </div>
         </div>
       ))}
@@ -211,6 +212,32 @@ export function HistoryPage() {
     setMonth(currentMonth); setStartDate(''); setEndDate('');
     setFilterMode('month'); setPage(1);
   };
+
+  const handlePaymentRecorded = useCallback((tripId: string, summary: RecordPaymentTripSummary) => {
+    const paymentStatus =
+      summary.paymentStatus === 'paid' ||
+      summary.paymentStatus === 'partial' ||
+      summary.paymentStatus === 'unpaid'
+        ? summary.paymentStatus
+        : 'unpaid';
+    setTrips((prev) =>
+      prev.map((t) =>
+        t._id === tripId
+          ? {
+              ...t,
+              paidAmount: summary.paidAmount,
+              paymentSummary: {
+                ...t.paymentSummary,
+                totalAmount: summary.totalAmount,
+                paidAmount: summary.paidAmount,
+                remainingBalance: summary.remainingBalance,
+                paymentStatus,
+              },
+            }
+          : t
+      )
+    );
+  }, []);
 
   const hasActiveFilters = status !== 'all' || month !== currentMonth || startDate || endDate || debouncedSearch;
 
@@ -600,7 +627,7 @@ export function HistoryPage() {
             key={trip._id}
             trip={trip}
             onDeleted={load}
-            onPaymentRecorded={load}
+            onPaymentRecorded={handlePaymentRecorded}
           />
         ))}
       </div>

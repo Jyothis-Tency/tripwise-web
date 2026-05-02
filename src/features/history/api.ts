@@ -162,14 +162,38 @@ export async function deleteTrip(id: string): Promise<void> {
   await apiClient.delete(`/owners/trips/${id}`);
 }
 
+/** Mirrors backend `recordTripPayment` → `tripSummary`. */
+export interface RecordPaymentTripSummary {
+  tripId: string;
+  tripNumber?: string;
+  totalAmount: number;
+  paidAmount: number;
+  advance?: number;
+  remainingBalance: number;
+  paymentStatus: string;
+}
+
 export async function recordPayment(tripId: string, payload: {
   amount: number;
   paymentMethod: string;
   referenceNumber?: string;
   notes?: string;
   paymentDate?: string;
-}): Promise<void> {
-  await apiClient.post(`/owners/trips/${tripId}/payments`, payload);
+}): Promise<RecordPaymentTripSummary> {
+  const res = await apiClient.post(`/owners/trips/${tripId}/payments`, payload);
+  const raw = res.data?.data?.tripSummary ?? res.data?.tripSummary;
+  if (!raw || raw.tripId == null) {
+    throw new Error('Invalid payment response');
+  }
+  return {
+    tripId: String(raw.tripId),
+    tripNumber: raw.tripNumber,
+    totalAmount: Number(raw.totalAmount) || 0,
+    paidAmount: Number(raw.paidAmount) || 0,
+    advance: raw.advance != null ? Number(raw.advance) : undefined,
+    remainingBalance: Number(raw.remainingBalance) || 0,
+    paymentStatus: String(raw.paymentStatus ?? 'unpaid'),
+  };
 }
 
 export async function fetchPaymentHistory(tripId: string): Promise<{

@@ -106,7 +106,7 @@ const ExpensesPage: React.FC = () => {
             ) : trips.length === 0 ? (
               <div className="text-center py-16 text-slate-400">
                 <div className="text-5xl mb-2">📦</div>
-                <p className="text-sm">No trips with expenses found</p>
+                <p className="text-sm">No trips found. Try another search or create a trip first.</p>
               </div>
             ) : (
               trips.map((t, i) => <TripExpenseCard key={t._id || (t as any).id || i} trip={t} onRefresh={loadTrips} />)

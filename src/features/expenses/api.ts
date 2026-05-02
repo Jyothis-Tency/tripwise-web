@@ -127,13 +127,17 @@ export async function fetchTripsWithExpenses(params?: {
   return { trips, pagination: inner?.pagination };
 }
 
-export async function addTripExpense(tripId: string, data: { description?: string; amount: number; category?: string; date?: string }): Promise<any> {
-  const res = await apiClient.post(ApiEndpoints.tripExpenses(tripId), data);
+export async function addTripExpense(tripId: string, data: { description?: string; amount: number; category?: string; type?: string; date?: string }): Promise<any> {
+  // Backend expects `type` (Trip embedded expense enum). Frontend historically sent `category` only.
+  const type = data.type ?? data.category;
+  const res = await apiClient.post(ApiEndpoints.tripExpenses(tripId), { ...data, type });
   return extract(res);
 }
 
-export async function updateTripExpense(tripId: string, expenseId: string, data: Partial<{ description: string; amount: number; category: string; date: string }>): Promise<any> {
-  const res = await apiClient.put(ApiEndpoints.tripExpenseById(tripId, expenseId), data);
+export async function updateTripExpense(tripId: string, expenseId: string, data: Partial<{ description: string; amount: number; category: string; type?: string; date: string }>): Promise<any> {
+  const type = data.type ?? data.category;
+  const payload = type !== undefined ? { ...data, type } : data;
+  const res = await apiClient.put(ApiEndpoints.tripExpenseById(tripId, expenseId), payload);
   return extract(res);
 }
 

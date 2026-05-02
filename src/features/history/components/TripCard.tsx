@@ -3,7 +3,7 @@ import {
   ChevronDown, ChevronUp, Trash2, Car, User, Calendar,
   DollarSign, Clock, Pencil, Check, X,
 } from 'lucide-react';
-import type { HistoryTrip, TripPayment } from '../api';
+import type { HistoryTrip, TripPayment, RecordPaymentTripSummary } from '../api';
 import { recordPayment, deleteTrip, fetchPaymentHistory, updateTripFields } from '../api';
 import { PaymentHistoryModal } from './PaymentHistoryModal';
 import { fmtTimeAmPm, isoToTimeInputInTz, fmtTripDuration } from '../historyTimeUtils';
@@ -60,13 +60,19 @@ const NUMBER_FIELDS = new Set([
   'startKilometers', 'endKilometers',
 ]);
 
+const DATE_FIELDS = new Set(['startDate', 'expectedEndDate']);
+const TIME_FIELDS = new Set(['startTime', 'endTime']);
+
+const valueEmphasisClass = (highlight?: boolean) =>
+  `text-base sm:text-lg font-bold tabular-nums tracking-tight ${highlight ? 'text-indigo-700' : 'text-slate-900'}`;
+
 // ─── Compact Detail Row ──────────────────────────────────────────────────────
 
-function DetailRow({ label, value, highlight }: { label: string; value: string; highlight?: boolean }) {
+function DetailRow({ label, value, highlight, emphasizeValue }: { label: string; value: string; highlight?: boolean; emphasizeValue?: boolean }) {
   return (
-    <div className="flex items-baseline py-1">
-      <span className="w-[130px] sm:w-[150px] shrink-0 text-sm text-slate-500">{label}</span>
-      <span className={`text-sm font-medium ${highlight ? 'text-indigo-600' : 'text-slate-800'}`}>{value}</span>
+    <div className="flex items-baseline gap-2 py-1.5">
+      <span className="w-[130px] sm:w-[150px] shrink-0 text-sm sm:text-[15px] text-slate-600">{label}</span>
+      <span className={emphasizeValue ? valueEmphasisClass(highlight) : `text-sm sm:text-[15px] font-medium ${highlight ? 'text-indigo-600' : 'text-slate-800'}`}>{value}</span>
     </div>
   );
 }
@@ -126,10 +132,13 @@ function EditableRow({
     setEditing(false);
   };
 
+  const emphasizeDisplay =
+    NUMBER_FIELDS.has(fieldKey) || DATE_FIELDS.has(fieldKey) || TIME_FIELDS.has(fieldKey);
+
   if (editing) {
     return (
       <div className="flex w-full min-w-0 flex-col gap-2 py-1 sm:flex-row sm:items-center sm:gap-2">
-        <span className="w-full shrink-0 text-sm text-slate-500 sm:w-[130px] sm:max-w-[150px]">{label}</span>
+        <span className="w-full shrink-0 text-sm sm:text-[15px] text-slate-600 sm:w-[130px] sm:max-w-[150px]">{label}</span>
         <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
           <input
             autoFocus
@@ -137,7 +146,7 @@ function EditableRow({
             value={editValue}
             onChange={e => setEditValue(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter') handleSave(); if (e.key === 'Escape') handleCancel(); }}
-            className="min-h-[28px] min-w-0 flex-1 basis-[6rem] rounded-md border border-indigo-300 bg-white px-2 py-1 text-sm leading-tight outline-none focus:ring-1 focus:ring-indigo-200 sm:basis-[8rem]"
+            className={`min-h-[32px] min-w-0 flex-1 basis-[6rem] rounded-md border border-indigo-300 bg-white px-2 py-1.5 leading-tight outline-none focus:ring-2 focus:ring-indigo-200 sm:basis-[8rem] ${NUMBER_FIELDS.has(fieldKey) || DATE_FIELDS.has(fieldKey) || TIME_FIELDS.has(fieldKey) ? 'text-base sm:text-lg font-semibold tabular-nums' : 'text-sm'}`}
             disabled={saving}
           />
           <div className="flex shrink-0 items-center gap-0.5 rounded-md border border-slate-200/80 bg-white/80 p-0.5 shadow-sm">
@@ -165,9 +174,9 @@ function EditableRow({
   }
 
   return (
-    <div className="group flex min-w-0 items-baseline gap-1 py-1">
-      <span className="w-[130px] sm:w-[150px] shrink-0 text-sm text-slate-500">{label}</span>
-      <span className={`min-w-0 flex-1 break-words text-sm font-medium ${highlight ? 'text-indigo-600' : 'text-slate-800'}`}>{displayValue}</span>
+    <div className="group flex min-w-0 items-baseline gap-2 py-1.5">
+      <span className="w-[130px] sm:w-[150px] shrink-0 text-sm sm:text-[15px] text-slate-600">{label}</span>
+      <span className={`min-w-0 flex-1 wrap-break-word ${emphasizeDisplay ? valueEmphasisClass(highlight) : `text-sm sm:text-[15px] font-medium ${highlight ? 'text-indigo-600' : 'text-slate-800'}`}`}>{displayValue}</span>
       <button
         onClick={() => {
           const isTime = fieldKey.toLowerCase().includes('time');
@@ -190,9 +199,10 @@ function EditableRow({
 function RecordPaymentModal({ trip, onClose, onSuccess }: {
   trip: HistoryTrip;
   onClose: () => void;
-  onSuccess: () => void;
+  onSuccess: (summary: RecordPaymentTripSummary) => void;
 }) {
   const remaining = trip.paymentSummary?.remainingBalance ?? 0;
+  const balanceCleared = remaining <= 1e-6;
   const [amount, setAmount] = useState('');
   const [method, setMethod] = useState('cash');
   const [reference, setReference] = useState('');
@@ -207,40 +217,59 @@ function RecordPaymentModal({ trip, onClose, onSuccess }: {
     setSaving(true);
     setError('');
     try {
-      await recordPayment(trip._id, { amount: amt, paymentMethod: method, referenceNumber: reference || undefined, notes: notes || undefined, paymentDate: date });
-      onSuccess();
-    } catch {
-      setError('Failed to record payment. Please try again.');
+      const summary = await recordPayment(trip._id, { amount: amt, paymentMethod: method, referenceNumber: reference || undefined, notes: notes || undefined, paymentDate: date });
+      onSuccess(summary);
+    } catch (err: any) {
+      setError(err?.response?.data?.message || err?.message || 'Failed to record payment. Please try again.');
     } finally {
       setSaving(false);
     }
   };
 
+  const amtPreview = parseFloat(amount);
+  const showOverpayNote =
+    Number.isFinite(amtPreview) &&
+    amtPreview > 0 &&
+    remaining > 1e-6 &&
+    amtPreview > remaining + 1e-6;
+
   return (
     <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
         <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
-          <h3 className="font-semibold text-slate-800">Record Payment</h3>
+          <h3 className="text-lg font-bold text-slate-800">Record Payment</h3>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600 text-lg leading-none">✕</button>
         </div>
         <div className="px-5 py-4 space-y-3">
-          <div className="rounded-lg bg-indigo-50 border border-indigo-100 px-3 py-2 text-xs text-indigo-700">
-            {fmt(trip.tripNumber)} · Remaining: {fmtCurrency(remaining)}
+          <div className="rounded-lg bg-indigo-50 border border-indigo-100 px-3 py-2.5 text-sm sm:text-base text-indigo-900">
+            <span className="font-semibold">{fmt(trip.tripNumber)}</span>
+            <span className="text-indigo-700"> · Remaining: </span>
+            <span className="font-bold tabular-nums text-base sm:text-lg">{fmtCurrency(remaining)}</span>
           </div>
+          {balanceCleared && (
+            <p className="rounded-lg border border-emerald-200 bg-emerald-50/90 px-3 py-2 text-sm font-medium text-emerald-900">
+              Balance is cleared. You can still record more payments here (overpayment, correction, or extra receipt).
+            </p>
+          )}
+          {showOverpayNote && (
+            <p className="rounded-lg border border-amber-200 bg-amber-50/90 px-3 py-2 text-sm font-medium text-amber-950">
+              This amount is above the remaining balance. It will be saved; remaining may show as negative (overpaid) until you adjust the trip.
+            </p>
+          )}
 
           <div>
-            <label className="block text-xs font-medium text-slate-600 mb-1">Amount *</label>
-            <div className="flex items-center border border-slate-200 rounded-lg overflow-hidden focus-within:border-indigo-400 focus-within:ring-1 focus-within:ring-indigo-200">
-              <span className="px-3 text-sm text-slate-500 bg-slate-50 border-r border-slate-200 py-2">₹</span>
+            <label className="block text-sm font-semibold text-slate-700 mb-1">Amount *</label>
+            <div className="flex items-center border border-slate-200 rounded-lg overflow-hidden focus-within:border-indigo-400 focus-within:ring-2 focus-within:ring-indigo-200">
+              <span className="px-3 text-base font-semibold text-slate-600 bg-slate-50 border-r border-slate-200 py-2.5">₹</span>
               <input type="number" value={amount} onChange={e => setAmount(e.target.value)} placeholder="Enter amount"
-                className="flex-1 px-3 py-2 text-sm outline-none bg-white" />
+                className="flex-1 px-3 py-2.5 text-base sm:text-lg font-bold tabular-nums outline-none bg-white" />
             </div>
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-slate-600 mb-1">Payment Method</label>
+            <label className="block text-sm font-semibold text-slate-700 mb-1">Payment Method</label>
             <select value={method} onChange={e => setMethod(e.target.value)}
-              className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-200">
+              className="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-base outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-200">
               {[{v:'cash',l:'Cash'},{v:'bank_transfer',l:'Bank Transfer'},{v:'upi',l:'UPI'},{v:'cheque',l:'Cheque'},{v:'online',l:'Online'},{v:'other',l:'Other'}].map(m => (
                 <option key={m.v} value={m.v}>{m.l}</option>
               ))}
@@ -248,29 +277,29 @@ function RecordPaymentModal({ trip, onClose, onSuccess }: {
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-slate-600 mb-1">Date</label>
+            <label className="block text-sm font-semibold text-slate-700 mb-1">Date</label>
             <input type="date" value={date} onChange={e => setDate(e.target.value)}
-              className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-200" />
+              className="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-base font-semibold tabular-nums outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-200" />
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-slate-600 mb-1">Reference Number</label>
+            <label className="block text-sm font-semibold text-slate-700 mb-1">Reference Number</label>
             <input type="text" value={reference} onChange={e => setReference(e.target.value)} placeholder="Optional"
-              className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-200" />
+              className="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-base outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-200" />
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-slate-600 mb-1">Notes</label>
+            <label className="block text-sm font-semibold text-slate-700 mb-1">Notes</label>
             <textarea value={notes} onChange={e => setNotes(e.target.value)} placeholder="Optional" rows={2}
-              className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-200 resize-none" />
+              className="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-base outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-200 resize-none" />
           </div>
 
-          {error && <p className="text-red-500 text-xs">{error}</p>}
+          {error && <p className="text-red-600 text-sm font-semibold">{error}</p>}
         </div>
         <div className="flex gap-2 px-5 pb-5">
-          <button onClick={onClose} className="flex-1 border border-slate-200 rounded-xl py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50 transition">Cancel</button>
+          <button onClick={onClose} className="flex-1 border border-slate-200 rounded-xl py-3 text-base font-semibold text-slate-600 hover:bg-slate-50 transition">Cancel</button>
           <button onClick={handleSubmit} disabled={saving}
-            className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl py-2.5 text-sm font-semibold transition disabled:opacity-60">
+            className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl py-3 text-base font-bold transition disabled:opacity-60">
             {saving ? 'Saving…' : 'Record Payment'}
           </button>
         </div>
@@ -284,7 +313,8 @@ function RecordPaymentModal({ trip, onClose, onSuccess }: {
 interface TripCardProps {
   trip: HistoryTrip;
   onDeleted: () => void;
-  onPaymentRecorded: () => void;
+  /** Called with server summary after a payment; parent can patch list without refetching. */
+  onPaymentRecorded: (tripId: string, summary: RecordPaymentTripSummary) => void;
 }
 
 export function TripCard({ trip: initialTrip, onDeleted, onPaymentRecorded }: TripCardProps) {
@@ -302,7 +332,10 @@ export function TripCard({ trip: initialTrip, onDeleted, onPaymentRecorded }: Tr
   const [loadingHistory, setLoadingHistory] = useState(false);
 
   const paymentBadge = getPaymentStatus(trip);
-  const totalAmount = trip.paymentSummary?.totalAmount ?? trip.agencyCost ?? 0;
+  const expensePart = Number(trip.totalExpenses) || 0;
+  const totalAmount =
+    trip.paymentSummary?.totalAmount ??
+    (Number(trip.agencyCost) || 0) + expensePart;
   const paidAmount = trip.paymentSummary?.paidAmount ?? trip.paidAmount ?? 0;
   const remaining = trip.paymentSummary?.remainingBalance ?? (totalAmount - paidAmount);
   const progress = totalAmount > 0 ? Math.min((paidAmount / totalAmount) * 100, 100) : 0;
@@ -355,29 +388,38 @@ export function TripCard({ trip: initialTrip, onDeleted, onPaymentRecorded }: Tr
           onClick={() => setExpanded(e => !e)}>
 
           {/* Status badge */}
-          <span className={`shrink-0 mt-1 rounded-full px-3 py-1 text-[11px] sm:text-xs font-bold uppercase tracking-wide ${getTripStatusStyle(trip.status)}`}>
+          <span className={`shrink-0 mt-1 rounded-full px-3 py-1.5 text-xs sm:text-sm font-bold uppercase tracking-wide ${getTripStatusStyle(trip.status)}`}>
             {trip.status}
           </span>
 
           {/* Trip info */}
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-base sm:text-base font-semibold text-slate-800 truncate">
+              <span className="text-lg sm:text-xl font-bold text-slate-900 truncate tabular-nums tracking-tight">
                 {trip.tripNumber ?? trip._id}
               </span>
-              <span className={`rounded-full border px-2.5 py-0.5 text-[11px] sm:text-xs font-semibold ${paymentBadge.bg} ${paymentBadge.color}`}>
+              <span className={`rounded-full border px-2.5 py-1 text-xs sm:text-sm font-bold ${paymentBadge.bg} ${paymentBadge.color}`}>
                 {paymentBadge.label}
               </span>
             </div>
-            <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-sm text-slate-500">
+            <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm sm:text-[15px] text-slate-600">
               {(trip.from || trip.pickup) && (trip.to || trip.drop) && (
-                <span className="truncate">{trip.from ?? trip.pickup} → {trip.to ?? trip.drop}</span>
+                <span className="truncate font-medium">{trip.from ?? trip.pickup} → {trip.to ?? trip.drop}</span>
               )}
-              <span className="flex items-center gap-1"><Calendar className="h-4 w-4" />{fmtDate(trip.startDate ?? trip.date)}</span>
+              <span className="flex items-center gap-1.5 font-bold text-slate-900 tabular-nums text-base sm:text-lg">
+                <Calendar className="h-5 w-5 shrink-0 text-slate-600" aria-hidden />
+                {fmtDate(trip.startDate ?? trip.date)}
+              </span>
             </div>
-            <div className="mt-0.5 flex flex-wrap items-center gap-x-3 text-sm text-slate-500">
-              <span className="flex items-center gap-1"><User className="h-4 w-4" />{driverName(trip.driver)}</span>
-              <span className="flex items-center gap-1"><Car className="h-4 w-4" />{vehicleNum(trip.vehicle)}{travelledKm != null ? ` · ${travelledKm} km` : ''}</span>
+            <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm sm:text-[15px] text-slate-600">
+              <span className="flex items-center gap-1.5"><User className="h-4 w-4 shrink-0" />{driverName(trip.driver)}</span>
+              <span className="flex items-center gap-1.5 tabular-nums">
+                <Car className="h-4 w-4 shrink-0" />
+                {vehicleNum(trip.vehicle)}
+                {travelledKm != null && (
+                  <span className="font-bold text-slate-900 text-base sm:text-[17px]"> · {travelledKm} km</span>
+                )}
+              </span>
             </div>
           </div>
 
@@ -402,16 +444,16 @@ export function TripCard({ trip: initialTrip, onDeleted, onPaymentRecorded }: Tr
                 Trip Details
               </h4>
               <div className="bg-slate-50/50 rounded-lg px-4 sm:px-5 py-3 sm:py-4">
-                <DetailRow label="Trip Number" value={fmt(trip.tripNumber)} />
+                <DetailRow label="Trip Number" value={fmt(trip.tripNumber)} emphasizeValue />
                 <DetailRow label="Status" value={fmt(trip.status)} />
                 {E('Start Date', fmtDate(trip.startDate ?? trip.date), 'startDate')}
                 {trip.endDate && E('End Date', fmtDate(trip.endDate), 'expectedEndDate')}
                 {E('Start Time', fmtTimeAmPm(trip.startTime), 'startTime', undefined, isoToTimeInputInTz(trip.startTime))}
                 {E('End Time', fmtTimeAmPm(trip.endTime), 'endTime', undefined, isoToTimeInputInTz(trip.endTime))}
-                <DetailRow label="Trip duration" value={fmtTripDuration(trip.startTime, trip.endTime)} highlight />
+                <DetailRow label="Trip duration" value={fmtTripDuration(trip.startTime, trip.endTime)} highlight emphasizeValue />
                 <DetailRow label="Driver" value={driverName(trip.driver)} />
                 {typeof trip.driver !== 'string' && trip.driver?.phone && (
-                  <DetailRow label="Driver Phone" value={fmt(trip.driver.phone)} />
+                  <DetailRow label="Driver Phone" value={fmt(trip.driver.phone)} emphasizeValue />
                 )}
                 <DetailRow label="Vehicle" value={vehicleNum(trip.vehicle)} />
                 {typeof trip.vehicle !== 'string' && trip.vehicle?.vehicleType && (
@@ -422,7 +464,7 @@ export function TripCard({ trip: initialTrip, onDeleted, onPaymentRecorded }: Tr
                 {E('Distance', fmt(trip.distance || ''), 'distance')}
                 {E('Start KM', trip.startKilometers != null ? `${trip.startKilometers}` : '—', 'startKilometers')}
                 {E('End KM', trip.endKilometers != null ? `${trip.endKilometers}` : '—', 'endKilometers')}
-                {travelledKm != null && <DetailRow label="KM Travelled" value={`${travelledKm} km`} highlight />}
+                {travelledKm != null && <DetailRow label="KM Travelled" value={`${travelledKm} km`} highlight emphasizeValue />}
                 {E('Customer', fmt(trip.customer || ''), 'customer')}
                 {E('Agency', fmt(trip.agencyName || ''), 'agencyName')}
                 {trip.careOf?.name && <DetailRow label="Care Of" value={fmt(trip.careOf.name)} />}
@@ -442,8 +484,8 @@ export function TripCard({ trip: initialTrip, onDeleted, onPaymentRecorded }: Tr
                   {E('Cab Cost', fmtCurrency(trip.cabCost), 'cabCost')}
                   {E('Driver Salary', fmtCurrency(trip.driver_salary), 'driver_salary')}
                   {E('Advance', fmtCurrency(trip.advance), 'advance')}
-                  <DetailRow label="Total Expenses" value={fmtCurrency(trip.totalExpenses)} />
-                  <DetailRow label="Owner Profit" value={fmtCurrency(trip.ownerProfit)} highlight />
+                  <DetailRow label="Total Expenses" value={fmtCurrency(trip.totalExpenses)} emphasizeValue />
+                  <DetailRow label="Owner Profit" value={fmtCurrency(trip.ownerProfit)} highlight emphasizeValue />
                 </div>
               </section>
 
@@ -454,7 +496,7 @@ export function TripCard({ trip: initialTrip, onDeleted, onPaymentRecorded }: Tr
                   Payment Status
                 </h4>
                 {/* Progress bar */}
-                <div className="h-2.5 bg-slate-100 rounded-full overflow-hidden mb-3 shadow-inner">
+                <div className="h-3 sm:h-3.5 bg-slate-100 rounded-full overflow-hidden mb-3 shadow-inner">
                   <div className="h-full rounded-full transition-all duration-500"
                     style={{
                       width: `${progress}%`,
@@ -466,17 +508,22 @@ export function TripCard({ trip: initialTrip, onDeleted, onPaymentRecorded }: Tr
                     }} />
                 </div>
                 <div className="mb-3 bg-slate-50/50 rounded-lg px-4 sm:px-5 py-3 sm:py-4">
-                  <DetailRow label="Total Amount" value={fmtCurrency(totalAmount)} />
-                  <DetailRow label="Paid Amount" value={fmtCurrency(paidAmount)} highlight={paidAmount > 0} />
-                  <DetailRow label="Remaining" value={fmtCurrency(remaining)} highlight={remaining > 0} />
+                  <DetailRow label="Total Amount" value={fmtCurrency(totalAmount)} emphasizeValue />
+                  <DetailRow label="Paid Amount" value={fmtCurrency(paidAmount)} highlight={paidAmount > 0} emphasizeValue />
+                  <DetailRow
+                    label={remaining < -1e-6 ? 'Overpaid (credit)' : 'Remaining'}
+                    value={fmtCurrency(remaining)}
+                    highlight={remaining > 1e-6 || remaining < -1e-6}
+                    emphasizeValue
+                  />
                 </div>
                 <div className="flex flex-col sm:flex-row xl:flex-col gap-2.5">
                   <button onClick={() => setShowPaymentModal(true)}
-                    className="flex-1 flex items-center justify-center gap-2 bg-indigo-50 border border-indigo-200 text-indigo-600 hover:bg-indigo-100 rounded-lg py-3 sm:py-2.5 text-sm font-semibold transition">
-                    <DollarSign className="h-4.5 w-4.5" /> Record Payment
+                    className="flex-1 flex items-center justify-center gap-2 bg-indigo-50 border border-indigo-200 text-indigo-600 hover:bg-indigo-100 rounded-lg py-3 sm:py-3 text-base font-bold transition">
+                    <DollarSign className="h-5 w-5" /> Record Payment
                   </button>
                   <button onClick={handleOpenHistory} disabled={loadingHistory}
-                    className="flex-1 flex items-center justify-center gap-2 border border-slate-200 text-slate-600 hover:bg-slate-50 rounded-lg py-3 sm:py-2.5 text-sm font-semibold transition disabled:opacity-50">
+                    className="flex-1 flex items-center justify-center gap-2 border border-slate-200 text-slate-600 hover:bg-slate-50 rounded-lg py-3 sm:py-3 text-base font-bold transition disabled:opacity-50">
                     {loadingHistory ? <div className="h-4 w-4 border-2 border-slate-400 border-t-transparent rounded-full animate-spin" /> : <Clock className="h-4.5 w-4.5" />}
                     History
                   </button>
@@ -492,7 +539,24 @@ export function TripCard({ trip: initialTrip, onDeleted, onPaymentRecorded }: Tr
         <RecordPaymentModal
           trip={trip}
           onClose={() => setShowPaymentModal(false)}
-          onSuccess={() => { setShowPaymentModal(false); onPaymentRecorded(); }}
+          onSuccess={(summary) => {
+            setShowPaymentModal(false);
+            const ps = summary.paymentStatus;
+            const paymentStatus =
+              ps === 'paid' || ps === 'partial' || ps === 'unpaid' ? ps : 'unpaid';
+            setTrip((prev) => ({
+              ...prev,
+              paidAmount: summary.paidAmount,
+              paymentSummary: {
+                ...prev.paymentSummary,
+                totalAmount: summary.totalAmount,
+                paidAmount: summary.paidAmount,
+                remainingBalance: summary.remainingBalance,
+                paymentStatus,
+              },
+            }));
+            onPaymentRecorded(trip._id, summary);
+          }}
         />
       )}
 

@@ -344,6 +344,9 @@ export function TripCard({ trip: initialTrip, onDeleted, onPaymentRecorded }: Tr
     ? (trip.endKilometers - trip.startKilometers)
     : null;
 
+  const remainingHeaderShort =
+    remaining < -1e-6 ? 'Overpaid' : 'Remaining';
+
   const handleDelete = async () => {
     if (!confirm('Delete this trip? This cannot be undone.')) return;
     setDeleting(true);
@@ -387,19 +390,16 @@ export function TripCard({ trip: initialTrip, onDeleted, onPaymentRecorded }: Tr
         <div className="flex items-start gap-3 px-4 sm:px-5 py-3.5 sm:py-4 cursor-pointer hover:bg-slate-50/60 transition"
           onClick={() => setExpanded(e => !e)}>
 
-          {/* Status badge */}
-          <span className={`shrink-0 mt-1 rounded-full px-3 py-1.5 text-xs sm:text-sm font-bold uppercase tracking-wide ${getTripStatusStyle(trip.status)}`}>
-            {trip.status}
-          </span>
-
           {/* Trip info */}
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
               <span className="text-lg sm:text-xl font-bold text-slate-900 truncate tabular-nums tracking-tight">
                 {trip.tripNumber ?? trip._id}
               </span>
-              <span className={`rounded-full border px-2.5 py-1 text-xs sm:text-sm font-bold ${paymentBadge.bg} ${paymentBadge.color}`}>
-                {paymentBadge.label}
+              <span
+                className={`shrink-0 rounded-full px-3 py-1.5 text-xs sm:text-sm font-bold uppercase tracking-wide ${getTripStatusStyle(trip.status)}`}
+              >
+                {trip.status?.replace(/_/g, ' ')}
               </span>
             </div>
             <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm sm:text-[15px] text-slate-600">
@@ -423,13 +423,54 @@ export function TripCard({ trip: initialTrip, onDeleted, onPaymentRecorded }: Tr
             </div>
           </div>
 
-          {/* Right side */}
-          <div className="shrink-0 flex flex-col items-end gap-1.5">
-            <button onClick={e => { e.stopPropagation(); handleDelete(); }} disabled={deleting}
-              className="text-red-400 hover:text-red-600 transition disabled:opacity-40 p-1">
-              <Trash2 className="h-4 w-4" />
-            </button>
-            {expanded ? <ChevronUp className="h-5 w-5 text-slate-400" /> : <ChevronDown className="h-5 w-5 text-slate-400" />}
+          {/* Right: payment summary + actions */}
+          <div className="shrink-0 flex items-start gap-2 sm:gap-3">
+            <div className="flex flex-col items-end gap-1 text-right min-w-0 max-w-[11rem] sm:max-w-[13rem]">
+              <div className="flex flex-col items-end gap-0.5 w-full">
+                <span
+                  className={`rounded-full border px-2 py-0.5 text-[10px] sm:text-xs font-bold ${paymentBadge.bg} ${paymentBadge.color}`}
+                >
+                  {paymentBadge.label}
+                </span>
+                <span
+                  className={`text-xs sm:text-sm font-bold tabular-nums leading-tight ${
+                    remaining < -1e-6
+                      ? 'text-indigo-700'
+                      : remaining > 1e-6
+                        ? 'text-amber-800'
+                        : 'text-emerald-800'
+                  }`}
+                >
+                  {remainingHeaderShort}: {fmtCurrency(remaining)}
+                </span>
+              </div>
+            </div>
+            <div className="flex flex-col items-end gap-1 shrink-0">
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleDelete();
+                }}
+                disabled={deleting}
+                className="text-red-400 hover:text-red-600 transition disabled:opacity-40 p-1"
+                aria-label="Delete trip"
+              >
+                <Trash2 className="h-4 w-4 sm:h-5 sm:w-5" />
+              </button>
+              <button
+                type="button"
+                className="p-0.5 text-slate-400 hover:text-slate-600"
+                aria-expanded={expanded}
+                aria-label={expanded ? 'Collapse trip' : 'Expand trip'}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setExpanded((x) => !x);
+                }}
+              >
+                {expanded ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
+              </button>
+            </div>
           </div>
         </div>
 
@@ -491,9 +532,18 @@ export function TripCard({ trip: initialTrip, onDeleted, onPaymentRecorded }: Tr
 
               {/* Payment Status */}
               <section>
-                <h4 className="text-sm font-bold text-amber-600 uppercase tracking-wider mb-2 flex items-center gap-2">
-                  <span className="w-1 h-4 bg-amber-400 rounded-full"></span>
-                  Payment Status
+                <h4 className="text-sm font-bold text-amber-600 uppercase tracking-wider mb-2 flex flex-wrap items-center gap-x-2 gap-y-1">
+                  <span className="flex items-center gap-2">
+                    <span className="w-1 h-4 bg-amber-400 rounded-full shrink-0" />
+                    Payment Status
+                  </span>
+                  <span className="inline-flex items-center gap-1.5 rounded-lg border border-amber-200/80 bg-amber-50/90 px-2 py-0.5 text-xs sm:text-sm font-bold normal-case tracking-normal text-amber-950 tabular-nums">
+                    <span className={`rounded-full border px-1.5 py-0 text-[10px] font-bold ${paymentBadge.bg} ${paymentBadge.color}`}>
+                      {paymentBadge.label}
+                    </span>
+                    <span className="text-slate-700 font-semibold">{remainingHeaderShort}:</span>
+                    {fmtCurrency(remaining)}
+                  </span>
                 </h4>
                 {/* Progress bar */}
                 <div className="h-3 sm:h-3.5 bg-slate-100 rounded-full overflow-hidden mb-3 shadow-inner">

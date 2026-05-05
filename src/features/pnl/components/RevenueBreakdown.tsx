@@ -1,5 +1,5 @@
 import React from 'react';
-import { Wallet, Briefcase, Truck } from 'lucide-react';
+import { Wallet, Briefcase, Truck, BadgeIndianRupee } from 'lucide-react';
 import type { PLRevenue, PLSummary } from '../api';
 
 interface RevenueBreakdownProps {
@@ -9,10 +9,11 @@ interface RevenueBreakdownProps {
 
 export const RevenueBreakdown: React.FC<RevenueBreakdownProps> = ({ revenue, summary }) => {
   const commission = revenue.commission || revenue.commissionRevenue || revenue.ownerRevenue || 0;
+  const tripsProfit = revenue.ownerProfit ?? revenue.ownerRevenue ?? 0;
   
   return (
     <div className="space-y-4 sm:space-y-6">
-      <div className="grid gap-4 sm:gap-6 md:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-4 sm:gap-6 md:grid-cols-2 lg:grid-cols-4">
         {/* Total Revenue Card - Large */}
         <div className="relative overflow-hidden rounded-2xl border border-indigo-100 bg-indigo-600 p-5 sm:p-6 shadow-md md:col-span-2 lg:col-span-1 flex flex-col justify-between">
           <div className="absolute -right-6 -top-6 h-32 w-32 rounded-full bg-white/10 blur-2xl"></div>
@@ -53,7 +54,7 @@ export const RevenueBreakdown: React.FC<RevenueBreakdownProps> = ({ revenue, sum
               <Briefcase className="h-5 w-5 sm:h-6 sm:w-6" />
             </div>
             <div>
-              <p className="text-xs sm:text-sm font-medium text-slate-500">Commission Revenue</p>
+              <p className="text-xs sm:text-sm font-medium text-slate-500">Commission Profit</p>
               <h3 className="text-lg sm:text-xl font-bold text-slate-900">₹{commission.toLocaleString()}</h3>
             </div>
           </div>
@@ -72,6 +73,20 @@ export const RevenueBreakdown: React.FC<RevenueBreakdownProps> = ({ revenue, sum
             </div>
           </div>
           <p className="mt-4 text-xs text-slate-400">From owner's own trips</p>
+        </div>
+
+        {/* Trips Profit Card */}
+        <div className="rounded-2xl border border-violet-100 bg-white p-5 sm:p-6 shadow-sm transition-all hover:shadow-md">
+          <div className="flex items-center gap-3 sm:gap-4">
+            <div className="flex h-10 w-10 sm:h-12 sm:w-12 shrink-0 items-center justify-center rounded-xl bg-violet-50 text-violet-600">
+              <BadgeIndianRupee className="h-5 w-5 sm:h-6 sm:w-6" />
+            </div>
+            <div>
+              <p className="text-xs sm:text-sm font-medium text-slate-500">Trips Profit</p>
+              <h3 className="text-lg sm:text-xl font-bold text-slate-900">₹{tripsProfit.toLocaleString()}</h3>
+            </div>
+          </div>
+          <p className="mt-4 text-xs text-slate-400">Net profit earned from all trips</p>
         </div>
       </div>
     </div>

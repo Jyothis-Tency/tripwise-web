@@ -37,13 +37,13 @@ export const TopRoutes: React.FC<TopRoutesProps> = ({ routes }) => {
                 {route.driverName || 'Driver N/A'} • {route.vehicleName || 'Vehicle N/A'}
               </p>
               <p className="text-[10px] sm:text-xs text-slate-500 whitespace-nowrap overflow-hidden text-ellipsis mt-0.5">
-                {route.trips} {route.trips === 1 ? 'trip' : 'trips'} <span className="hidden sm:inline">• Avg: ₹{Math.round(route.avgRevenue).toLocaleString()}</span>
+                {route.trips} {route.trips === 1 ? 'trip' : 'trips'} <span className="hidden sm:inline">• Agency Cost: ₹{Math.round(route.avgRevenue).toLocaleString()}</span>
               </p>
             </div>
 
             <div className="text-right shrink-0">
-              <p className="text-sm sm:text-base font-bold text-emerald-600">₹{Math.round(route.revenue).toLocaleString()}</p>
-              <p className="text-[9px] sm:text-[10px] font-medium uppercase tracking-wider text-slate-400">Total Rev<span className="hidden sm:inline">enue</span></p>
+              <p className="text-sm sm:text-base font-bold text-emerald-600">₹{Math.round(route.profit ?? 0).toLocaleString()}</p>
+              <p className="text-[9px] sm:text-[10px] font-medium uppercase tracking-wider text-slate-400">Profit</p>
             </div>
           </div>
         ))}

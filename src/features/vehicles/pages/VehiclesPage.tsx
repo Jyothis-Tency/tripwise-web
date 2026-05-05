@@ -521,8 +521,8 @@ export function TripFormModal({ vehicleId, trip, onClose, onSaved }: {
 
   return (
     <ModalShell title={isUpdate ? 'Update Trip Details' : 'Start New Trip'} onClose={onClose} maxWidth="max-w-2xl">
-      <form onSubmit={submit} className="flex flex-col h-full max-h-[85vh]">
-        <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4">
+      <form onSubmit={submit} className="flex flex-col">
+        <div className="p-4 sm:p-6 space-y-4">
           {error && <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-600">{error}</p>}
           
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
@@ -1202,7 +1202,13 @@ function TripDriverTab({ vehicle, onStartTrip, onUpdateTrip, onCancelTrip, onAss
                 {activeTrip.startingNote && <div className="col-span-2 sm:col-span-3"><span className="text-slate-400 block mb-0.5">Starting Note</span><p className="whitespace-pre-wrap">{activeTrip.startingNote}</p></div>}
                 {activeTrip.completionNote && <div className="col-span-2 sm:col-span-3"><span className="text-slate-400 block mb-0.5">Completion Note</span><p className="whitespace-pre-wrap">{activeTrip.completionNote}</p></div>}
                 <div className="col-span-2 sm:col-span-3 grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-2 mt-2 border-t border-indigo-100/30 pt-3 text-[11px]">
-                  <EditableGridField tripId={activeTrip._id} fieldKey={activeTrip.fare ? "fare" : "amount"} label="AMOUNT" value={activeTrip.amount || activeTrip.fare || 0} isCurrency />
+                  <EditableGridField
+                    tripId={activeTrip._id}
+                    fieldKey="agencyCost"
+                    label="AGENCY COST"
+                    value={activeTrip.agencyCost ?? activeTrip.amount ?? activeTrip.fare ?? 0}
+                    isCurrency
+                  />
                   <EditableGridField tripId={activeTrip._id} fieldKey="advance" label="ADVANCE" value={activeTrip.advance || 0} isCurrency />
                   <EditableGridField tripId={activeTrip._id} fieldKey="driver_salary" label="BATA" value={activeTrip.driver_salary || 0} isCurrency />
                   <div><span className="text-slate-400 block mb-0.5 uppercase">Personal Exp.</span><span className="font-semibold text-slate-700">₹{Number(activeTrip.totalPersonalExpense || 0).toLocaleString('en-IN')}</span></div>
@@ -1310,7 +1316,13 @@ function TripDriverTab({ vehicle, onStartTrip, onUpdateTrip, onCancelTrip, onAss
                       {trip.startingNote && <div className="col-span-2 sm:col-span-3"><span className="text-slate-400 block mb-0.5">Starting Note</span><p className="whitespace-pre-wrap">{trip.startingNote}</p></div>}
                       {trip.completionNote && <div className="col-span-2 sm:col-span-3"><span className="text-slate-400 block mb-0.5">Completion Note</span><p className="whitespace-pre-wrap">{trip.completionNote}</p></div>}
                       <div className="col-span-2 sm:col-span-3 grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-2 mt-2 border-t border-slate-100 pt-3">
-                        <EditableGridField tripId={trip._id} fieldKey={(trip as any).fare ? "fare" : "amount"} label="AMOUNT" value={trip.amount || (trip as any).fare || 0} isCurrency />
+                        <EditableGridField
+                          tripId={trip._id}
+                          fieldKey="agencyCost"
+                          label="AGENCY COST"
+                          value={trip.agencyCost ?? trip.amount ?? (trip as any).fare ?? 0}
+                          isCurrency
+                        />
                         <EditableGridField tripId={trip._id} fieldKey="advance" label="ADVANCE" value={trip.advance || 0} isCurrency />
                         <EditableGridField tripId={trip._id} fieldKey="driver_salary" label="BATA" value={trip.driver_salary || 0} isCurrency />
                         <div><span className="text-slate-400 block mb-0.5 text-[10px] uppercase">Personal Exp.</span><span className="font-semibold text-slate-700">₹{Number(trip.totalPersonalExpense || 0).toLocaleString('en-IN')}</span></div>

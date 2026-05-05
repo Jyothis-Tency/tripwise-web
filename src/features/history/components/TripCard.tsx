@@ -376,7 +376,30 @@ export function TripCard({ trip: initialTrip, onDeleted, onPaymentRecorded }: Tr
       fieldKey={fieldKey}
       tripId={trip._id}
       onSaved={(updatedTrip) => {
-        setTrip(prev => ({ ...prev, ...updatedTrip }));
+        setTrip((prev) => {
+          const next: HistoryTrip = { ...prev, ...updatedTrip };
+
+          // `patchTripFields` may return relation fields as raw IDs.
+          // Keep already-populated objects so UI doesn't regress to ObjectId text.
+          if (
+            updatedTrip.driver &&
+            typeof updatedTrip.driver === 'string' &&
+            prev.driver &&
+            typeof prev.driver !== 'string'
+          ) {
+            next.driver = prev.driver;
+          }
+          if (
+            updatedTrip.vehicle &&
+            typeof updatedTrip.vehicle === 'string' &&
+            prev.vehicle &&
+            typeof prev.vehicle !== 'string'
+          ) {
+            next.vehicle = prev.vehicle;
+          }
+
+          return next;
+        });
       }}
       highlight={hl}
       timeEditSeed={timeEditSeed}

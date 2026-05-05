@@ -27,6 +27,7 @@ export interface PLRoute {
   trips: number;
   revenue: number;
   avgRevenue: number;
+  profit?: number;
   driverName?: string;
   vehicleName?: string;
 }

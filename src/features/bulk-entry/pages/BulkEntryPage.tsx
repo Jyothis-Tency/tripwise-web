@@ -607,6 +607,8 @@ function generateBulkTripsPDF(
     return;
   }
 
+  let reportGrandTotal = 0;
+
   validGroups.forEach((g, driverIdx) => {
     if (y > doc.internal.pageSize.getHeight() - 40) {
       doc.addPage();
@@ -695,8 +697,28 @@ function generateBulkTripsPDF(
     doc.setTextColor(100, 116, 139);
     doc.text(`Total: ${INR(groupGrandTotal)}`, pw - 20, y, { align: "right" });
 
+    reportGrandTotal += groupGrandTotal;
+
     y += 18;
   });
+
+  if (y > doc.internal.pageSize.getHeight() - 32) {
+    doc.addPage();
+    y = 20;
+  }
+
+  doc.setDrawColor(203, 213, 225);
+  doc.setLineWidth(0.35);
+  doc.line(20, y - 4, pw - 20, y - 4);
+  y += 8;
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(11);
+  doc.setTextColor(30, 41, 59);
+  doc.text("Grand total (all trips)", 22, y);
+  doc.setTextColor(16, 185, 129);
+  doc.setFontSize(12);
+  doc.text(INR(reportGrandTotal), pw - 20, y, { align: "right" });
 
   drawFooter(doc);
   doc.save(fileName);

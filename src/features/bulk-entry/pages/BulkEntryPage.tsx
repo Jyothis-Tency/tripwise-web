@@ -1384,6 +1384,78 @@ function BulkEntryTable({
   };
   const { user } = useAuth();
   const [expandedPayoutGi, setExpandedPayoutGi] = useState<number | null>(null);
+  const [exportOpen, setExportOpen] = useState(false);
+  const [exportStartDate, setExportStartDate] = useState("");
+  const [exportEndDate, setExportEndDate] = useState("");
+  const [exportError, setExportError] = useState<string | null>(null);
+
+  const buildBulkExportGroups = useCallback(
+    (start: string, end: string) => {
+      const startMs = start ? new Date(`${start}T00:00:00`).getTime() : null;
+      const endMs = end ? new Date(`${end}T23:59:59`).getTime() : null;
+
+      const dateOk = (rowStartDate: string) => {
+        if (!startMs && !endMs) return true;
+        if (!rowStartDate) return false;
+        const t = new Date(`${rowStartDate}T00:00:00`).getTime();
+        if (!Number.isFinite(t)) return false;
+        if (startMs && t < startMs) return false;
+        if (endMs && t > endMs) return false;
+        return true;
+      };
+
+      return groups
+        .map((g) => ({
+          ...g,
+          rows: (g.rows ?? []).filter(
+            (r) => !isRowHidden(r.isCompleted) && dateOk(r.startDate),
+          ),
+        }))
+        .filter((g) => (g.rows ?? []).length > 0);
+    },
+    [groups, isRowHidden],
+  );
+
+  const runBulkExport = useCallback(() => {
+    const start = exportStartDate.trim();
+    const end = exportEndDate.trim();
+
+    if (start && end) {
+      const s = new Date(`${start}T00:00:00`).getTime();
+      const e = new Date(`${end}T00:00:00`).getTime();
+      if (Number.isFinite(s) && Number.isFinite(e) && s > e) {
+        setExportError("Start date cannot be after end date");
+        return;
+      }
+    }
+
+    const reportGroups = buildBulkExportGroups(start, end);
+    const rowCount = reportGroups.reduce((s, g) => s + (g.rows?.length ?? 0), 0);
+    if (rowCount === 0) {
+      setExportError("No trips found for the selected filter/date range.");
+      return;
+    }
+
+    const today = new Date().toISOString().split("T")[0];
+    const agencyPart = (agencyName || "Agency").replace(/\s+/g, "_");
+    const rangePart = start || end ? `${start || "from"}_${end || "to"}` : "all";
+    const fileName = `BulkTrips_${agencyPart}_${rangePart}_${today}.pdf`;
+
+    generateBulkTripsPDF(
+      user?.name || "Owner",
+      agencyName || "Agency",
+      fileName,
+      reportGroups,
+    );
+    setExportOpen(false);
+    setExportError(null);
+  }, [
+    agencyName,
+    buildBulkExportGroups,
+    exportEndDate,
+    exportStartDate,
+    user?.name,
+  ]);
   const updateGroupField = useCallback(
     (gi: number, field: keyof DriverGroup, val: any) => {
       onChange((prev) => {
@@ -1530,31 +1602,88 @@ function BulkEntryTable({
         <div className="flex justify-end mb-2">
           <button
             onClick={() => {
-              const defaultName = `BulkTrips_${(agencyName || "Agency").replace(/\s+/g, "_")}_${new Date().toISOString().split("T")[0]}.pdf`;
-              const fileName = window.prompt(
-                "Enter file name for Report:",
-                defaultName,
-              );
-              if (fileName) {
-                const reportGroups = groups
-                  .map((g) => ({
-                    ...g,
-                    rows: (g.rows ?? []).filter((r) => !isRowHidden(r.isCompleted)),
-                  }))
-                  .filter((g) => (g.rows ?? []).length > 0);
-                generateBulkTripsPDF(
-                  user?.name || "Owner",
-                  agencyName || "Agency",
-                  fileName.endsWith(".pdf") ? fileName : `${fileName}.pdf`,
-                  reportGroups,
-                );
-              }
+              setExportError(null);
+              setExportOpen(true);
             }}
             className="flex items-center gap-2 rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-2 text-sm font-semibold text-indigo-700 hover:bg-indigo-100 transition shadow-sm"
           >
             <FileDown className="h-4 w-4" /> Download Bulk Trips Report (PDF)
           </button>
         </div>
+      )}
+
+      {exportOpen && (
+        <ModalShell
+          title="Export Bulk Trips (PDF)"
+          onClose={() => {
+            setExportOpen(false);
+            setExportError(null);
+          }}
+          maxWidth="max-w-md"
+        >
+          <div className="p-5 sm:p-6 space-y-4">
+            <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-700">
+              <span className="font-semibold">{agencyName || "Agency"}</span>
+              <span className="text-slate-500">
+                {" "}
+                • Filter:{" "}
+                <span className="font-semibold capitalize">{filterStatus}</span>
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1">
+                  Start Date (optional)
+                </label>
+                <input
+                  type="date"
+                  value={exportStartDate}
+                  onChange={(e) => setExportStartDate(e.target.value)}
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-200 bg-white"
+                />
+              </div>
+              <div>
+                <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1">
+                  End Date (optional)
+                </label>
+                <input
+                  type="date"
+                  value={exportEndDate}
+                  onChange={(e) => setExportEndDate(e.target.value)}
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-200 bg-white"
+                />
+              </div>
+            </div>
+
+            {exportError && (
+              <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs font-semibold text-red-700">
+                {exportError}
+              </p>
+            )}
+
+            <div className="flex gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setExportStartDate("");
+                  setExportEndDate("");
+                  setExportError(null);
+                }}
+                className="flex-1 rounded-xl border border-slate-200 bg-white py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+              >
+                Clear
+              </button>
+              <button
+                type="button"
+                onClick={runBulkExport}
+                className="flex-1 rounded-xl bg-indigo-600 py-2.5 text-sm font-bold text-white hover:bg-indigo-700"
+              >
+                Export PDF
+              </button>
+            </div>
+          </div>
+        </ModalShell>
       )}
 
       {/* All groups are editable — server trips are merged into groups[] */}

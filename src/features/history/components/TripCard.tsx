@@ -83,7 +83,7 @@ function EditableRow({
   label, value, highlight, fieldKey, tripId, onSaved, timeEditSeed,
 }: {
   label: string; value: string; highlight?: boolean;
-  fieldKey: string; tripId: string; onSaved: (updatedTrip: HistoryTrip) => void;
+  fieldKey: string; tripId: string; onSaved: (fieldKey: string, updatedTrip: HistoryTrip) => void;
   /** For `type="time"` rows: HH:mm seed from ISO (not the AM/PM display string). */
   timeEditSeed?: string;
 }) {
@@ -119,7 +119,7 @@ function EditableRow({
         : editValue || '—';
       setDisplayValue(newDisplay);
       setEditing(false);
-      onSaved(updatedTrip);
+      onSaved(fieldKey, updatedTrip);
     } catch (err: any) {
       alert(err?.message || err?.response?.data?.message || 'Failed to update field');
     } finally {
@@ -375,9 +375,28 @@ export function TripCard({ trip: initialTrip, onDeleted, onPaymentRecorded }: Tr
       value={value}
       fieldKey={fieldKey}
       tripId={trip._id}
-      onSaved={(updatedTrip) => {
+      onSaved={(savedFieldKey, updatedTrip) => {
         setTrip((prev) => {
           const next: HistoryTrip = { ...prev, ...updatedTrip };
+
+          // If we edited some other field, preserve date/time fields so they don't
+          // "jump" due to backend serialization/timezone differences.
+          const dateLikeKeys = new Set([
+            'startDate',
+            'expectedEndDate',
+            'actualStartTime',
+            'actualEndTime',
+            'startTime',
+            'endTime',
+          ]);
+          if (!dateLikeKeys.has(savedFieldKey)) {
+            next.startDate = prev.startDate;
+            next.expectedEndDate = (prev as any).expectedEndDate;
+            (next as any).actualStartTime = (prev as any).actualStartTime;
+            (next as any).actualEndTime = (prev as any).actualEndTime;
+            next.startTime = prev.startTime;
+            next.endTime = prev.endTime;
+          }
 
           // `patchTripFields` may return relation fields as raw IDs.
           // Keep already-populated objects so UI doesn't regress to ObjectId text.

@@ -1536,11 +1536,17 @@ function BulkEntryTable({
                 defaultName,
               );
               if (fileName) {
+                const reportGroups = groups
+                  .map((g) => ({
+                    ...g,
+                    rows: (g.rows ?? []).filter((r) => !isRowHidden(r.isCompleted)),
+                  }))
+                  .filter((g) => (g.rows ?? []).length > 0);
                 generateBulkTripsPDF(
                   user?.name || "Owner",
                   agencyName || "Agency",
                   fileName.endsWith(".pdf") ? fileName : `${fileName}.pdf`,
-                  groups,
+                  reportGroups,
                 );
               }
             }}
@@ -2429,13 +2435,14 @@ function NormalEntryTable({
                   defaultName,
                 );
                 if (fileName) {
+                  const reportEntries = entries
+                    .filter((e) => e.driverName || e.vehicleNumber || e.mobileNumber)
+                    .filter((e) => !isRowHidden(e.isCompleted));
                   generateNormalTripsPDF(
                     user?.name || "Owner",
                     agencyName || "Agency",
                     fileName.endsWith(".pdf") ? fileName : `${fileName}.pdf`,
-                    entries.filter(
-                      (e) => e.driverName || e.vehicleNumber || e.mobileNumber,
-                    ),
+                    reportEntries,
                   );
                 }
               }}

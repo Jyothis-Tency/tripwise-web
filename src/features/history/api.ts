@@ -10,6 +10,8 @@ export interface HistoryTrip {
   status: string;
   date?: string;
   startDate?: string;
+  /** Backend field used across owner trip endpoints. */
+  expectedEndDate?: string;
   endDate?: string;
   from?: string;
   to?: string;

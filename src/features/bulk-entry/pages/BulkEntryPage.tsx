@@ -607,20 +607,35 @@ function generateBulkTripsPDF(
     return;
   }
 
-  validGroups.forEach((g) => {
+  validGroups.forEach((g, driverIdx) => {
     if (y > doc.internal.pageSize.getHeight() - 40) {
       doc.addPage();
       y = 20;
     }
 
+    const slNo = driverIdx + 1;
     doc.setFillColor(241, 245, 249);
     doc.rect(20, y - 5, pw - 40, 10, "F");
+
+    const badgeR = slNo >= 100 ? 5.2 : slNo >= 10 ? 4.6 : 4.2;
+    const cx = 20 + badgeR + 3;
+    const cy = y;
+    doc.setFillColor(255, 255, 255);
+    doc.setDrawColor(71, 85, 105);
+    doc.setLineWidth(0.25);
+    doc.circle(cx, cy, badgeR, "FD");
+
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(10);
+    const badgeFont = slNo >= 100 ? 7 : slNo >= 10 ? 8 : 9;
+    doc.setFontSize(badgeFont);
     doc.setTextColor(30, 41, 59);
+    const badgeDy = slNo >= 100 ? 1 : slNo >= 10 ? 1.15 : 1.25;
+    doc.text(String(slNo), cx, cy + badgeDy, { align: "center" });
+
+    doc.setFontSize(10);
     doc.text(
       `Driver: ${g.driverName || "Unknown"}  |  Vehicle: ${g.vehicleNumber || "Unknown"}`,
-      25,
+      cx + badgeR + 4,
       y + 2,
     );
 

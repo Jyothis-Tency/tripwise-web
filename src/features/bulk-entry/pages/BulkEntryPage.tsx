@@ -340,6 +340,7 @@ function drawPDFHeader(
   title: string,
   ownerName: string,
   y: number,
+  opts?: { metaLabel?: string; metaLineMatchAgency?: boolean },
 ): number {
   const pw = doc.internal.pageSize.getWidth();
 
@@ -357,11 +358,18 @@ function drawPDFHeader(
   doc.setTextColor(30, 41, 59); // slate-800
   doc.text(title, 20, y + 35);
 
-  // Owner Name
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(10);
-  doc.setTextColor(100, 116, 139); // slate-500
-  doc.text(`Owner: ${ownerName}`, 20, y + 43);
+  const metaLabel = opts?.metaLabel ?? "Owner";
+  if (opts?.metaLineMatchAgency) {
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(12);
+    doc.setTextColor(49, 46, 129);
+    doc.text(`${metaLabel}: ${ownerName}`, 20, y + 43);
+  } else {
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(10);
+    doc.setTextColor(100, 116, 139); // slate-500
+    doc.text(`${metaLabel}: ${ownerName}`, 20, y + 43);
+  }
 
   return y + 53;
 }
@@ -586,31 +594,53 @@ function generateBulkTripsPDF(
   groups: DriverGroup[],
 ) {
   const doc = new jsPDF("l", "mm", "a4"); // 'l' for landscape
-  let y = drawPDFHeader(doc, `Bulk Trips Report`, ownerName, 0);
+  const pw = doc.internal.pageSize.getWidth();
+  const pageH = doc.internal.pageSize.getHeight();
+
+  const validGroups = groups.filter((g) => g.rows.length > 0);
+  const reportGrandTotal = validGroups.reduce(
+    (sum, g) =>
+      sum + g.rows.reduce((s, r) => s + (Number(r.grandTotal) || 0), 0),
+    0,
+  );
+
+  let y = drawPDFHeader(doc, `Trip Report`, ownerName, 0, {
+    metaLabel: "From",
+    metaLineMatchAgency: true,
+  });
 
   doc.setFont("helvetica", "bold");
   doc.setFontSize(12);
   doc.setTextColor(49, 46, 129);
-  doc.text(`Agency: ${agencyName}`, 20, y);
+  doc.text(`To: ${agencyName}`, 20, y);
+  y += 10;
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(12);
+  const grandLabel = "Grand Total: ";
+  doc.setTextColor(30, 41, 59);
+  doc.text(grandLabel, 20, y);
+  doc.setTextColor(16, 185, 129);
+  doc.text(INR(reportGrandTotal), 20 + doc.getTextWidth(grandLabel), y);
   y += 14;
-
-  const pw = doc.internal.pageSize.getWidth();
-
-  const validGroups = groups.filter((g) => g.rows.length > 0);
 
   if (validGroups.length === 0) {
     doc.setFont("helvetica", "normal");
     doc.setFontSize(10);
+    doc.setTextColor(51, 65, 85);
     doc.text("No trips recorded.", 20, y);
     drawFooter(doc);
     doc.save(fileName);
     return;
   }
 
-  let reportGrandTotal = 0;
+  const NOTE_X = 195;
+  const totalColReserveMm = 32;
+  const maxNotesW = Math.max(24, pw - 20 - totalColReserveMm - NOTE_X);
+  const noteLineMm = 4;
 
   validGroups.forEach((g, driverIdx) => {
-    if (y > doc.internal.pageSize.getHeight() - 40) {
+    if (y > pageH - 40) {
       doc.addPage();
       y = 20;
     }
@@ -663,12 +693,21 @@ function generateBulkTripsPDF(
 
     g.rows.forEach((r) => {
       groupGrandTotal += r.grandTotal || 0;
-      if (y > doc.internal.pageSize.getHeight() - 25) {
+
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(9);
+      const rawNotes = (r.notes || "").trim();
+      const noteLines =
+        rawNotes.length > 0
+          ? doc.splitTextToSize(rawNotes, maxNotesW)
+          : ["—"];
+      const rowH = Math.max(8, noteLines.length * noteLineMm + 2);
+
+      if (y + rowH > pageH - 25) {
         doc.addPage();
         y = 20;
       }
-      doc.setFont("helvetica", "normal");
-      doc.setFontSize(9);
+
       doc.setTextColor(51, 65, 85);
 
       doc.text(fmtDate(r.startDate), 22, y);
@@ -681,14 +720,19 @@ function generateBulkTripsPDF(
       doc.text(`${r.distance || 0} km`, 150, y);
       doc.text(`${r.hours || 0} hr`, 165, y);
       doc.text(INR(r.toll || 0), 180, y);
-      doc.text((r.notes || "").substring(0, 35), 195, y);
+
+      let noteY = y;
+      for (let li = 0; li < noteLines.length; li++) {
+        doc.text(noteLines[li], NOTE_X, noteY);
+        noteY += noteLineMm;
+      }
 
       // Total column
       doc.setFont("helvetica", "bold");
       doc.setTextColor(16, 185, 129);
       doc.text(INR(r.grandTotal || 0), pw - 20, y, { align: "right" });
 
-      y += 8;
+      y += rowH;
     });
 
     y += 2;
@@ -697,28 +741,8 @@ function generateBulkTripsPDF(
     doc.setTextColor(100, 116, 139);
     doc.text(`Total: ${INR(groupGrandTotal)}`, pw - 20, y, { align: "right" });
 
-    reportGrandTotal += groupGrandTotal;
-
     y += 18;
   });
-
-  if (y > doc.internal.pageSize.getHeight() - 32) {
-    doc.addPage();
-    y = 20;
-  }
-
-  doc.setDrawColor(203, 213, 225);
-  doc.setLineWidth(0.35);
-  doc.line(20, y - 4, pw - 20, y - 4);
-  y += 8;
-
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(11);
-  doc.setTextColor(30, 41, 59);
-  doc.text("Grand total (all trips)", 22, y);
-  doc.setTextColor(16, 185, 129);
-  doc.setFontSize(12);
-  doc.text(INR(reportGrandTotal), pw - 20, y, { align: "right" });
 
   drawFooter(doc);
   doc.save(fileName);

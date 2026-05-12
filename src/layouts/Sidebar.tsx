@@ -12,13 +12,15 @@ import {
   X,
   LogOut,
   User,
+  CirclePlus,
 } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 
 const menuItems = [
   { label: 'Dashboard', path: '/', icon: LayoutDashboard },
+  { label: 'Create New Trip', path: '/create-trip', icon: CirclePlus },
   { label: 'P&L', path: '/pl', icon: TrendingUp },
-  { label: 'Vehicles', path: '/vehicles', icon: Car },
+  { label: 'Trip Details', path: '/vehicles', icon: Car },
   { label: 'Tracking', path: '/tracking', icon: Navigation },
   { label: 'Drivers', path: '/drivers', icon: Users },
   { label: 'Expenses', path: '/expenses', icon: Receipt },

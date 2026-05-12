@@ -153,7 +153,7 @@ export function HistoryPage() {
         limit: LIMIT,
         status: status === 'all' ? undefined : status,
         search: debouncedSearch || undefined,
-        sortBy: 'updatedAt',
+        sortBy: 'startDate',
         sortOrder: 'desc',
       };
       if (filterMode === 'month' && month && month !== 'all_time') {
@@ -212,6 +212,12 @@ export function HistoryPage() {
     setMonth(currentMonth); setStartDate(''); setEndDate('');
     setFilterMode('month'); setPage(1);
   };
+
+  const handleTripUpdated = useCallback((updated: HistoryTrip) => {
+    setTrips((prev) =>
+      prev.map((t) => (t._id === updated._id ? updated : t)),
+    );
+  }, []);
 
   const handlePaymentRecorded = useCallback((tripId: string, summary: RecordPaymentTripSummary) => {
     const paymentStatus =
@@ -628,6 +634,7 @@ export function HistoryPage() {
             trip={trip}
             onDeleted={load}
             onPaymentRecorded={handlePaymentRecorded}
+            onTripUpdated={handleTripUpdated}
           />
         ))}
       </div>

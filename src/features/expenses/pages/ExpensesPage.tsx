@@ -1,188 +1,276 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import type { Expense, TripWithExpenses } from '../api';
-import { fetchExpenses, fetchTripsWithExpenses } from '../api';
-import ExpenseCard from '../components/ExpenseCard';
-import AddExpenseModal from '../components/AddExpenseModal';
-import TripExpenseCard from '../components/TripExpenseCard';
+import React, { useCallback, useEffect, useState } from "react";
+import type { TripWithExpenses } from "../api";
+import { fetchTripsWithExpenses } from "../api";
+import TripExpenseCard from "../components/TripExpenseCard";
+import { VehicleExpensesPane } from "../components/VehicleExpensesPane";
+import { fetchVehicles, type Vehicle } from "../../vehicles/api";
+import { VehicleListCard } from "../../vehicles/components/VehicleListCard";
+import { Car, Search, ChevronLeft } from "lucide-react";
 
-const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+type ExpensesMode = "trip" | "vehicle";
 
-function monthRange(d: Date): { startDate: string; endDate: string } {
-  const y = d.getFullYear(), m = d.getMonth();
-  const start = new Date(y, m, 1);
-  const end = new Date(y, m + 1, 0);
-  return { startDate: start.toISOString().split('T')[0], endDate: end.toISOString().split('T')[0] };
+function ModeTabsBar({
+  mode,
+  setMode,
+}: {
+  mode: ExpensesMode;
+  setMode: (m: ExpensesMode) => void;
+}) {
+  const tabBtn =
+    "flex min-h-0 min-w-0 items-center justify-center rounded-lg px-1.5 py-2 text-center text-xs font-semibold leading-tight sm:px-2";
+
+  return (
+    <div
+      className="grid h-10 w-[min(100%,17.5rem)] shrink-0 grid-cols-2 gap-1 rounded-xl border border-slate-200 bg-slate-50 p-1"
+      role="tablist"
+    >
+      <button
+        type="button"
+        role="tab"
+        aria-selected={mode === "vehicle"}
+        className={`${tabBtn} ${
+          mode === "vehicle"
+            ? "bg-indigo-500 text-white shadow-sm"
+            : "bg-transparent text-slate-500 hover:text-slate-700"
+        }`}
+        onClick={() => setMode("vehicle")}
+      >
+        Vehicle expenses
+      </button>
+      <button
+        type="button"
+        role="tab"
+        aria-selected={mode === "trip"}
+        className={`${tabBtn} ${
+          mode === "trip"
+            ? "bg-indigo-500 text-white shadow-sm"
+            : "bg-transparent text-slate-500 hover:text-slate-700"
+        }`}
+        onClick={() => setMode("trip")}
+      >
+        Trip expense
+      </button>
+    </div>
+  );
 }
 
 const ExpensesPage: React.FC = () => {
-  const [isTripMode, setIsTripMode] = useState(false);
-  const [month, setMonth] = useState(() => { const n = new Date(); return new Date(n.getFullYear(), n.getMonth()); });
-  const [expenses, setExpenses] = useState<Expense[]>([]);
-  const [trips, setTrips] = useState<TripWithExpenses[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [showAdd, setShowAdd] = useState(false);
-  const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
-  const [search, setSearch] = useState('');
+  const [mode, setMode] = useState<ExpensesMode>("vehicle");
 
-  const loadPersonal = useCallback(async () => {
-    setLoading(true);
-    try {
-      const { startDate, endDate } = monthRange(month);
-      const res = await fetchExpenses({ limit: 100, startDate, endDate });
-      setExpenses(res.expenses);
-    } catch { setExpenses([]); }
-    finally { setLoading(false); }
-  }, [month]);
+  const [search, setSearch] = useState("");
+  const [trips, setTrips] = useState<TripWithExpenses[]>([]);
+  const [tripLoading, setTripLoading] = useState(true);
+
+  const [vehicles, setVehicles] = useState<Vehicle[]>([]);
+  const [vehicleSearch, setVehicleSearch] = useState("");
+  const [vehicleLoading, setVehicleLoading] = useState(false);
+  const [selectedVehicleId, setSelectedVehicleId] = useState<string | null>(
+    null,
+  );
 
   const loadTrips = useCallback(async () => {
-    setLoading(true);
+    setTripLoading(true);
     try {
-      const res = await fetchTripsWithExpenses({ limit: 100, search: search || undefined });
+      const res = await fetchTripsWithExpenses({
+        limit: 100,
+        search: search || undefined,
+      });
       setTrips(res.trips);
-    } catch { setTrips([]); }
-    finally { setLoading(false); }
+    } catch {
+      setTrips([]);
+    } finally {
+      setTripLoading(false);
+    }
   }, [search]);
 
-  useEffect(() => { if (!isTripMode) loadPersonal(); }, [isTripMode, loadPersonal]);
-  useEffect(() => { if (isTripMode) loadTrips(); }, [isTripMode, loadTrips]);
+  const loadVehicles = useCallback(async (q: string) => {
+    setVehicleLoading(true);
+    try {
+      const res = await fetchVehicles({
+        page: 1,
+        limit: 80,
+        search: q || undefined,
+      });
+      setVehicles(res.items ?? []);
+    } catch {
+      setVehicles([]);
+    } finally {
+      setVehicleLoading(false);
+    }
+  }, []);
 
-  /* Summary stats */
-  const totalAmt = useMemo(() => expenses.reduce((s, e) => s + (e.amount || 0), 0), [expenses]);
-  const avgAmt = useMemo(() => expenses.length ? totalAmt / expenses.length : 0, [totalAmt, expenses.length]);
+  useEffect(() => {
+    if (mode !== "trip") return;
+    void loadTrips();
+  }, [mode, loadTrips]);
 
+  useEffect(() => {
+    if (mode !== "vehicle") return;
+    const t = setTimeout(() => void loadVehicles(vehicleSearch), 300);
+    return () => clearTimeout(t);
+  }, [mode, vehicleSearch, loadVehicles]);
+
+  useEffect(() => {
+    if (mode !== "vehicle") return;
+    setSelectedVehicleId((prev) => {
+      if (!prev) return null;
+      if (vehicles.some((v) => v._id === prev)) return prev;
+      return null;
+    });
+  }, [mode, vehicles]);
+
+  const selectedVehicle =
+    selectedVehicleId != null
+      ? vehicles.find((v) => v._id === selectedVehicleId) ?? null
+      : null;
 
   return (
-    <div className="flex flex-col h-full bg-slate-50">
-      {/* Header */}
-      <div className="px-4 py-4 sm:px-6 sm:py-5 lg:px-6 lg:py-5 border-b border-slate-200/50">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div className="flex items-center gap-2.5">
-            <span className="text-2xl">💰</span>
-            <h2 className="text-xl sm:text-2xl font-bold text-slate-800 m-0">Expenses</h2>
+    <div className="flex h-full min-h-0 flex-col bg-slate-50">
+      {mode === "vehicle" ? (
+        <div className="flex min-h-0 flex-1 overflow-hidden">
+          <div
+            className={`flex w-full shrink-0 flex-col border-r border-slate-200 bg-white transition-all lg:w-72 xl:w-80 ${
+              selectedVehicleId ? "hidden lg:flex" : "flex"
+            }`}
+          >
+            <div className="flex justify-end border-b border-slate-200 bg-white px-3 py-2 lg:hidden">
+              <ModeTabsBar mode={mode} setMode={setMode} />
+            </div>
+            <div className="relative border-b border-slate-100 px-3 py-2">
+              <Search className="absolute left-5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
+              <input
+                type="text"
+                value={vehicleSearch}
+                onChange={(e) => setVehicleSearch(e.target.value)}
+                placeholder="Search vehicles..."
+                className="w-full rounded-md border border-slate-200 bg-slate-50 py-1.5 pl-7 pr-3 text-xs text-slate-700 outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400"
+              />
+            </div>
+            <div className="flex-1 space-y-1.5 overflow-y-auto p-3">
+              {vehicleLoading ? (
+                Array.from({ length: 6 }).map((_, i) => (
+                  <div
+                    key={i}
+                    className="h-24 animate-pulse rounded-xl bg-slate-100"
+                  />
+                ))
+              ) : vehicles.length === 0 ? (
+                <div className="flex flex-col items-center gap-2 py-12 text-center">
+                  <Car className="h-10 w-10 text-slate-300" />
+                  <p className="text-sm text-slate-400">No vehicles found</p>
+                </div>
+              ) : (
+                vehicles.map((v) => (
+                  <VehicleListCard
+                    key={v._id}
+                    vehicle={v}
+                    isSelected={v._id === selectedVehicleId}
+                    onSelect={() => setSelectedVehicleId(v._id)}
+                    showEditButton={false}
+                  />
+                ))
+              )}
+            </div>
           </div>
 
-          {/* Controls row */}
-          <div className="flex flex-col xs:flex-row items-stretch sm:items-center gap-3">
-            {/* Toggle */}
-            <div className="flex bg-white border border-slate-200 rounded-xl p-1 w-full sm:w-[220px]">
-              <button
-                type="button"
-                className={`flex-1 py-1.5 sm:py-2 text-center rounded-lg font-semibold text-xs sm:text-sm transition-colors ${!isTripMode ? 'bg-indigo-500 text-white shadow-sm' : 'bg-transparent text-slate-500 hover:text-slate-700'}`}
-                onClick={() => setIsTripMode(false)}
-              >
-                Personal
-              </button>
-              <button
-                type="button"
-                className={`flex-1 py-1.5 sm:py-2 text-center rounded-lg font-semibold text-xs sm:text-sm transition-colors ${isTripMode ? 'bg-indigo-500 text-white shadow-sm' : 'bg-transparent text-slate-500 hover:text-slate-700'}`}
-                onClick={() => setIsTripMode(true)}
-              >
-                Trip Expense
-              </button>
+          <div
+            className={`min-h-0 flex-1 overflow-y-auto bg-slate-50 p-4 ${
+              selectedVehicleId ? "flex flex-col" : "hidden lg:flex"
+            }`}
+          >
+            <div className="mb-4 flex shrink-0 justify-end">
+              <ModeTabsBar mode={mode} setMode={setMode} />
             </div>
-
-            {!isTripMode && (
-              <button onClick={() => setShowAdd(true)} className="flex items-center justify-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white border-0 rounded-xl px-4 py-2 sm:py-2.5 text-xs sm:text-sm font-semibold cursor-pointer transition-colors shadow-sm">
-                + Add Expense
-              </button>
+            {selectedVehicle ? (
+              <>
+                <div className="mb-4 flex items-center gap-2 lg:hidden">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedVehicleId(null)}
+                    className="rounded-lg border border-slate-200 bg-white p-2 text-slate-600 hover:bg-slate-50"
+                    aria-label="Back to vehicle list"
+                  >
+                    <ChevronLeft className="h-5 w-5" />
+                  </button>
+                  <div>
+                    <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
+                      Vehicle
+                    </p>
+                    <p className="text-lg font-bold text-slate-900">
+                      {selectedVehicle.vehicleNumber}
+                    </p>
+                  </div>
+                </div>
+                <div className="hidden border-b border-slate-200 pb-3 lg:block">
+                  <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
+                    Vehicle expenses
+                  </p>
+                  <p className="text-xl font-bold text-slate-900">
+                    {selectedVehicle.vehicleNumber}
+                  </p>
+                  <p className="text-sm text-slate-500">
+                    {[selectedVehicle.vehicleType, selectedVehicle.vehicleModel]
+                      .filter(Boolean)
+                      .join(" – ")}
+                  </p>
+                </div>
+                <div className="mt-4 min-h-0 flex-1">
+                  <VehicleExpensesPane vehicle={selectedVehicle} />
+                </div>
+              </>
+            ) : (
+              !vehicleLoading && (
+                <div className="flex min-h-0 flex-1 flex-col items-center justify-center text-center">
+                  <Car className="h-12 w-12 text-slate-300" />
+                  <p className="mt-3 text-sm font-medium text-slate-500">
+                    No vehicle selected
+                  </p>
+                  <p className="mt-1 text-xs text-slate-400">
+                    Select a vehicle from the list to manage its expenses
+                  </p>
+                </div>
+              )
             )}
           </div>
         </div>
-      </div>
-
-      {/* Content */}
-      <div className="flex-1 overflow-y-auto p-4 sm:p-6 pb-24">
-        {isTripMode ? (
-          /* ── Trip Expenses ── */
-          <>
-            <div className="mb-4">
-              <input
-                placeholder="Search trips…" value={search} onChange={e => setSearch(e.target.value)}
-                className="w-full sm:max-w-[340px] px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-200"
+      ) : (
+        <div className="min-h-0 flex-1 overflow-y-auto p-4 pb-24 sm:p-6">
+          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <input
+              placeholder="Search trips…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-200 sm:max-w-md"
+            />
+            <div className="flex justify-end sm:shrink-0">
+              <ModeTabsBar mode={mode} setMode={setMode} />
+            </div>
+          </div>
+          {tripLoading ? (
+            Array.from({ length: 4 }).map((_, i) => (
+              <div
+                key={i}
+                className="mb-2.5 h-16 animate-pulse rounded-xl bg-slate-200"
               />
+            ))
+          ) : trips.length === 0 ? (
+            <div className="py-16 text-center text-slate-400">
+              <div className="mb-2 text-5xl">📦</div>
+              <p className="text-sm">
+                No trips found. Try another search or create a trip first.
+              </p>
             </div>
-            {loading ? (
-              Array.from({ length: 4 }).map((_, i) => <div key={i} className="h-16 rounded-xl bg-slate-200 animate-pulse mb-2.5" />)
-            ) : trips.length === 0 ? (
-              <div className="text-center py-16 text-slate-400">
-                <div className="text-5xl mb-2">📦</div>
-                <p className="text-sm">No trips found. Try another search or create a trip first.</p>
-              </div>
-            ) : (
-              trips.map((t, i) => <TripExpenseCard key={t._id || (t as any).id || i} trip={t} onRefresh={loadTrips} />)
-            )}
-          </>
-        ) : (
-          /* ── Personal Expenses ── */
-          <>
-            {/* Month selector */}
-            <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 mb-4">
-              <div className="flex items-center gap-2 bg-white border border-slate-200 rounded-lg px-3 py-2 w-full sm:w-auto">
-                <span className="text-sm">📅</span>
-                <select
-                  value={`${month.getFullYear()}-${month.getMonth()}`}
-                  onChange={e => { const [y, m] = e.target.value.split('-').map(Number); setMonth(new Date(y, m)); }}
-                  className="border-0 outline-none text-sm cursor-pointer bg-transparent w-full sm:w-auto font-medium text-slate-700"
-                >
-                  {Array.from({ length: 12 }, (_, i) => {
-                    const y = new Date().getFullYear();
-                    const m = new Date().getMonth() - i;
-                    const d = new Date(y, m);
-                    return <option key={i} value={`${d.getFullYear()}-${d.getMonth()}`}>{MONTHS[d.getMonth()]} {d.getFullYear()}</option>;
-                  })}
-                </select>
-              </div>
-              <div className="bg-indigo-50 text-indigo-600 px-4 py-2 rounded-lg text-sm font-bold w-full sm:w-auto text-center sm:text-left">
-                Total: ₹{totalAmt.toLocaleString('en-IN')}
-              </div>
-            </div>
-
-            {/* Summary cards */}
-            <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 mb-5">
-              {[
-                { label: 'Total Expenses', value: `₹${totalAmt.toLocaleString('en-IN')}`, color: 'text-red-500', bg: 'bg-red-50 border border-red-100' },
-                { label: 'Count', value: String(expenses.length), color: 'text-indigo-500', bg: 'bg-indigo-50 border border-indigo-100' },
-                { label: 'Average', value: `₹${Math.round(avgAmt).toLocaleString('en-IN')}`, color: 'text-amber-500', bg: 'bg-amber-50 border border-amber-100' },
-              ].map(c => (
-                <div key={c.label} className={`${c.bg} rounded-xl p-3.5 sm:p-4`}>
-                  <div className="text-xs sm:text-xs text-slate-500 font-semibold uppercase tracking-wider">{c.label}</div>
-                  <div className={`text-lg sm:text-xl font-bold ${c.color} mt-1`}>{c.value}</div>
-                </div>
-              ))}
-            </div>
-
-            {/* Expense list */}
-            {loading ? (
-              Array.from({ length: 4 }).map((_, i) => <div key={i} className="h-14 rounded-xl bg-slate-200 animate-pulse mb-2" />)
-            ) : expenses.length === 0 ? (
-              <div className="text-center py-12 text-slate-400">
-                <div className="text-5xl mb-2">📋</div>
-                <p className="text-sm">No expenses this month</p>
-                <button onClick={() => setShowAdd(true)} className="mt-3 bg-indigo-600 hover:bg-indigo-700 text-white border-0 rounded-lg px-4 py-2 text-sm font-semibold cursor-pointer transition-colors shadow-sm">Add one</button>
-              </div>
-            ) : (
-              <div className="space-y-2.5">
-                {expenses.map(e => (
-                  <ExpenseCard
-                    key={e._id}
-                    expense={e}
-                    onRefresh={loadPersonal}
-                    onEdit={(expense) => setEditingExpense(expense)}
-                  />
-                ))}
-              </div>
-            )}
-          </>
-        )}
-      </div>
-
-      <AddExpenseModal open={showAdd} onClose={() => setShowAdd(false)} onCreated={loadPersonal} />
-      <AddExpenseModal
-        open={!!editingExpense}
-        onClose={() => setEditingExpense(null)}
-        onCreated={loadPersonal}
-        expense={editingExpense}
-      />
+          ) : (
+            trips.map((t, i) => (
+              <TripExpenseCard
+                key={t._id || (t as { id?: string }).id || i}
+                trip={t}
+                onRefresh={loadTrips}
+              />
+            ))
+          )}
+        </div>
+      )}
     </div>
   );
 };

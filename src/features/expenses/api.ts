@@ -32,6 +32,8 @@ export interface TripWithExpenses {
   toLocation?: string;
   startDate?: string;
   status?: string;
+  /** Mongo id of the trip's vehicle, when API returns populated or raw id */
+  vehicleId?: string;
   expenses: TripExpense[];
   totalExpenses?: number;
 }
@@ -112,6 +114,13 @@ export async function fetchTripsWithExpenses(params?: {
   // Flatten into our TripWithExpenses shape
   const trips: TripWithExpenses[] = rawTrips.map((item: any) => {
     const t = item.trip ?? item;
+    const veh = t.vehicle;
+    let vehicleId: string | undefined;
+    if (veh && typeof veh === 'object' && veh._id != null) {
+      vehicleId = String(veh._id);
+    } else if (typeof veh === 'string') {
+      vehicleId = veh;
+    }
     return {
       _id: t._id || t.id || item._id || item.id || '',
       tripNumber: t.tripNumber,
@@ -120,6 +129,7 @@ export async function fetchTripsWithExpenses(params?: {
       toLocation: t.to || t.toLocation || '',
       startDate: t.startDate || t.date,
       status: t.status,
+      vehicleId,
       expenses: item.expenses ?? t.expenses ?? [],
       totalExpenses: item.totalExpenses ?? t.totalExpenses,
     };

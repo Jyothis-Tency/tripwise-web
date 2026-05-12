@@ -63,6 +63,51 @@ const NUMBER_FIELDS = new Set([
 const DATE_FIELDS = new Set(['startDate', 'expectedEndDate']);
 const TIME_FIELDS = new Set(['startTime', 'endTime']);
 
+/** Merge PATCH response into local trip (date/driver/vehicle rules match expanded card). */
+function mergeTripAfterInlineSave(
+  prev: HistoryTrip,
+  savedFieldKey: string,
+  updatedTrip: HistoryTrip,
+): HistoryTrip {
+  const next: HistoryTrip = { ...prev, ...updatedTrip };
+
+  const dateLikeKeys = new Set([
+    'startDate',
+    'expectedEndDate',
+    'actualStartTime',
+    'actualEndTime',
+    'startTime',
+    'endTime',
+  ]);
+  if (!dateLikeKeys.has(savedFieldKey)) {
+    next.startDate = prev.startDate;
+    next.expectedEndDate = prev.expectedEndDate;
+    (next as any).actualStartTime = (prev as any).actualStartTime;
+    (next as any).actualEndTime = (prev as any).actualEndTime;
+    next.startTime = prev.startTime;
+    next.endTime = prev.endTime;
+  }
+
+  if (
+    updatedTrip.driver &&
+    typeof updatedTrip.driver === 'string' &&
+    prev.driver &&
+    typeof prev.driver !== 'string'
+  ) {
+    next.driver = prev.driver;
+  }
+  if (
+    updatedTrip.vehicle &&
+    typeof updatedTrip.vehicle === 'string' &&
+    prev.vehicle &&
+    typeof prev.vehicle !== 'string'
+  ) {
+    next.vehicle = prev.vehicle;
+  }
+
+  return next;
+}
+
 const valueEmphasisClass = (highlight?: boolean) =>
   `text-base sm:text-lg font-bold tabular-nums tracking-tight ${highlight ? 'text-indigo-700' : 'text-slate-900'}`;
 
@@ -315,9 +360,16 @@ interface TripCardProps {
   onDeleted: () => void;
   /** Called with server summary after a payment; parent can patch list without refetching. */
   onPaymentRecorded: (tripId: string, summary: RecordPaymentTripSummary) => void;
+  /** After inline field save: merged trip so parent list order stays stable without refetch. */
+  onTripUpdated?: (trip: HistoryTrip) => void;
 }
 
-export function TripCard({ trip: initialTrip, onDeleted, onPaymentRecorded }: TripCardProps) {
+export function TripCard({
+  trip: initialTrip,
+  onDeleted,
+  onPaymentRecorded,
+  onTripUpdated,
+}: TripCardProps) {
   const [trip, setTrip] = useState<HistoryTrip>(initialTrip);
 
   useEffect(() => {
@@ -332,10 +384,8 @@ export function TripCard({ trip: initialTrip, onDeleted, onPaymentRecorded }: Tr
   const [loadingHistory, setLoadingHistory] = useState(false);
 
   const paymentBadge = getPaymentStatus(trip);
-  const expensePart = Number(trip.totalExpenses) || 0;
   const totalAmount =
-    trip.paymentSummary?.totalAmount ??
-    (Number(trip.agencyCost) || 0) + expensePart;
+    trip.paymentSummary?.totalAmount ?? (Number(trip.agencyCost) || 0);
   const paidAmount = trip.paymentSummary?.paidAmount ?? trip.paidAmount ?? 0;
   const remaining = trip.paymentSummary?.remainingBalance ?? (totalAmount - paidAmount);
   const progress = totalAmount > 0 ? Math.min((paidAmount / totalAmount) * 100, 100) : 0;
@@ -377,46 +427,8 @@ export function TripCard({ trip: initialTrip, onDeleted, onPaymentRecorded }: Tr
       tripId={trip._id}
       onSaved={(savedFieldKey, updatedTrip) => {
         setTrip((prev) => {
-          const next: HistoryTrip = { ...prev, ...updatedTrip };
-
-          // If we edited some other field, preserve date/time fields so they don't
-          // "jump" due to backend serialization/timezone differences.
-          const dateLikeKeys = new Set([
-            'startDate',
-            'expectedEndDate',
-            'actualStartTime',
-            'actualEndTime',
-            'startTime',
-            'endTime',
-          ]);
-          if (!dateLikeKeys.has(savedFieldKey)) {
-            next.startDate = prev.startDate;
-            next.expectedEndDate = (prev as any).expectedEndDate;
-            (next as any).actualStartTime = (prev as any).actualStartTime;
-            (next as any).actualEndTime = (prev as any).actualEndTime;
-            next.startTime = prev.startTime;
-            next.endTime = prev.endTime;
-          }
-
-          // `patchTripFields` may return relation fields as raw IDs.
-          // Keep already-populated objects so UI doesn't regress to ObjectId text.
-          if (
-            updatedTrip.driver &&
-            typeof updatedTrip.driver === 'string' &&
-            prev.driver &&
-            typeof prev.driver !== 'string'
-          ) {
-            next.driver = prev.driver;
-          }
-          if (
-            updatedTrip.vehicle &&
-            typeof updatedTrip.vehicle === 'string' &&
-            prev.vehicle &&
-            typeof prev.vehicle !== 'string'
-          ) {
-            next.vehicle = prev.vehicle;
-          }
-
+          const next = mergeTripAfterInlineSave(prev, savedFieldKey, updatedTrip);
+          queueMicrotask(() => onTripUpdated?.(next));
           return next;
         });
       }}

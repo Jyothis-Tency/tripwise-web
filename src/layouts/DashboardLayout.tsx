@@ -6,9 +6,10 @@ import { useAuth } from '../hooks/useAuth';
 
 const routeTitle: Record<string, string> = {
   '/': 'Dashboard',
-  '/vehicles': 'Vehicles',
+  '/vehicles': 'Trip Details',
+  '/create-trip': 'Create New Trip',
+  '/trips': 'Create New Trip',
   '/drivers': 'Drivers',
-  '/trips': 'Trips',
   '/bulk-entry': 'Bulk Entry',
   '/expenses': 'Expenses',
   '/history': 'History',
@@ -22,7 +23,7 @@ const routeTitle: Record<string, string> = {
 };
 
 // Pages that should fill the viewport without padding (two-pane layouts etc.)
-const fullHeightPaths = ['/vehicles', '/drivers', '/tracking'];
+const fullHeightPaths = ['/vehicles', '/drivers', '/tracking', '/create-trip', '/expenses'];
 
 export function DashboardLayout() {
   const { pathname } = useLocation();

@@ -496,6 +496,8 @@ export async function unassignDriverFromTripApi(tripId: string): Promise<void> {
 
 export async function createTrip(payload: {
   vehicleId: string;
+  /** Optional driver Mongo id — sent as `driver` to API */
+  driverId?: string;
   from: string;
   to: string;
   startDate?: string;
@@ -513,11 +515,15 @@ export async function createTrip(payload: {
   notes?: string;
   careOf?: { name?: string; phone?: string };
 }): Promise<TripItem> {
-  const { vehicleId, ...rest } = payload;
-  const res = await apiClient.post(ApiEndpoints.trips, {
+  const { vehicleId, driverId, ...rest } = payload;
+  const body: Record<string, unknown> = {
     ...rest,
     vehicle: vehicleId,
-  });
+  };
+  if (driverId?.trim()) {
+    body.driver = driverId.trim();
+  }
+  const res = await apiClient.post(ApiEndpoints.trips, body);
   const raw: any = res.data ?? {};
   const data = raw.data ?? raw;
   return mapTrip(data);
@@ -559,5 +565,5 @@ export async function updateTrip(
 }
 
 export async function cancelTrip(tripId: string): Promise<void> {
-  await apiClient.post(ApiEndpoints.tripCancel(tripId), {});
+  await apiClient.put(ApiEndpoints.tripCancel(tripId), {});
 }

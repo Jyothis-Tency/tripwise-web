@@ -35,7 +35,8 @@ export const ApiEndpoints = {
   // TRIPS
   trips: '/owners/trips',
   tripById: (id: string) => `/owners/trips/${id}`,
-  tripCancel: (id: string) => `/owners/trips/${id}/cancel`,
+  /** Vehicle module trip cancel (matches owner.js PUT /vehicles/trip/cancel/:id). */
+  tripCancel: (id: string) => `/owners/vehicles/trip/cancel/${id}`,
   assignDriverToTrip: (tripId: string) => `/owners/trips/${tripId}/assign-driver`,
   unassignDriverFromTrip: (tripId: string) => `/owners/trips/${tripId}/unassign-driver`,
 

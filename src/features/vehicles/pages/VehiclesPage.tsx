@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
 import {
   Car,
   ChevronRight,
@@ -11,22 +12,18 @@ import {
   UserCheck,
   UserPlus,
   AlertTriangle,
-  CheckCircle2,
   Calculator,
-  Edit2,
-  Trash2,
   ArrowLeft,
   X,
   Check,
   Loader2,
 } from 'lucide-react';
+import { AgencyNameCombobox } from '../../../components/AgencyNameCombobox';
 import {
   fetchVehicles,
   fetchVehicleById,
   fetchVehicleHistoryDetailed,
-  fetchVehicleExpenses,
   fetchDriversList,
-  fetchAgencyNames,
   createVehicle,
   updateVehicle,
   assignDriverToVehicle,
@@ -37,16 +34,13 @@ import {
   updateTrip,
   fetchTripById,
   cancelTrip,
-  createVehicleExpense,
-  updateVehicleExpense,
-  deleteVehicleExpense,
   type Vehicle,
   type TripItem,
   type DriverItem,
-  type ExpenseItem,
   type HistoryTripItem,
   type VehicleHistoryResponse,
 } from '../api';
+import { VehicleListCard } from '../components/VehicleListCard';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // UTILITIES
@@ -54,16 +48,6 @@ import {
 
 const VEHICLE_TYPES = ['Car', 'Traveller', 'Bus', 'Van'];
 const VEHICLE_STATUSES = ['Available', 'On Trip', 'Maintenance', 'Inactive'];
-
-function statusDotCls(status?: string) {
-  switch ((status ?? '').toLowerCase()) {
-    case 'available': return 'bg-green-500';
-    case 'on trip': case 'on_trip': return 'bg-indigo-500';
-    case 'maintenance': case 'under maintenance': return 'bg-orange-400';
-    case 'inactive': return 'bg-slate-400';
-    default: return 'bg-slate-300';
-  }
-}
 
 function statusBadgeCls(status?: string) {
   switch ((status ?? '').toLowerCase()) {
@@ -77,12 +61,6 @@ function statusBadgeCls(status?: string) {
     case 'cancelled': return 'bg-red-100 text-red-700 border-red-200';
     default: return 'bg-slate-100 text-slate-600 border-slate-200';
   }
-}
-
-function commissionText(v: Vehicle): string {
-  if (v.commission == null) return '';
-  const n = v.commission;
-  return `${n % 1 === 0 ? n.toFixed(0) : n}%`;
 }
 
 function formatDate(d?: string) {
@@ -128,15 +106,6 @@ function Field({ label, id, required, children }: { label: string; id: string; r
     <div className="space-y-1">
       <label htmlFor={id} className="text-xs font-medium text-slate-600">{label}{required && <span className="ml-0.5 text-red-500">*</span>}</label>
       {children}
-    </div>
-  );
-}
-
-function InfoRow({ label, value }: { label: string; value?: string | number | null }) {
-  return (
-    <div className="flex items-start justify-between py-2 border-b border-slate-100 last:border-0">
-      <span className="text-xs text-slate-500 shrink-0 mr-4">{label}</span>
-      <span className="text-xs font-medium text-slate-800 text-right">{value ?? '—'}</span>
     </div>
   );
 }
@@ -236,59 +205,6 @@ function EditableGridField({
           className="opacity-100 lg:opacity-0 lg:group-hover:opacity-100 text-slate-400 hover:text-indigo-500 transition-opacity p-0.5" title="Edit inline">
           <Pencil className="h-3 w-3" />
         </button>
-      </div>
-    </div>
-  );
-}
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// VEHICLE CARD (Left List)
-// ═══════════════════════════════════════════════════════════════════════════════
-
-function VehicleCard({ vehicle, isSelected, onSelect, onEdit }: {
-  vehicle: Vehicle; isSelected: boolean; onSelect: () => void; onEdit: () => void;
-}) {
-  const trip = vehicle.currentTrip && typeof vehicle.currentTrip === 'object' ? vehicle.currentTrip as any : null;
-  const tripFrom = vehicle.tripFrom ?? trip?.from;
-  const tripTo = vehicle.tripTo ?? trip?.to;
-
-  return (
-    <div
-      role="button"
-      tabIndex={0}
-      onClick={onSelect}
-      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onSelect(); }}
-      className={`w-full rounded-xl border p-3 text-left transition-all cursor-pointer ${isSelected ? 'border-indigo-400 bg-indigo-50 shadow-sm' : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'}`}
-    >
-      <div className="flex items-start gap-3">
-        <div className="flex h-10 w-12 shrink-0 items-center justify-center rounded-lg bg-indigo-100">
-          <Car className="h-5 w-5 text-indigo-500" />
-        </div>
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center justify-between gap-1">
-            <p className="truncate text-sm font-semibold text-slate-900">{vehicle.vehicleNumber}</p>
-            <button type="button" onClick={(e) => { e.stopPropagation(); onEdit(); }}
-              className="shrink-0 rounded p-0.5 text-slate-400 hover:text-indigo-500" title="Edit vehicle">
-              <Pencil className="h-3.5 w-3.5" />
-            </button>
-          </div>
-          <div className="mt-0.5 flex items-center gap-1.5">
-            <span className={`inline-block h-2 w-2 shrink-0 rounded-full ${statusDotCls(vehicle.status)}`} />
-            <span className="text-xs text-slate-500 capitalize">{vehicle.status ?? 'Unknown'}</span>
-          </div>
-          <p className="mt-0.5 truncate text-xs text-slate-400">
-            {[vehicle.vehicleType, vehicle.vehicleModel].filter(Boolean).join(' – ')}
-          </p>
-          {commissionText(vehicle) && <p className="text-xs text-slate-400">Bata: {commissionText(vehicle)}</p>}
-          <p className="text-xs text-slate-400">Driver: {vehicle.currentDriverName ?? 'Unassigned'}</p>
-          {tripFrom && tripTo && (
-            <p className="mt-0.5 flex items-center gap-1 text-xs font-medium text-indigo-500">
-              <span className="truncate">{tripFrom}</span>
-              <ChevronRight className="h-3 w-3 shrink-0" />
-              <span className="truncate">{tripTo}</span>
-            </p>
-          )}
-        </div>
       </div>
     </div>
   );
@@ -434,9 +350,7 @@ export function TripFormModal({ vehicleId, trip, onClose, onSaved }: {
   const isUpdate = !!trip;
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [agencyNames, setAgencyNames] = useState<string[]>([]);
-  const [showAgencySuggestions, setShowAgencySuggestions] = useState(false);
-  
+
   const [form, setForm] = useState({
     from: trip?.from ?? '',
     to: trip?.to ?? '',
@@ -444,9 +358,6 @@ export function TripFormModal({ vehicleId, trip, onClose, onSaved }: {
     expectedEndDate: trip?.expectedEndDate ?? '',
     distance: trip?.distance?.toString() ?? '',
     customer: trip?.customer ?? '',
-    priority: trip?.priority ?? 'Medium',
-    careOfName: trip?.careOf?.name ?? '',
-    careOfPhone: trip?.careOf?.phone ?? '',
     agencyName: trip?.agencyName ?? '',
     agencyCost: trip?.agencyCost?.toString() ?? trip?.amount?.toString() ?? '',
     cabCost: trip?.cabCost?.toString() ?? '',
@@ -454,41 +365,15 @@ export function TripFormModal({ vehicleId, trip, onClose, onSaved }: {
     notes: trip?.notes ?? '',
   });
 
-  useEffect(() => {
-    let active = true;
-    fetchAgencyNames()
-      .then((names) => {
-        if (!active) return;
-        setAgencyNames((prev) => {
-          const merged = new Set<string>([...prev, ...names]);
-          if (trip?.agencyName?.trim()) merged.add(trip.agencyName.trim());
-          return Array.from(merged);
-        });
-      })
-      .catch(() => {
-        // Keep form usable even if suggestions fail.
-      });
-    return () => {
-      active = false;
-    };
-  }, [trip?.agencyName]);
-
   const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
     setForm(prev => ({ ...prev, [k]: e.target.value }));
-
-  const filteredAgencyNames = agencyNames
-    .filter((name) => {
-      const query = form.agencyName.trim().toLowerCase();
-      if (!query) return true;
-      return name.toLowerCase().includes(query);
-    })
-    .slice(0, 8);
 
   const profit = (parseFloat(form.agencyCost || '0') - parseFloat(form.cabCost || '0')).toFixed(2);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.from.trim() || !form.to.trim()) { setError('From and To locations are required'); return; }
+    if (!form.agencyName.trim()) { setError('Agency name is required'); return; }
     setSaving(true); setError(null);
     try {
       const payload = {
@@ -499,9 +384,7 @@ export function TripFormModal({ vehicleId, trip, onClose, onSaved }: {
         departureDate: form.startDate || undefined, // Fallback for old fields
         distance: form.distance ? parseFloat(form.distance) : undefined,
         customer: form.customer.trim() || undefined,
-        priority: form.priority,
-        careOf: (form.careOfName || form.careOfPhone) ? { name: form.careOfName, phone: form.careOfPhone } : undefined,
-        agencyName: form.agencyName.trim() || undefined,
+        agencyName: form.agencyName.trim(),
         agencyCost: form.agencyCost ? parseFloat(form.agencyCost) : undefined,
         cabCost: form.cabCost ? parseFloat(form.cabCost) : undefined,
         advance: form.advance ? parseFloat(form.advance) : undefined,
@@ -547,66 +430,21 @@ export function TripFormModal({ vehicleId, trip, onClose, onSaved }: {
               <input id="tcus" value={form.customer} onChange={set('customer')} className={inputCls} placeholder="Customer Name (Optional)" />
             </Field>
 
-            <Field label="Priority" id="tprio">
-              <select id="tprio" value={form.priority} onChange={set('priority')} className={inputCls}>
-                <option value="Low">Low</option>
-                <option value="Medium">Medium</option>
-                <option value="High">High</option>
-              </select>
-            </Field>
-            <Field label="Agency Name (Optional)" id="tagn">
-              <div className="relative">
-                <input
-                  id="tagn"
-                  value={form.agencyName}
-                  onChange={(e) => {
-                    setForm((prev) => ({ ...prev, agencyName: e.target.value }));
-                    setShowAgencySuggestions(true);
-                  }}
-                  onFocus={() => setShowAgencySuggestions(true)}
-                  onBlur={() => {
-                    // Delay close so click on suggestion can register.
-                    setTimeout(() => setShowAgencySuggestions(false), 120);
-                  }}
-                  autoComplete="off"
-                  className={inputCls}
-                  placeholder="Agency Name"
-                />
-                {showAgencySuggestions && filteredAgencyNames.length > 0 && (
-                  <div className="absolute z-30 mt-1 w-full rounded-md border border-slate-200 bg-white shadow-lg max-h-44 overflow-auto">
-                    {filteredAgencyNames.map((name) => (
-                      <button
-                        key={name}
-                        type="button"
-                        className="w-full text-left px-3 py-2 text-sm hover:bg-indigo-50"
-                        onMouseDown={(e) => {
-                          e.preventDefault();
-                          setForm((prev) => ({ ...prev, agencyName: name }));
-                          setShowAgencySuggestions(false);
-                        }}
-                      >
-                        {name}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
+            <Field label="Agency Name" id="tagn" required>
+              <AgencyNameCombobox
+                id="tagn"
+                required
+                value={form.agencyName}
+                onChange={(agencyName) =>
+                  setForm((prev) => ({ ...prev, agencyName }))
+                }
+                inputClassName={inputCls}
+                extraSuggestionNames={
+                  trip?.agencyName?.trim() ? [trip.agencyName.trim()] : []
+                }
+              />
             </Field>
           </div>
-
-          <fieldset className="rounded-lg border border-slate-200 p-4">
-            <legend className="text-[11px] font-semibold uppercase tracking-wide px-1 -ml-1 text-indigo-500 flex items-center gap-1">
-              <UserCheck className="h-3.5 w-3.5" /> Care Of Details
-            </legend>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 mt-2">
-              <Field label="Name" id="tcarename">
-                <input id="tcarename" value={form.careOfName} onChange={set('careOfName')} className={inputCls} placeholder="Care of name" />
-              </Field>
-              <Field label="Phone" id="tcarephone">
-                <input id="tcarephone" value={form.careOfPhone} onChange={set('careOfPhone')} className={inputCls} placeholder="Phone number" />
-              </Field>
-            </div>
-          </fieldset>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
             <Field label="Agency Cost (₹)" id="tagenC">
@@ -634,7 +472,7 @@ export function TripFormModal({ vehicleId, trip, onClose, onSaved }: {
         <div className="flex justify-end gap-2 border-t border-slate-100 p-4 shrink-0 bg-slate-50 rounded-b-xl">
           <button type="button" onClick={onClose}
             className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm text-slate-700 hover:bg-slate-100">Cancel</button>
-          <button type="submit" disabled={saving}
+          <button type="submit" disabled={saving || !form.agencyName.trim()}
             className="rounded-lg bg-indigo-500 px-6 py-2 text-sm font-semibold text-white hover:bg-indigo-600 disabled:opacity-50">
             {saving ? 'Saving…' : isUpdate ? 'Update Trip' : 'Start Trip'}
           </button>
@@ -786,10 +624,10 @@ function DriverAssignModal({ vehicleId, tripId, currentDriverName, onClose, onAs
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// VEHICLE HISTORY MODAL
+// VEHICLE HISTORY (inline tab)
 // ═══════════════════════════════════════════════════════════════════════════════
 
-function VehicleHistoryModal({ vehicle, onClose }: { vehicle: Vehicle; onClose: () => void }) {
+function VehicleHistoryTab({ vehicle }: { vehicle: Vehicle }) {
   const STATUS_OPTIONS = ['all', 'completed', 'in_progress', 'scheduled', 'cancelled'] as const;
 
   const [selectedStatus, setSelectedStatus] = useState<(typeof STATUS_OPTIONS)[number]>('all');
@@ -864,66 +702,67 @@ function VehicleHistoryModal({ vehicle, onClose }: { vehicle: Vehicle; onClose: 
   const canNext = pagination?.pages != null ? (pagination.current ?? 1) < pagination.pages : false;
 
   return (
-    <ModalShell title={`Vehicle History — ${vehicle.vehicleNumber}`} onClose={onClose} maxWidth="max-w-2xl">
-      <div className="p-4 space-y-4">
-        {/* Filters (old Flutter parity) */}
-        <div className="space-y-3">
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
-            <div className="w-full sm:w-40">
-              <label className="text-xs font-medium text-slate-600">Status</label>
-              <select
-                value={selectedStatus}
-                onChange={(e) => {
-                  setSelectedStatus(e.target.value as any);
-                  setPage(1);
-                }}
-                className={inputCls}
-                style={{ paddingTop: 8, paddingBottom: 8 }}
-              >
-                <option value="all">All</option>
-                <option value="completed">Completed</option>
-                <option value="in_progress">In Progress</option>
-                <option value="scheduled">Scheduled</option>
-                <option value="cancelled">Cancelled</option>
-              </select>
+    <div className="space-y-4">
+        {/* Filters: sticky within tab scroll so list/stats scroll underneath */}
+        <div className="sticky top-0 z-10 -mx-4 border-b border-slate-200 bg-slate-50 px-4 pb-3 pt-0">
+          <div className="space-y-3">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
+              <div className="w-full sm:w-40">
+                <label className="text-xs font-medium text-slate-600">Status</label>
+                <select
+                  value={selectedStatus}
+                  onChange={(e) => {
+                    setSelectedStatus(e.target.value as any);
+                    setPage(1);
+                  }}
+                  className={inputCls}
+                  style={{ paddingTop: 8, paddingBottom: 8 }}
+                >
+                  <option value="all">All</option>
+                  <option value="completed">Completed</option>
+                  <option value="in_progress">In Progress</option>
+                  <option value="scheduled">Scheduled</option>
+                  <option value="cancelled">Cancelled</option>
+                </select>
+              </div>
+
+              <div className="w-full sm:flex-1">
+                <label className="text-xs font-medium text-slate-600">From Date</label>
+                <input
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    setStartDate(v);
+                    setPage(1);
+                    if (v && endDate && new Date(endDate) < new Date(v)) setEndDate('');
+                  }}
+                  className={inputCls}
+                />
+              </div>
+
+              <div className="w-full sm:flex-1">
+                <label className="text-xs font-medium text-slate-600">To Date</label>
+                <input
+                  type="date"
+                  value={endDate}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    setEndDate(v);
+                    setPage(1);
+                    if (v && startDate && new Date(v) < new Date(startDate)) setStartDate('');
+                  }}
+                  className={inputCls}
+                />
+              </div>
             </div>
 
-            <div className="w-full sm:flex-1">
-              <label className="text-xs font-medium text-slate-600">From Date</label>
-              <input
-                type="date"
-                value={startDate}
-                onChange={(e) => {
-                  const v = e.target.value;
-                  setStartDate(v);
-                  setPage(1);
-                  if (v && endDate && new Date(endDate) < new Date(v)) setEndDate('');
-                }}
-                className={inputCls}
-              />
-            </div>
-
-            <div className="w-full sm:flex-1">
-              <label className="text-xs font-medium text-slate-600">To Date</label>
-              <input
-                type="date"
-                value={endDate}
-                onChange={(e) => {
-                  const v = e.target.value;
-                  setEndDate(v);
-                  setPage(1);
-                  if (v && startDate && new Date(v) < new Date(startDate)) setStartDate('');
-                }}
-                className={inputCls}
-              />
-            </div>
+            {tripStats?.completed != null && (
+              <p className="text-xs text-slate-500">
+                {tripStats?.completed ?? 0} completed trips
+              </p>
+            )}
           </div>
-
-          {tripStats?.completed != null && (
-            <p className="text-xs text-slate-500">
-              {tripStats?.completed ?? 0} completed trips
-            </p>
-          )}
         </div>
 
         {/* Statistics banner */}
@@ -1061,45 +900,24 @@ function VehicleHistoryModal({ vehicle, onClose }: { vehicle: Vehicle; onClose: 
             </button>
           </div>
         )}
-      </div>
-    </ModalShell>
-  );
-}
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// TAB 1 — BASIC INFORMATION
-// ═══════════════════════════════════════════════════════════════════════════════
-
-function BasicInfoTab({ vehicle }: { vehicle: Vehicle }) {
-  return (
-    <div className="space-y-3">
-      <section className="rounded-xl border border-slate-200 bg-white p-4">
-        <h4 className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-400">Basic Information</h4>
-        <InfoRow label="Registration Number" value={vehicle.vehicleNumber} />
-        <InfoRow label="Type" value={vehicle.vehicleType} />
-        <InfoRow label="Model" value={vehicle.vehicleModel} />
-        <InfoRow label="Year" value={vehicle.vehicleYear} />
-        <InfoRow label="Seats" value={vehicle.seats} />
-        <InfoRow label="Driver Bata" value={commissionText(vehicle) || null} />
-      </section>
     </div>
   );
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// TAB 2 — TRIP & DRIVER
+// TABS — LIVE TRIP / UPCOMING TRIPS
 // ═══════════════════════════════════════════════════════════════════════════════
 
 interface TripDriverTabProps {
+  mode: 'live' | 'upcoming';
   vehicle: Vehicle;
-  onStartTrip: () => void;
   onUpdateTrip: (tripId: string) => void;
   onCancelTrip: (tripId: string) => void;
   onAssignDriver: (tripId?: string) => void;
   onUnassignDriver: (tripId?: string) => void;
 }
 
-function TripDriverTab({ vehicle, onStartTrip, onUpdateTrip, onCancelTrip, onAssignDriver, onUnassignDriver }: TripDriverTabProps) {
+function TripDriverTab({ mode, vehicle, onUpdateTrip, onCancelTrip, onAssignDriver, onUnassignDriver }: TripDriverTabProps) {
   const [unassigning, setUnassigning] = useState(false);
   const [uErr, setUErr] = useState<string | null>(null);
   const [expandedTripId, setExpandedTripId] = useState<string | null>(null);
@@ -1145,11 +963,11 @@ function TripDriverTab({ vehicle, onStartTrip, onUpdateTrip, onCancelTrip, onAss
   const upcomingTrips = scheduledTrips.filter(t => t._id !== activeTrip?._id);
   const activeTripDriver = activeTrip ? tripDriverName(activeTrip as TripItem) : null;
 
-  return (
+  if (mode === 'live') {
+    return (
     <div className="space-y-4">
       {uErr && <p className="text-xs text-red-500">{uErr}</p>}
-      {/* Active Trip Card */}
-      {hasActiveTrip && (
+      {hasActiveTrip ? (
         <section className={`rounded-xl border overflow-hidden ${expandedTripId === activeTrip._id ? 'border-indigo-300 shadow-sm' : 'border-indigo-100'} bg-indigo-50`}>
           <div
             className="p-4 cursor-pointer hover:bg-indigo-100/50 transition-colors"
@@ -1159,7 +977,7 @@ function TripDriverTab({ vehicle, onStartTrip, onUpdateTrip, onCancelTrip, onAss
               <div>
                 <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-indigo-400">
                   {expandedTripId === activeTrip._id ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
-                  Active Trip
+                  Live trip
                 </p>
                 {activeTrip.tripNumber && <p className="text-sm font-bold text-slate-800 mt-0.5">Trip #{activeTrip.tripNumber}</p>}
               </div>
@@ -1248,14 +1066,27 @@ function TripDriverTab({ vehicle, onStartTrip, onUpdateTrip, onCancelTrip, onAss
             </div>
           )}
         </section>
+      ) : (
+        <div className="flex flex-col items-center rounded-xl border border-dashed border-slate-200 bg-white py-12 text-center">
+          <p className="text-sm text-slate-500">No live trip on this vehicle</p>
+          <p className="mt-1 text-xs text-slate-400">When a trip is in progress, it will show here.</p>
+        </div>
       )}
+    </div>
+    );
+  }
 
-      {/* Scheduled / Upcoming Trips Header */}
+  return (
+    <div className="space-y-4">
+      {uErr && <p className="text-xs text-red-500">{uErr}</p>}
       <div className="flex items-center justify-between pt-2">
-        <h4 className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Scheduled Trips</h4>
-        <button type="button" onClick={onStartTrip} className="flex items-center gap-1.5 rounded-lg bg-indigo-50 px-2.5 py-1.5 text-xs font-semibold text-indigo-600 hover:bg-indigo-100">
-          <Plus className="h-3.5 w-3.5" /> New Trip
-        </button>
+        <h4 className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Upcoming trips</h4>
+        <Link
+          to="/create-trip"
+          className="flex items-center gap-1.5 rounded-lg bg-indigo-50 px-2.5 py-1.5 text-xs font-semibold text-indigo-600 hover:bg-indigo-100"
+        >
+          <Plus className="h-3.5 w-3.5" /> Create New Trip
+        </Link>
       </div>
 
       {upcomingTrips.length === 0 ? (
@@ -1356,249 +1187,22 @@ function TripDriverTab({ vehicle, onStartTrip, onUpdateTrip, onCancelTrip, onAss
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// TAB 3 — VEHICLE EXPENSES
-// ═══════════════════════════════════════════════════════════════════════════════
-
-function ExpensesTab({ vehicle }: { vehicle: Vehicle }) {
-  const [expenses, setExpenses] = useState<ExpenseItem[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  const [expenseModal, setExpenseModal] = useState<'add' | { edit: ExpenseItem } | null>(null);
-  const [deleteModal, setDeleteModal] = useState<ExpenseItem | null>(null);
-  const [deleting, setDeleting] = useState(false);
-
-  const fetchExpenses = useCallback(() => {
-    setLoading(true);
-    fetchVehicleExpenses(vehicle._id)
-      .then(setExpenses)
-      .catch(() => setError('Failed to load expenses'))
-      .finally(() => setLoading(false));
-  }, [vehicle._id]);
-
-  useEffect(() => {
-    fetchExpenses();
-  }, [fetchExpenses]);
-
-  const total = expenses.reduce((sum, e) => sum + (e.amount ?? 0), 0);
-
-  const handleDelete = async () => {
-    if (!deleteModal) return;
-    setDeleting(true);
-    try {
-      await deleteVehicleExpense(vehicle._id, deleteModal._id);
-      fetchExpenses();
-    } catch (err) {
-      alert('Failed to delete expense');
-    } finally {
-      setDeleting(false);
-      setDeleteModal(null);
-    }
-  };
-
-  if (loading) return <div className="space-y-2">{Array.from({ length: 4 }).map((_, i) => <div key={i} className="h-10 animate-pulse rounded-lg bg-slate-100" />)}</div>;
-
-  return (
-    <div className="space-y-4">
-      <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-3 sm:gap-0 bg-white p-4 rounded-xl border border-slate-200">
-        <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600">
-            <Calculator className="h-5 w-5" />
-          </div>
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Total Expenses</p>
-            <p className="text-lg font-bold text-slate-800">₹{total.toLocaleString('en-IN')}</p>
-          </div>
-        </div>
-        <button type="button" onClick={() => setExpenseModal('add')}
-          className="flex items-center gap-1.5 rounded-lg bg-indigo-500 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-600">
-          <Plus className="h-4 w-4" /> Add Expense
-        </button>
-      </div>
-
-      <section className="rounded-xl border border-slate-200 bg-white overflow-hidden">
-        {error && <p className="py-2 text-center text-xs text-red-500 bg-red-50 border-b border-red-100">{error}</p>}
-        {expenses.length === 0 ? (
-          <div className="flex flex-col items-center py-10 text-center">
-            <CheckCircle2 className="h-10 w-10 text-slate-300" />
-            <p className="mt-2 text-sm text-slate-400">No expenses recorded</p>
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="min-w-full text-xs text-left">
-              <thead>
-                <tr className="border-b border-slate-100 text-[11px] uppercase tracking-wide text-slate-400">
-                  <th className="px-4 py-3">Date</th>
-                  <th className="px-4 py-3">Category</th>
-                  <th className="px-4 py-3">Vendor</th>
-                  <th className="px-4 py-3">Notes</th>
-                  <th className="px-4 py-3 text-right">Amount</th>
-                  <th className="px-4 py-3 text-center">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {expenses.map(e => (
-                  <tr key={e._id} className="border-b border-slate-50 last:border-0 hover:bg-slate-50">
-                    <td className="px-4 py-3 whitespace-nowrap">{formatDate(e.date)}</td>
-                    <td className="px-4 py-3 capitalize font-medium text-slate-700">{e.category ?? '—'}</td>
-                    <td className="px-4 py-3 text-slate-500">{e.vendor ?? '—'}</td>
-                    <td className="px-4 py-3 text-slate-500">{e.notes ?? '—'}</td>
-                    <td className="px-4 py-3 text-right font-bold text-slate-800">{e.amount != null ? `₹${e.amount.toLocaleString('en-IN')}` : '—'}</td>
-                    <td className="px-4 py-3 text-center">
-                      <div className="flex items-center justify-center gap-2">
-                        <button type="button" onClick={() => setExpenseModal({ edit: e })} className="text-indigo-500 hover:text-indigo-700 p-1" title="Edit">
-                          <Edit2 className="h-3.5 w-3.5" />
-                        </button>
-                        <button type="button" onClick={() => setDeleteModal(e)} className="text-red-500 hover:text-red-700 p-1" title="Delete">
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </section>
-
-      {expenseModal && (
-        <ExpenseFormModal
-          vehicleId={vehicle._id}
-          expense={expenseModal === 'add' ? null : expenseModal.edit}
-          onClose={() => setExpenseModal(null)}
-          onSaved={() => { setExpenseModal(null); fetchExpenses(); }}
-        />
-      )}
-
-      {deleteModal && (
-        <ModalShell title="Delete Expense" onClose={() => setDeleteModal(null)} maxWidth="max-w-sm">
-          <div className="p-6 space-y-4">
-            <div className="flex items-start gap-3">
-              <Trash2 className="h-6 w-6 text-red-500 shrink-0 mt-0.5" />
-              <div>
-                <p className="text-sm font-medium text-slate-900">Delete this expense?</p>
-                <p className="text-xs text-slate-500 mt-1">This action cannot be undone.</p>
-              </div>
-            </div>
-            <div className="flex justify-end gap-2 pt-2">
-              <button type="button" onClick={() => setDeleteModal(null)}
-                className="rounded-lg border border-slate-200 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50">Cancel</button>
-              <button type="button" onClick={handleDelete} disabled={deleting}
-                className="rounded-lg bg-red-500 px-5 py-2 text-sm font-semibold text-white hover:bg-red-600 disabled:opacity-50">
-                {deleting ? 'Deleting…' : 'Delete'}
-              </button>
-            </div>
-          </div>
-        </ModalShell>
-      )}
-    </div>
-  );
-}
-
-function ExpenseFormModal({ vehicleId, expense, onClose, onSaved }: {
-  vehicleId: string; expense?: ExpenseItem | null; onClose: () => void; onSaved: () => void;
-}) {
-  const isUpdate = !!expense;
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const [form, setForm] = useState({
-    category: expense?.category ?? 'Fuel',
-    amount: expense?.amount?.toString() ?? '',
-    date: expense?.date ? expense.date.split('T')[0] : new Date().toISOString().split('T')[0],
-    vendor: expense?.vendor ?? '',
-    description: expense?.description ?? expense?.notes ?? '',
-  });
-
-  const CATEGORIES = ['Fuel', 'Maintenance', 'Insurance', 'Toll', 'Parking', 'Repair', 'Food', 'Cleaning', 'Fine', 'Tax & Permit', 'Other'];
-
-  const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
-    setForm(prev => ({ ...prev, [k]: e.target.value }));
-
-  const submit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setSaving(true); setError(null);
-    try {
-      const payload = {
-        category: form.category.toLowerCase(), // Normalize for backend enum match
-        amount: parseFloat(form.amount),
-        date: form.date,
-        vendor: form.vendor.trim() || undefined,
-        description: form.description.trim() || '',
-      };
-
-      if (isUpdate && expense) await updateVehicleExpense(vehicleId, expense._id, payload);
-      else await createVehicleExpense(vehicleId, payload);
-
-      onSaved();
-    } catch (err: any) {
-      setError(err?.response?.data?.message ?? 'Failed to save expense');
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  return (
-    <ModalShell title={isUpdate ? 'Edit Expense' : 'Add Expense'} onClose={onClose} maxWidth="max-w-md">
-      <form onSubmit={submit} className="p-6 space-y-4">
-        {error && <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-600">{error}</p>}
-        
-        <Field label="Category" id="ecat">
-          <select id="ecat" value={form.category} onChange={set('category')} className={inputCls} required>
-            {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
-          </select>
-        </Field>
-        
-        <Field label="Amount (₹)" id="eamt">
-          <input id="eamt" type="number" step="0.01" value={form.amount} onChange={set('amount')} required className={inputCls} placeholder="0.00" />
-        </Field>
-        
-        <Field label="Date" id="edte">
-          <input id="edte" type="date" value={form.date} onChange={set('date')} required className={inputCls} />
-        </Field>
-        
-        <Field label="Vendor (Optional)" id="even">
-          <input id="even" value={form.vendor} onChange={set('vendor')} className={inputCls} placeholder="Vendor name" />
-        </Field>
-        
-        <Field label="Description" id="edesc">
-          <textarea id="edesc" rows={2} value={form.description} onChange={set('description') as any} className={`${inputCls} resize-none`} placeholder="Details about this expense..." required />
-        </Field>
-        
-        <div className="flex justify-end gap-2 pt-2">
-          <button type="button" onClick={onClose}
-            className="rounded-lg border border-slate-200 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50">Cancel</button>
-          <button type="submit" disabled={saving}
-            className="rounded-lg bg-indigo-500 px-5 py-2 text-sm font-semibold text-white hover:bg-indigo-600 disabled:opacity-50">
-            {saving ? 'Saving…' : isUpdate ? 'Update' : 'Save'}
-          </button>
-        </div>
-      </form>
-    </ModalShell>
-  );
-}
-
-// ═══════════════════════════════════════════════════════════════════════════════
 // VEHICLE DETAIL PANEL
 // ═══════════════════════════════════════════════════════════════════════════════
 
 type DetailModal =
-  | { kind: 'startTrip' }
   | { kind: 'updateTrip'; tripId: string }
   | { kind: 'cancelTrip'; tripId: string }
-  | { kind: 'assignDriver'; tripId?: string }
-  | { kind: 'history' };
+  | { kind: 'assignDriver'; tripId?: string };
 
 interface VehicleDetailPanelProps {
   vehicle: Vehicle;
-  onEditClicked: () => void;
   onVehicleUpdated: (updated: Partial<Vehicle>) => void;
   onBackClicked: () => void;
 }
 
-function VehicleDetailPanel({ vehicle, onEditClicked, onVehicleUpdated, onBackClicked }: VehicleDetailPanelProps) {
-  const [tab, setTab] = useState<'basic' | 'trip' | 'expenses'>('basic');
+function VehicleDetailPanel({ vehicle, onVehicleUpdated, onBackClicked }: VehicleDetailPanelProps) {
+  const [tab, setTab] = useState<'upcoming' | 'live' | 'history'>('live');
   const [detailModal, setDetailModal] = useState<DetailModal | null>(null);
 
   const closeDetailModal = () => setDetailModal(null);
@@ -1611,11 +1215,21 @@ function VehicleDetailPanel({ vehicle, onEditClicked, onVehicleUpdated, onBackCl
     return vehicle.status;
   };
 
-  const tabs: { key: 'basic' | 'trip' | 'expenses'; label: string }[] = [
-    { key: 'basic', label: 'BASIC INFORMATION' },
-    { key: 'trip', label: 'TRIP & DRIVER' },
-    { key: 'expenses', label: 'VEHICLE EXPENSES' },
+  const tabs: { key: 'upcoming' | 'live' | 'history'; label: string }[] = [
+    { key: 'live', label: 'Live Trip' },
+    { key: 'upcoming', label: 'Upcoming Trips' },
+    { key: 'history', label: 'History' },
   ];
+
+  const tripCallbacks = {
+    onUpdateTrip: (tripId: string) => setDetailModal({ kind: 'updateTrip', tripId }),
+    onCancelTrip: (tripId: string) => setDetailModal({ kind: 'cancelTrip', tripId }),
+    onAssignDriver: (tripId?: string) => setDetailModal({ kind: 'assignDriver', tripId }),
+    onUnassignDriver: (tripId?: string) => {
+      if (tripId) onVehicleUpdated({ _updatedAt: Date.now() } as any);
+      else onVehicleUpdated({ currentDriverName: undefined });
+    },
+  };
 
   return (
     <div className="flex h-full flex-col bg-slate-50">
@@ -1637,17 +1251,6 @@ function VehicleDetailPanel({ vehicle, onEditClicked, onVehicleUpdated, onBackCl
           <span className={`rounded-full border px-3 py-0.5 text-xs font-semibold capitalize ${statusBadgeCls(getDisplayStatus())}`}>
             {getDisplayStatus() ?? 'Unknown'}
           </span>
-          <button type="button" onClick={() => setDetailModal({ kind: 'history' })}
-            title="Vehicle History"
-            className="flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50">
-            <History className="h-3.5 w-3.5" />
-            History
-          </button>
-          <button type="button" onClick={onEditClicked}
-            className="flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50">
-            <Pencil className="h-3.5 w-3.5" />
-            Edit
-          </button>
         </div>
       </div>
 
@@ -1655,7 +1258,7 @@ function VehicleDetailPanel({ vehicle, onEditClicked, onVehicleUpdated, onBackCl
       <div className="flex border-b border-slate-200 bg-white shrink-0 overflow-x-auto hide-scrollbar">
         {tabs.map(t => (
           <button key={t.key} type="button" onClick={() => setTab(t.key)}
-            className={`flex-1 sm:flex-none whitespace-nowrap px-3 sm:px-5 py-3 text-[10px] sm:text-[11px] font-semibold tracking-wide transition border-b-2 ${
+            className={`flex-1 sm:flex-none whitespace-nowrap px-3 sm:px-5 py-3 text-xs sm:text-sm font-semibold normal-case tracking-normal transition border-b-2 ${
               tab === t.key
                 ? 'border-indigo-500 text-indigo-600'
                 : 'border-transparent text-slate-400 hover:text-slate-600'
@@ -1667,31 +1270,16 @@ function VehicleDetailPanel({ vehicle, onEditClicked, onVehicleUpdated, onBackCl
 
       {/* Tab content */}
       <div className="flex-1 overflow-y-auto p-4">
-        {tab === 'basic' && <BasicInfoTab vehicle={vehicle} />}
-        {tab === 'trip' && (
-          <TripDriverTab
-            vehicle={vehicle}
-            onStartTrip={() => setDetailModal({ kind: 'startTrip' })}
-            onUpdateTrip={(tripId) => setDetailModal({ kind: 'updateTrip', tripId })}
-            onCancelTrip={(tripId) => setDetailModal({ kind: 'cancelTrip', tripId })}
-            onAssignDriver={(tripId) => setDetailModal({ kind: 'assignDriver', tripId })}
-            onUnassignDriver={(tripId) => {
-              if (tripId) onVehicleUpdated({ _updatedAt: Date.now() } as any);
-              else onVehicleUpdated({ currentDriverName: undefined });
-            }}
-          />
+        {tab === 'live' && (
+          <TripDriverTab mode="live" vehicle={vehicle} {...tripCallbacks} />
         )}
-        {tab === 'expenses' && <ExpensesTab vehicle={vehicle} />}
+        {tab === 'upcoming' && (
+          <TripDriverTab mode="upcoming" vehicle={vehicle} {...tripCallbacks} />
+        )}
+        {tab === 'history' && <VehicleHistoryTab vehicle={vehicle} />}
       </div>
 
       {/* Detail-level modals */}
-      {detailModal?.kind === 'startTrip' && (
-        <TripFormModal vehicleId={vehicle._id} onClose={closeDetailModal}
-          onSaved={() => {
-            closeDetailModal();
-            onVehicleUpdated({ status: 'On Trip', _updatedAt: Date.now() } as any);
-          }} />
-      )}
       {detailModal?.kind === 'updateTrip' && (
         <UpdateTripWrapper vehicleId={vehicle._id} tripId={detailModal.tripId} onClose={closeDetailModal}
           onSaved={() => {
@@ -1720,9 +1308,6 @@ function VehicleDetailPanel({ vehicle, onEditClicked, onVehicleUpdated, onBackCl
             }
           }}
         />
-      )}
-      {detailModal?.kind === 'history' && (
-        <VehicleHistoryModal vehicle={vehicle} onClose={closeDetailModal} />
       )}
     </div>
   );
@@ -1788,7 +1373,7 @@ export function VehiclesPage() {
       <div className={`flex w-full lg:w-72 xl:w-80 shrink-0 flex-col border-r border-slate-200 bg-white transition-all ${selectedIdx !== null ? 'hidden lg:flex' : 'flex'}`}>
         {/* Header */}
         <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
-          <h2 className="text-sm font-semibold text-slate-900">Vehicles</h2>
+          <h2 className="text-sm font-semibold text-slate-900">Trip Details</h2>
           <button type="button" onClick={() => setPageModal('add')}
             className="flex items-center gap-1 rounded-lg bg-indigo-500 px-2.5 py-1.5 text-xs font-semibold text-white hover:bg-indigo-600">
             <Plus className="h-3.5 w-3.5" />Add
@@ -1819,7 +1404,7 @@ export function VehiclesPage() {
             </div>
           ) : (
             vehicles.map((v, i) => (
-              <VehicleCard key={v._id} vehicle={v} isSelected={i === selectedIdx}
+              <VehicleListCard key={v._id} vehicle={v} isSelected={i === selectedIdx}
                 onSelect={() => setSelectedIdx(i)}
                 onEdit={() => { setSelectedIdx(i); setPageModal('edit'); }} />
             ))
@@ -1832,7 +1417,6 @@ export function VehiclesPage() {
         {selectedVehicle ? (
           <VehicleDetailPanel
             vehicle={selectedVehicle}
-            onEditClicked={() => setPageModal('edit')}
             onVehicleUpdated={handleVehicleUpdated}
             onBackClicked={() => setSelectedIdx(null)}
           />

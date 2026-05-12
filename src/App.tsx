@@ -12,6 +12,7 @@ import { HistoryPayoutPage } from './features/history/pages/HistoryPayoutPage';
 import DriversPage from './features/drivers/pages/DriversPage';
 import RemindersPage from './features/reminders/pages/RemindersPage';
 import ExpensesPage from './features/expenses/pages/ExpensesPage';
+import { CreateNewTripPage } from './features/trips/pages/CreateNewTripPage';
 
 function App() {
   return (
@@ -29,7 +30,8 @@ function App() {
         <Route index element={<DashboardPage />} />
         <Route path="vehicles" element={<VehiclesPage />} />
         <Route path="drivers" element={<DriversPage />} />
-        <Route path="trips" element={<div>Trips (coming soon)</div>} />
+        <Route path="create-trip" element={<CreateNewTripPage />} />
+        <Route path="trips" element={<Navigate to="/create-trip" replace />} />
         <Route path="bulk-entry" element={<BulkEntryPage />} />
         <Route path="expenses" element={<ExpensesPage />} />
         <Route path="history" element={<HistoryPage />} />

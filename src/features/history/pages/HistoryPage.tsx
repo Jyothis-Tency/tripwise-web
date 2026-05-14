@@ -80,7 +80,7 @@ function EmptyState({ onReset }: { onReset: () => void }) {
       </div>
       <h3 className="text-base sm:text-lg font-semibold text-slate-700 mb-1">No trips found</h3>
       <p className="text-sm sm:text-sm text-slate-500 mb-4 px-4">Try adjusting your filters or search query.</p>
-      <button onClick={onReset} className="text-sm sm:text-sm font-medium text-indigo-600 hover:text-indigo-700 bg-indigo-50 hover:bg-indigo-100 px-4 py-2 rounded-lg transition">Clear all filters</button>
+      <button onClick={onReset} className="text-sm sm:text-sm font-medium text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 px-4 py-2 rounded-lg transition">Clear all filters</button>
     </div>
   );
 }
@@ -519,26 +519,26 @@ export function HistoryPage() {
     <div className="flex flex-col gap-5 sm:gap-6 px-4 sm:px-6 py-5 sm:py-6">
 
       {/* Page Header */}
-      <div className="flex items-center justify-between gap-3">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-slate-800 bg-gradient-to-r from-slate-800 to-indigo-700 bg-clip-text text-transparent">Trip History</h1>
-          <p className="text-sm text-slate-500 mt-1">View, filter and manage your trips</p>
+          <h1 className="text-xl sm:text-2xl font-bold text-slate-800 tracking-tight">Trip History</h1>
+          <p className="text-sm text-slate-500 mt-0.5">View, filter and manage your trips</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
           <button
             onClick={() => navigate('/history/payout')}
-            className="flex items-center gap-2 rounded-lg border border-indigo-100 bg-indigo-50 text-indigo-600 px-4 py-2.5 text-sm font-medium hover:bg-indigo-100 transition shrink-0"
+            className="flex items-center gap-1.5 rounded-lg border border-blue-100 bg-blue-50 text-blue-600 px-3 py-2 text-sm font-semibold hover:bg-blue-100 transition shrink-0 active:scale-[0.98]"
           >
             <Wallet className="h-4 w-4" />
             Payout
           </button>
           <button onClick={handleExportPdf}
-            className="flex items-center gap-2 rounded-lg bg-indigo-50 border border-indigo-100 text-indigo-600 px-4 py-2.5 text-sm font-medium hover:bg-indigo-100 transition shrink-0">
+            className="flex items-center gap-1.5 rounded-lg bg-blue-50 border border-blue-100 text-blue-600 px-3 py-2 text-sm font-semibold hover:bg-blue-100 transition shrink-0 active:scale-[0.98]">
             <FileDown className="h-4 w-4" />
-            Export PDF
+            Export
           </button>
           <button onClick={load} disabled={loading}
-            className="flex items-center gap-2 rounded-lg border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50 transition disabled:opacity-50 shrink-0">
+            className="flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 transition disabled:opacity-50 shrink-0 active:scale-[0.98]">
             <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
             Refresh
           </button>
@@ -558,7 +558,7 @@ export function HistoryPage() {
             value={search}
             onChange={e => handleSearchChange(e.target.value)}
             placeholder="Search by Trip ID, driver, vehicle or location…"
-            className="w-full pl-11 pr-10 py-3 rounded-lg border border-slate-200 text-base outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-200 transition bg-slate-50 focus:bg-white"
+            className="w-full pl-11 pr-10 py-3 rounded-lg border border-slate-200 text-base outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-200 transition bg-slate-50 focus:bg-white"
           />
           {search && (
             <button onClick={() => handleSearchChange('')}
@@ -572,15 +572,15 @@ export function HistoryPage() {
         <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-3">
           {/* Status */}
           <select value={status} onChange={e => { setStatus(e.target.value); setPage(1); }}
-            className="rounded-lg border border-slate-200 px-4 py-3 text-sm font-medium text-slate-700 outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-200 bg-white">
+            className="rounded-lg border border-slate-200 px-4 py-3 text-sm font-medium text-slate-700 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-200 bg-white">
             {STATUS_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
           </select>
 
           {/* Month */}
           <select value={filterMode === 'month' ? month : ''}
             onChange={e => handleMonthChange(e.target.value)}
-            className={`rounded-lg border px-4 py-3 text-sm font-medium outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-200 bg-white ${
-              filterMode === 'month' ? 'border-indigo-300 text-indigo-700 ring-1 ring-indigo-100' : 'border-slate-200 text-slate-700'
+            className={`rounded-lg border px-4 py-3 text-sm font-medium outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-200 bg-white ${
+              filterMode === 'month' ? 'border-blue-300 text-blue-700 ring-1 ring-blue-100' : 'border-slate-200 text-slate-700'
             }`}>
             {monthOptions().map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
           </select>
@@ -590,13 +590,13 @@ export function HistoryPage() {
 
           {/* Date range */}
           <div className={`col-span-2 flex items-center gap-2 rounded-lg border p-1 ${
-            filterMode === 'daterange' ? 'border-indigo-300 ring-1 ring-indigo-100' : 'border-transparent'
+            filterMode === 'daterange' ? 'border-blue-300 ring-1 ring-blue-100' : 'border-transparent'
           }`}>
             <input type="date" value={startDate} onChange={e => handleStartDateChange(e.target.value)}
-              className="flex-1 rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-slate-700 outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-200" />
+              className="flex-1 rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-slate-700 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-200" />
             <span className="text-slate-400 text-sm shrink-0">to</span>
             <input type="date" value={endDate} onChange={e => handleEndDateChange(e.target.value)}
-              className="flex-1 rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-slate-700 outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-200" />
+              className="flex-1 rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-slate-700 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-200" />
           </div>
 
           {/* Clear */}
@@ -613,7 +613,7 @@ export function HistoryPage() {
       <div className="space-y-3">
         {loading && (
           <div className="flex justify-center py-16">
-            <RefreshCw className="h-6 w-6 animate-spin text-indigo-500" />
+            <RefreshCw className="h-6 w-6 animate-spin text-blue-500" />
           </div>
         )}
 

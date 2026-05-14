@@ -60,14 +60,14 @@ const AddExpenseModal: React.FC<Props> = ({ open, onClose, onCreated, expense })
     }
   };
 
-  const inputCls = 'w-full px-3 py-2 rounded-xl border border-slate-200 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 transition-all';
+  const inputCls = 'w-full px-3 py-2 rounded-xl border border-slate-200 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition-all';
   const labelCls = 'block text-xs font-semibold text-slate-500 mb-1.5 uppercase tracking-wide';
 
   return (
     <div className="fixed inset-0 z-[999] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
       <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl overflow-hidden">
         {/* Header */}
-        <div className={`px-6 py-4 border-b border-slate-100 flex items-center justify-between ${isEdit ? 'bg-amber-50' : 'bg-indigo-50'}`}>
+        <div className={`px-6 py-4 border-b border-slate-100 flex items-center justify-between ${isEdit ? 'bg-amber-50' : 'bg-blue-50'}`}>
           <div>
             <h3 className="text-base font-bold text-slate-800">
               {isEdit ? '✏️ Edit Expense' : '+ Add Expense'}
@@ -154,7 +154,7 @@ const AddExpenseModal: React.FC<Props> = ({ open, onClose, onCreated, expense })
             <button
               type="submit"
               disabled={saving}
-              className={`flex-1 py-2.5 rounded-xl text-white text-sm font-semibold transition-colors disabled:opacity-60 ${isEdit ? 'bg-amber-500 hover:bg-amber-600' : 'bg-indigo-600 hover:bg-indigo-700'}`}
+              className={`flex-1 py-2.5 rounded-xl text-white text-sm font-semibold transition-colors disabled:opacity-60 ${isEdit ? 'bg-amber-500 hover:bg-amber-600' : 'bg-blue-600 hover:bg-blue-700'}`}
             >
               {saving ? (isEdit ? 'Saving…' : 'Adding…') : (isEdit ? 'Save Changes' : 'Add Expense')}
             </button>

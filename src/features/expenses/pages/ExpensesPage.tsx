@@ -30,7 +30,7 @@ function ModeTabsBar({
         aria-selected={mode === "vehicle"}
         className={`${tabBtn} ${
           mode === "vehicle"
-            ? "bg-indigo-500 text-white shadow-sm"
+            ? "bg-blue-500 text-white shadow-sm"
             : "bg-transparent text-slate-500 hover:text-slate-700"
         }`}
         onClick={() => setMode("vehicle")}
@@ -43,7 +43,7 @@ function ModeTabsBar({
         aria-selected={mode === "trip"}
         className={`${tabBtn} ${
           mode === "trip"
-            ? "bg-indigo-500 text-white shadow-sm"
+            ? "bg-blue-500 text-white shadow-sm"
             : "bg-transparent text-slate-500 hover:text-slate-700"
         }`}
         onClick={() => setMode("trip")}
@@ -129,11 +129,11 @@ const ExpensesPage: React.FC = () => {
       {mode === "vehicle" ? (
         <div className="flex min-h-0 flex-1 overflow-hidden">
           <div
-            className={`flex w-full shrink-0 flex-col border-r border-slate-200 bg-white transition-all lg:w-72 xl:w-80 ${
-              selectedVehicleId ? "hidden lg:flex" : "flex"
+            className={`flex w-full shrink-0 flex-col border-r border-slate-200 bg-white transition-all md:w-64 lg:w-72 xl:w-80 ${
+              selectedVehicleId ? "hidden md:flex" : "flex"
             }`}
           >
-            <div className="flex justify-end border-b border-slate-200 bg-white px-3 py-2 lg:hidden">
+            <div className="flex justify-end border-b border-slate-200 bg-white px-3 py-2 md:hidden">
               <ModeTabsBar mode={mode} setMode={setMode} />
             </div>
             <div className="relative border-b border-slate-100 px-3 py-2">
@@ -143,7 +143,7 @@ const ExpensesPage: React.FC = () => {
                 value={vehicleSearch}
                 onChange={(e) => setVehicleSearch(e.target.value)}
                 placeholder="Search vehicles..."
-                className="w-full rounded-md border border-slate-200 bg-slate-50 py-1.5 pl-7 pr-3 text-xs text-slate-700 outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400"
+                className="w-full rounded-md border border-slate-200 bg-slate-50 py-1.5 pl-7 pr-3 text-xs text-slate-700 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400"
               />
             </div>
             <div className="flex-1 space-y-1.5 overflow-y-auto p-3">
@@ -175,7 +175,7 @@ const ExpensesPage: React.FC = () => {
 
           <div
             className={`min-h-0 flex-1 overflow-y-auto bg-slate-50 p-4 ${
-              selectedVehicleId ? "flex flex-col" : "hidden lg:flex"
+              selectedVehicleId ? "flex flex-col" : "hidden md:flex"
             }`}
           >
             <div className="mb-4 flex shrink-0 justify-end">
@@ -183,7 +183,7 @@ const ExpensesPage: React.FC = () => {
             </div>
             {selectedVehicle ? (
               <>
-                <div className="mb-4 flex items-center gap-2 lg:hidden">
+                <div className="mb-4 flex items-center gap-2 md:hidden">
                   <button
                     type="button"
                     onClick={() => setSelectedVehicleId(null)}
@@ -201,7 +201,7 @@ const ExpensesPage: React.FC = () => {
                     </p>
                   </div>
                 </div>
-                <div className="hidden border-b border-slate-200 pb-3 lg:block">
+                <div className="hidden border-b border-slate-200 pb-3 md:block">
                   <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
                     Vehicle expenses
                   </p>
@@ -240,7 +240,7 @@ const ExpensesPage: React.FC = () => {
               placeholder="Search trips…"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-200 sm:max-w-md"
+              className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-200 sm:max-w-md"
             />
             <div className="flex justify-end sm:shrink-0">
               <ModeTabsBar mode={mode} setMode={setMode} />

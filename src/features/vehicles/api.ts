@@ -48,7 +48,7 @@ export interface TripItem {
   agencyCost?: number;
   cabCost?: number;
   agencyName?: string;
-  ownerProfit?: number | string;
+  agencyProfit?: number | string;
   advance?: number;
   driver_salary?: number;
   notes?: string;
@@ -112,7 +112,7 @@ export interface HistoryTripItem {
   endKilometers?: number;
   totalExpenses?: number;
   driver_salary?: number;
-  ownerProfit?: number;
+  agencyProfit?: number;
   agencyCost?: number;
   cabCost?: number;
   driver?: {
@@ -149,7 +149,7 @@ function mapTrip(t: any): TripItem {
     agencyCost: t.agencyCost,
     cabCost: t.cabCost,
     agencyName: t.agencyName,
-    ownerProfit: t.ownerProfit,
+    agencyProfit: t.agencyProfit ?? t.ownerProfit,
     advance: t.advance,
     driver_salary: t.driver_salary,
     notes: t.notes,
@@ -354,7 +354,7 @@ export async function fetchVehicleHistoryDetailed(params: {
       endKilometers: t.endKilometers,
       totalExpenses: t.totalExpenses,
       driver_salary: t.driver_salary,
-      ownerProfit: t.ownerProfit,
+      agencyProfit: t.agencyProfit ?? t.ownerProfit,
       agencyCost: t.agencyCost,
       cabCost: t.cabCost,
       driverName:
@@ -509,7 +509,7 @@ export async function createTrip(payload: {
   agencyCost?: number | string;
   cabCost?: number | string;
   agencyName?: string;
-  ownerProfit?: number | string;
+  agencyProfit?: number | string;
   advance?: number | string;
   amount?: number;
   notes?: string;
@@ -550,7 +550,7 @@ export async function updateTrip(
     agencyCost?: number | string;
     cabCost?: number | string;
     agencyName?: string;
-    ownerProfit?: number | string;
+    agencyProfit?: number | string;
     advance?: number | string;
     amount?: number;
     notes?: string;

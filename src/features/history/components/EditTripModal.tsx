@@ -102,22 +102,22 @@ export function EditTripModal({
               <div>
                 <label className="block text-xs font-medium text-slate-600 mb-1">From</label>
                 <input type="text" value={fields.from} onChange={e => handleChange('from', e.target.value)}
-                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-indigo-400 focus:ring-1" />
+                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-blue-400 focus:ring-1" />
               </div>
               <div>
                 <label className="block text-xs font-medium text-slate-600 mb-1">To</label>
                 <input type="text" value={fields.to} onChange={e => handleChange('to', e.target.value)}
-                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-indigo-400 focus:ring-1" />
+                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-blue-400 focus:ring-1" />
               </div>
               <div>
                 <label className="block text-xs font-medium text-slate-600 mb-1">Customer / Care of</label>
                 <input type="text" value={fields.customer} onChange={e => handleChange('customer', e.target.value)}
-                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-indigo-400 focus:ring-1" />
+                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-blue-400 focus:ring-1" />
               </div>
               <div>
                 <label className="block text-xs font-medium text-slate-600 mb-1">Agency Name</label>
                 <input type="text" value={fields.agencyName} onChange={e => handleChange('agencyName', e.target.value)}
-                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-indigo-400 focus:ring-1" />
+                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-blue-400 focus:ring-1" />
               </div>
             </div>
           </section>
@@ -129,35 +129,35 @@ export function EditTripModal({
               <div>
                 <label className="block text-xs font-medium text-slate-600 mb-1">Start Date</label>
                 <input type="date" value={fields.startDate} onChange={e => handleChange('startDate', e.target.value)}
-                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-indigo-400 focus:ring-1" />
+                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-blue-400 focus:ring-1" />
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <div>
                   <label className="block text-xs font-medium text-slate-600 mb-1">Start Time</label>
                   <input type="time" value={fields.startTime} onChange={e => handleChange('startTime', e.target.value)}
-                    className="w-full border border-slate-200 rounded-lg px-2 py-2 text-sm outline-none focus:border-indigo-400 focus:ring-1" />
+                    className="w-full border border-slate-200 rounded-lg px-2 py-2 text-sm outline-none focus:border-blue-400 focus:ring-1" />
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-slate-600 mb-1">End Time</label>
                   <input type="time" value={fields.endTime} onChange={e => handleChange('endTime', e.target.value)}
-                    className="w-full border border-slate-200 rounded-lg px-2 py-2 text-sm outline-none focus:border-indigo-400 focus:ring-1" />
+                    className="w-full border border-slate-200 rounded-lg px-2 py-2 text-sm outline-none focus:border-blue-400 focus:ring-1" />
                 </div>
               </div>
               
               <div>
                 <label className="block text-xs font-medium text-slate-600 mb-1">Start KM</label>
                 <input type="number" value={fields.startKilometers} onChange={e => handleChange('startKilometers', e.target.value)} onBlur={calculateDistance}
-                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-indigo-400 focus:ring-1" />
+                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-blue-400 focus:ring-1" />
               </div>
               <div>
                 <label className="block text-xs font-medium text-slate-600 mb-1">End KM</label>
                 <input type="number" value={fields.endKilometers} onChange={e => handleChange('endKilometers', e.target.value)} onBlur={calculateDistance}
-                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-indigo-400 focus:ring-1" />
+                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-blue-400 focus:ring-1" />
               </div>
               <div className="col-span-2">
                 <label className="block text-xs font-medium text-slate-600 mb-1">Total Distance</label>
                 <input type="number" value={fields.distance} onChange={e => handleChange('distance', e.target.value)}
-                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-indigo-400 focus:ring-1 bg-slate-50" />
+                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-blue-400 focus:ring-1 bg-slate-50" />
               </div>
             </div>
           </section>
@@ -168,7 +168,7 @@ export function EditTripModal({
             <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
               <div>
                 <label className="block text-xs font-medium text-slate-600 mb-1">Total Revenue (Agency Cost)</label>
-                <div className="flex border border-slate-200 rounded-lg overflow-hidden focus-within:border-indigo-400 focus-within:ring-1">
+                <div className="flex border border-slate-200 rounded-lg overflow-hidden focus-within:border-blue-400 focus-within:ring-1">
                   <span className="px-3 bg-slate-50 border-r border-slate-200 py-2 text-sm text-slate-500">₹</span>
                   <input type="number" value={fields.agencyCost} onChange={e => handleChange('agencyCost', e.target.value)}
                     className="flex-1 w-full px-3 py-2 text-sm outline-none" />
@@ -176,7 +176,7 @@ export function EditTripModal({
               </div>
               <div>
                 <label className="block text-xs font-medium text-slate-600 mb-1">Cab Cost</label>
-                <div className="flex border border-slate-200 rounded-lg overflow-hidden focus-within:border-indigo-400 focus-within:ring-1">
+                <div className="flex border border-slate-200 rounded-lg overflow-hidden focus-within:border-blue-400 focus-within:ring-1">
                   <span className="px-3 bg-slate-50 border-r border-slate-200 py-2 text-sm text-slate-500">₹</span>
                   <input type="number" value={fields.cabCost} onChange={e => handleChange('cabCost', e.target.value)}
                     className="flex-1 w-full px-3 py-2 text-sm outline-none" />
@@ -184,7 +184,7 @@ export function EditTripModal({
               </div>
               <div>
                 <label className="block text-xs font-medium text-slate-600 mb-1">Driver Salary</label>
-                <div className="flex border border-slate-200 rounded-lg overflow-hidden focus-within:border-indigo-400 focus-within:ring-1">
+                <div className="flex border border-slate-200 rounded-lg overflow-hidden focus-within:border-blue-400 focus-within:ring-1">
                   <span className="px-3 bg-slate-50 border-r border-slate-200 py-2 text-sm text-slate-500">₹</span>
                   <input type="number" value={fields.driver_salary} onChange={e => handleChange('driver_salary', e.target.value)}
                     className="flex-1 w-full px-3 py-2 text-sm outline-none" />
@@ -192,7 +192,7 @@ export function EditTripModal({
               </div>
               <div>
                 <label className="block text-xs font-medium text-slate-600 mb-1">Advance</label>
-                <div className="flex border border-slate-200 rounded-lg overflow-hidden focus-within:border-indigo-400 focus-within:ring-1">
+                <div className="flex border border-slate-200 rounded-lg overflow-hidden focus-within:border-blue-400 focus-within:ring-1">
                   <span className="px-3 bg-slate-50 border-r border-slate-200 py-2 text-sm text-slate-500">₹</span>
                   <input type="number" value={fields.advance} onChange={e => handleChange('advance', e.target.value)}
                     className="flex-1 w-full px-3 py-2 text-sm outline-none" />
@@ -205,7 +205,7 @@ export function EditTripModal({
           <section>
             <label className="block text-xs font-medium text-slate-600 mb-1">Trip Notes</label>
             <textarea value={fields.notes} onChange={e => handleChange('notes', e.target.value)} rows={3}
-              className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-indigo-400 focus:ring-1 resize-none" />
+              className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-blue-400 focus:ring-1 resize-none" />
           </section>
 
         </div>
@@ -215,7 +215,7 @@ export function EditTripModal({
           <button onClick={onClose} disabled={saving} className="flex-1 px-4 py-2 border border-slate-200 rounded-xl text-sm font-medium text-slate-600 hover:bg-white transition bg-transparent disabled:opacity-50">
             Cancel
           </button>
-          <button onClick={handleSubmit} disabled={saving} className="flex-[2] flex justify-center items-center gap-2 bg-indigo-600 text-white rounded-xl py-2 px-4 text-sm font-semibold hover:bg-indigo-700 transition disabled:opacity-70">
+          <button onClick={handleSubmit} disabled={saving} className="flex-[2] flex justify-center items-center gap-2 bg-blue-600 text-white rounded-xl py-2 px-4 text-sm font-semibold hover:bg-blue-700 transition disabled:opacity-70">
             {saving ? <div className="h-4 w-4 border-2 border-white/30 border-t-white rounded-full animate-spin"/> : <Save className="h-4 w-4" />}
             {saving ? 'Saving...' : 'Save Changes'}
           </button>

@@ -37,7 +37,7 @@ export function DriverCard({ driver, isSelected, onSelect, onEdit }: DriverCardP
       onClick={onSelect}
       className={`flex items-center gap-3 px-3 py-2.5 rounded-xl border cursor-pointer transition-all
         ${isSelected
-          ? 'bg-indigo-50 border-indigo-400 shadow-sm'
+          ? 'bg-blue-50 border-blue-400 shadow-sm'
           : 'bg-white border-slate-200 hover:border-slate-300 hover:bg-slate-50/50'}`}
     >
       {/* Avatar */}
@@ -49,8 +49,8 @@ export function DriverCard({ driver, isSelected, onSelect, onEdit }: DriverCardP
           onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
         />
       ) : (
-        <div className="h-10 w-10 rounded-full bg-indigo-100 flex items-center justify-center shrink-0">
-          <User className="h-5 w-5 text-indigo-500" />
+        <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center shrink-0">
+          <User className="h-5 w-5 text-blue-500" />
         </div>
       )}
 
@@ -67,7 +67,7 @@ export function DriverCard({ driver, isSelected, onSelect, onEdit }: DriverCardP
       {/* Edit */}
       <button
         onClick={e => { e.stopPropagation(); onEdit(); }}
-        className="shrink-0 p-1.5 rounded-md bg-indigo-50 text-indigo-500 hover:bg-indigo-100 transition"
+        className="shrink-0 p-1.5 rounded-md bg-blue-50 text-blue-500 hover:bg-blue-100 transition"
         title="Edit driver"
       >
         <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>

@@ -21,7 +21,7 @@ import { fetchTrackingVehicles, completeTrip, type TrackingVehicle } from '../ap
 function statusBadgeCls(status?: string) {
   switch ((status ?? '').toLowerCase()) {
     case 'in_progress': return 'border-green-200 bg-green-50 text-green-700';
-    case 'scheduled': return 'border-indigo-200 bg-indigo-50 text-indigo-700';
+    case 'scheduled': return 'border-blue-200 bg-blue-50 text-blue-700';
     case 'completed': return 'border-slate-200 bg-slate-50 text-slate-600';
     default: return 'border-slate-200 bg-slate-50 text-slate-600';
   }
@@ -129,20 +129,20 @@ function TrackingCard({ item, isSelected, onSelect }: {
     <button type="button" onClick={onSelect}
       className={`w-full text-left rounded-xl border p-4 transition-all ${
         isSelected
-          ? 'border-indigo-400 bg-indigo-50 ring-1 ring-indigo-200 shadow-sm'
+          ? 'border-blue-400 bg-blue-50 ring-1 ring-blue-200 shadow-sm'
           : 'border-slate-200 bg-white hover:border-slate-300 hover:shadow-sm'
       }`}>
 
       {/* Top row: icon + vehicle number + status */}
       <div className="flex items-center gap-3">
-        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-indigo-50">
-          <Car className="h-6 w-6 text-indigo-500" />
+        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-blue-50">
+          <Car className="h-6 w-6 text-blue-500" />
         </div>
         <div className="flex-1 min-w-0">
           <p className="text-base font-semibold text-slate-800 truncate">{v.vehicleNumber ?? 'N/A'}</p>
           <div className="flex items-center gap-1.5 mt-0.5">
-            <span className={`h-2.5 w-2.5 rounded-full ${tripStatus === 'in_progress' ? 'bg-green-500' : 'bg-indigo-400'}`} />
-            <span className={`text-sm font-medium ${tripStatus === 'in_progress' ? 'text-green-600' : 'text-indigo-500'}`}>
+            <span className={`h-2.5 w-2.5 rounded-full ${tripStatus === 'in_progress' ? 'bg-green-500' : 'bg-blue-400'}`} />
+            <span className={`text-sm font-medium ${tripStatus === 'in_progress' ? 'text-green-600' : 'text-blue-500'}`}>
               {statusLabel(trip?.status)}
             </span>
           </div>
@@ -214,8 +214,8 @@ function TripInfoTab({ item, onComplete }: { item: TrackingVehicle; onComplete: 
               <CheckCircle2 className="h-5 w-5" />
               Complete Trip
             </button>
-            <div className="flex items-start gap-2 mt-3 px-4 py-3 rounded-lg bg-indigo-50 text-xs text-slate-600">
-              <Info className="h-4 w-4 shrink-0 text-indigo-400 mt-0.5" />
+            <div className="flex items-start gap-2 mt-3 px-4 py-3 rounded-lg bg-blue-50 text-xs text-slate-600">
+              <Info className="h-4 w-4 shrink-0 text-blue-400 mt-0.5" />
               <span>This will mark the trip as completed. The vehicle will be available for new trips.</span>
             </div>
           </InfoCard>
@@ -254,7 +254,12 @@ function ExpenseInfoTab({ item }: { item: TrackingVehicle }) {
 
   const agencyCost = trip.agencyCost != null ? Number(trip.agencyCost) : 0;
   const cabCost = trip.cabCost != null ? Number(trip.cabCost) : 0;
-  const ownerProfit = trip.ownerProfit != null ? Number(trip.ownerProfit) : 0;
+  const agencyProfitAmt =
+    trip.agencyProfit != null
+      ? Number(trip.agencyProfit)
+      : (trip as { ownerProfit?: number | string }).ownerProfit != null
+        ? Number((trip as { ownerProfit?: number | string }).ownerProfit)
+        : 0;
   const expenses = trip.expenses ?? [];
 
   // Categorise expenses
@@ -278,7 +283,7 @@ function ExpenseInfoTab({ item }: { item: TrackingVehicle }) {
         <InfoRow label="Agency Cost" value={`₹${agencyCost.toLocaleString('en-IN')}`} />
         <InfoRow label="Cab Cost" value={`₹${cabCost.toLocaleString('en-IN')}`} />
         <div className="border-t border-slate-100 my-1" />
-        <InfoRow label="Owner Profit" value={`₹${ownerProfit.toLocaleString('en-IN')}`} valueColor="text-emerald-600 font-bold" />
+        <InfoRow label="Agency Profit" value={`₹${agencyProfitAmt.toLocaleString('en-IN')}`} valueColor="text-emerald-600 font-bold" />
         <InfoRow label="Advance" value={`₹${(trip.advance != null ? Number(trip.advance) : 0).toLocaleString('en-IN')}`} />
       </InfoCard>
 
@@ -298,7 +303,7 @@ function ExpenseInfoTab({ item }: { item: TrackingVehicle }) {
 function ExpenseRow({ icon, label, amount }: { icon: string; label: string; amount: number }) {
   return (
     <div className="flex items-center gap-3 py-2 border-b border-slate-50 last:border-0">
-      <span className="flex h-8 w-8 items-center justify-center rounded-md bg-indigo-50 text-base">{icon}</span>
+      <span className="flex h-8 w-8 items-center justify-center rounded-md bg-blue-50 text-base">{icon}</span>
       <span className="flex-1 text-sm text-slate-500">{label}</span>
       <span className="text-sm font-semibold text-slate-800">₹{amount.toLocaleString('en-IN')}</span>
     </div>
@@ -338,8 +343,8 @@ function CompleteTripModal({ tripId, startKm, onClose, onCompleted }: {
     <ModalShell title="Complete Trip" onClose={onClose} maxWidth="max-w-sm">
       <div className="p-6 space-y-4">
         {startKm != null && (
-          <div className="flex items-center gap-2 rounded-lg bg-indigo-50 px-3 py-2 text-xs text-slate-700">
-            <Info className="h-4 w-4 text-indigo-400 shrink-0" />
+          <div className="flex items-center gap-2 rounded-lg bg-blue-50 px-3 py-2 text-xs text-slate-700">
+            <Info className="h-4 w-4 text-blue-400 shrink-0" />
             <span>Starting KM: <strong>{startKm}</strong></span>
           </div>
         )}
@@ -348,7 +353,7 @@ function CompleteTripModal({ tripId, startKm, onClose, onCompleted }: {
           <label htmlFor="endKm" className="text-xs font-medium text-slate-600">Ending KM <span className="text-red-500">*</span></label>
           <input id="endKm" type="number" value={endKm} onChange={e => { setEndKm(e.target.value); setErr(null); }}
             placeholder="Enter ending odometer reading"
-            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500" />
+            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500" />
           {err && <p className="text-xs text-red-600">{err}</p>}
         </div>
 
@@ -424,11 +429,11 @@ function DetailPanel({ item, onBack, onRefresh }: {
           <button key={t.key} type="button" onClick={() => setTab(t.key)}
             className={`whitespace-nowrap px-6 py-4 text-xs font-bold tracking-widest transition-all border-b-2 relative ${
               tab === t.key
-                ? 'border-indigo-500 text-indigo-600'
+                ? 'border-blue-500 text-blue-600'
                 : 'border-transparent text-slate-400 hover:text-slate-600'
             }`}>
             {t.label}
-            {tab === t.key && <div className="absolute inset-x-0 bottom-0 h-0.5 bg-indigo-500 rounded-t-full shadow-[0_-1px_4px_rgba(99,102,241,0.3)]" />}
+            {tab === t.key && <div className="absolute inset-x-0 bottom-0 h-0.5 bg-blue-500 rounded-t-full shadow-[0_-1px_4px_rgba(99,102,241,0.3)]" />}
           </button>
         ))}
       </div>
@@ -481,8 +486,8 @@ export function TrackingPage() {
   return (
     <div className="flex h-full overflow-hidden relative">
       {/* LEFT: list panel */}
-      <div className={`flex w-full lg:w-80 xl:w-96 shrink-0 flex-col border-r border-slate-200 bg-white transition-all ${
-        selectedIdx !== null ? 'hidden lg:flex' : 'flex'
+      <div className={`flex w-full md:w-72 lg:w-80 xl:w-96 shrink-0 flex-col border-r border-slate-200 bg-white transition-all ${
+        selectedIdx !== null ? 'hidden md:flex' : 'flex'
       }`}>
         {/* Header */}
         <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4 shrink-0">
@@ -491,11 +496,11 @@ export function TrackingPage() {
           </div>
           <div className="flex items-center gap-2.5">
             <button type="button" onClick={load} 
-              className="flex h-9 w-9 items-center justify-center text-indigo-500 hover:bg-indigo-50 rounded-full transition-all active:scale-95 active:rotate-180"
+              className="flex h-9 w-9 items-center justify-center text-blue-500 hover:bg-blue-50 rounded-full transition-all active:scale-95 active:rotate-180"
               title="Refresh tracking data">
               <RefreshCw className="h-5 w-5" />
             </button>
-            <span className="rounded-full bg-indigo-50 px-3 py-1 text-sm font-bold text-indigo-600">
+            <span className="rounded-full bg-blue-50 px-3 py-1 text-sm font-bold text-blue-600">
               {vehicles.length}
             </span>
           </div>
@@ -511,7 +516,7 @@ export function TrackingPage() {
             <div className="flex flex-col items-center gap-3 py-12">
               <AlertTriangle className="h-12 w-12 text-red-300" />
               <p className="text-base text-red-500">{error}</p>
-              <button type="button" onClick={load} className="text-sm text-indigo-500 underline">Retry</button>
+              <button type="button" onClick={load} className="text-sm text-blue-500 underline">Retry</button>
             </div>
           ) : vehicles.length === 0 ? (
             <div className="flex flex-col items-center gap-4 py-16 text-center">
@@ -530,7 +535,7 @@ export function TrackingPage() {
 
       {/* RIGHT: detail panel */}
       <div className={`flex-1 overflow-hidden transition-all ${
-        selectedIdx !== null ? 'flex flex-col' : 'hidden lg:flex flex-col'
+        selectedIdx !== null ? 'flex flex-col' : 'hidden md:flex flex-col'
       }`}>
         {selected ? (
           <DetailPanel item={selected} onBack={() => setSelectedIdx(null)} onRefresh={load} />

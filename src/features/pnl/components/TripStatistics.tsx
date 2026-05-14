@@ -15,20 +15,20 @@ export const TripStatistics: React.FC<TripStatisticsProps> = ({ trips }) => {
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-6 shadow-sm">
       <div className="mb-4 sm:mb-6 flex items-center gap-2">
-        <BarChart3 className="h-5 w-5 text-indigo-500" />
+        <BarChart3 className="h-5 w-5 text-blue-500" />
         <h2 className="text-base sm:text-lg font-semibold text-slate-900">Trip Statistics</h2>
       </div>
 
       <div className="grid gap-3 sm:gap-4 grid-cols-2 lg:grid-cols-4">
         {/* Total Trips */}
-        <div className="rounded-xl border border-indigo-50 bg-indigo-50/30 p-3 sm:p-4">
+        <div className="rounded-xl border border-blue-50 bg-blue-50/30 p-3 sm:p-4">
           <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-3">
-            <div className="flex h-8 w-8 sm:h-10 sm:w-10 shrink-0 items-center justify-center rounded-lg bg-indigo-100 text-indigo-600">
+            <div className="flex h-8 w-8 sm:h-10 sm:w-10 shrink-0 items-center justify-center rounded-lg bg-blue-100 text-blue-600">
               <Milestone className="h-4 w-4 sm:h-5 sm:w-5" />
             </div>
             <div>
               <p className="text-[10px] sm:text-xs font-medium text-slate-500">Total Trips</p>
-              <h4 className="text-base sm:text-lg font-bold text-indigo-700 leading-tight border-red-500">{trips.total}</h4>
+              <h4 className="text-base sm:text-lg font-bold text-blue-700 leading-tight border-red-500">{trips.total}</h4>
             </div>
           </div>
         </div>

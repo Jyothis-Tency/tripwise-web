@@ -894,7 +894,7 @@ function AgencyPayoutTab({
   if (loading)
     return (
       <div className="flex items-center justify-center py-16">
-        <Loader2 className="h-6 w-6 animate-spin text-indigo-400" />
+        <Loader2 className="h-6 w-6 animate-spin text-blue-400" />
       </div>
     );
 
@@ -958,7 +958,7 @@ function AgencyPayoutTab({
       )}
 
       {/* Add payment form */}
-      <div className="rounded-xl border border-indigo-100 bg-indigo-50/60 p-4 space-y-3">
+      <div className="rounded-xl border border-blue-100 bg-blue-50/60 p-4 space-y-3">
         <h4 className="text-sm font-semibold text-slate-700">
           Record Payment Received
         </h4>
@@ -979,7 +979,7 @@ function AgencyPayoutTab({
               placeholder="0"
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
-              className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-indigo-400"
+              className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-blue-400"
             />
           </div>
           <div>
@@ -990,7 +990,7 @@ function AgencyPayoutTab({
               type="date"
               value={paymentDate}
               onChange={(e) => setPaymentDate(e.target.value)}
-              className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-indigo-400"
+              className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-blue-400"
             />
           </div>
           <div>
@@ -1000,7 +1000,7 @@ function AgencyPayoutTab({
             <select
               value={paymentMethod}
               onChange={(e) => setPaymentMethod(e.target.value)}
-              className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-indigo-400"
+              className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-blue-400"
             >
               <option value="cash">Cash</option>
               <option value="bank_transfer">Bank Transfer</option>
@@ -1017,14 +1017,14 @@ function AgencyPayoutTab({
               placeholder="Optional"
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-indigo-400"
+              className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-blue-400"
             />
           </div>
         </div>
         <button
           onClick={handleAdd}
           disabled={saving}
-          className="flex items-center gap-2 rounded-lg bg-indigo-500 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-600 disabled:opacity-50"
+          className="flex items-center gap-2 rounded-lg bg-blue-500 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-600 disabled:opacity-50"
         >
           <Plus className="h-4 w-4" />
           {saving ? "Adding…" : "Add Payment"}
@@ -1085,7 +1085,7 @@ function AgencyPayoutTab({
           onClick={() =>
             generateAgencyPayoutPDF(user?.name || "Owner", agencyName, data)
           }
-          className="flex items-center gap-2 rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-2.5 text-sm font-semibold text-indigo-700 hover:bg-indigo-100 transition w-full justify-center"
+          className="flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-4 py-2.5 text-sm font-semibold text-blue-700 hover:bg-blue-100 transition w-full justify-center"
         >
           <FileDown className="h-4 w-4" /> Download Agency Report (PDF)
         </button>
@@ -1180,7 +1180,7 @@ function DriverPayoutPanel({
   if (loading)
     return (
       <div className="flex items-center justify-center py-8">
-        <Loader2 className="h-5 w-5 animate-spin text-indigo-400" />
+        <Loader2 className="h-5 w-5 animate-spin text-blue-400" />
       </div>
     );
 
@@ -1225,18 +1225,18 @@ function DriverPayoutPanel({
           placeholder="Amount"
           value={amount}
           onChange={(e) => setAmount(e.target.value)}
-          className="flex-1 min-w-[80px] rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs outline-none focus:border-indigo-400"
+          className="flex-1 min-w-[80px] rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs outline-none focus:border-blue-400"
         />
         <input
           type="date"
           value={paymentDate}
           onChange={(e) => setPaymentDate(e.target.value)}
-          className="rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs outline-none focus:border-indigo-400"
+          className="rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs outline-none focus:border-blue-400"
         />
         <select
           value={paymentMethod}
           onChange={(e) => setPaymentMethod(e.target.value)}
-          className="rounded-lg border border-slate-200 px-2 py-1.5 text-xs outline-none focus:border-indigo-400"
+          className="rounded-lg border border-slate-200 px-2 py-1.5 text-xs outline-none focus:border-blue-400"
         >
           <option value="cash">Cash</option>
           <option value="bank_transfer">Bank Transfer</option>
@@ -1247,7 +1247,7 @@ function DriverPayoutPanel({
           placeholder="Notes"
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
-          className="flex-1 min-w-[80px] rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs outline-none focus:border-indigo-400"
+          className="flex-1 min-w-[80px] rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs outline-none focus:border-blue-400"
         />
         <button
           onClick={handleAdd}
@@ -1298,7 +1298,7 @@ function DriverPayoutPanel({
               data,
             )
           }
-          className="flex items-center gap-1.5 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-1.5 text-xs font-semibold text-indigo-700 hover:bg-indigo-100 transition w-full justify-center"
+          className="flex items-center gap-1.5 rounded-lg border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-100 transition w-full justify-center"
         >
           <FileDown className="h-3.5 w-3.5" /> Download Report
         </button>
@@ -1350,7 +1350,7 @@ function CreateAgencyModal({
             placeholder="Enter agency name"
             autoFocus
             onKeyDown={(e) => e.key === "Enter" && submit()}
-            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
           />
           {err && <p className="text-xs text-red-600">{err}</p>}
         </div>
@@ -1366,7 +1366,7 @@ function CreateAgencyModal({
             type="button"
             onClick={submit}
             disabled={submitting}
-            className="rounded-lg bg-indigo-500 px-5 py-2 text-sm font-semibold text-white hover:bg-indigo-600 disabled:opacity-50"
+            className="rounded-lg bg-blue-500 px-5 py-2 text-sm font-semibold text-white hover:bg-blue-600 disabled:opacity-50"
           >
             {submitting ? "Creating…" : "Create"}
           </button>
@@ -1408,7 +1408,7 @@ const CellInput = memo(function CellInput({
       type={type}
       placeholder={placeholder}
       className={`w-full rounded-md border border-slate-200 px-2.5 py-2 text-sm outline-none
-        focus:border-indigo-400 focus:ring-1 focus:ring-indigo-200 bg-white transition ${
+        focus:border-blue-400 focus:ring-1 focus:ring-blue-200 bg-white transition ${
           type === "number"
             ? "[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
             : ""
@@ -1666,7 +1666,7 @@ function BulkEntryTable({
               setExportError(null);
               setExportOpen(true);
             }}
-            className="flex items-center gap-2 rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-2 text-sm font-semibold text-indigo-700 hover:bg-indigo-100 transition shadow-sm"
+            className="flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-100 transition shadow-sm"
           >
             <FileDown className="h-4 w-4" /> Download Bulk Trips Report (PDF)
           </button>
@@ -1701,7 +1701,7 @@ function BulkEntryTable({
                   type="date"
                   value={exportStartDate}
                   onChange={(e) => setExportStartDate(e.target.value)}
-                  className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-200 bg-white"
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-200 bg-white"
                 />
               </div>
               <div>
@@ -1712,7 +1712,7 @@ function BulkEntryTable({
                   type="date"
                   value={exportEndDate}
                   onChange={(e) => setExportEndDate(e.target.value)}
-                  className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-200 bg-white"
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-200 bg-white"
                 />
               </div>
             </div>
@@ -1738,7 +1738,7 @@ function BulkEntryTable({
               <button
                 type="button"
                 onClick={runBulkExport}
-                className="flex-1 rounded-xl bg-indigo-600 py-2.5 text-sm font-bold text-white hover:bg-indigo-700"
+                className="flex-1 rounded-xl bg-blue-600 py-2.5 text-sm font-bold text-white hover:bg-blue-700"
               >
                 Export PDF
               </button>
@@ -1754,9 +1754,9 @@ function BulkEntryTable({
           className={`rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden ${groups.length > 1 && g.rows.every((r) => isRowHidden(r.isCompleted)) ? "hidden" : ""}`}
         >
           {/* Group header */}
-          <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-2.5 sm:gap-3 border-b border-slate-100 bg-indigo-50/50 px-4 sm:px-5 py-3 sm:py-3.5">
+          <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-2.5 sm:gap-3 border-b border-slate-100 bg-blue-50/50 px-4 sm:px-5 py-3 sm:py-3.5">
             <div className="flex items-center gap-2.5 sm:gap-3">
-              <span className="flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-full bg-indigo-100 text-xs sm:text-sm font-bold text-indigo-600 shrink-0">
+              <span className="flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-full bg-blue-100 text-xs sm:text-sm font-bold text-blue-600 shrink-0">
                 {gi + 1}
               </span>
               <div className="flex items-center gap-2 flex-1 min-w-0">
@@ -1810,7 +1810,7 @@ function BulkEntryTable({
                 className={`p-4 space-y-3 ${isRowHidden(r.isCompleted) ? "hidden" : ""}`}
               >
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-indigo-500 uppercase">
+                  <span className="text-xs font-bold text-blue-500 uppercase">
                     Trip {ri + 1}
                   </span>
                   <div className="flex items-center gap-2.5">
@@ -1962,7 +1962,7 @@ function BulkEntryTable({
                     onChange={(e) => updateRow(gi, ri, "notes", e.target.value)}
                     placeholder="Add note…"
                     rows={2}
-                    className="w-full rounded-md border border-slate-200 px-2.5 py-2 text-sm outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-200 bg-white transition resize-y"
+                    className="w-full rounded-md border border-slate-200 px-2.5 py-2 text-sm outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-200 bg-white transition resize-y"
                   />
                 </div>
               </div>
@@ -2097,7 +2097,7 @@ function BulkEntryTable({
                         }
                         placeholder="Add note…"
                         rows={3}
-                        className="w-full min-w-[130px] rounded-md border border-slate-200 px-2 py-1.5 text-xs outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-200 bg-white transition resize-y"
+                        className="w-full min-w-[130px] rounded-md border border-slate-200 px-2 py-1.5 text-xs outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-200 bg-white transition resize-y"
                       />
                     </td>
                     <td className="px-2 py-1.5">
@@ -2136,7 +2136,7 @@ function BulkEntryTable({
             <button
               type="button"
               onClick={() => addRow(gi)}
-              className="flex items-center gap-2 text-sm font-medium text-indigo-600 hover:text-indigo-700"
+              className="flex items-center gap-2 text-sm font-medium text-blue-600 hover:text-blue-700"
             >
               <Plus className="h-4 w-4" /> Add Trip
             </button>
@@ -2209,7 +2209,7 @@ function BulkEntryTable({
       <button
         type="button"
         onClick={addGroup}
-        className="flex items-center gap-2 text-sm font-medium text-indigo-600 hover:text-indigo-700 border border-dashed border-indigo-300 rounded-xl px-4 py-3.5 w-full justify-center hover:bg-indigo-50/50 transition"
+        className="flex items-center gap-2 text-sm font-medium text-blue-600 hover:text-blue-700 border border-dashed border-blue-300 rounded-xl px-4 py-3.5 w-full justify-center hover:bg-blue-50/50 transition"
       >
         <Plus className="h-5 w-5" /> Add Driver / Vehicle
       </button>
@@ -2368,7 +2368,7 @@ function NormalEntryTable({
             className={`rounded-xl border border-slate-200 bg-white shadow-sm p-4 space-y-3 ${isRowHidden(e.isCompleted) ? "hidden" : ""}`}
           >
             <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-indigo-500 uppercase">
+              <span className="text-xs font-bold text-blue-500 uppercase">
                 Entry {i + 1}
               </span>
               <div className="flex items-center gap-2.5">
@@ -2377,7 +2377,7 @@ function NormalEntryTable({
                     type="button"
                     onClick={() => copySingleEntry(e)}
                     title="Copy this entry"
-                    className="flex items-center gap-1 text-indigo-600 hover:text-indigo-800 text-xs font-semibold transition"
+                    className="flex items-center gap-1 text-blue-600 hover:text-blue-800 text-xs font-semibold transition"
                   >
                     <Copy className="h-3.5 w-3.5" /> Copy
                   </button>
@@ -2472,7 +2472,7 @@ function NormalEntryTable({
                 onChange={(ev) => update(i, "notes", ev.target.value)}
                 placeholder="Add note…"
                 rows={2}
-                className="w-full rounded-md border border-slate-200 px-2.5 py-2 text-sm outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-200 bg-white transition resize-y"
+                className="w-full rounded-md border border-slate-200 px-2.5 py-2 text-sm outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-200 bg-white transition resize-y"
               />
             </div>
           </div>
@@ -2545,7 +2545,7 @@ function NormalEntryTable({
                       onChange={(ev) => update(i, "notes", ev.target.value)}
                       placeholder="Add note…"
                       rows={3}
-                      className="w-full min-w-[130px] rounded-md border border-slate-200 px-2 py-1.5 text-xs outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-200 bg-white transition resize-y"
+                      className="w-full min-w-[130px] rounded-md border border-slate-200 px-2 py-1.5 text-xs outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-200 bg-white transition resize-y"
                     />
                   </td>
                   <td className="px-2 py-1.5">
@@ -2555,7 +2555,7 @@ function NormalEntryTable({
                           type="button"
                           onClick={() => copySingleEntry(e)}
                           title="Copy this entry"
-                          className="flex items-center gap-1 text-indigo-600 hover:text-indigo-800 text-[10px] font-semibold transition"
+                          className="flex items-center gap-1 text-blue-600 hover:text-blue-800 text-[10px] font-semibold transition"
                         >
                           <Copy className="h-3 w-3" /> Copy
                         </button>
@@ -2608,7 +2608,7 @@ function NormalEntryTable({
         <button
           type="button"
           onClick={addEntry}
-          className="flex items-center gap-2 text-sm font-medium text-indigo-600 hover:text-indigo-700 border border-dashed border-indigo-300 rounded-xl px-4 py-3.5 flex-1 justify-center hover:bg-indigo-50/50 transition"
+          className="flex items-center gap-2 text-sm font-medium text-blue-600 hover:text-blue-700 border border-dashed border-blue-300 rounded-xl px-4 py-3.5 flex-1 justify-center hover:bg-blue-50/50 transition"
         >
           <Plus className="h-5 w-5" /> Add Entry
         </button>
@@ -2637,7 +2637,7 @@ function NormalEntryTable({
                 }
               }}
               title="Download Normal Trips Report"
-              className="flex items-center gap-2 text-sm font-semibold text-indigo-700 bg-indigo-50 border border-indigo-300 hover:bg-indigo-100 rounded-xl px-4 py-3.5 transition"
+              className="flex items-center gap-2 text-sm font-semibold text-blue-700 bg-blue-50 border border-blue-300 hover:bg-blue-100 rounded-xl px-4 py-3.5 transition"
             >
               <FileDown className="h-5 w-5" /> Download Report
             </button>
@@ -2646,7 +2646,7 @@ function NormalEntryTable({
           type="button"
           onClick={() => copyAllEntries(entries, agencyName)}
           title="Copy all entries"
-          className="flex items-center gap-2 text-sm font-semibold text-indigo-700 bg-indigo-50 border border-indigo-300 hover:bg-indigo-100 rounded-xl px-4 py-3.5 transition"
+          className="flex items-center gap-2 text-sm font-semibold text-blue-700 bg-blue-50 border border-blue-300 hover:bg-blue-100 rounded-xl px-4 py-3.5 transition"
         >
           <Copy className="h-5 w-5" /> Copy All
         </button>
@@ -3208,7 +3208,7 @@ export function BulkEntryPage() {
       {/* ─── HEADER BAR ─── */}
       <div className="sticky top-0 z-20 flex flex-col sm:flex-row sm:flex-wrap sm:items-center justify-between gap-2.5 sm:gap-3 border-b border-slate-200 bg-white/90 backdrop-blur-md px-4 sm:px-6 py-3 sm:py-3.5 shadow-sm shrink-0">
         <div className="flex items-center gap-2.5 sm:gap-3 flex-wrap">
-          <FileSpreadsheet className="h-6 w-6 text-indigo-500 shrink-0 hidden sm:block" />
+          <FileSpreadsheet className="h-6 w-6 text-blue-500 shrink-0 hidden sm:block" />
           <h1 className="text-sm sm:text-base font-bold text-slate-800 uppercase tracking-wider hidden md:block">
             {isBulkMode ? "Bulk Entry" : "Normal Entry"}
           </h1>
@@ -3221,7 +3221,7 @@ export function BulkEntryPage() {
                 e.stopPropagation();
                 setShowDropdown(!showDropdown);
               }}
-              className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm hover:border-indigo-300 transition w-full sm:min-w-[180px]"
+              className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm hover:border-blue-300 transition w-full sm:min-w-[180px]"
             >
               <Building2 className="h-4.5 w-4.5 text-slate-400 shrink-0" />
               <span className="truncate text-slate-700 font-medium">
@@ -3249,9 +3249,9 @@ export function BulkEntryPage() {
                       key={a._id ?? a.id}
                       type="button"
                       onClick={() => selectAgency(a._id ?? a.id ?? "")}
-                      className={`w-full text-left px-4 py-3 text-sm hover:bg-indigo-50 transition ${
+                      className={`w-full text-left px-4 py-3 text-sm hover:bg-blue-50 transition ${
                         (a._id ?? a.id) === selectedId
-                          ? "bg-indigo-50 text-indigo-700 font-semibold"
+                          ? "bg-blue-50 text-blue-700 font-semibold"
                           : "text-slate-700"
                       }`}
                     >
@@ -3266,7 +3266,7 @@ export function BulkEntryPage() {
           <button
             type="button"
             onClick={() => setShowCreateModal(true)}
-            className="flex items-center gap-1.5 rounded-lg bg-indigo-500 px-3 py-2.5 text-xs sm:text-sm font-semibold text-white hover:bg-indigo-600 transition shadow-sm shrink-0"
+            className="flex items-center gap-1.5 rounded-lg bg-blue-500 px-3 py-2.5 text-xs sm:text-sm font-semibold text-white hover:bg-blue-600 transition shadow-sm shrink-0"
           >
             <Plus className="h-4 w-4" />{" "}
             <span className="hidden sm:inline">Agency</span>
@@ -3368,7 +3368,7 @@ export function BulkEntryPage() {
               onClick={() => toggleMode("bulk")}
               className={`rounded-md px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-semibold transition ${
                 activeTab === "bulk"
-                  ? "bg-white text-indigo-600 shadow-sm"
+                  ? "bg-white text-blue-600 shadow-sm"
                   : "text-slate-500 hover:text-slate-700"
               }`}
             >
@@ -3379,7 +3379,7 @@ export function BulkEntryPage() {
               onClick={() => toggleMode("normal")}
               className={`rounded-md px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-semibold transition ${
                 activeTab === "normal"
-                  ? "bg-white text-indigo-600 shadow-sm"
+                  ? "bg-white text-blue-600 shadow-sm"
                   : "text-slate-500 hover:text-slate-700"
               }`}
             >

@@ -1,7 +1,13 @@
-import { useCallback, useEffect, useState, type FormEvent, type ReactNode } from 'react';
-import { Link } from 'react-router-dom';
-import { Calculator, Car, Users, CheckCircle2, X } from 'lucide-react';
-import { AgencyNameCombobox } from '../../../components/AgencyNameCombobox';
+import {
+  useCallback,
+  useEffect,
+  useState,
+  type FormEvent,
+  type ReactNode,
+} from "react";
+import { Link } from "react-router-dom";
+import { Calculator, Car, Users, CheckCircle2, X } from "lucide-react";
+import { AgencyNameCombobox } from "../../../components/AgencyNameCombobox";
 import {
   createTrip,
   fetchDriversList,
@@ -9,11 +15,11 @@ import {
   type DriverItem,
   type TripItem,
   type Vehicle,
-} from '../../vehicles/api';
+} from "../../vehicles/api";
 
 /** Comfortable tap/read size; fits more in view via layout, not shrinking type */
 const inputCls =
-  'w-full rounded-lg border border-slate-300 px-3 py-2.5 text-base text-slate-800 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200';
+  "w-full rounded-lg border border-slate-300 px-3 py-2.5 text-base text-slate-800 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200";
 
 function Field({
   label,
@@ -40,9 +46,9 @@ function Field({
 function driverLabel(d: DriverItem): string {
   const name =
     d.name?.trim() ||
-    `${d.firstName ?? ''} ${d.lastName ?? ''}`.trim() ||
+    `${d.firstName ?? ""} ${d.lastName ?? ""}`.trim() ||
     d.fullName?.trim() ||
-    'Driver';
+    "Driver";
   return d.phone ? `${name} · ${d.phone}` : name;
 }
 
@@ -52,21 +58,21 @@ export function CreateNewTripPage() {
   const [listsLoading, setListsLoading] = useState(true);
   const [listsError, setListsError] = useState<string | null>(null);
 
-  const [vehicleId, setVehicleId] = useState('');
-  const [driverId, setDriverId] = useState('');
+  const [vehicleId, setVehicleId] = useState("");
+  const [driverId, setDriverId] = useState("");
 
   const [form, setForm] = useState({
-    from: '',
-    to: '',
-    startDate: '',
-    expectedEndDate: '',
-    distance: '',
-    customer: '',
-    agencyName: '',
-    agencyCost: '',
-    cabCost: '',
-    advance: '',
-    notes: '',
+    from: "",
+    to: "",
+    startDate: "",
+    expectedEndDate: "",
+    distance: "",
+    customer: "",
+    agencyName: "",
+    agencyCost: "",
+    cabCost: "",
+    advance: "",
+    notes: "",
   });
 
   const [saving, setSaving] = useState(false);
@@ -85,7 +91,9 @@ export function CreateNewTripPage() {
       })
       .catch(() => {
         if (!active) return;
-        setListsError('Could not load vehicles or drivers. Refresh and try again.');
+        setListsError(
+          "Could not load vehicles or drivers. Refresh and try again.",
+        );
       })
       .finally(() => {
         if (active) setListsLoading(false);
@@ -97,42 +105,48 @@ export function CreateNewTripPage() {
 
   const set =
     (k: keyof typeof form) =>
-    (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
+    (
+      e: React.ChangeEvent<
+        HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
+      >,
+    ) =>
       setForm((prev) => ({ ...prev, [k]: e.target.value }));
 
-  const profit = (parseFloat(form.agencyCost || '0') - parseFloat(form.cabCost || '0')).toFixed(2);
+  const profit = (
+    parseFloat(form.agencyCost || "0") - parseFloat(form.cabCost || "0")
+  ).toFixed(2);
 
   const resetFormFields = useCallback(() => {
     setForm({
-      from: '',
-      to: '',
-      startDate: '',
-      expectedEndDate: '',
-      distance: '',
-      customer: '',
-      agencyName: '',
-      agencyCost: '',
-      cabCost: '',
-      advance: '',
-      notes: '',
+      from: "",
+      to: "",
+      startDate: "",
+      expectedEndDate: "",
+      distance: "",
+      customer: "",
+      agencyName: "",
+      agencyCost: "",
+      cabCost: "",
+      advance: "",
+      notes: "",
     });
-    setDriverId('');
-    setVehicleId('');
+    setDriverId("");
+    setVehicleId("");
     setError(null);
   }, []);
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     if (!vehicleId) {
-      setError('Select a vehicle.');
+      setError("Select a vehicle.");
       return;
     }
     if (!form.from.trim() || !form.to.trim()) {
-      setError('From and To locations are required');
+      setError("From and To locations are required");
       return;
     }
     if (!form.agencyName.trim()) {
-      setError('Agency name is required');
+      setError("Agency name is required");
       return;
     }
     setSaving(true);
@@ -151,7 +165,7 @@ export function CreateNewTripPage() {
         agencyCost: form.agencyCost ? parseFloat(form.agencyCost) : undefined,
         cabCost: form.cabCost ? parseFloat(form.cabCost) : undefined,
         advance: form.advance ? parseFloat(form.advance) : undefined,
-        ownerProfit: profit,
+        agencyProfit: profit,
         amount: form.agencyCost ? parseFloat(form.agencyCost) : undefined,
         notes: form.notes.trim() || undefined,
       };
@@ -163,7 +177,7 @@ export function CreateNewTripPage() {
       setCreatedTrip(saved);
       resetFormFields();
     } catch (err: any) {
-      setError(err?.response?.data?.message ?? 'Failed to create trip');
+      setError(err?.response?.data?.message ?? "Failed to create trip");
     } finally {
       setSaving(false);
     }
@@ -175,12 +189,17 @@ export function CreateNewTripPage() {
       <header className="shrink-0 border-b border-slate-200 bg-white px-4 py-3 shadow-sm sm:px-5 lg:px-6">
         <div className="mx-auto flex max-w-7xl flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h1 className="text-xl font-bold tracking-tight text-slate-900 sm:text-2xl">Create New Trip</h1>
+            <h1 className="text-xl font-bold tracking-tight text-slate-900 sm:text-2xl">
+              Create New Trip
+            </h1>
             <p className="mt-0.5 text-sm text-slate-600">
-              Changes to existing trips:{' '}
-              <Link to="/vehicles" className="font-semibold text-indigo-600 underline-offset-2 hover:underline">
+              Changes to existing trips:{" "}
+              <Link
+                to="/vehicles"
+                className="font-semibold text-blue-600 underline-offset-2 hover:underline"
+              >
                 Trip Details
-              </Link>{' '}
+              </Link>{" "}
               → Trip &amp; Driver
             </p>
           </div>
@@ -188,7 +207,10 @@ export function CreateNewTripPage() {
             <div className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-900 sm:max-w-md">
               <CheckCircle2 className="h-5 w-5 shrink-0 text-emerald-600" />
               <span className="min-w-0 font-medium leading-snug">
-                {createdTrip.tripNumber ? `Trip #${createdTrip.tripNumber}` : 'Trip saved'}. Add another below.
+                {createdTrip.tripNumber
+                  ? `Trip #${createdTrip.tripNumber}`
+                  : "Trip saved"}
+                . Add another below.
               </span>
               <button
                 type="button"
@@ -210,7 +232,9 @@ export function CreateNewTripPage() {
           </p>
         )}
         {listsError && (
-          <p className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-base text-red-800">{listsError}</p>
+          <p className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-base text-red-800">
+            {listsError}
+          </p>
         )}
 
         {!listsLoading && !listsError && (
@@ -220,16 +244,20 @@ export function CreateNewTripPage() {
           >
             {/* Single scroll region only if content exceeds viewport (e.g. small laptop height) */}
             <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain">
-              <div className="grid grid-cols-1 gap-6 p-4 sm:p-5 lg:grid-cols-2 lg:gap-x-10 lg:gap-y-4 lg:p-6 xl:gap-x-12">
+              <div className="grid grid-cols-1 gap-6 p-4 sm:p-5 md:grid-cols-2 md:gap-x-10 md:gap-y-4 lg:p-6 xl:gap-x-12">
                 {error && (
-                  <div className="lg:col-span-2">
-                    <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>
+                  <div className="md:col-span-2">
+                    <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                      {error}
+                    </p>
                   </div>
                 )}
 
                 {/* Column 1 — who & where */}
                 <div className="flex min-h-0 flex-col gap-3 sm:gap-4">
-                  <p className="text-xs font-bold uppercase tracking-wider text-indigo-600">Vehicle &amp; route</p>
+                  <p className="text-xs font-bold uppercase tracking-wider text-blue-600">
+                    Vehicle &amp; route
+                  </p>
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
                     <Field label="Vehicle" id="c-vehicle" required>
                       <div className="relative">
@@ -245,7 +273,7 @@ export function CreateNewTripPage() {
                           {vehicles.map((v) => (
                             <option key={v._id} value={v._id}>
                               {v.vehicleNumber}
-                              {v.vehicleModel ? ` — ${v.vehicleModel}` : ''}
+                              {v.vehicleModel ? ` — ${v.vehicleModel}` : ""}
                             </option>
                           ))}
                         </select>
@@ -276,7 +304,7 @@ export function CreateNewTripPage() {
                       <input
                         id="c-from"
                         value={form.from}
-                        onChange={set('from')}
+                        onChange={set("from")}
                         required
                         className={inputCls}
                         placeholder="Origin"
@@ -286,7 +314,7 @@ export function CreateNewTripPage() {
                       <input
                         id="c-to"
                         value={form.to}
-                        onChange={set('to')}
+                        onChange={set("to")}
                         required
                         className={inputCls}
                         placeholder="Destination"
@@ -296,14 +324,20 @@ export function CreateNewTripPage() {
 
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
                     <Field label="Start date" id="c-startdate">
-                      <input id="c-startdate" type="date" value={form.startDate} onChange={set('startDate')} className={inputCls} />
+                      <input
+                        id="c-startdate"
+                        type="date"
+                        value={form.startDate}
+                        onChange={set("startDate")}
+                        className={inputCls}
+                      />
                     </Field>
                     <Field label="Expected end date" id="c-enddate">
                       <input
                         id="c-enddate"
                         type="date"
                         value={form.expectedEndDate}
-                        onChange={set('expectedEndDate')}
+                        onChange={set("expectedEndDate")}
                         className={inputCls}
                       />
                     </Field>
@@ -311,17 +345,32 @@ export function CreateNewTripPage() {
 
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
                     <Field label="Distance (km)" id="c-dist">
-                      <input id="c-dist" type="number" value={form.distance} onChange={set('distance')} className={inputCls} placeholder="0" />
+                      <input
+                        id="c-dist"
+                        type="number"
+                        value={form.distance}
+                        onChange={set("distance")}
+                        className={inputCls}
+                        placeholder="0"
+                      />
                     </Field>
                     <Field label="Customer (optional)" id="c-cus">
-                      <input id="c-cus" value={form.customer} onChange={set('customer')} className={inputCls} placeholder="Name" />
+                      <input
+                        id="c-cus"
+                        value={form.customer}
+                        onChange={set("customer")}
+                        className={inputCls}
+                        placeholder="Name"
+                      />
                     </Field>
                   </div>
                 </div>
 
                 {/* Column 2 — agency & money */}
                 <div className="flex min-h-0 flex-col gap-3 sm:gap-4">
-                  <p className="text-xs font-bold uppercase tracking-wider text-indigo-600">Agency &amp; amounts</p>
+                  <p className="text-xs font-bold uppercase tracking-wider text-blue-600">
+                    Agency &amp; amounts
+                  </p>
                   <Field label="Agency name" id="c-agn" required>
                     <AgencyNameCombobox
                       id="c-agn"
@@ -341,28 +390,46 @@ export function CreateNewTripPage() {
                         type="number"
                         step="0.01"
                         value={form.agencyCost}
-                        onChange={set('agencyCost')}
+                        onChange={set("agencyCost")}
                         className={inputCls}
                       />
                     </Field>
                     <Field label="Cab cost (₹)" id="c-cabC">
-                      <input id="c-cabC" type="number" step="0.01" value={form.cabCost} onChange={set('cabCost')} className={inputCls} />
+                      <input
+                        id="c-cabC"
+                        type="number"
+                        step="0.01"
+                        value={form.cabCost}
+                        onChange={set("cabCost")}
+                        className={inputCls}
+                      />
                     </Field>
                     <Field label="Advance (₹)" id="c-advance">
-                      <input id="c-advance" type="number" step="0.01" value={form.advance} onChange={set('advance')} className={inputCls} />
+                      <input
+                        id="c-advance"
+                        type="number"
+                        step="0.01"
+                        value={form.advance}
+                        onChange={set("advance")}
+                        className={inputCls}
+                      />
                     </Field>
                   </div>
 
-                  <div className="flex items-center gap-3 rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-3">
-                    <Calculator className="h-6 w-6 shrink-0 text-indigo-600" />
-                    <span className="text-base font-bold text-indigo-900">Owner profit: ₹{profit}</span>
+                  <div className="flex items-center gap-3 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3">
+                    <Calculator className="h-6 w-6 shrink-0 text-blue-600" />
+                    <span className="text-base font-bold text-blue-900">
+                      Agency profit: ₹{profit}
+                    </span>
                   </div>
 
                   <Field label="Notes (optional)" id="c-notes">
                     <textarea
                       id="c-notes"
                       value={form.notes}
-                      onChange={(e) => setForm((prev) => ({ ...prev, notes: e.target.value }))}
+                      onChange={(e) =>
+                        setForm((prev) => ({ ...prev, notes: e.target.value }))
+                      }
                       className={`${inputCls} min-h-18 resize-y`}
                       rows={2}
                       placeholder="Anything the driver or office should know…"
@@ -372,7 +439,7 @@ export function CreateNewTripPage() {
               </div>
             </div>
 
-            <div className="flex shrink-0 flex-wrap items-center justify-end gap-3 border-t border-slate-200 bg-slate-50 px-4 py-3 sm:px-5 lg:px-6">
+            <div className="flex shrink-0 flex-wrap items-center justify-end gap-3 border-t border-slate-200 bg-slate-50/80 px-4 py-3 sm:px-5 lg:px-6 pb-safe">
               <Link
                 to="/vehicles"
                 className="rounded-xl border border-slate-300 bg-white px-5 py-2.5 text-base font-semibold text-slate-700 shadow-sm hover:bg-slate-50"
@@ -382,9 +449,9 @@ export function CreateNewTripPage() {
               <button
                 type="submit"
                 disabled={saving || !vehicleId || !form.agencyName.trim()}
-                className="rounded-xl bg-indigo-600 px-8 py-2.5 text-base font-bold text-white shadow-sm hover:bg-indigo-700 disabled:opacity-50"
+                className="rounded-xl bg-blue-600 px-8 py-2.5 text-base font-bold text-white shadow-sm hover:bg-blue-700 disabled:opacity-50"
               >
-                {saving ? 'Creating…' : 'Create trip'}
+                {saving ? "Creating…" : "Create trip"}
               </button>
             </div>
           </form>

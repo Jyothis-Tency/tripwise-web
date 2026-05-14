@@ -78,7 +78,7 @@ export function PaymentHistoryModal({
           ) : (
             <div className="space-y-2.5 sm:space-y-3">
               {payments.map(payment => (
-                <div key={payment._id} className="bg-white border text-sm border-slate-200 rounded-xl p-3 sm:p-3.5 shadow-sm hover:border-indigo-200 transition">
+                <div key={payment._id} className="bg-white border text-sm border-slate-200 rounded-xl p-3 sm:p-3.5 shadow-sm hover:border-blue-200 transition">
                   <div className="flex justify-between items-start mb-1.5 sm:mb-2 gap-2">
                     <div className="flex items-center gap-2 text-slate-900 font-bold text-base sm:text-lg tabular-nums">
                       <CreditCard className="h-5 w-5 shrink-0 text-emerald-600" aria-hidden />

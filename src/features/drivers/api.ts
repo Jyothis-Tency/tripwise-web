@@ -207,7 +207,7 @@ export async function fetchDriverHistoryDetailed(params: {
       endKilometers: t.endKilometers,
       totalExpenses: t.totalExpenses,
       driver_salary: t.driver_salary,
-      ownerProfit: t.ownerProfit,
+      agencyProfit: t.agencyProfit ?? t.ownerProfit,
       agencyCost: t.agencyCost,
       cabCost: t.cabCost,
       driverName:

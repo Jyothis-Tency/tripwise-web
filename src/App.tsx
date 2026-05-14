@@ -13,6 +13,7 @@ import DriversPage from './features/drivers/pages/DriversPage';
 import RemindersPage from './features/reminders/pages/RemindersPage';
 import ExpensesPage from './features/expenses/pages/ExpensesPage';
 import { CreateNewTripPage } from './features/trips/pages/CreateNewTripPage';
+import { ComingSoonPage } from './components/ui/ComingSoonPage';
 
 function App() {
   return (
@@ -36,12 +37,12 @@ function App() {
         <Route path="expenses" element={<ExpensesPage />} />
         <Route path="history" element={<HistoryPage />} />
         <Route path="history/payout" element={<HistoryPayoutPage />} />
-        <Route path="analytics" element={<div>Analytics (coming soon)</div>} />
+        <Route path="analytics" element={<ComingSoonPage title="Analytics" description="Comprehensive fleet analytics with charts, trends, and insights." icon="📊" />} />
         <Route path="pl" element={<PLPage />} />
         <Route path="reminders" element={<RemindersPage />} />
-        <Route path="credit-debit" element={<div>Credit / Debit (coming soon)</div>} />
+        <Route path="credit-debit" element={<ComingSoonPage title="Credit / Debit" description="Track credits, debits, and outstanding balances across your fleet." icon="💳" />} />
         <Route path="tracking" element={<TrackingPage />} />
-        <Route path="admin" element={<div>Admin (coming soon)</div>} />
+        <Route path="admin" element={<ComingSoonPage title="Admin Panel" description="User management, roles, permissions, and system configuration." icon="⚙️" />} />
       </Route>
 
       <Route path="*" element={<Navigate to="/" replace />} />

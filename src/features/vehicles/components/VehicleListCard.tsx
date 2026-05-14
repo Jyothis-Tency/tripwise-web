@@ -7,7 +7,7 @@ function statusDotCls(status?: string) {
       return "bg-green-500";
     case "on trip":
     case "on_trip":
-      return "bg-indigo-500";
+      return "bg-blue-500";
     case "maintenance":
     case "under maintenance":
       return "bg-orange-400";
@@ -61,13 +61,13 @@ export function VehicleListCard({
       }}
       className={`w-full cursor-pointer rounded-xl border p-3 text-left transition-all ${
         isSelected
-          ? "border-indigo-400 bg-indigo-50 shadow-sm"
+          ? "border-blue-400 bg-blue-50 shadow-sm"
           : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50"
       }`}
     >
       <div className="flex items-start gap-3">
-        <div className="flex h-10 w-12 shrink-0 items-center justify-center rounded-lg bg-indigo-100">
-          <Car className="h-5 w-5 text-indigo-500" />
+        <div className="flex h-10 w-12 shrink-0 items-center justify-center rounded-lg bg-blue-100">
+          <Car className="h-5 w-5 text-blue-500" />
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex items-center justify-between gap-1">
@@ -81,7 +81,7 @@ export function VehicleListCard({
                   e.stopPropagation();
                   onEdit();
                 }}
-                className="shrink-0 rounded p-0.5 text-slate-400 hover:text-indigo-500"
+                className="shrink-0 rounded p-0.5 text-slate-400 hover:text-blue-500"
                 title="Edit vehicle"
               >
                 <Pencil className="h-3.5 w-3.5" />
@@ -114,7 +114,7 @@ export function VehicleListCard({
             Driver: {vehicle.currentDriverName ?? "Unassigned"}
           </p>
           {tripFrom && tripTo && (
-            <p className="mt-0.5 flex items-center gap-1 text-xs font-medium text-indigo-500">
+            <p className="mt-0.5 flex items-center gap-1 text-xs font-medium text-blue-500">
               <span className="truncate">{tripFrom}</span>
               <ChevronRight className="h-3 w-3 shrink-0" />
               <span className="truncate">{tripTo}</span>

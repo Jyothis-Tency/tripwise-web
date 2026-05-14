@@ -36,7 +36,7 @@ export function ExportPdfModal({ open, onClose, onExport }: Props) {
         {/* Header */}
         <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
           <h3 className="text-base font-semibold text-slate-800 flex items-center gap-2">
-            <FileDown className="h-5 w-5 text-indigo-500" />
+            <FileDown className="h-5 w-5 text-blue-500" />
             Export History PDF
           </h3>
           <button
@@ -61,7 +61,7 @@ export function ExportPdfModal({ open, onClose, onExport }: Props) {
                 value={startDate}
                 onChange={e => setStartDate(e.target.value)}
                 disabled={exporting}
-                className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-200"
+                className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-200"
               />
             </div>
             <div>
@@ -71,7 +71,7 @@ export function ExportPdfModal({ open, onClose, onExport }: Props) {
                 value={endDate}
                 onChange={e => setEndDate(e.target.value)}
                 disabled={exporting}
-                className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-200"
+                className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-200"
               />
             </div>
           </div>
@@ -89,7 +89,7 @@ export function ExportPdfModal({ open, onClose, onExport }: Props) {
           <button
             onClick={handleExport}
             disabled={exporting || !startDate || !endDate}
-            className="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium transition flex items-center gap-2 disabled:opacity-60"
+            className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium transition flex items-center gap-2 disabled:opacity-60"
           >
             {exporting ? (
               <>

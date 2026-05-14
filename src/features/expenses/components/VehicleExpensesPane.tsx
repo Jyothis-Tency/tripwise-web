@@ -17,7 +17,7 @@ import {
 } from "../../vehicles/api";
 
 const inputCls =
-  "w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500";
+  "w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500";
 
 function Field({
   label,
@@ -256,7 +256,7 @@ function VehicleExpenseFormModal({
           <button
             type="submit"
             disabled={saving}
-            className="rounded-lg bg-indigo-500 px-5 py-2 text-sm font-semibold text-white hover:bg-indigo-600 disabled:opacity-50"
+            className="rounded-lg bg-blue-500 px-5 py-2 text-sm font-semibold text-white hover:bg-blue-600 disabled:opacity-50"
           >
             {saving ? "Saving…" : isUpdate ? "Update" : "Save"}
           </button>
@@ -320,7 +320,7 @@ export function VehicleExpensesPane({ vehicle }: { vehicle: Vehicle }) {
     <div className="space-y-4">
       <div className="flex flex-col justify-between gap-3 rounded-xl border border-slate-200 bg-white p-4 sm:flex-row sm:items-center sm:gap-0">
         <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600">
+          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-50 text-blue-600">
             <Calculator className="h-5 w-5" />
           </div>
           <div>
@@ -335,7 +335,7 @@ export function VehicleExpensesPane({ vehicle }: { vehicle: Vehicle }) {
         <button
           type="button"
           onClick={() => setExpenseModal("add")}
-          className="flex items-center gap-1.5 rounded-lg bg-indigo-500 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-600"
+          className="flex items-center gap-1.5 rounded-lg bg-blue-500 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-600"
         >
           <Plus className="h-4 w-4" /> Add expense
         </button>
@@ -393,7 +393,7 @@ export function VehicleExpensesPane({ vehicle }: { vehicle: Vehicle }) {
                         <button
                           type="button"
                           onClick={() => setExpenseModal({ edit: e })}
-                          className="p-1 text-indigo-500 hover:text-indigo-700"
+                          className="p-1 text-blue-500 hover:text-blue-700"
                           title="Edit"
                         >
                           <Edit2 className="h-3.5 w-3.5" />

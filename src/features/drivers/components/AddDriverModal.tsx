@@ -48,7 +48,7 @@ export function AddDriverModal({ onClose, onSuccess }: AddDriverModalProps) {
     <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
         {/* Header */}
-        <div className="flex items-center gap-2 px-5 py-4 border-b border-slate-100 bg-indigo-600 rounded-t-2xl">
+        <div className="flex items-center gap-2 px-5 py-4 border-b border-slate-100 bg-blue-600 rounded-t-2xl">
           <UserPlus className="h-5 w-5 text-white" />
           <h3 className="text-white font-semibold flex-1">Add New Driver</h3>
           <button onClick={onClose} className="text-white/70 hover:text-white transition">
@@ -65,7 +65,7 @@ export function AddDriverModal({ onClose, onSuccess }: AddDriverModalProps) {
                 value={firstName}
                 onChange={e => setFirstName(e.target.value.toUpperCase())}
                 placeholder="JOHN"
-                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-200 uppercase"
+                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-200 uppercase"
               />
             </div>
             <div>
@@ -74,7 +74,7 @@ export function AddDriverModal({ onClose, onSuccess }: AddDriverModalProps) {
                 value={lastName}
                 onChange={e => setLastName(e.target.value.toUpperCase())}
                 placeholder="DOE"
-                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-200 uppercase"
+                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-200 uppercase"
               />
             </div>
           </div>
@@ -86,7 +86,7 @@ export function AddDriverModal({ onClose, onSuccess }: AddDriverModalProps) {
               value={email}
               onChange={e => setEmail(e.target.value.toLowerCase())}
               placeholder="john@gmail.com"
-              className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-200"
+              className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-200"
             />
           </div>
 
@@ -98,7 +98,7 @@ export function AddDriverModal({ onClose, onSuccess }: AddDriverModalProps) {
               onChange={e => setPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
               placeholder="9876543210"
               maxLength={10}
-              className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-200"
+              className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-200"
             />
           </div>
 
@@ -108,7 +108,7 @@ export function AddDriverModal({ onClose, onSuccess }: AddDriverModalProps) {
               value={place}
               onChange={e => setPlace(e.target.value)}
               placeholder="Ernakulam"
-              className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-200"
+              className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-200"
             />
           </div>
 
@@ -121,7 +121,7 @@ export function AddDriverModal({ onClose, onSuccess }: AddDriverModalProps) {
             Cancel
           </button>
           <button onClick={handleSubmit} disabled={saving}
-            className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl py-2.5 text-sm font-semibold transition disabled:opacity-60">
+            className="flex-1 bg-blue-600 hover:bg-blue-700 text-white rounded-xl py-2.5 text-sm font-semibold transition disabled:opacity-60">
             {saving ? 'Adding…' : 'Add Driver'}
           </button>
         </div>

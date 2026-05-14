@@ -89,15 +89,15 @@ export function DriverDetail({ driver, onBack, onBlockChange }: DriverDetailProp
       <div className="flex items-center gap-3 px-5 py-4 border-b border-slate-100 shrink-0">
         {onBack && (
           <button type="button" onClick={onBack}
-            className="lg:hidden flex h-10 w-10 items-center justify-center -ml-2 text-slate-500 hover:bg-slate-100 rounded-full transition-colors active:scale-95">
+            className="md:hidden flex h-10 w-10 items-center justify-center -ml-2 text-slate-500 hover:bg-slate-100 rounded-full transition-colors active:scale-95">
             <ArrowLeft className="h-5 w-5" />
           </button>
         )}
         {driver.profileImg ? (
           <img src={driver.profileImg} alt="" className="h-11 w-11 rounded-full object-cover shrink-0" />
         ) : (
-          <div className="h-11 w-11 rounded-full bg-indigo-100 flex items-center justify-center shrink-0">
-            <User className="h-6 w-6 text-indigo-500" />
+          <div className="h-11 w-11 rounded-full bg-blue-50 flex items-center justify-center shrink-0">
+            <User className="h-6 w-6 text-blue-500" />
           </div>
         )}
         <div className="flex-1 min-w-0">
@@ -109,7 +109,7 @@ export function DriverDetail({ driver, onBack, onBlockChange }: DriverDetailProp
         <button
           type="button"
           onClick={() => setHistoryOpen(true)}
-          className="flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 px-2 py-1.5 text-[11px] font-semibold text-slate-600 hover:bg-slate-100 transition shrink-0"
+          className="flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-[11px] font-medium text-slate-600 hover:bg-slate-50 transition shrink-0"
           title="Driver trip history"
         >
           <History className="h-3.5 w-3.5" />
@@ -135,7 +135,7 @@ export function DriverDetail({ driver, onBack, onBlockChange }: DriverDetailProp
         {(['details', 'salary'] as const).map(t => (
           <button key={t} onClick={() => setTab(t)}
             className={`flex-1 py-2.5 text-xs font-semibold capitalize transition
-              ${tab === t ? 'text-indigo-600 border-b-2 border-indigo-600' : 'text-slate-400 hover:text-slate-600'}`}>
+              ${tab === t ? 'text-blue-600 border-b-2 border-blue-600' : 'text-slate-400 hover:text-slate-600'}`}>
             {t}
           </button>
         ))}
@@ -240,6 +240,7 @@ function SalaryTab({ driver }: { driver: Driver }) {
 
   const driverId = driver._id ?? (driver as any).id;
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     loadData();
   }, [driverId, monthFilter]);
@@ -329,7 +330,7 @@ function SalaryTab({ driver }: { driver: Driver }) {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <div className="h-6 w-6 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+        <div className="h-6 w-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
@@ -349,7 +350,7 @@ function SalaryTab({ driver }: { driver: Driver }) {
           type="month"
           value={monthFilter}
           onChange={e => setMonthFilter(e.target.value)}
-          className="rounded-lg border border-slate-200 px-2.5 py-1.5 text-sm text-slate-700 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+          className="rounded-lg border border-slate-200 px-2.5 py-1.5 text-sm text-slate-700 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
         />
       </div>
       <p className="text-[10px] text-slate-500 -mt-2">
@@ -358,12 +359,12 @@ function SalaryTab({ driver }: { driver: Driver }) {
 
       {/* Summary Cards */}
       <div className="grid grid-cols-2 gap-2">
-        <StatCard icon={<DollarSign className="h-4 w-4 text-emerald-500" />} label="Trip Bata (earned)" value={fmtCurrency(salaryData?.totalEarnings)} />
+        <StatCard icon={<DollarSign className="h-4 w-4 text-emerald-500" />} label="Trip Bata" value={fmtCurrency(salaryData?.totalEarnings)} />
         <StatCard icon={<Wallet className="h-4 w-4 text-violet-500" />} label="Advances paid" value={fmtCurrency(salaryData?.totalAdvance)} />
         <StatCard icon={<Banknote className="h-4 w-4 text-sky-600" />} label="Salary paid" value={fmtCurrency(salaryData?.salaryPaid)} />
         <StatCard icon={<DollarSign className="h-4 w-4 text-amber-600" />} label="Pending payout" value={fmtCurrency(salaryData?.pendingTripSalary)} />
         <StatCard icon={<TrendingUp className="h-4 w-4 text-blue-500" />} label="Trips" value={String(salaryData?.totalTrips ?? 0)} />
-        <StatCard icon={<MapPin className="h-4 w-4 text-indigo-500" />} label="Total KM" value={`${salaryData?.totalKm ?? 0} km`} />
+        <StatCard icon={<MapPin className="h-4 w-4 text-blue-500" />} label="Total KM" value={`${salaryData?.totalKm ?? 0} km`} />
       </div>
 
       {/* Record salary payment */}
@@ -377,14 +378,14 @@ function SalaryTab({ driver }: { driver: Driver }) {
             value={paymentAmount}
             onChange={e => setPaymentAmount(e.target.value)}
             placeholder="Amount paying now"
-            className="w-28 border border-slate-200 rounded px-2 py-1.5 text-xs outline-none focus:border-indigo-300"
+            className="w-28 border border-slate-200 rounded px-2 py-1.5 text-xs outline-none focus:border-blue-300"
           />
           <input
             type="text"
             value={paymentNote}
             onChange={e => setPaymentNote(e.target.value)}
             placeholder="Note (e.g. UPI ref, cash)"
-            className="flex-1 min-w-[120px] border border-slate-200 rounded px-2 py-1.5 text-xs outline-none focus:border-indigo-300"
+            className="flex-1 min-w-[120px] border border-slate-200 rounded px-2 py-1.5 text-xs outline-none focus:border-blue-300"
           />
           <button
             type="button"
@@ -410,7 +411,7 @@ function SalaryTab({ driver }: { driver: Driver }) {
         title="Advance Payments"
         icon={<DollarSign className="h-3.5 w-3.5" />}
         action={
-          <button type="button" onClick={() => setShowAddAdvance(s => !s)} className="text-indigo-500 hover:text-indigo-700">
+          <button type="button" onClick={() => setShowAddAdvance(s => !s)} className="text-blue-500 hover:text-blue-700">
             <Plus className="h-3.5 w-3.5" />
           </button>
         }
@@ -422,17 +423,17 @@ function SalaryTab({ driver }: { driver: Driver }) {
               value={advanceAmount}
               onChange={e => setAdvanceAmount(e.target.value)}
               placeholder="Amount"
-              className="w-20 border border-slate-200 rounded px-2 py-1 text-xs outline-none focus:border-indigo-300"
+              className="w-20 border border-slate-200 rounded px-2 py-1 text-xs outline-none focus:border-blue-300"
             />
             <input
               type="text"
               value={advanceDesc}
               onChange={e => setAdvanceDesc(e.target.value)}
               placeholder="Description"
-              className="flex-1 border border-slate-200 rounded px-2 py-1 text-xs outline-none focus:border-indigo-300"
+              className="flex-1 border border-slate-200 rounded px-2 py-1 text-xs outline-none focus:border-blue-300"
             />
             <button type="button" onClick={handleAddAdvance} disabled={addingSalary}
-              className="px-2 py-1 bg-indigo-600 text-white rounded text-xs font-semibold disabled:opacity-50">
+              className="px-2 py-1 bg-blue-600 text-white rounded text-xs font-semibold disabled:opacity-50">
               {addingSalary ? '…' : 'Add'}
             </button>
           </div>
@@ -515,7 +516,7 @@ function SalaryTab({ driver }: { driver: Driver }) {
               <span className="text-[11px] text-slate-700 flex-1 truncate">
                 {trip.from ?? '—'} → {trip.to ?? '—'}
               </span>
-              <span className="text-[11px] font-medium text-indigo-600 ml-2">
+              <span className="text-[11px] font-medium text-blue-600 ml-2">
                 {trip.driver_salary ? fmtCurrency(trip.driver_salary) : '—'}
               </span>
             </div>

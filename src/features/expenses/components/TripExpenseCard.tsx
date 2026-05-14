@@ -103,7 +103,7 @@ const TripExpenseCard: React.FC<Props> = ({ trip, onRefresh }) => {
     setEditingId(null);
   };
 
-  const inputCls = "px-2 py-1.5 rounded-md border border-slate-200 text-xs outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-200 bg-white";
+  const inputCls = "px-2 py-1.5 rounded-md border border-slate-200 text-xs outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-200 bg-white";
 
   return (
     <div className="bg-white rounded-xl border border-slate-100 mb-2.5 overflow-hidden shadow-sm transition-shadow hover:shadow-md">
@@ -143,7 +143,7 @@ const TripExpenseCard: React.FC<Props> = ({ trip, onRefresh }) => {
                   <input placeholder="₹" type="number" value={editExp.amount} onChange={e => setEditExp(p => ({ ...p, amount: e.target.value }))} className={`${inputCls} w-20`} />
                   
                   <div className="flex gap-1">
-                    <button type="button" onClick={handleEditExp} disabled={saving} className="px-2 py-1.5 rounded-md border-0 bg-indigo-600 hover:bg-indigo-700 text-white text-[11px] font-semibold cursor-pointer disabled:opacity-60">{saving ? '…' : 'Save'}</button>
+                    <button type="button" onClick={handleEditExp} disabled={saving} className="px-2 py-1.5 rounded-md border-0 bg-blue-600 hover:bg-blue-700 text-white text-[11px] font-semibold cursor-pointer disabled:opacity-60">{saving ? '…' : 'Save'}</button>
                     <button type="button" onClick={() => { cancelEdit(); setFormError(null); }} className="px-1.5 py-1.5 rounded-md border border-slate-200 bg-white hover:bg-slate-100 text-slate-500 text-[11px] cursor-pointer">✕</button>
                   </div>
                 </div>
@@ -162,7 +162,7 @@ const TripExpenseCard: React.FC<Props> = ({ trip, onRefresh }) => {
                   <div className="flex items-center gap-2.5">
                     <span className="font-semibold text-[13px] text-red-500">₹{Number(exp.amount).toLocaleString('en-IN')}</span>
                     <div className="flex items-center gap-1">
-                      <button type="button" onClick={() => { setFormError(null); startEdit(exp); }} className="text-indigo-500 hover:bg-indigo-50 rounded-md p-1 px-1.5 text-[11px] cursor-pointer" title="Edit">✎</button>
+                      <button type="button" onClick={() => { setFormError(null); startEdit(exp); }} className="text-blue-500 hover:bg-blue-50 rounded-md p-1 px-1.5 text-[11px] cursor-pointer" title="Edit">✎</button>
                       <button type="button" onClick={() => handleDeleteExp(exp._id)} className="text-red-500 hover:bg-red-50 rounded-md p-1 px-1.5 text-[11px] cursor-pointer" title="Delete">✕</button>
                     </div>
                   </div>
@@ -179,20 +179,20 @@ const TripExpenseCard: React.FC<Props> = ({ trip, onRefresh }) => {
           )}
 
           {adding && !editingId ? (
-            <div className="mt-3 flex flex-wrap xs:flex-nowrap gap-1.5 sm:gap-2 items-center bg-indigo-50/50 p-2 rounded-lg border border-indigo-100 border-dashed">
+            <div className="mt-3 flex flex-wrap xs:flex-nowrap gap-1.5 sm:gap-2 items-center bg-blue-50/50 p-2 rounded-lg border border-blue-100 border-dashed">
               <select 
                 value={newExp.category} 
                 onChange={e => setNewExp(p => ({ ...p, category: e.target.value }))}
-                className={`${inputCls} min-w-[90px] border-indigo-200 focus:border-indigo-500`}
+                className={`${inputCls} min-w-[90px] border-blue-200 focus:border-blue-500`}
               >
                 {TRIP_EXPENSE_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
               </select>
-              <input placeholder="Desc (Optional)" value={newExp.description} onChange={e => setNewExp(p => ({ ...p, description: e.target.value }))} className={`${inputCls} flex-1 min-w-[80px] border-indigo-200 focus:border-indigo-500`} />
-              <input placeholder="₹ Amount" type="number" value={newExp.amount} onChange={e => setNewExp(p => ({ ...p, amount: e.target.value }))} className={`${inputCls} w-20 border-indigo-200 focus:border-indigo-500`} />
+              <input placeholder="Desc (Optional)" value={newExp.description} onChange={e => setNewExp(p => ({ ...p, description: e.target.value }))} className={`${inputCls} flex-1 min-w-[80px] border-blue-200 focus:border-blue-500`} />
+              <input placeholder="₹ Amount" type="number" value={newExp.amount} onChange={e => setNewExp(p => ({ ...p, amount: e.target.value }))} className={`${inputCls} w-20 border-blue-200 focus:border-blue-500`} />
               
               <div className="flex gap-1 ml-auto xs:ml-0">
-                <button type="button" onClick={handleAddExp} disabled={saving} className="px-3 py-1.5 rounded-md border-0 bg-indigo-600 hover:bg-indigo-700 text-white text-[11px] font-semibold cursor-pointer disabled:opacity-60">{saving ? '…' : 'Add'}</button>
-                <button type="button" onClick={() => { setAdding(false); setFormError(null); }} className="px-2 py-1.5 rounded-md border border-indigo-200 bg-white hover:bg-indigo-50 text-indigo-700 text-[11px] cursor-pointer">✕</button>
+                <button type="button" onClick={handleAddExp} disabled={saving} className="px-3 py-1.5 rounded-md border-0 bg-blue-600 hover:bg-blue-700 text-white text-[11px] font-semibold cursor-pointer disabled:opacity-60">{saving ? '…' : 'Add'}</button>
+                <button type="button" onClick={() => { setAdding(false); setFormError(null); }} className="px-2 py-1.5 rounded-md border border-blue-200 bg-white hover:bg-blue-50 text-blue-700 text-[11px] cursor-pointer">✕</button>
               </div>
             </div>
           ) : !editingId ? (

@@ -36,7 +36,7 @@ export interface TrackingVehicle {
     customer?: string;
     agencyCost?: string | number;
     cabCost?: string | number;
-    ownerProfit?: string | number;
+    agencyProfit?: string | number;
     agencyName?: string;
     advance?: number;
     startKilometers?: number;

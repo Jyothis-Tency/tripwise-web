@@ -46,7 +46,7 @@ export interface HistoryTrip {
   driver_salary?: number;
   advance?: number;
   totalExpenses?: number;
-  ownerProfit?: number;
+  agencyProfit?: number;
   paidAmount?: number;
   paymentSummary?: {
     totalAmount?: number;
@@ -132,7 +132,7 @@ export interface HistoryPayoutAgencyTrip {
   expectedEndDate?: string;
   agencyCost: number;
   cabCost: number;
-  ownerProfit: number;
+  agencyProfit: number;
   advance: number;
   paidAmount?: number;
   remainingAmount?: number;

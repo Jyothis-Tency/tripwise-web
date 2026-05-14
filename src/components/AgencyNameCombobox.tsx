@@ -95,7 +95,7 @@ function CreateAgencyModal({
             placeholder="Enter agency name"
             autoFocus
             onKeyDown={(e) => e.key === "Enter" && submit()}
-            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
           />
           {err && <p className="text-xs text-red-600">{err}</p>}
         </div>
@@ -111,7 +111,7 @@ function CreateAgencyModal({
             type="button"
             onClick={submit}
             disabled={submitting}
-            className="rounded-lg bg-indigo-500 px-5 py-2 text-sm font-semibold text-white hover:bg-indigo-600 disabled:opacity-50"
+            className="rounded-lg bg-blue-500 px-5 py-2 text-sm font-semibold text-white hover:bg-blue-600 disabled:opacity-50"
           >
             {submitting ? "Creating…" : "Create"}
           </button>
@@ -212,7 +212,7 @@ export function AgencyNameCombobox({
           }}
           onFocus={() => setShowSuggestions(true)}
           onBlur={() => {
-            setTimeout(() => setShowSuggestions(false), 120);
+            setTimeout(() => setShowSuggestions(false), 200);
           }}
           autoComplete="off"
           className={inputClassName}
@@ -224,7 +224,7 @@ export function AgencyNameCombobox({
               <button
                 key={name}
                 type="button"
-                className="w-full px-3 py-2 text-left text-sm hover:bg-indigo-50"
+                className="w-full px-3 py-2 text-left text-sm hover:bg-blue-50"
                 onMouseDown={(e) => {
                   e.preventDefault();
                   onChange(name);
@@ -237,7 +237,7 @@ export function AgencyNameCombobox({
             {value.trim() && !exactMatch && (
               <button
                 type="button"
-                className="w-full border-t border-slate-100 px-3 py-2 text-left text-sm font-medium text-indigo-700 hover:bg-indigo-50"
+                className="w-full border-t border-slate-100 px-3 py-2 text-left text-sm font-medium text-blue-700 hover:bg-blue-50"
                 onMouseDown={(e) => {
                   e.preventDefault();
                   openCreate(value.trim());

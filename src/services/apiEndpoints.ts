@@ -54,6 +54,19 @@ export const ApiEndpoints = {
   agencies: '/owners/agencies',
   agencyById: (id: string) => `/owners/agencies/${id}`,
 
+  // CASH IN / CASH OUT
+  cashInCashOutSummary: '/owners/cash-in-cash-out/summary',
+  cashInCashOutAgencyDetail: (agencyId: string) =>
+    `/owners/cash-in-cash-out/agencies/${agencyId}/detail`,
+  cashInCashOutDriverDetail: (driverId: string) =>
+    `/owners/cash-in-cash-out/drivers/${driverId}/detail`,
+  agencyProfitPayoutPayments: (agencyId: string) =>
+    `/owners/agencies/${agencyId}/agency-profit-payout-payments`,
+  cashInCashOutAgencyAdjustments: (agencyId: string) =>
+    `/owners/cash-in-cash-out/agencies/${agencyId}/adjustments`,
+  cashInCashOutDriverAdjustments: (driverId: string) =>
+    `/owners/cash-in-cash-out/drivers/${driverId}/adjustments`,
+
   // BULK ENTRY
   bulkEntryTrips: '/owners/bulk-entry/trips',
   bulkEntrySync: '/owners/bulk-entry/sync',

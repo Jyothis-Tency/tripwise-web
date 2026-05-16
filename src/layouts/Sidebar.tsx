@@ -8,6 +8,7 @@ import {
   Receipt,
   Bell,
   History,
+  ArrowRightLeft,
   TrendingUp,
   X,
   LogOut,
@@ -27,6 +28,7 @@ const menuItems = [
   { label: 'Expenses', path: '/expenses', icon: Receipt },
   { label: 'Reminders', path: '/reminders', icon: Bell },
   { label: 'Bulk Entry', path: '/bulk-entry', icon: ListChecks },
+  { label: 'Cash In / Cash Out', path: '/cash-in-cash-out', icon: ArrowRightLeft },
   { label: 'History', path: '/history', icon: History },
 ];
 

@@ -14,6 +14,7 @@ const routeTitle: Record<string, string> = {
   '/expenses': 'Expenses',
   '/history': 'History',
   '/history/payout': 'Agency Payout',
+  '/cash-in-cash-out': 'Cash In / Cash Out',
   '/analytics': 'Analytics',
   '/pl': 'P&L',
   '/reminders': 'Reminders',
@@ -29,7 +30,7 @@ const routeBreadcrumbs: Record<string, { label: string; to?: string }[]> = {
   ],
 };
 
-const fullHeightPaths = ['/vehicles', '/drivers', '/tracking', '/create-trip', '/expenses'];
+const fullHeightPaths = ['/vehicles', '/drivers', '/tracking', '/create-trip', '/expenses', '/cash-in-cash-out'];
 
 export function DashboardLayout() {
   const { pathname } = useLocation();

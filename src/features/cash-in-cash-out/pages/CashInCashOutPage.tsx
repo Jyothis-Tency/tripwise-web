@@ -29,6 +29,46 @@ function fmtCurrency(v: number): string {
   })}`;
 }
 
+/** Bulk remaining (to receive) minus vehicle remaining (to pay). */
+function agencyTotalRemaining(detail: AgencyCashInCashOutDetail): number {
+  return (
+    detail.summary.cashInBulk.remaining -
+    detail.summary.cashOutAgencyProfit.remaining
+  );
+}
+
+/** Bata remaining minus bulk advance remaining (net owed to driver). */
+function driverTotalRemaining(detail: DriverCashInCashOutDetail): number {
+  return (
+    detail.summary.vehicleBata.remaining -
+    detail.summary.bulkAdvance.remaining
+  );
+}
+
+function pickAgencyIdForDriverBulkPayout(
+  detail: DriverCashInCashOutDetail,
+  agencies: Agency[],
+): string {
+  const rows = detail.tables.bulkTripsAdvance.filter((r) => r.agencyId);
+  if (rows.length > 0) {
+    const counts = new Map<string, number>();
+    for (const r of rows) {
+      counts.set(r.agencyId, (counts.get(r.agencyId) ?? 0) + 1);
+    }
+    let best = rows[0].agencyId;
+    let max = 0;
+    for (const [id, c] of counts) {
+      if (c > max) {
+        max = c;
+        best = id;
+      }
+    }
+    return best;
+  }
+  const first = agencies[0];
+  return first?._id ?? first?.id ?? "";
+}
+
 function formatDate(d?: string | Date | null): string {
   if (d == null || d === "") return "—";
   try {
@@ -638,21 +678,21 @@ export function CashInCashOutPage() {
   const [detailError, setDetailError] = useState<string | null>(null);
 
   const [modal, setModal] = useState<
-    | "agencyCashIn"
-    | "agencyCashOut"
+    | "agencyMarkPayment"
     | "agencyCashInExtra"
     | "agencyCashOutExtra"
-    | "driverBata"
-    | "driverAdvance"
+    | "driverMarkPayment"
     | "driverBataExtra"
     | "driverAdvanceExtra"
     | null
   >(null);
+  const [agencyPaymentKind, setAgencyPaymentKind] = useState<
+    "cash_in" | "cash_out"
+  >("cash_in");
   const [payAmount, setPayAmount] = useState("");
   const [payDate, setPayDate] = useState(() => new Date().toISOString().split("T")[0]);
   const [payMethod, setPayMethod] = useState<string>("cash");
   const [payNotes, setPayNotes] = useState("");
-  const [advanceAgencyId, setAdvanceAgencyId] = useState("");
   const [paySaving, setPaySaving] = useState(false);
   const [payMessage, setPayMessage] = useState<string | null>(null);
 
@@ -767,6 +807,17 @@ export function CashInCashOutPage() {
     [agencyDetail],
   );
 
+  const agencyNetRemaining = useMemo(() => {
+    if (!agencyDetail) return null;
+    const bulkRemaining = agencyDetail.summary.cashInBulk.remaining;
+    const vehicleRemaining = agencyDetail.summary.cashOutAgencyProfit.remaining;
+    return {
+      bulkRemaining,
+      vehicleRemaining,
+      total: agencyTotalRemaining(agencyDetail),
+    };
+  }, [agencyDetail]);
+
   const driverUnifiedTrips = useMemo(
     () => (driverDetail ? buildDriverUnifiedTrips(driverDetail) : []),
     [driverDetail],
@@ -777,14 +828,24 @@ export function CashInCashOutPage() {
     [driverDetail],
   );
 
-  const openPayModal = (kind: typeof modal) => {
+  const driverNetRemaining = useMemo(() => {
+    if (!driverDetail) return null;
+    const bataRemaining = driverDetail.summary.vehicleBata.remaining;
+    const bulkRemaining = driverDetail.summary.bulkAdvance.remaining;
+    return {
+      bataRemaining,
+      bulkRemaining,
+      total: driverTotalRemaining(driverDetail),
+    };
+  }, [driverDetail]);
+
+  const openDriverMarkPaymentModal = () => {
     setPayMessage(null);
     setPayAmount("");
     setPayDate(new Date().toISOString().split("T")[0]);
     setPayMethod("cash");
     setPayNotes("");
-    setAdvanceAgencyId("");
-    setModal(kind);
+    setModal("driverMarkPayment");
   };
 
   const openDriverExtraModal = (kind: "driverBataExtra" | "driverAdvanceExtra") => {
@@ -803,6 +864,16 @@ export function CashInCashOutPage() {
     setPayAmount(adj.amount > 0 ? String(adj.amount) : "");
     setPayNotes(adj.notes || "");
     setModal(kind);
+  };
+
+  const openAgencyMarkPaymentModal = () => {
+    setPayMessage(null);
+    setPayAmount("");
+    setPayDate(new Date().toISOString().split("T")[0]);
+    setPayMethod("cash");
+    setPayNotes("");
+    setAgencyPaymentKind("cash_in");
+    setModal("agencyMarkPayment");
   };
 
   const openAgencyExtraModal = (kind: "agencyCashInExtra" | "agencyCashOutExtra") => {
@@ -907,6 +978,14 @@ export function CashInCashOutPage() {
     }
   };
 
+  const submitAgencyMarkPayment = async () => {
+    if (agencyPaymentKind === "cash_in") {
+      await submitAgencyCashIn();
+    } else {
+      await submitAgencyCashOut();
+    }
+  };
+
   const submitDriverExtra = async (kind: "driverBataExtra" | "driverAdvanceExtra") => {
     if (!selectedDriverId) return;
     const amt = Number(payAmount);
@@ -935,55 +1014,61 @@ export function CashInCashOutPage() {
     }
   };
 
-  const submitDriverBata = async () => {
-    if (!selectedDriverId) return;
-    const amt = Number(payAmount);
-    if (!amt || amt <= 0) {
-      setPayMessage("Enter a valid amount.");
-      return;
-    }
-    setPaySaving(true);
-    setPayMessage(null);
-    try {
-      await createSalaryTransaction(selectedDriverId, {
-        type: "salary",
-        amount: amt,
-        date: payDate,
-        notes: payNotes,
-      });
-      setModal(null);
-      await loadDriverDetail(selectedDriverId);
-    } catch (e: unknown) {
-      setPayMessage(
-        (e as { response?: { data?: { message?: string } } })?.response?.data
-          ?.message ?? "Failed to record.",
-      );
-    } finally {
-      setPaySaving(false);
-    }
-  };
-
-  const submitDriverAdvance = async () => {
+  const submitDriverMarkPayment = async () => {
     if (!selectedDriverId || !driverDetail) return;
     const amt = Number(payAmount);
-    if (!advanceAgencyId) {
-      setPayMessage("Select an agency.");
-      return;
-    }
     if (!amt || amt <= 0) {
       setPayMessage("Enter a valid amount.");
       return;
     }
+
+    const bataRemaining = driverDetail.summary.vehicleBata.remaining;
+    const bulkRemaining = driverDetail.summary.bulkAdvance.remaining;
+
     setPaySaving(true);
     setPayMessage(null);
     try {
-      await addDriverPayoutPayment(advanceAgencyId, {
-        driverName: driverDetail.driver.displayName,
-        amount: amt,
-        paymentDate: payDate,
-        paymentMethod: payMethod,
-        notes: payNotes,
-      });
+      let left = amt;
+
+      if (left > 0 && bataRemaining > 0) {
+        const pay = Math.min(left, bataRemaining);
+        await createSalaryTransaction(selectedDriverId, {
+          type: "salary",
+          amount: pay,
+          date: payDate,
+          notes: payNotes,
+        });
+        left -= pay;
+      }
+
+      if (left > 0 && bulkRemaining > 0) {
+        const agencyId = pickAgencyIdForDriverBulkPayout(driverDetail, agencies);
+        if (!agencyId) {
+          setPayMessage(
+            "Could not record bulk advance: no agency available. Link a bulk trip to an agency first.",
+          );
+          return;
+        }
+        const pay = Math.min(left, bulkRemaining);
+        await addDriverPayoutPayment(agencyId, {
+          driverName: driverDetail.driver.displayName,
+          amount: pay,
+          paymentDate: payDate,
+          paymentMethod: payMethod,
+          notes: payNotes,
+        });
+        left -= pay;
+      }
+
+      if (left > 0) {
+        await createSalaryTransaction(selectedDriverId, {
+          type: "salary",
+          amount: left,
+          date: payDate,
+          notes: payNotes,
+        });
+      }
+
       setModal(null);
       await loadDriverDetail(selectedDriverId);
     } catch (e: unknown) {
@@ -995,15 +1080,6 @@ export function CashInCashOutPage() {
       setPaySaving(false);
     }
   };
-
-  const advanceAgencyOptions = useMemo(() => {
-    if (!driverDetail) return agencies;
-    const ids = new Set(
-      driverDetail.tables.bulkTripsAdvance.map((r) => r.agencyId).filter(Boolean),
-    );
-    if (ids.size === 0) return agencies;
-    return agencies.filter((a) => ids.has(a._id ?? a.id ?? ""));
-  }, [driverDetail, agencies]);
 
   const hasSelection =
     tab === "agencies" ? selectedAgencyId != null : selectedDriverId != null;
@@ -1132,7 +1208,7 @@ export function CashInCashOutPage() {
           {tab === "agencies" && selectedAgencyId && (
             <>
               <div className="flex shrink-0 flex-col gap-3 border-b border-slate-200 bg-white px-3 py-3 sm:flex-row sm:items-center sm:justify-between sm:gap-2 lg:px-4">
-                <div className="flex min-w-0 items-center gap-2">
+                <div className="flex min-w-0 flex-1 items-center gap-2 sm:gap-3">
                   <button
                     type="button"
                     onClick={() => setSelectedAgencyId(null)}
@@ -1140,9 +1216,17 @@ export function CashInCashOutPage() {
                   >
                     <ArrowLeft className="h-5 w-5" />
                   </button>
-                  <h2 className="min-w-0 flex-1 truncate text-base font-bold text-slate-900 sm:text-lg">
+                  <h2 className="min-w-0 truncate text-base font-bold text-slate-900 sm:text-lg">
                     {agencyDetail?.agency.name ?? "…"}
                   </h2>
+                  <button
+                    type="button"
+                    onClick={openAgencyMarkPaymentModal}
+                    disabled={!agencyDetail || detailLoading}
+                    className="ml-auto shrink-0 touch-manipulation rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50 sm:ml-0 sm:px-4 sm:py-2 sm:text-sm"
+                  >
+                    Mark Payment
+                  </button>
                 </div>
                 <EntityDetailTabBar
                   tab={agencyDetailTab}
@@ -1159,62 +1243,47 @@ export function CashInCashOutPage() {
                   <p className="text-sm text-red-600">{detailError}</p>
                 ) : agencyDetail ? (
                   <>
-                    <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-2">
-                      <div className="rounded-xl border border-emerald-100 bg-emerald-50/50 p-3 text-xs sm:p-4 sm:text-sm">
-                        <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
-                          <p className="min-w-0 font-semibold leading-snug text-emerald-900">Cash in (bulk)</p>
-                          <div className="flex w-full flex-wrap gap-1.5 sm:w-auto sm:shrink-0 sm:justify-end">
-                            <button
-                              type="button"
-                              onClick={() => openAgencyExtraModal("agencyCashInExtra")}
-                              className="min-h-[36px] touch-manipulation rounded-lg border border-emerald-300 bg-white px-2.5 py-2 text-[11px] font-semibold text-emerald-800 hover:bg-emerald-50 sm:min-h-0 sm:py-1.5"
-                            >
-                              Extra
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => openPayModal("agencyCashIn")}
-                              className="min-h-[36px] touch-manipulation rounded-lg bg-emerald-600 px-2.5 py-2 text-[11px] font-semibold text-white hover:bg-emerald-700 sm:min-h-0 sm:py-1.5"
-                            >
-                              Cash in
-                            </button>
-                          </div>
+                    <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 sm:gap-2">
+                      <div className="rounded-xl border border-slate-200 bg-slate-50/80 p-3 text-xs sm:p-4 sm:text-sm">
+                        <div className="flex items-start justify-between gap-3">
+                          <p className="min-w-0 font-semibold leading-snug text-slate-900">Bulk</p>
+                          <button
+                            type="button"
+                            onClick={() => openAgencyExtraModal("agencyCashInExtra")}
+                            className="min-h-[36px] shrink-0 touch-manipulation rounded-lg border border-slate-300 bg-white px-2.5 py-2 text-[11px] font-semibold text-slate-700 hover:bg-slate-100 sm:min-h-0 sm:py-1.5"
+                          >
+                            Extra
+                          </button>
                         </div>
-                        <p className="mt-1 text-emerald-800">
-                          Received {fmtCurrency(agencyDetail.summary.cashInBulk.received)} ·
-                          Remaining{" "}
-                          <span className="font-bold">
-                            {fmtCurrency(agencyDetail.summary.cashInBulk.remaining)}
-                          </span>
+                        <p className="mt-2 text-xl font-bold tabular-nums text-slate-900 sm:text-2xl">
+                          {fmtCurrency(agencyDetail.summary.cashInBulk.remaining)}
                         </p>
                       </div>
-                      <div className="rounded-xl border border-amber-100 bg-amber-50/50 p-3 text-xs sm:p-4 sm:text-sm">
-                        <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
-                          <p className="min-w-0 font-semibold leading-snug text-amber-900">Cash out (vehicle profit)</p>
-                          <div className="flex w-full flex-wrap gap-1.5 sm:w-auto sm:shrink-0 sm:justify-end">
-                            <button
-                              type="button"
-                              onClick={() => openAgencyExtraModal("agencyCashOutExtra")}
-                              className="min-h-[36px] touch-manipulation rounded-lg border border-amber-300 bg-white px-2.5 py-2 text-[11px] font-semibold text-amber-800 hover:bg-amber-50 sm:min-h-0 sm:py-1.5"
-                            >
-                              Extra
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => openPayModal("agencyCashOut")}
-                              className="min-h-[36px] touch-manipulation rounded-lg bg-amber-600 px-2.5 py-2 text-[11px] font-semibold text-white hover:bg-amber-700 sm:min-h-0 sm:py-1.5"
-                            >
-                              Cash out
-                            </button>
-                          </div>
+                      <div className="rounded-xl border border-slate-200 bg-slate-50/80 p-3 text-xs sm:p-4 sm:text-sm">
+                        <div className="flex items-start justify-between gap-3">
+                          <p className="min-w-0 font-semibold leading-snug text-slate-900">Vehicle</p>
+                          <button
+                            type="button"
+                            onClick={() => openAgencyExtraModal("agencyCashOutExtra")}
+                            className="min-h-[36px] shrink-0 touch-manipulation rounded-lg border border-slate-300 bg-white px-2.5 py-2 text-[11px] font-semibold text-slate-700 hover:bg-slate-100 sm:min-h-0 sm:py-1.5"
+                          >
+                            Extra
+                          </button>
                         </div>
-                        <p className="mt-1 text-amber-800">
-                          Paid {fmtCurrency(agencyDetail.summary.cashOutAgencyProfit.paid)} · Remaining{" "}
-                          <span className="font-bold">
-                            {fmtCurrency(agencyDetail.summary.cashOutAgencyProfit.remaining)}
-                          </span>
+                        <p className="mt-2 text-xl font-bold tabular-nums text-slate-900 sm:text-2xl">
+                          {fmtCurrency(agencyDetail.summary.cashOutAgencyProfit.remaining)}
                         </p>
                       </div>
+                      {agencyNetRemaining && (
+                        <div className="rounded-xl border border-slate-200 bg-slate-50/80 p-3 text-xs sm:col-span-2 sm:p-4 lg:col-span-1 sm:text-sm">
+                          <p className="min-w-0 font-semibold leading-snug text-slate-900">
+                            Total remaining
+                          </p>
+                          <p className="mt-2 text-xl font-bold tabular-nums text-slate-900 sm:text-2xl">
+                            {fmtCurrency(Math.abs(agencyNetRemaining.total))}
+                          </p>
+                        </div>
+                      )}
                     </div>
 
                     {agencyDetailTab === "trips" && (
@@ -1286,7 +1355,6 @@ export function CashInCashOutPage() {
                         <table className="min-w-[36rem] w-full text-left text-xs sm:min-w-full">
                           <thead>
                             <tr className="border-b border-slate-100 text-slate-500">
-                              <th className="px-3 py-2 font-medium">Source</th>
                               <th className="px-3 py-2 font-medium">Type</th>
                               <th className="px-3 py-2 font-medium">Date</th>
                               <th className="px-3 py-2 text-right font-medium">Amount</th>
@@ -1296,20 +1364,13 @@ export function CashInCashOutPage() {
                           </thead>
                           <tbody>
                             {agencyUnifiedCashHistory.length === 0 ? (
-                              <EmptyTableRow colSpan={6} message="No cash history yet." />
+                              <EmptyTableRow colSpan={5} message="No cash history yet." />
                             ) : (
                               agencyUnifiedCashHistory.map((r) => (
                                 <tr
                                   key={r.id}
                                   className="border-b border-slate-50 text-slate-800"
                                 >
-                                  <td className="whitespace-nowrap px-3 py-2">
-                                    <span
-                                      className={`inline-block rounded-md px-1.5 py-0.5 text-[10px] font-semibold ${sourceBadgeCls(r.source)}`}
-                                    >
-                                      {r.source}
-                                    </span>
-                                  </td>
                                   <td className="whitespace-nowrap px-3 py-2">
                                     <span
                                       className={`inline-block rounded-md px-1.5 py-0.5 text-[10px] font-semibold ${directionBadgeCls(r.direction)}`}
@@ -1354,7 +1415,7 @@ export function CashInCashOutPage() {
           {tab === "drivers" && selectedDriverId && (
             <>
               <div className="flex shrink-0 flex-col gap-3 border-b border-slate-200 bg-white px-3 py-3 sm:flex-row sm:items-center sm:justify-between sm:gap-2 lg:px-4">
-                <div className="flex min-w-0 items-center gap-2">
+                <div className="flex min-w-0 flex-1 items-center gap-2 sm:gap-3">
                   <button
                     type="button"
                     onClick={() => setSelectedDriverId(null)}
@@ -1362,9 +1423,17 @@ export function CashInCashOutPage() {
                   >
                     <ArrowLeft className="h-5 w-5" />
                   </button>
-                  <h2 className="min-w-0 flex-1 truncate text-base font-bold text-slate-900 sm:text-lg">
+                  <h2 className="min-w-0 truncate text-base font-bold text-slate-900 sm:text-lg">
                     {driverDetail?.driver.displayName ?? "…"}
                   </h2>
+                  <button
+                    type="button"
+                    onClick={openDriverMarkPaymentModal}
+                    disabled={!driverDetail || detailLoading}
+                    className="ml-auto shrink-0 touch-manipulation rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50 sm:ml-0 sm:px-4 sm:py-2 sm:text-sm"
+                  >
+                    Mark Payment
+                  </button>
                 </div>
                 <EntityDetailTabBar
                   tab={driverDetailTab}
@@ -1381,83 +1450,47 @@ export function CashInCashOutPage() {
                   <p className="text-sm text-red-600">{detailError}</p>
                 ) : driverDetail ? (
                   <>
-                    <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-2">
-                      <div className="rounded-xl border border-violet-100 bg-violet-50/50 p-3 text-xs sm:p-4 sm:text-sm">
-                        <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
-                          <p className="min-w-0 font-semibold leading-snug text-violet-900">Driver bata</p>
-                          <div className="flex w-full flex-wrap gap-1.5 sm:w-auto sm:shrink-0 sm:justify-end">
-                            <button
-                              type="button"
-                              onClick={() => openDriverExtraModal("driverBataExtra")}
-                              className="min-h-[36px] touch-manipulation rounded-lg border border-violet-300 bg-white px-2.5 py-2 text-[11px] font-semibold text-violet-800 hover:bg-violet-50 sm:min-h-0 sm:py-1.5"
-                            >
-                              Extra
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => openPayModal("driverBata")}
-                              className="min-h-[36px] touch-manipulation rounded-lg bg-violet-600 px-2.5 py-2 text-[11px] font-semibold text-white hover:bg-violet-700 sm:min-h-0 sm:py-1.5"
-                            >
-                              Cash out (Bata)
-                            </button>
-                          </div>
+                    <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 sm:gap-2">
+                      <div className="rounded-xl border border-slate-200 bg-slate-50/80 p-3 text-xs sm:p-4 sm:text-sm">
+                        <div className="flex items-start justify-between gap-3">
+                          <p className="min-w-0 font-semibold leading-snug text-slate-900">Bata</p>
+                          <button
+                            type="button"
+                            onClick={() => openDriverExtraModal("driverBataExtra")}
+                            className="min-h-[36px] shrink-0 touch-manipulation rounded-lg border border-slate-300 bg-white px-2.5 py-2 text-[11px] font-semibold text-slate-700 hover:bg-slate-100 sm:min-h-0 sm:py-1.5"
+                          >
+                            Extra
+                          </button>
                         </div>
-                        <p className="mt-1 text-violet-800">
-                          {(driverDetail.summary.vehicleBata.manualExtra ?? 0) > 0 && (
-                            <>
-                              Trips{" "}
-                              {fmtCurrency(
-                                driverDetail.summary.vehicleBata.fromTrips ??
-                                  driverDetail.summary.vehicleBata.totalOwed,
-                              )}{" "}
-                              · Extra {fmtCurrency(driverDetail.summary.vehicleBata.manualExtra)}
-                              {" · "}
-                            </>
-                          )}
-                          Paid {fmtCurrency(driverDetail.summary.vehicleBata.paid)} · Remaining{" "}
-                          <span className="font-bold">
-                            {fmtCurrency(driverDetail.summary.vehicleBata.remaining)}
-                          </span>
+                        <p className="mt-2 text-xl font-bold tabular-nums text-slate-900 sm:text-2xl">
+                          {fmtCurrency(driverDetail.summary.vehicleBata.remaining)}
                         </p>
                       </div>
-                      <div className="rounded-xl border border-amber-100 bg-amber-50/50 p-3 text-xs sm:p-4 sm:text-sm">
-                        <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
-                          <p className="min-w-0 font-semibold leading-snug text-amber-900">Bulk advance</p>
-                          <div className="flex w-full flex-wrap gap-1.5 sm:w-auto sm:shrink-0 sm:justify-end">
-                            <button
-                              type="button"
-                              onClick={() => openDriverExtraModal("driverAdvanceExtra")}
-                              className="min-h-[36px] touch-manipulation rounded-lg border border-amber-300 bg-white px-2.5 py-2 text-[11px] font-semibold text-amber-800 hover:bg-amber-50 sm:min-h-0 sm:py-1.5"
-                            >
-                              Extra
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => openPayModal("driverAdvance")}
-                              className="min-h-[36px] touch-manipulation rounded-lg bg-amber-600 px-2.5 py-2 text-[11px] font-semibold text-white hover:bg-amber-700 sm:min-h-0 sm:py-1.5"
-                            >
-                              Cash out (Advance)
-                            </button>
-                          </div>
+                      <div className="rounded-xl border border-slate-200 bg-slate-50/80 p-3 text-xs sm:p-4 sm:text-sm">
+                        <div className="flex items-start justify-between gap-3">
+                          <p className="min-w-0 font-semibold leading-snug text-slate-900">Bulk</p>
+                          <button
+                            type="button"
+                            onClick={() => openDriverExtraModal("driverAdvanceExtra")}
+                            className="min-h-[36px] shrink-0 touch-manipulation rounded-lg border border-slate-300 bg-white px-2.5 py-2 text-[11px] font-semibold text-slate-700 hover:bg-slate-100 sm:min-h-0 sm:py-1.5"
+                          >
+                            Extra
+                          </button>
                         </div>
-                        <p className="mt-1 text-amber-800">
-                          {(driverDetail.summary.bulkAdvance.manualExtra ?? 0) > 0 && (
-                            <>
-                              Trips{" "}
-                              {fmtCurrency(
-                                driverDetail.summary.bulkAdvance.fromTrips ??
-                                  driverDetail.summary.bulkAdvance.totalOwed,
-                              )}{" "}
-                              · Extra {fmtCurrency(driverDetail.summary.bulkAdvance.manualExtra)}
-                              {" · "}
-                            </>
-                          )}
-                          Paid {fmtCurrency(driverDetail.summary.bulkAdvance.paid)} · Remaining{" "}
-                          <span className="font-bold">
-                            {fmtCurrency(driverDetail.summary.bulkAdvance.remaining)}
-                          </span>
+                        <p className="mt-2 text-xl font-bold tabular-nums text-slate-900 sm:text-2xl">
+                          {fmtCurrency(driverDetail.summary.bulkAdvance.remaining)}
                         </p>
                       </div>
+                      {driverNetRemaining && (
+                        <div className="rounded-xl border border-slate-200 bg-slate-50/80 p-3 text-xs sm:col-span-2 sm:p-4 lg:col-span-1 sm:text-sm">
+                          <p className="min-w-0 font-semibold leading-snug text-slate-900">
+                            Total remaining
+                          </p>
+                          <p className="mt-2 text-xl font-bold tabular-nums text-slate-900 sm:text-2xl">
+                            {fmtCurrency(Math.abs(driverNetRemaining.total))}
+                          </p>
+                        </div>
+                      )}
                     </div>
 
                     {driverDetailTab === "trips" && (
@@ -1525,7 +1558,6 @@ export function CashInCashOutPage() {
                         <table className="min-w-[36rem] w-full text-left text-xs sm:min-w-full">
                           <thead>
                             <tr className="border-b border-slate-100 text-slate-500">
-                              <th className="px-3 py-2 font-medium">Source</th>
                               <th className="px-3 py-2 font-medium">Type</th>
                               <th className="px-3 py-2 font-medium">Date</th>
                               <th className="px-3 py-2 text-right font-medium">Amount</th>
@@ -1535,20 +1567,13 @@ export function CashInCashOutPage() {
                           </thead>
                           <tbody>
                             {driverUnifiedCashHistory.length === 0 ? (
-                              <EmptyTableRow colSpan={6} message="No cash history yet." />
+                              <EmptyTableRow colSpan={5} message="No cash history yet." />
                             ) : (
                               driverUnifiedCashHistory.map((r) => (
                                 <tr
                                   key={r.id}
                                   className="border-b border-slate-50 text-slate-800"
                                 >
-                                  <td className="whitespace-nowrap px-3 py-2">
-                                    <span
-                                      className={`inline-block rounded-md px-1.5 py-0.5 text-[10px] font-semibold ${sourceBadgeCls(r.source)}`}
-                                    >
-                                      {r.source}
-                                    </span>
-                                  </td>
                                   <td className="whitespace-nowrap px-3 py-2">
                                     <span
                                       className={`inline-block rounded-md px-1.5 py-0.5 text-[10px] font-semibold ${driverCashKindBadgeCls(r.kind)}`}
@@ -1615,7 +1640,7 @@ export function CashInCashOutPage() {
 
       {modal === "agencyCashInExtra" && (
         <Modal
-          title="Manual extra — cash in (bulk)"
+          title="Manual extra — bulk"
           onClose={() => setModal(null)}
         >
           <p className="mb-3 text-xs text-slate-500">
@@ -1664,7 +1689,7 @@ export function CashInCashOutPage() {
 
       {modal === "agencyCashOutExtra" && (
         <Modal
-          title="Manual extra — cash out (vehicle)"
+          title="Manual extra — vehicle"
           onClose={() => setModal(null)}
         >
           <p className="mb-3 text-xs text-slate-500">
@@ -1710,12 +1735,39 @@ export function CashInCashOutPage() {
         </Modal>
       )}
 
-      {modal === "agencyCashIn" && (
-        <Modal title="Record cash in (bulk receipt)" onClose={() => setModal(null)}>
+      {modal === "agencyMarkPayment" && (
+        <Modal title="Mark Payment" onClose={() => setModal(null)}>
           <p className="mb-3 text-xs text-slate-500">
-            Records money received from this agency against bulk trip totals.
+            Record a payment received from or paid to this agency.
           </p>
-          <label className="block text-xs font-medium text-slate-600">
+          <fieldset className="block">
+            <legend className="text-xs font-medium text-slate-600">Payment type</legend>
+            <div className="mt-1.5 grid grid-cols-2 gap-1 rounded-xl border border-slate-200 bg-slate-50 p-1">
+              <button
+                type="button"
+                onClick={() => setAgencyPaymentKind("cash_in")}
+                className={`min-h-[40px] rounded-lg px-2 py-2 text-xs font-semibold sm:text-sm ${
+                  agencyPaymentKind === "cash_in"
+                    ? "bg-blue-600 text-white shadow-sm"
+                    : "text-slate-600 hover:bg-white"
+                }`}
+              >
+                Cash in
+              </button>
+              <button
+                type="button"
+                onClick={() => setAgencyPaymentKind("cash_out")}
+                className={`min-h-[40px] rounded-lg px-2 py-2 text-xs font-semibold sm:text-sm ${
+                  agencyPaymentKind === "cash_out"
+                    ? "bg-blue-600 text-white shadow-sm"
+                    : "text-slate-600 hover:bg-white"
+                }`}
+              >
+                Cash out
+              </button>
+            </div>
+          </fieldset>
+          <label className="mt-3 block text-xs font-medium text-slate-600">
             Amount (₹)
             <input
               type="number"
@@ -1768,75 +1820,8 @@ export function CashInCashOutPage() {
             <button
               type="button"
               disabled={paySaving}
-              onClick={submitAgencyCashIn}
-              className="inline-flex min-h-[44px] w-full items-center justify-center rounded-lg bg-emerald-600 px-3 py-2.5 text-sm font-medium text-white disabled:opacity-50 sm:min-h-0 sm:w-auto sm:py-2"
-            >
-              {paySaving ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save"}
-            </button>
-          </div>
-        </Modal>
-      )}
-
-      {modal === "agencyCashOut" && (
-        <Modal title="Record cash out (agency profit)" onClose={() => setModal(null)}>
-          <p className="mb-3 text-xs text-slate-500">
-            Records money paid to this agency for vehicle-trip agency profit.
-          </p>
-          <label className="block text-xs font-medium text-slate-600">
-            Amount (₹)
-            <input
-              type="number"
-              className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
-              value={payAmount}
-              onChange={(e) => setPayAmount(e.target.value)}
-              min={0}
-            />
-          </label>
-          <label className="mt-3 block text-xs font-medium text-slate-600">
-            Date
-            <input
-              type="date"
-              className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
-              value={payDate}
-              onChange={(e) => setPayDate(e.target.value)}
-            />
-          </label>
-          <label className="mt-3 block text-xs font-medium text-slate-600">
-            Method
-            <select
-              className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
-              value={payMethod}
-              onChange={(e) => setPayMethod(e.target.value)}
-            >
-              {PAYMENT_METHODS.map((m) => (
-                <option key={m} value={m}>
-                  {m}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="mt-3 block text-xs font-medium text-slate-600">
-            Notes
-            <input
-              className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
-              value={payNotes}
-              onChange={(e) => setPayNotes(e.target.value)}
-            />
-          </label>
-          {payMessage && <p className="mt-2 text-xs text-red-600">{payMessage}</p>}
-          <div className="mt-4 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-            <button
-              type="button"
-              onClick={() => setModal(null)}
-              className="min-h-[44px] w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm font-medium sm:min-h-0 sm:w-auto sm:py-2"
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              disabled={paySaving}
-              onClick={submitAgencyCashOut}
-              className="inline-flex min-h-[44px] w-full items-center justify-center rounded-lg bg-amber-600 px-3 py-2.5 text-sm font-medium text-white disabled:opacity-50 sm:min-h-0 sm:w-auto sm:py-2"
+              onClick={submitAgencyMarkPayment}
+              className="inline-flex min-h-[44px] w-full items-center justify-center rounded-lg bg-blue-600 px-3 py-2.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50 sm:min-h-0 sm:w-auto sm:py-2"
             >
               {paySaving ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save"}
             </button>
@@ -1845,7 +1830,7 @@ export function CashInCashOutPage() {
       )}
 
       {modal === "driverBataExtra" && (
-        <Modal title="Manual extra — driver bata" onClose={() => setModal(null)}>
+        <Modal title="Manual extra — bata" onClose={() => setModal(null)}>
           <p className="mb-3 text-xs text-slate-500">
             Add bata/commission owed to this driver beyond vehicle trips. Set to 0 to remove.
           </p>
@@ -1890,7 +1875,7 @@ export function CashInCashOutPage() {
       )}
 
       {modal === "driverAdvanceExtra" && (
-        <Modal title="Manual extra — bulk advance" onClose={() => setModal(null)}>
+        <Modal title="Manual extra — bulk" onClose={() => setModal(null)}>
           <p className="mb-3 text-xs text-slate-500">
             Add bulk advance owed to this driver beyond bulk trip rows. Set to 0 to remove.
           </p>
@@ -1934,88 +1919,22 @@ export function CashInCashOutPage() {
         </Modal>
       )}
 
-      {modal === "driverBata" && driverDetail && (
-        <Modal title="Cash out — driver bata (salary)" onClose={() => setModal(null)}>
+      {modal === "driverMarkPayment" && driverDetail && (
+        <Modal title="Cash out" onClose={() => setModal(null)}>
           <p className="mb-3 text-xs text-slate-500">
-            Maximum allowed matches backend rules (trip Bata minus advance and salary
-            already recorded). Remaining:{" "}
-            <strong>{fmtCurrency(driverDetail.summary.vehicleBata.remaining)}</strong>
+            Records cash paid to this driver. Applied to bata first, then bulk
+            advance.
+            {driverNetRemaining && (
+              <>
+                {" "}
+                Total remaining:{" "}
+                <strong>
+                  {fmtCurrency(Math.abs(driverNetRemaining.total))}
+                </strong>
+              </>
+            )}
           </p>
           <label className="block text-xs font-medium text-slate-600">
-            Amount (₹)
-            <input
-              type="number"
-              className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
-              value={payAmount}
-              onChange={(e) => setPayAmount(e.target.value)}
-              min={0}
-            />
-          </label>
-          <label className="mt-3 block text-xs font-medium text-slate-600">
-            Date
-            <input
-              type="date"
-              className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
-              value={payDate}
-              onChange={(e) => setPayDate(e.target.value)}
-            />
-          </label>
-          <label className="mt-3 block text-xs font-medium text-slate-600">
-            Notes
-            <input
-              className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
-              value={payNotes}
-              onChange={(e) => setPayNotes(e.target.value)}
-            />
-          </label>
-          {payMessage && <p className="mt-2 text-xs text-red-600">{payMessage}</p>}
-          <div className="mt-4 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-            <button
-              type="button"
-              onClick={() => setModal(null)}
-              className="min-h-[44px] w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm font-medium sm:min-h-0 sm:w-auto sm:py-2"
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              disabled={paySaving}
-              onClick={submitDriverBata}
-              className="inline-flex min-h-[44px] w-full items-center justify-center rounded-lg bg-violet-600 px-3 py-2.5 text-sm font-medium text-white disabled:opacity-50 sm:min-h-0 sm:w-auto sm:py-2"
-            >
-              {paySaving ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save"}
-            </button>
-          </div>
-        </Modal>
-      )}
-
-      {modal === "driverAdvance" && driverDetail && (
-        <Modal title="Cash out — bulk advance" onClose={() => setModal(null)}>
-          <p className="mb-3 text-xs text-slate-500">
-            Records a driver payout for bulk advance. Driver name sent:{" "}
-            <strong>{driverDetail.driver.displayName}</strong>
-          </p>
-          <label className="block text-xs font-medium text-slate-600">
-            Agency
-            <select
-              className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
-              value={advanceAgencyId}
-              onChange={(e) => setAdvanceAgencyId(e.target.value)}
-            >
-              <option value="">Select agency…</option>
-              {(advanceAgencyOptions.length ? advanceAgencyOptions : agencies).map(
-                (a) => {
-                  const id = a._id ?? a.id ?? "";
-                  return (
-                    <option key={id} value={id}>
-                      {a.name}
-                    </option>
-                  );
-                },
-              )}
-            </select>
-          </label>
-          <label className="mt-3 block text-xs font-medium text-slate-600">
             Amount (₹)
             <input
               type="number"
@@ -2068,8 +1987,8 @@ export function CashInCashOutPage() {
             <button
               type="button"
               disabled={paySaving}
-              onClick={submitDriverAdvance}
-              className="inline-flex min-h-[44px] w-full items-center justify-center rounded-lg bg-amber-600 px-3 py-2.5 text-sm font-medium text-white disabled:opacity-50 sm:min-h-0 sm:w-auto sm:py-2"
+              onClick={submitDriverMarkPayment}
+              className="inline-flex min-h-[44px] w-full items-center justify-center rounded-lg bg-blue-600 px-3 py-2.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50 sm:min-h-0 sm:w-auto sm:py-2"
             >
               {paySaving ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save"}
             </button>

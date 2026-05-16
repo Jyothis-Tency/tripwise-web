@@ -328,27 +328,31 @@ function EditableRow({
       <span className="w-[130px] sm:w-[150px] shrink-0 text-sm sm:text-[15px] text-slate-600">
         {label}
       </span>
-      <span
-        className={`min-w-0 flex-1 wrap-break-word ${emphasizeDisplay ? valueEmphasisClass(highlight) : `text-sm sm:text-[15px] font-medium ${highlight ? "text-blue-600" : "text-slate-800"}`}`}
-      >
-        {displayValue}
-      </span>
-      <button
-        onClick={() => {
-          const isTime = fieldKey.toLowerCase().includes("time");
-          let seed =
-            displayValue === "—"
-              ? ""
-              : displayValue.replace(/^₹/, "").replace(/,/g, "");
-          if (isTime && timeEditSeed !== undefined) seed = timeEditSeed;
-          setEditValue(seed);
-          setEditing(true);
-        }}
-        className="ml-1.5 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 text-slate-400 hover:text-blue-500 transition-opacity p-0.5"
-        title={`Edit ${label}`}
-      >
-        <Pencil className="h-3.5 w-3.5" />
-      </button>
+      <div className="flex min-w-0 flex-1 items-center gap-1.5">
+        <span
+          className={`min-w-0 wrap-break-word ${emphasizeDisplay ? valueEmphasisClass(highlight) : `text-sm sm:text-[15px] font-medium ${highlight ? "text-blue-600" : "text-slate-800"}`}`}
+        >
+          {displayValue}
+        </span>
+        <button
+          type="button"
+          onClick={() => {
+            const isTime = fieldKey.toLowerCase().includes("time");
+            let seed =
+              displayValue === "—"
+                ? ""
+                : displayValue.replace(/^₹/, "").replace(/,/g, "");
+            if (isTime && timeEditSeed !== undefined) seed = timeEditSeed;
+            setEditValue(seed);
+            setEditing(true);
+          }}
+          className="shrink-0 rounded-md p-1 text-slate-600 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 focus-visible:opacity-100 hover:bg-slate-100 hover:text-slate-900 active:bg-slate-200 transition-opacity"
+          title={`Edit ${label}`}
+          aria-label={`Edit ${label}`}
+        >
+          <Pencil className="h-4 w-4 stroke-[2.25]" />
+        </button>
+      </div>
     </div>
   );
 }

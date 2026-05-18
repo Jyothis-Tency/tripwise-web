@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   Loader2,
@@ -14,13 +14,17 @@ import {
   fetchCashInCashOutAgencyDetail,
   fetchCashInCashOutDriverDetail,
   recordAgencyProfitPayout,
-  updateAgencyCashInCashOutAdjustments,
-  updateDriverCashInCashOutAdjustments,
   type AgencyCashInCashOutDetail,
   type DriverCashInCashOutDetail,
 } from "../api";
 import { fetchAgencies, addAgencyPayoutPayment, addDriverPayoutPayment, type Agency } from "../../bulk-entry/api";
 import { fetchDrivers, createSalaryTransaction, type Driver } from "../../drivers/api";
+import {
+  loadCashInCashOutUi,
+  saveCashInCashOutUi,
+  type CashInCashOutDetailTabId,
+  type CashInCashOutTabId,
+} from "../cashInCashOutUiStorage";
 
 function fmtCurrency(v: number): string {
   return `₹${v.toLocaleString("en-IN", {
@@ -42,6 +46,124 @@ function driverTotalRemaining(detail: DriverCashInCashOutDetail): number {
   return (
     detail.summary.vehicleBata.remaining -
     detail.summary.bulkAdvance.remaining
+  );
+}
+
+type EntitySummaryMetrics = {
+  moneyGiven: number;
+  moneyGot: number;
+  bulkTrips: number;
+  vehicleTrips: number;
+  remainingToGet: number;
+};
+
+function buildAgencySummaryMetrics(
+  detail: AgencyCashInCashOutDetail,
+): EntitySummaryMetrics {
+  return {
+    moneyGiven: detail.summary.cashOutAgencyProfit.paid,
+    moneyGot: detail.summary.cashInBulk.received,
+    bulkTrips: detail.summary.cashInBulk.fromTrips,
+    vehicleTrips: detail.summary.cashOutAgencyProfit.fromTrips,
+    remainingToGet: agencyTotalRemaining(detail),
+  };
+}
+
+function buildDriverSummaryMetrics(
+  detail: DriverCashInCashOutDetail,
+): EntitySummaryMetrics {
+  return {
+    moneyGiven:
+      detail.summary.vehicleBata.paid + detail.summary.bulkAdvance.paid,
+    moneyGot: 0,
+    bulkTrips: detail.summary.bulkAdvance.fromTrips,
+    vehicleTrips: detail.summary.vehicleBata.fromTrips,
+    remainingToGet: driverTotalRemaining(detail),
+  };
+}
+
+function EntitySummaryCards({
+  metrics,
+  entity = "agency",
+}: {
+  metrics: EntitySummaryMetrics;
+  entity?: "agency" | "driver";
+}) {
+  const cards: { label: string; value: number; highlight?: boolean }[] =
+    entity === "driver"
+      ? [
+          { label: "Total money given", value: metrics.moneyGiven },
+          { label: "Total from bulk trips", value: metrics.bulkTrips },
+          { label: "Total from vehicle trips", value: metrics.vehicleTrips },
+          {
+            label: "Total remaining to pay",
+            value: metrics.remainingToGet,
+            highlight: true,
+          },
+        ]
+      : [
+          { label: "Total money given", value: metrics.moneyGiven },
+          { label: "Total money got", value: metrics.moneyGot },
+          { label: "Total from bulk trips", value: metrics.bulkTrips },
+          { label: "Total from vehicle trips", value: metrics.vehicleTrips },
+          {
+            label: "Total remaining to get",
+            value: metrics.remainingToGet,
+            highlight: true,
+          },
+        ];
+
+  const gridCls =
+    entity === "driver"
+      ? "mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-2 lg:grid-cols-2 xl:grid-cols-4"
+      : "mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-2 lg:grid-cols-3 xl:grid-cols-5";
+
+  return (
+    <div className={gridCls}>
+      {cards.map((c) => {
+        const isRemaining = c.highlight;
+        const remainingPositive = c.value >= 0;
+        const valueCls = isRemaining
+          ? remainingPositive
+            ? "text-emerald-700"
+            : "text-amber-700"
+          : "text-slate-900";
+        const displayAmount = isRemaining
+          ? fmtCurrency(Math.abs(c.value))
+          : fmtCurrency(c.value);
+
+        return (
+          <div
+            key={c.label}
+            className={`rounded-xl border p-3 text-xs sm:p-4 sm:text-sm ${
+              isRemaining
+                ? "border-blue-300 bg-blue-50/80 ring-1 ring-blue-100"
+                : "border-slate-200 bg-slate-50/80"
+            }`}
+          >
+            <p className="min-w-0 font-semibold leading-snug text-slate-900">
+              {c.label}
+            </p>
+            {isRemaining && (
+              <p className="mt-0.5 text-[10px] font-medium text-slate-500 sm:text-xs">
+                {entity === "driver"
+                  ? remainingPositive
+                    ? "Still to pay driver"
+                    : "Driver owes (net)"
+                  : remainingPositive
+                    ? "Net to collect"
+                    : "Net to pay"}
+              </p>
+            )}
+            <p
+              className={`mt-2 text-xl font-bold tabular-nums sm:text-2xl ${valueCls}`}
+            >
+              {displayAmount}
+            </p>
+          </div>
+        );
+      })}
+    </div>
   );
 }
 
@@ -84,8 +206,57 @@ function formatDate(d?: string | Date | null): string {
   }
 }
 
-type TabId = "agencies" | "drivers";
-type DetailTabId = "trips" | "cashHistory";
+function cashInCashOutMonthOptions(): { value: string; label: string }[] {
+  const opts: { value: string; label: string }[] = [
+    { value: "all_time", label: "All time" },
+  ];
+  const now = new Date();
+  for (let i = 0; i < 24; i++) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const value = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+    const label = d.toLocaleString("en-IN", { month: "long", year: "numeric" });
+    opts.push({ value, label });
+  }
+  return opts;
+}
+
+const MONTH_OPTIONS = cashInCashOutMonthOptions();
+
+function DetailMonthFilter({
+  month,
+  setMonth,
+  monthLabel,
+}: {
+  month: string;
+  setMonth: (m: string) => void;
+  monthLabel?: string;
+}) {
+  return (
+    <div className="flex min-w-0 flex-wrap items-center gap-2">
+      <label className="sr-only" htmlFor="cash-detail-month">
+        Month
+      </label>
+      <select
+        id="cash-detail-month"
+        value={month}
+        onChange={(e) => setMonth(e.target.value)}
+        className="min-h-[36px] max-w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-800 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 sm:text-sm"
+      >
+        {MONTH_OPTIONS.map((o) => (
+          <option key={o.value} value={o.value}>
+            {o.label}
+          </option>
+        ))}
+      </select>
+      {monthLabel && month !== "all_time" && (
+        <span className="text-[11px] text-slate-500 sm:text-xs">{monthLabel}</span>
+      )}
+    </div>
+  );
+}
+
+type TabId = CashInCashOutTabId;
+type DetailTabId = CashInCashOutDetailTabId;
 
 function parseSortDate(d?: string | Date | null): number {
   if (d == null || d === "") return 0;
@@ -105,10 +276,11 @@ type AgencyUnifiedTripRow = {
   status: string;
 };
 
+type CashDirection = "Cash in" | "Cash out";
+
 type AgencyUnifiedCashRow = {
   id: string;
-  source: "Bulk" | "Vehicle";
-  direction: "Cash in" | "Cash out" | "Extra";
+  direction: CashDirection;
   date: string | null;
   amount: number;
   method: string;
@@ -144,48 +316,7 @@ function buildAgencyUnifiedTrips(
     status: r.status,
     sortDate: parseSortDate(r.date),
   }));
-  const manualRows: Array<AgencyUnifiedTripRow & { sortDate: number }> = [];
-  const cashInExtra =
-    detail.summary.cashInBulk.manualExtra ??
-    detail.adjustments?.cashInBulk?.amount ??
-    0;
-  if (cashInExtra > 0) {
-    manualRows.push({
-      id: "manual-cash-in",
-      source: "Bulk",
-      date: null,
-      reference: "Manual extra",
-      details:
-        detail.adjustments?.cashInBulk?.notes?.trim() ||
-        "Additional amount to collect",
-      cashIn: cashInExtra,
-      cashOut: null,
-      advance: null,
-      status: "extra",
-      sortDate: Number.MAX_SAFE_INTEGER,
-    });
-  }
-  const cashOutExtra =
-    detail.summary.cashOutAgencyProfit.manualExtra ??
-    detail.adjustments?.cashOutVehicle?.amount ??
-    0;
-  if (cashOutExtra > 0) {
-    manualRows.push({
-      id: "manual-cash-out",
-      source: "Vehicle",
-      date: null,
-      reference: "Manual extra",
-      details:
-        detail.adjustments?.cashOutVehicle?.notes?.trim() ||
-        "Additional amount to pay",
-      cashIn: null,
-      cashOut: cashOutExtra,
-      advance: null,
-      status: "extra",
-      sortDate: Number.MAX_SAFE_INTEGER - 1,
-    });
-  }
-  return [...bulk, ...vehicle, ...manualRows]
+  return [...bulk, ...vehicle]
     .sort((a, b) => b.sortDate - a.sortDate)
     .map(({ sortDate: _s, ...row }) => row);
 }
@@ -195,7 +326,6 @@ function buildAgencyUnifiedCashHistory(
 ): AgencyUnifiedCashRow[] {
   const receipts = detail.tables.bulkReceiptPayments.map((r) => ({
     id: `in-${r._id}`,
-    source: "Bulk" as const,
     direction: "Cash in" as const,
     date: r.paymentDate,
     amount: r.amount,
@@ -205,7 +335,6 @@ function buildAgencyUnifiedCashHistory(
   }));
   const payouts = detail.tables.agencyProfitPayoutPayments.map((r) => ({
     id: `out-${r._id}`,
-    source: "Vehicle" as const,
     direction: "Cash out" as const,
     date: r.paymentDate,
     amount: r.amount,
@@ -213,59 +342,8 @@ function buildAgencyUnifiedCashHistory(
     notes: r.notes,
     sortDate: parseSortDate(r.paymentDate),
   }));
-  const extras = (detail.tables.extraAdjustments ?? []).map((r) => ({
-    id: `extra-${r._id}`,
-    source: (r.kind === "cash_in_bulk_extra" ? "Bulk" : "Vehicle") as
-      | "Bulk"
-      | "Vehicle",
-    direction: "Extra" as const,
-    date: r.recordedAt,
-    amount: r.amount,
-    method: "—",
-    notes: r.notes,
-    sortDate: parseSortDate(r.recordedAt),
-  }));
 
-  if (extras.length === 0) {
-    const cashInExtra =
-      detail.summary.cashInBulk.manualExtra ??
-      detail.adjustments?.cashInBulk?.amount ??
-      0;
-    if (cashInExtra > 0) {
-      extras.push({
-        id: "extra-manual-cash-in",
-        source: "Bulk",
-        direction: "Extra",
-        date: null,
-        amount: cashInExtra,
-        method: "—",
-        notes:
-          detail.adjustments?.cashInBulk?.notes?.trim() ||
-          "Manual extra (cash in)",
-        sortDate: 0,
-      });
-    }
-    const cashOutExtra =
-      detail.summary.cashOutAgencyProfit.manualExtra ??
-      detail.adjustments?.cashOutVehicle?.amount ??
-      0;
-    if (cashOutExtra > 0) {
-      extras.push({
-        id: "extra-manual-cash-out",
-        source: "Vehicle",
-        direction: "Extra",
-        date: null,
-        amount: cashOutExtra,
-        method: "—",
-        notes:
-          detail.adjustments?.cashOutVehicle?.notes?.trim() ||
-          "Manual extra (cash out)",
-        sortDate: 0,
-      });
-    }
-  }
-
-  return [...receipts, ...payouts, ...extras]
+  return [...receipts, ...payouts]
     .sort((a, b) => b.sortDate - a.sortDate)
     .map(({ sortDate: _s, ...row }) => row);
 }
@@ -276,31 +354,14 @@ function sourceBadgeCls(source: "Bulk" | "Vehicle") {
     : "bg-blue-100 text-blue-800";
 }
 
-function directionBadgeCls(direction: AgencyUnifiedCashRow["direction"]) {
-  if (direction === "Cash in") return "bg-emerald-100 text-emerald-800";
-  if (direction === "Cash out") return "bg-amber-100 text-amber-800";
-  return "bg-slate-100 text-slate-700";
+function directionBadgeCls(direction: CashDirection) {
+  return direction === "Cash in"
+    ? "bg-emerald-100 text-emerald-800"
+    : "bg-amber-100 text-amber-800";
 }
 
-function agencyCashAmountCls(row: AgencyUnifiedCashRow) {
-  if (row.direction === "Cash in") return "text-emerald-700";
-  if (row.direction === "Cash out") return "text-amber-700";
-  return row.source === "Bulk" ? "text-emerald-700" : "text-amber-700";
-}
-
-function driverCashKindBadgeCls(kind: string) {
-  if (kind === "Bata (salary)") return "bg-violet-100 text-violet-800";
-  if (kind === "Advance payout") return "bg-amber-100 text-amber-800";
-  if (kind === "Extra") return "bg-slate-100 text-slate-700";
-  return "bg-slate-100 text-slate-700";
-}
-
-function driverCashAmountCls(row: DriverUnifiedCashRow) {
-  if (row.kind === "Extra") {
-    return row.source === "Vehicle" ? "text-violet-700" : "text-amber-700";
-  }
-  if (row.kind === "Advance payout") return "text-amber-700";
-  return "text-violet-700";
+function cashAmountCls(direction: CashDirection) {
+  return direction === "Cash in" ? "text-emerald-700" : "text-amber-700";
 }
 
 type DriverUnifiedTripRow = {
@@ -316,8 +377,7 @@ type DriverUnifiedTripRow = {
 
 type DriverUnifiedCashRow = {
   id: string;
-  source: "Bulk" | "Vehicle";
-  kind: string;
+  direction: CashDirection;
   date: string | null;
   amount: number;
   method: string;
@@ -351,46 +411,7 @@ function buildDriverUnifiedTrips(
     status: r.status,
     sortDate: parseSortDate(r.date),
   }));
-  const manualRows: Array<DriverUnifiedTripRow & { sortDate: number }> = [];
-  const bataExtra =
-    detail.summary.vehicleBata.manualExtra ??
-    detail.adjustments?.vehicleBata?.amount ??
-    0;
-  if (bataExtra > 0) {
-    manualRows.push({
-      id: "manual-bata",
-      source: "Vehicle",
-      date: null,
-      reference: "Manual extra",
-      details:
-        detail.adjustments?.vehicleBata?.notes?.trim() ||
-        "Additional bata to pay",
-      cashOut: bataExtra,
-      grandTotal: null,
-      status: "extra",
-      sortDate: Number.MAX_SAFE_INTEGER,
-    });
-  }
-  const advanceExtra =
-    detail.summary.bulkAdvance.manualExtra ??
-    detail.adjustments?.bulkAdvance?.amount ??
-    0;
-  if (advanceExtra > 0) {
-    manualRows.push({
-      id: "manual-advance",
-      source: "Bulk",
-      date: null,
-      reference: "Manual extra",
-      details:
-        detail.adjustments?.bulkAdvance?.notes?.trim() ||
-        "Additional advance to pay",
-      cashOut: advanceExtra,
-      grandTotal: null,
-      status: "extra",
-      sortDate: Number.MAX_SAFE_INTEGER - 1,
-    });
-  }
-  return [...vehicle, ...bulk, ...manualRows]
+  return [...vehicle, ...bulk]
     .sort((a, b) => b.sortDate - a.sortDate)
     .map(({ sortDate: _s, ...row }) => row);
 }
@@ -400,18 +421,7 @@ function buildDriverUnifiedCashHistory(
 ): DriverUnifiedCashRow[] {
   const bata = detail.tables.salaryPayments.map((r) => ({
     id: `salary-${r._id}`,
-    source: "Vehicle" as const,
-    kind: "Bata (salary)",
-    date: r.date,
-    amount: r.amount,
-    method: "—",
-    notes: r.notes,
-    sortDate: parseSortDate(r.date),
-  }));
-  const vehicleAdvance = detail.tables.advanceLedger.map((r) => ({
-    id: `vadv-${r._id}`,
-    source: "Vehicle" as const,
-    kind: "Advance",
+    direction: "Cash out" as const,
     date: r.date,
     amount: r.amount,
     method: "—",
@@ -420,66 +430,15 @@ function buildDriverUnifiedCashHistory(
   }));
   const bulkPayouts = detail.tables.bulkAdvancePayouts.map((r) => ({
     id: `bulkpay-${r._id}`,
-    source: "Bulk" as const,
-    kind: "Advance payout",
+    direction: "Cash out" as const,
     date: r.paymentDate,
     amount: r.amount,
     method: r.paymentMethod,
     notes: r.notes,
     sortDate: parseSortDate(r.paymentDate),
   }));
-  const extras = (detail.tables.extraAdjustments ?? []).map((r) => ({
-    id: `extra-${r._id}`,
-    source: (r.kind === "vehicle_bata_extra" ? "Vehicle" : "Bulk") as
-      | "Bulk"
-      | "Vehicle",
-    kind: "Extra",
-    date: r.recordedAt,
-    amount: r.amount,
-    method: "—",
-    notes: r.notes,
-    sortDate: parseSortDate(r.recordedAt),
-  }));
 
-  if (extras.length === 0) {
-    const bataExtra =
-      detail.summary.vehicleBata.manualExtra ??
-      detail.adjustments?.vehicleBata?.amount ??
-      0;
-    if (bataExtra > 0) {
-      extras.push({
-        id: "extra-manual-bata",
-        source: "Vehicle",
-        kind: "Extra",
-        date: null,
-        amount: bataExtra,
-        method: "—",
-        notes:
-          detail.adjustments?.vehicleBata?.notes?.trim() || "Manual extra (bata)",
-        sortDate: 0,
-      });
-    }
-    const advanceExtra =
-      detail.summary.bulkAdvance.manualExtra ??
-      detail.adjustments?.bulkAdvance?.amount ??
-      0;
-    if (advanceExtra > 0) {
-      extras.push({
-        id: "extra-manual-advance",
-        source: "Bulk",
-        kind: "Extra",
-        date: null,
-        amount: advanceExtra,
-        method: "—",
-        notes:
-          detail.adjustments?.bulkAdvance?.notes?.trim() ||
-          "Manual extra (advance)",
-        sortDate: 0,
-      });
-    }
-  }
-
-  return [...bata, ...vehicleAdvance, ...bulkPayouts, ...extras]
+  return [...bata, ...bulkPayouts]
     .sort((a, b) => b.sortDate - a.sortDate)
     .map(({ sortDate: _s, ...row }) => row);
 }
@@ -660,32 +619,39 @@ function driverListName(d: Driver): string {
 }
 
 export function CashInCashOutPage() {
-  const [tab, setTab] = useState<TabId>("agencies");
-  const [listSearch, setListSearch] = useState("");
+  const savedUi = useMemo(() => loadCashInCashOutUi(), []);
+  const prevAgencyIdRef = useRef<string | null>(savedUi.selectedAgencyId);
+  const prevDriverIdRef = useRef<string | null>(savedUi.selectedDriverId);
+
+  const [tab, setTab] = useState<TabId>(savedUi.tab);
+  const [listSearch, setListSearch] = useState(savedUi.listSearch);
 
   const [agencies, setAgencies] = useState<Agency[]>([]);
   const [drivers, setDrivers] = useState<Driver[]>([]);
   const [listLoading, setListLoading] = useState(true);
 
-  const [selectedAgencyId, setSelectedAgencyId] = useState<string | null>(null);
-  const [agencyDetailTab, setAgencyDetailTab] = useState<DetailTabId>("trips");
-  const [selectedDriverId, setSelectedDriverId] = useState<string | null>(null);
-  const [driverDetailTab, setDriverDetailTab] = useState<DetailTabId>("trips");
+  const [selectedAgencyId, setSelectedAgencyId] = useState<string | null>(
+    savedUi.selectedAgencyId,
+  );
+  const [agencyDetailTab, setAgencyDetailTab] = useState<DetailTabId>(
+    savedUi.agencyDetailTab,
+  );
+  const [selectedDriverId, setSelectedDriverId] = useState<string | null>(
+    savedUi.selectedDriverId,
+  );
+  const [driverDetailTab, setDriverDetailTab] = useState<DetailTabId>(
+    savedUi.driverDetailTab,
+  );
 
   const [agencyDetail, setAgencyDetail] = useState<AgencyCashInCashOutDetail | null>(null);
   const [driverDetail, setDriverDetail] = useState<DriverCashInCashOutDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState<string | null>(null);
+  const [detailMonth, setDetailMonth] = useState(savedUi.detailMonth);
 
-  const [modal, setModal] = useState<
-    | "agencyMarkPayment"
-    | "agencyCashInExtra"
-    | "agencyCashOutExtra"
-    | "driverMarkPayment"
-    | "driverBataExtra"
-    | "driverAdvanceExtra"
-    | null
-  >(null);
+  const [modal, setModal] = useState<"agencyMarkPayment" | "driverMarkPayment" | null>(
+    null,
+  );
   const [agencyPaymentKind, setAgencyPaymentKind] = useState<
     "cash_in" | "cash_out"
   >("cash_in");
@@ -721,65 +687,111 @@ export function CashInCashOutPage() {
   }, []);
 
   useEffect(() => {
-    setSelectedAgencyId(null);
-    setSelectedDriverId(null);
-    setAgencyDetail(null);
-    setDriverDetail(null);
     if (tab === "agencies") loadAgencies();
     else loadDrivers();
   }, [tab, loadAgencies, loadDrivers]);
 
-  const loadAgencyDetail = useCallback(async (agencyId: string) => {
-    setDetailLoading(true);
-    setDetailError(null);
-    try {
-      const d = await fetchCashInCashOutAgencyDetail(agencyId);
-      setAgencyDetail(d);
-    } catch {
-      setAgencyDetail(null);
-      setDetailError("Could not load agency details.");
-    } finally {
-      setDetailLoading(false);
-    }
-  }, []);
-
-  const loadDriverDetail = useCallback(async (driverId: string) => {
-    setDetailLoading(true);
-    setDetailError(null);
-    try {
-      const d = await fetchCashInCashOutDriverDetail(driverId);
-      setDriverDetail(d);
-    } catch {
-      setDriverDetail(null);
-      setDetailError("Could not load driver details.");
-    } finally {
-      setDetailLoading(false);
-    }
-  }, []);
+  useEffect(() => {
+    saveCashInCashOutUi({
+      tab,
+      selectedAgencyId,
+      selectedDriverId,
+      agencyDetailTab,
+      driverDetailTab,
+      detailMonth,
+      listSearch,
+    });
+  }, [
+    tab,
+    selectedAgencyId,
+    selectedDriverId,
+    agencyDetailTab,
+    driverDetailTab,
+    detailMonth,
+    listSearch,
+  ]);
 
   useEffect(() => {
-    setAgencyDetailTab("trips");
+    if (listLoading || tab !== "agencies" || !selectedAgencyId) return;
+    const exists = agencies.some((a) => (a._id ?? a.id ?? "") === selectedAgencyId);
+    if (!exists) setSelectedAgencyId(null);
+  }, [agencies, listLoading, tab, selectedAgencyId]);
+
+  useEffect(() => {
+    if (listLoading || tab !== "drivers" || !selectedDriverId) return;
+    const exists = drivers.some((d) => (d._id ?? d.id ?? "") === selectedDriverId);
+    if (!exists) setSelectedDriverId(null);
+  }, [drivers, listLoading, tab, selectedDriverId]);
+
+  const loadAgencyDetail = useCallback(
+    async (agencyId: string, month: string) => {
+      setDetailLoading(true);
+      setDetailError(null);
+      try {
+        const d = await fetchCashInCashOutAgencyDetail(agencyId, month);
+        setAgencyDetail(d);
+      } catch {
+        setAgencyDetail(null);
+        setDetailError("Could not load agency details.");
+      } finally {
+        setDetailLoading(false);
+      }
+    },
+    [],
+  );
+
+  const loadDriverDetail = useCallback(
+    async (driverId: string, month: string) => {
+      setDetailLoading(true);
+      setDetailError(null);
+      try {
+        const d = await fetchCashInCashOutDriverDetail(driverId, month);
+        setDriverDetail(d);
+      } catch {
+        setDriverDetail(null);
+        setDetailError("Could not load driver details.");
+      } finally {
+        setDetailLoading(false);
+      }
+    },
+    [],
+  );
+
+  useEffect(() => {
+    if (
+      prevAgencyIdRef.current !== null &&
+      prevAgencyIdRef.current !== selectedAgencyId
+    ) {
+      setAgencyDetailTab("trips");
+    }
+    prevAgencyIdRef.current = selectedAgencyId;
   }, [selectedAgencyId]);
 
   useEffect(() => {
-    setDriverDetailTab("trips");
+    if (
+      prevDriverIdRef.current !== null &&
+      prevDriverIdRef.current !== selectedDriverId
+    ) {
+      setDriverDetailTab("trips");
+    }
+    prevDriverIdRef.current = selectedDriverId;
   }, [selectedDriverId]);
 
   useEffect(() => {
     if (tab === "agencies" && selectedAgencyId) {
-      loadAgencyDetail(selectedAgencyId);
+      loadAgencyDetail(selectedAgencyId, detailMonth);
     } else {
       setAgencyDetail(null);
     }
-  }, [tab, selectedAgencyId, loadAgencyDetail]);
+  }, [tab, selectedAgencyId, detailMonth, loadAgencyDetail]);
 
   useEffect(() => {
     if (tab === "drivers" && selectedDriverId) {
-      loadDriverDetail(selectedDriverId);
+      loadDriverDetail(selectedDriverId, detailMonth);
     } else {
       setDriverDetail(null);
     }
-  }, [tab, selectedDriverId, loadDriverDetail]);
+  }, [tab, selectedDriverId, detailMonth, loadDriverDetail]);
 
   const filteredAgencies = useMemo(() => {
     const q = listSearch.trim().toLowerCase();
@@ -807,16 +819,10 @@ export function CashInCashOutPage() {
     [agencyDetail],
   );
 
-  const agencyNetRemaining = useMemo(() => {
-    if (!agencyDetail) return null;
-    const bulkRemaining = agencyDetail.summary.cashInBulk.remaining;
-    const vehicleRemaining = agencyDetail.summary.cashOutAgencyProfit.remaining;
-    return {
-      bulkRemaining,
-      vehicleRemaining,
-      total: agencyTotalRemaining(agencyDetail),
-    };
-  }, [agencyDetail]);
+  const agencySummaryMetrics = useMemo(
+    () => (agencyDetail ? buildAgencySummaryMetrics(agencyDetail) : null),
+    [agencyDetail],
+  );
 
   const driverUnifiedTrips = useMemo(
     () => (driverDetail ? buildDriverUnifiedTrips(driverDetail) : []),
@@ -828,16 +834,10 @@ export function CashInCashOutPage() {
     [driverDetail],
   );
 
-  const driverNetRemaining = useMemo(() => {
-    if (!driverDetail) return null;
-    const bataRemaining = driverDetail.summary.vehicleBata.remaining;
-    const bulkRemaining = driverDetail.summary.bulkAdvance.remaining;
-    return {
-      bataRemaining,
-      bulkRemaining,
-      total: driverTotalRemaining(driverDetail),
-    };
-  }, [driverDetail]);
+  const driverSummaryMetrics = useMemo(
+    () => (driverDetail ? buildDriverSummaryMetrics(driverDetail) : null),
+    [driverDetail],
+  );
 
   const openDriverMarkPaymentModal = () => {
     setPayMessage(null);
@@ -848,24 +848,6 @@ export function CashInCashOutPage() {
     setModal("driverMarkPayment");
   };
 
-  const openDriverExtraModal = (kind: "driverBataExtra" | "driverAdvanceExtra") => {
-    if (!driverDetail) return;
-    const adj =
-      kind === "driverBataExtra"
-        ? (driverDetail.adjustments?.vehicleBata ?? {
-            amount: driverDetail.summary.vehicleBata.manualExtra ?? 0,
-            notes: "",
-          })
-        : (driverDetail.adjustments?.bulkAdvance ?? {
-            amount: driverDetail.summary.bulkAdvance.manualExtra ?? 0,
-            notes: "",
-          });
-    setPayMessage(null);
-    setPayAmount(adj.amount > 0 ? String(adj.amount) : "");
-    setPayNotes(adj.notes || "");
-    setModal(kind);
-  };
-
   const openAgencyMarkPaymentModal = () => {
     setPayMessage(null);
     setPayAmount("");
@@ -874,24 +856,6 @@ export function CashInCashOutPage() {
     setPayNotes("");
     setAgencyPaymentKind("cash_in");
     setModal("agencyMarkPayment");
-  };
-
-  const openAgencyExtraModal = (kind: "agencyCashInExtra" | "agencyCashOutExtra") => {
-    if (!agencyDetail) return;
-    const adj =
-      kind === "agencyCashInExtra"
-        ? (agencyDetail.adjustments?.cashInBulk ?? {
-            amount: agencyDetail.summary.cashInBulk.manualExtra ?? 0,
-            notes: "",
-          })
-        : (agencyDetail.adjustments?.cashOutVehicle ?? {
-            amount: agencyDetail.summary.cashOutAgencyProfit.manualExtra ?? 0,
-            notes: "",
-          });
-    setPayMessage(null);
-    setPayAmount(adj.amount > 0 ? String(adj.amount) : "");
-    setPayNotes(adj.notes || "");
-    setModal(kind);
   };
 
   const submitAgencyCashIn = async () => {
@@ -911,39 +875,11 @@ export function CashInCashOutPage() {
         notes: payNotes,
       });
       setModal(null);
-      await loadAgencyDetail(selectedAgencyId);
+      await loadAgencyDetail(selectedAgencyId, detailMonth);
     } catch (e: unknown) {
       setPayMessage(
         (e as { response?: { data?: { message?: string } } })?.response?.data
           ?.message ?? "Failed to record.",
-      );
-    } finally {
-      setPaySaving(false);
-    }
-  };
-
-  const submitAgencyExtra = async (kind: "agencyCashInExtra" | "agencyCashOutExtra") => {
-    if (!selectedAgencyId) return;
-    const amt = Number(payAmount);
-    if (Number.isNaN(amt) || amt < 0) {
-      setPayMessage("Enter a valid amount (0 or more).");
-      return;
-    }
-    setPaySaving(true);
-    setPayMessage(null);
-    try {
-      await updateAgencyCashInCashOutAdjustments(
-        selectedAgencyId,
-        kind === "agencyCashInExtra"
-          ? { cashInBulkExtra: amt, cashInBulkExtraNotes: payNotes }
-          : { cashOutVehicleExtra: amt, cashOutVehicleExtraNotes: payNotes },
-      );
-      setModal(null);
-      await loadAgencyDetail(selectedAgencyId);
-    } catch (e: unknown) {
-      setPayMessage(
-        (e as { response?: { data?: { message?: string } } })?.response?.data
-          ?.message ?? "Failed to save.",
       );
     } finally {
       setPaySaving(false);
@@ -967,7 +903,7 @@ export function CashInCashOutPage() {
         notes: payNotes,
       });
       setModal(null);
-      await loadAgencyDetail(selectedAgencyId);
+      await loadAgencyDetail(selectedAgencyId, detailMonth);
     } catch (e: unknown) {
       setPayMessage(
         (e as { response?: { data?: { message?: string } } })?.response?.data
@@ -983,34 +919,6 @@ export function CashInCashOutPage() {
       await submitAgencyCashIn();
     } else {
       await submitAgencyCashOut();
-    }
-  };
-
-  const submitDriverExtra = async (kind: "driverBataExtra" | "driverAdvanceExtra") => {
-    if (!selectedDriverId) return;
-    const amt = Number(payAmount);
-    if (Number.isNaN(amt) || amt < 0) {
-      setPayMessage("Enter a valid amount (0 or more).");
-      return;
-    }
-    setPaySaving(true);
-    setPayMessage(null);
-    try {
-      await updateDriverCashInCashOutAdjustments(
-        selectedDriverId,
-        kind === "driverBataExtra"
-          ? { vehicleBataExtra: amt, vehicleBataExtraNotes: payNotes }
-          : { bulkAdvanceExtra: amt, bulkAdvanceExtraNotes: payNotes },
-      );
-      setModal(null);
-      await loadDriverDetail(selectedDriverId);
-    } catch (e: unknown) {
-      setPayMessage(
-        (e as { response?: { data?: { message?: string } } })?.response?.data
-          ?.message ?? "Failed to save.",
-      );
-    } finally {
-      setPaySaving(false);
     }
   };
 
@@ -1070,7 +978,7 @@ export function CashInCashOutPage() {
       }
 
       setModal(null);
-      await loadDriverDetail(selectedDriverId);
+      await loadDriverDetail(selectedDriverId, detailMonth);
     } catch (e: unknown) {
       setPayMessage(
         (e as { response?: { data?: { message?: string } } })?.response?.data
@@ -1087,8 +995,8 @@ export function CashInCashOutPage() {
   const refreshList = () => {
     if (tab === "agencies") loadAgencies();
     else loadDrivers();
-    if (selectedAgencyId) loadAgencyDetail(selectedAgencyId);
-    if (selectedDriverId) loadDriverDetail(selectedDriverId);
+    if (selectedAgencyId) loadAgencyDetail(selectedAgencyId, detailMonth);
+    if (selectedDriverId) loadDriverDetail(selectedDriverId, detailMonth);
   };
 
   return (
@@ -1207,7 +1115,7 @@ export function CashInCashOutPage() {
         >
           {tab === "agencies" && selectedAgencyId && (
             <>
-              <div className="flex shrink-0 flex-col gap-3 border-b border-slate-200 bg-white px-3 py-3 sm:flex-row sm:items-center sm:justify-between sm:gap-2 lg:px-4">
+              <div className="flex shrink-0 flex-col gap-2 border-b border-slate-200 bg-white px-3 py-3 lg:px-4">
                 <div className="flex min-w-0 flex-1 items-center gap-2 sm:gap-3">
                   <button
                     type="button"
@@ -1219,19 +1127,28 @@ export function CashInCashOutPage() {
                   <h2 className="min-w-0 truncate text-base font-bold text-slate-900 sm:text-lg">
                     {agencyDetail?.agency.name ?? "…"}
                   </h2>
-                  <button
-                    type="button"
-                    onClick={openAgencyMarkPaymentModal}
-                    disabled={!agencyDetail || detailLoading}
-                    className="ml-auto shrink-0 touch-manipulation rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50 sm:ml-0 sm:px-4 sm:py-2 sm:text-sm"
-                  >
-                    Mark Payment
-                  </button>
+                  <div className="ml-auto flex shrink-0">
+                    <button
+                      type="button"
+                      onClick={openAgencyMarkPaymentModal}
+                      disabled={!agencyDetail || detailLoading}
+                      className="touch-manipulation rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50 sm:px-4 sm:py-2 sm:text-sm"
+                    >
+                      Mark Payment
+                    </button>
+                  </div>
                 </div>
-                <EntityDetailTabBar
-                  tab={agencyDetailTab}
-                  setTab={setAgencyDetailTab}
-                />
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                  <DetailMonthFilter
+                    month={detailMonth}
+                    setMonth={setDetailMonth}
+                    monthLabel={agencyDetail?.filter?.monthLabel}
+                  />
+                  <EntityDetailTabBar
+                    tab={agencyDetailTab}
+                    setTab={setAgencyDetailTab}
+                  />
+                </div>
               </div>
 
               <div className="min-h-0 flex-1 overflow-y-auto p-3 sm:p-4 lg:p-5">
@@ -1242,49 +1159,17 @@ export function CashInCashOutPage() {
                 ) : detailError ? (
                   <p className="text-sm text-red-600">{detailError}</p>
                 ) : agencyDetail ? (
-                  <>
-                    <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 sm:gap-2">
-                      <div className="rounded-xl border border-slate-200 bg-slate-50/80 p-3 text-xs sm:p-4 sm:text-sm">
-                        <div className="flex items-start justify-between gap-3">
-                          <p className="min-w-0 font-semibold leading-snug text-slate-900">Bulk</p>
-                          <button
-                            type="button"
-                            onClick={() => openAgencyExtraModal("agencyCashInExtra")}
-                            className="min-h-[36px] shrink-0 touch-manipulation rounded-lg border border-slate-300 bg-white px-2.5 py-2 text-[11px] font-semibold text-slate-700 hover:bg-slate-100 sm:min-h-0 sm:py-1.5"
-                          >
-                            Extra
-                          </button>
-                        </div>
-                        <p className="mt-2 text-xl font-bold tabular-nums text-slate-900 sm:text-2xl">
-                          {fmtCurrency(agencyDetail.summary.cashInBulk.remaining)}
-                        </p>
+                  <div
+                    className={`relative ${detailLoading ? "pointer-events-none opacity-60" : ""}`}
+                  >
+                    {detailLoading && (
+                      <div className="absolute inset-x-0 top-0 z-10 flex justify-center pt-6">
+                        <Loader2 className="h-7 w-7 animate-spin text-blue-500" />
                       </div>
-                      <div className="rounded-xl border border-slate-200 bg-slate-50/80 p-3 text-xs sm:p-4 sm:text-sm">
-                        <div className="flex items-start justify-between gap-3">
-                          <p className="min-w-0 font-semibold leading-snug text-slate-900">Vehicle</p>
-                          <button
-                            type="button"
-                            onClick={() => openAgencyExtraModal("agencyCashOutExtra")}
-                            className="min-h-[36px] shrink-0 touch-manipulation rounded-lg border border-slate-300 bg-white px-2.5 py-2 text-[11px] font-semibold text-slate-700 hover:bg-slate-100 sm:min-h-0 sm:py-1.5"
-                          >
-                            Extra
-                          </button>
-                        </div>
-                        <p className="mt-2 text-xl font-bold tabular-nums text-slate-900 sm:text-2xl">
-                          {fmtCurrency(agencyDetail.summary.cashOutAgencyProfit.remaining)}
-                        </p>
-                      </div>
-                      {agencyNetRemaining && (
-                        <div className="rounded-xl border border-slate-200 bg-slate-50/80 p-3 text-xs sm:col-span-2 sm:p-4 lg:col-span-1 sm:text-sm">
-                          <p className="min-w-0 font-semibold leading-snug text-slate-900">
-                            Total remaining
-                          </p>
-                          <p className="mt-2 text-xl font-bold tabular-nums text-slate-900 sm:text-2xl">
-                            {fmtCurrency(Math.abs(agencyNetRemaining.total))}
-                          </p>
-                        </div>
-                      )}
-                    </div>
+                    )}
+                    {agencySummaryMetrics && (
+                      <EntitySummaryCards metrics={agencySummaryMetrics} />
+                    )}
 
                     {agencyDetailTab === "trips" && (
                       <TableShell title="Trips (bulk & vehicle)">
@@ -1382,7 +1267,7 @@ export function CashInCashOutPage() {
                                     {formatDate(r.date)}
                                   </td>
                                   <td
-                                    className={`px-3 py-2 text-right font-medium tabular-nums ${agencyCashAmountCls(r)}`}
+                                    className={`px-3 py-2 text-right font-medium tabular-nums ${cashAmountCls(r.direction)}`}
                                   >
                                     {fmtCurrency(r.amount)}
                                   </td>
@@ -1406,7 +1291,7 @@ export function CashInCashOutPage() {
                     </p>
                       </>
                     )}
-                  </>
+                  </div>
                 ) : null}
               </div>
             </>
@@ -1414,7 +1299,7 @@ export function CashInCashOutPage() {
 
           {tab === "drivers" && selectedDriverId && (
             <>
-              <div className="flex shrink-0 flex-col gap-3 border-b border-slate-200 bg-white px-3 py-3 sm:flex-row sm:items-center sm:justify-between sm:gap-2 lg:px-4">
+              <div className="flex shrink-0 flex-col gap-2 border-b border-slate-200 bg-white px-3 py-3 lg:px-4">
                 <div className="flex min-w-0 flex-1 items-center gap-2 sm:gap-3">
                   <button
                     type="button"
@@ -1426,19 +1311,28 @@ export function CashInCashOutPage() {
                   <h2 className="min-w-0 truncate text-base font-bold text-slate-900 sm:text-lg">
                     {driverDetail?.driver.displayName ?? "…"}
                   </h2>
-                  <button
-                    type="button"
-                    onClick={openDriverMarkPaymentModal}
-                    disabled={!driverDetail || detailLoading}
-                    className="ml-auto shrink-0 touch-manipulation rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50 sm:ml-0 sm:px-4 sm:py-2 sm:text-sm"
-                  >
-                    Mark Payment
-                  </button>
+                  <div className="ml-auto flex shrink-0">
+                    <button
+                      type="button"
+                      onClick={openDriverMarkPaymentModal}
+                      disabled={!driverDetail || detailLoading}
+                      className="touch-manipulation rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50 sm:px-4 sm:py-2 sm:text-sm"
+                    >
+                      Cash out
+                    </button>
+                  </div>
                 </div>
-                <EntityDetailTabBar
-                  tab={driverDetailTab}
-                  setTab={setDriverDetailTab}
-                />
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                  <DetailMonthFilter
+                    month={detailMonth}
+                    setMonth={setDetailMonth}
+                    monthLabel={driverDetail?.filter?.monthLabel}
+                  />
+                  <EntityDetailTabBar
+                    tab={driverDetailTab}
+                    setTab={setDriverDetailTab}
+                  />
+                </div>
               </div>
 
               <div className="min-h-0 flex-1 overflow-y-auto p-3 sm:p-4 lg:p-5">
@@ -1449,49 +1343,20 @@ export function CashInCashOutPage() {
                 ) : detailError ? (
                   <p className="text-sm text-red-600">{detailError}</p>
                 ) : driverDetail ? (
-                  <>
-                    <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 sm:gap-2">
-                      <div className="rounded-xl border border-slate-200 bg-slate-50/80 p-3 text-xs sm:p-4 sm:text-sm">
-                        <div className="flex items-start justify-between gap-3">
-                          <p className="min-w-0 font-semibold leading-snug text-slate-900">Bata</p>
-                          <button
-                            type="button"
-                            onClick={() => openDriverExtraModal("driverBataExtra")}
-                            className="min-h-[36px] shrink-0 touch-manipulation rounded-lg border border-slate-300 bg-white px-2.5 py-2 text-[11px] font-semibold text-slate-700 hover:bg-slate-100 sm:min-h-0 sm:py-1.5"
-                          >
-                            Extra
-                          </button>
-                        </div>
-                        <p className="mt-2 text-xl font-bold tabular-nums text-slate-900 sm:text-2xl">
-                          {fmtCurrency(driverDetail.summary.vehicleBata.remaining)}
-                        </p>
+                  <div
+                    className={`relative ${detailLoading ? "pointer-events-none opacity-60" : ""}`}
+                  >
+                    {detailLoading && (
+                      <div className="absolute inset-x-0 top-0 z-10 flex justify-center pt-6">
+                        <Loader2 className="h-7 w-7 animate-spin text-blue-500" />
                       </div>
-                      <div className="rounded-xl border border-slate-200 bg-slate-50/80 p-3 text-xs sm:p-4 sm:text-sm">
-                        <div className="flex items-start justify-between gap-3">
-                          <p className="min-w-0 font-semibold leading-snug text-slate-900">Bulk</p>
-                          <button
-                            type="button"
-                            onClick={() => openDriverExtraModal("driverAdvanceExtra")}
-                            className="min-h-[36px] shrink-0 touch-manipulation rounded-lg border border-slate-300 bg-white px-2.5 py-2 text-[11px] font-semibold text-slate-700 hover:bg-slate-100 sm:min-h-0 sm:py-1.5"
-                          >
-                            Extra
-                          </button>
-                        </div>
-                        <p className="mt-2 text-xl font-bold tabular-nums text-slate-900 sm:text-2xl">
-                          {fmtCurrency(driverDetail.summary.bulkAdvance.remaining)}
-                        </p>
-                      </div>
-                      {driverNetRemaining && (
-                        <div className="rounded-xl border border-slate-200 bg-slate-50/80 p-3 text-xs sm:col-span-2 sm:p-4 lg:col-span-1 sm:text-sm">
-                          <p className="min-w-0 font-semibold leading-snug text-slate-900">
-                            Total remaining
-                          </p>
-                          <p className="mt-2 text-xl font-bold tabular-nums text-slate-900 sm:text-2xl">
-                            {fmtCurrency(Math.abs(driverNetRemaining.total))}
-                          </p>
-                        </div>
-                      )}
-                    </div>
+                    )}
+                    {driverSummaryMetrics && (
+                      <EntitySummaryCards
+                        metrics={driverSummaryMetrics}
+                        entity="driver"
+                      />
+                    )}
 
                     {driverDetailTab === "trips" && (
                       <TableShell title="Trips (bulk & vehicle)">
@@ -1533,7 +1398,7 @@ export function CashInCashOutPage() {
                                   <td className="max-w-[140px] truncate px-3 py-2">
                                     {r.details}
                                   </td>
-                                  <td className="px-3 py-2 text-right tabular-nums text-violet-700">
+                                  <td className="px-3 py-2 text-right tabular-nums text-amber-700">
                                     {fmtCurrency(r.cashOut)}
                                   </td>
                                   <td className="px-3 py-2 text-right tabular-nums text-slate-500">
@@ -1576,16 +1441,16 @@ export function CashInCashOutPage() {
                                 >
                                   <td className="whitespace-nowrap px-3 py-2">
                                     <span
-                                      className={`inline-block rounded-md px-1.5 py-0.5 text-[10px] font-semibold ${driverCashKindBadgeCls(r.kind)}`}
+                                      className={`inline-block rounded-md px-1.5 py-0.5 text-[10px] font-semibold ${directionBadgeCls(r.direction)}`}
                                     >
-                                      {r.kind}
+                                      {r.direction}
                                     </span>
                                   </td>
                                   <td className="whitespace-nowrap px-3 py-2">
                                     {formatDate(r.date)}
                                   </td>
                                   <td
-                                    className={`px-3 py-2 text-right font-medium tabular-nums ${driverCashAmountCls(r)}`}
+                                    className={`px-3 py-2 text-right font-medium tabular-nums ${cashAmountCls(r.direction)}`}
                                   >
                                     {fmtCurrency(r.amount)}
                                   </td>
@@ -1614,7 +1479,7 @@ export function CashInCashOutPage() {
                     </p>
                       </>
                     )}
-                  </>
+                  </div>
                 ) : null}
               </div>
             </>
@@ -1638,110 +1503,13 @@ export function CashInCashOutPage() {
         </div>
       </div>
 
-      {modal === "agencyCashInExtra" && (
-        <Modal
-          title="Manual extra — bulk"
-          onClose={() => setModal(null)}
-        >
-          <p className="mb-3 text-xs text-slate-500">
-            Add an amount owed from this agency beyond bulk trip totals (e.g. old balance,
-            adjustment). Set to 0 to remove.
-          </p>
-          <label className="block text-xs font-medium text-slate-600">
-            Extra amount (₹)
-            <input
-              type="number"
-              className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
-              value={payAmount}
-              onChange={(e) => setPayAmount(e.target.value)}
-              min={0}
-            />
-          </label>
-          <label className="mt-3 block text-xs font-medium text-slate-600">
-            Reason / notes
-            <input
-              className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
-              value={payNotes}
-              onChange={(e) => setPayNotes(e.target.value)}
-              placeholder="e.g. Opening balance, correction"
-            />
-          </label>
-          {payMessage && <p className="mt-2 text-xs text-red-600">{payMessage}</p>}
-          <div className="mt-4 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-            <button
-              type="button"
-              onClick={() => setModal(null)}
-              className="min-h-[44px] w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm font-medium sm:min-h-0 sm:w-auto sm:py-2"
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              disabled={paySaving}
-              onClick={() => submitAgencyExtra("agencyCashInExtra")}
-              className="inline-flex min-h-[44px] w-full items-center justify-center rounded-lg bg-emerald-600 px-3 py-2.5 text-sm font-medium text-white disabled:opacity-50 sm:min-h-0 sm:w-auto sm:py-2"
-            >
-              {paySaving ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save"}
-            </button>
-          </div>
-        </Modal>
-      )}
-
-      {modal === "agencyCashOutExtra" && (
-        <Modal
-          title="Manual extra — vehicle"
-          onClose={() => setModal(null)}
-        >
-          <p className="mb-3 text-xs text-slate-500">
-            Add an amount to pay this agency beyond vehicle-trip profit. Set to 0 to remove.
-          </p>
-          <label className="block text-xs font-medium text-slate-600">
-            Extra amount (₹)
-            <input
-              type="number"
-              className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
-              value={payAmount}
-              onChange={(e) => setPayAmount(e.target.value)}
-              min={0}
-            />
-          </label>
-          <label className="mt-3 block text-xs font-medium text-slate-600">
-            Reason / notes
-            <input
-              className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
-              value={payNotes}
-              onChange={(e) => setPayNotes(e.target.value)}
-              placeholder="e.g. Bonus, prior agreement"
-            />
-          </label>
-          {payMessage && <p className="mt-2 text-xs text-red-600">{payMessage}</p>}
-          <div className="mt-4 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-            <button
-              type="button"
-              onClick={() => setModal(null)}
-              className="min-h-[44px] w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm font-medium sm:min-h-0 sm:w-auto sm:py-2"
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              disabled={paySaving}
-              onClick={() => submitAgencyExtra("agencyCashOutExtra")}
-              className="inline-flex min-h-[44px] w-full items-center justify-center rounded-lg bg-amber-600 px-3 py-2.5 text-sm font-medium text-white disabled:opacity-50 sm:min-h-0 sm:w-auto sm:py-2"
-            >
-              {paySaving ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save"}
-            </button>
-          </div>
-        </Modal>
-      )}
-
       {modal === "agencyMarkPayment" && (
         <Modal title="Mark Payment" onClose={() => setModal(null)}>
           <p className="mb-3 text-xs text-slate-500">
-            Record a payment received from or paid to this agency.
+            Cash in = money got from agency. Cash out = money given to agency.
           </p>
           <fieldset className="block">
-            <legend className="text-xs font-medium text-slate-600">Payment type</legend>
+            <legend className="text-xs font-medium text-slate-600">Type</legend>
             <div className="mt-1.5 grid grid-cols-2 gap-1 rounded-xl border border-slate-200 bg-slate-50 p-1">
               <button
                 type="button"
@@ -1829,107 +1597,17 @@ export function CashInCashOutPage() {
         </Modal>
       )}
 
-      {modal === "driverBataExtra" && (
-        <Modal title="Manual extra — bata" onClose={() => setModal(null)}>
-          <p className="mb-3 text-xs text-slate-500">
-            Add bata/commission owed to this driver beyond vehicle trips. Set to 0 to remove.
-          </p>
-          <label className="block text-xs font-medium text-slate-600">
-            Extra amount (₹)
-            <input
-              type="number"
-              className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
-              value={payAmount}
-              onChange={(e) => setPayAmount(e.target.value)}
-              min={0}
-            />
-          </label>
-          <label className="mt-3 block text-xs font-medium text-slate-600">
-            Reason / notes
-            <input
-              className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
-              value={payNotes}
-              onChange={(e) => setPayNotes(e.target.value)}
-              placeholder="e.g. Opening balance, correction"
-            />
-          </label>
-          {payMessage && <p className="mt-2 text-xs text-red-600">{payMessage}</p>}
-          <div className="mt-4 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-            <button
-              type="button"
-              onClick={() => setModal(null)}
-              className="min-h-[44px] w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm font-medium sm:min-h-0 sm:w-auto sm:py-2"
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              disabled={paySaving}
-              onClick={() => submitDriverExtra("driverBataExtra")}
-              className="inline-flex min-h-[44px] w-full items-center justify-center rounded-lg bg-violet-600 px-3 py-2.5 text-sm font-medium text-white disabled:opacity-50 sm:min-h-0 sm:w-auto sm:py-2"
-            >
-              {paySaving ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save"}
-            </button>
-          </div>
-        </Modal>
-      )}
-
-      {modal === "driverAdvanceExtra" && (
-        <Modal title="Manual extra — bulk" onClose={() => setModal(null)}>
-          <p className="mb-3 text-xs text-slate-500">
-            Add bulk advance owed to this driver beyond bulk trip rows. Set to 0 to remove.
-          </p>
-          <label className="block text-xs font-medium text-slate-600">
-            Extra amount (₹)
-            <input
-              type="number"
-              className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
-              value={payAmount}
-              onChange={(e) => setPayAmount(e.target.value)}
-              min={0}
-            />
-          </label>
-          <label className="mt-3 block text-xs font-medium text-slate-600">
-            Reason / notes
-            <input
-              className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
-              value={payNotes}
-              onChange={(e) => setPayNotes(e.target.value)}
-              placeholder="e.g. Prior advance not in bulk entry"
-            />
-          </label>
-          {payMessage && <p className="mt-2 text-xs text-red-600">{payMessage}</p>}
-          <div className="mt-4 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-            <button
-              type="button"
-              onClick={() => setModal(null)}
-              className="min-h-[44px] w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm font-medium sm:min-h-0 sm:w-auto sm:py-2"
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              disabled={paySaving}
-              onClick={() => submitDriverExtra("driverAdvanceExtra")}
-              className="inline-flex min-h-[44px] w-full items-center justify-center rounded-lg bg-amber-600 px-3 py-2.5 text-sm font-medium text-white disabled:opacity-50 sm:min-h-0 sm:w-auto sm:py-2"
-            >
-              {paySaving ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save"}
-            </button>
-          </div>
-        </Modal>
-      )}
-
       {modal === "driverMarkPayment" && driverDetail && (
         <Modal title="Cash out" onClose={() => setModal(null)}>
           <p className="mb-3 text-xs text-slate-500">
-            Records cash paid to this driver. Applied to bata first, then bulk
+            Record money given to this driver. Applied to bata first, then bulk
             advance.
-            {driverNetRemaining && (
+            {driverSummaryMetrics && (
               <>
                 {" "}
-                Total remaining:{" "}
+                Remaining to pay:{" "}
                 <strong>
-                  {fmtCurrency(Math.abs(driverNetRemaining.total))}
+                  {fmtCurrency(Math.abs(driverSummaryMetrics.remainingToGet))}
                 </strong>
               </>
             )}

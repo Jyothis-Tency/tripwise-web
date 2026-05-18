@@ -87,8 +87,14 @@ export interface AgencyCashAdjustments {
   cashOutVehicle: { amount: number; notes: string };
 }
 
+export interface CashInCashOutMonthFilter {
+  month: string;
+  monthLabel: string;
+}
+
 export interface AgencyCashInCashOutDetail {
   agency: { _id: string; name: string };
+  filter?: CashInCashOutMonthFilter;
   summary: {
     cashInBulk: AgencyCashSummaryBlock & { received: number };
     cashOutAgencyProfit: AgencyCashSummaryBlock & { paid: number };
@@ -150,6 +156,7 @@ export interface DriverCashInCashOutDetail {
     lastName: string;
     displayName: string;
   };
+  filter?: CashInCashOutMonthFilter;
   summary: {
     vehicleBata: AgencyCashSummaryBlock & { paid: number };
     bulkAdvance: AgencyCashSummaryBlock & { paid: number };
@@ -229,16 +236,26 @@ export async function updateDriverCashInCashOutAdjustments(
 
 export async function fetchCashInCashOutAgencyDetail(
   agencyId: string,
+  month?: string,
 ): Promise<AgencyCashInCashOutDetail> {
-  const res = await apiClient.get(ApiEndpoints.cashInCashOutAgencyDetail(agencyId));
+  const params: Record<string, string> = {};
+  if (month) params.month = month;
+  const res = await apiClient.get(ApiEndpoints.cashInCashOutAgencyDetail(agencyId), {
+    params,
+  });
   const raw: any = res.data ?? {};
   return (raw.data ?? raw) as AgencyCashInCashOutDetail;
 }
 
 export async function fetchCashInCashOutDriverDetail(
   driverId: string,
+  month?: string,
 ): Promise<DriverCashInCashOutDetail> {
-  const res = await apiClient.get(ApiEndpoints.cashInCashOutDriverDetail(driverId));
+  const params: Record<string, string> = {};
+  if (month) params.month = month;
+  const res = await apiClient.get(ApiEndpoints.cashInCashOutDriverDetail(driverId), {
+    params,
+  });
   const raw: any = res.data ?? {};
   return (raw.data ?? raw) as DriverCashInCashOutDetail;
 }

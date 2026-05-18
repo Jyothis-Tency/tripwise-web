@@ -268,7 +268,7 @@ function EditableGridField({
   };
 
   if (editing) {
-    return (
+  return (
       <div className="col-span-1">
         <span className="text-slate-400 block mb-0.5 uppercase tracking-wide text-[10px] sm:text-[11px]">
           {label}
@@ -306,9 +306,9 @@ function EditableGridField({
             className="text-slate-400 p-0.5 hover:text-slate-600"
           >
             <X className="h-3.5 w-3.5" />
-          </button>
-        </div>
-      </div>
+            </button>
+          </div>
+          </div>
     );
   }
   return (
@@ -610,7 +610,7 @@ export function TripFormModal({
   const isUpdate = !!trip;
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
+  
   const [form, setForm] = useState({
     from: trip?.from ?? "",
     to: trip?.to ?? "",
@@ -671,8 +671,8 @@ export function TripFormModal({
       };
       const saved =
         isUpdate && trip
-          ? await updateTrip(trip._id, payload)
-          : await createTrip({ vehicleId, ...payload });
+        ? await updateTrip(trip._id, payload)
+        : await createTrip({ vehicleId, ...payload });
       onSaved(saved);
       onClose();
     } catch (err: any) {
@@ -695,7 +695,7 @@ export function TripFormModal({
               {error}
             </p>
           )}
-
+          
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
             <Field label="From" id="tfrom" required>
               <input
@@ -1270,7 +1270,7 @@ function VehicleHistoryTab({ vehicle }: { vehicle: Vehicle }) {
       )}
 
       {/* Content */}
-      {loading ? (
+        {loading ? (
         <div className="space-y-3">
           {Array.from({ length: 5 }).map((_, i) => (
             <div
@@ -1283,14 +1283,14 @@ function VehicleHistoryTab({ vehicle }: { vehicle: Vehicle }) {
             </div>
           ))}
         </div>
-      ) : error ? (
-        <p className="py-6 text-center text-xs text-red-500">{error}</p>
+        ) : error ? (
+          <p className="py-6 text-center text-xs text-red-500">{error}</p>
       ) : trips.length === 0 ? (
-        <div className="flex flex-col items-center py-10 text-center">
-          <History className="h-10 w-10 text-slate-300" />
-          <p className="mt-2 text-sm text-slate-400">No trip history found</p>
-        </div>
-      ) : (
+          <div className="flex flex-col items-center py-10 text-center">
+            <History className="h-10 w-10 text-slate-300" />
+            <p className="mt-2 text-sm text-slate-400">No trip history found</p>
+          </div>
+        ) : (
         <div className="space-y-3">
           {trips.map((t, idx) => {
             const currentPage = pagination?.current ?? page;
@@ -1307,11 +1307,11 @@ function VehicleHistoryTab({ vehicle }: { vehicle: Vehicle }) {
                     <div className="flex items-center gap-3">
                       <div className="h-7 w-7 rounded-full bg-blue-50 border border-blue-200 flex items-center justify-center text-[11px] font-bold text-blue-700 shrink-0">
                         {rowNumber}
-                      </div>
+          </div>
                       <div className="min-w-0">
                         <div className="text-sm font-semibold text-slate-900 truncate">
                           {t.tripNumber ?? "—"}
-                        </div>
+      </div>
                         <div className="mt-0.5 text-[12px] text-slate-500">
                           {t.from && t.to ? `${t.from} → ${t.to}` : "—"}
                         </div>
@@ -1372,7 +1372,7 @@ function VehicleHistoryTab({ vehicle }: { vehicle: Vehicle }) {
                     </div>
                   </div>
                 </div>
-              </section>
+      </section>
             );
           })}
         </div>
@@ -1484,8 +1484,8 @@ function TripDriverTab({
     : null;
 
   if (mode === "live") {
-    return (
-      <div className="space-y-4">
+  return (
+    <div className="space-y-4">
         {uErr && <p className="text-xs text-red-500">{uErr}</p>}
         {hasActiveTrip ? (
           <section
@@ -1496,7 +1496,7 @@ function TripDriverTab({
               onClick={() => toggleExpand(activeTrip._id)}
             >
               <div className="flex items-start justify-between mb-2">
-                <div>
+              <div>
                   <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-blue-400">
                     {expandedTripId === activeTrip._id ? (
                       <ChevronUp className="h-3.5 w-3.5" />
@@ -1510,26 +1510,26 @@ function TripDriverTab({
                       Trip #{activeTrip.tripNumber}
                     </p>
                   )}
-                </div>
+            </div>
                 <span
                   className={`text-xs rounded-full border px-2 py-0.5 capitalize ${statusBadgeCls(activeTrip.status)}`}
                 >
                   {activeTrip.status ?? "—"}
-                </span>
-              </div>
-              <div className="space-y-1 text-xs text-slate-600">
-                {activeTrip.from && activeTrip.to && (
-                  <p className="flex items-center gap-1 font-medium">
-                    <span>{activeTrip.from}</span>
+            </span>
+          </div>
+          <div className="space-y-1 text-xs text-slate-600">
+            {activeTrip.from && activeTrip.to && (
+              <p className="flex items-center gap-1 font-medium">
+                <span>{activeTrip.from}</span>
                     <ChevronRight className="h-3.5 w-3.5 text-blue-400" />
-                    <span>{activeTrip.to}</span>
-                  </p>
-                )}
+                <span>{activeTrip.to}</span>
+              </p>
+            )}
                 {activeTrip.departureDate && (
                   <p>📅 {formatDate(activeTrip.departureDate)}</p>
                 )}
                 <p>👤 Driver: {activeTripDriver ?? "Unassigned"}</p>
-              </div>
+          </div>
             </div>
 
             {expandedTripId === activeTrip._id && (
@@ -1739,8 +1739,8 @@ function TripDriverTab({
                     }
                     className="flex-1 rounded-lg border border-blue-300 bg-white px-3 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-50"
                   >
-                    Update
-                  </button>
+              Update
+            </button>
                   <button
                     type="button"
                     onClick={() =>
@@ -1750,8 +1750,8 @@ function TripDriverTab({
                     }
                     className="flex-1 rounded-lg border border-red-200 bg-white px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50"
                   >
-                    Cancel Trip
-                  </button>
+              Cancel Trip
+            </button>
                   {activeTripDriver ? (
                     <button
                       type="button"
@@ -1778,10 +1778,10 @@ function TripDriverTab({
                       Assign Driver
                     </button>
                   )}
-                </div>
+          </div>
               </div>
             )}
-          </section>
+        </section>
         ) : (
           <div className="flex flex-col items-center rounded-xl border border-dashed border-slate-200 bg-white py-12 text-center">
             <p className="text-sm text-slate-500">
@@ -1828,40 +1828,40 @@ function TripDriverTab({
                   className="p-4 cursor-pointer hover:bg-slate-50 transition-colors"
                   onClick={() => toggleExpand(trip._id)}
                 >
-                  <div className="flex items-start justify-between mb-2">
+                <div className="flex items-start justify-between mb-2">
                     <div className="flex items-start gap-2">
                       {expandedTripId === trip._id ? (
                         <ChevronUp className="h-4 w-4 text-slate-400 mt-0.5 shrink-0" />
                       ) : (
                         <ChevronDown className="h-4 w-4 text-slate-400 mt-0.5 shrink-0" />
                       )}
-                      <div>
+                  <div>
                         {trip.tripNumber && (
                           <p className="text-sm font-bold text-slate-800">
                             Trip #{trip.tripNumber}
                           </p>
                         )}
-                        {trip.from && trip.to && (
-                          <p className="flex items-center gap-1 text-xs text-slate-600 mt-0.5">
-                            <span>{trip.from}</span>
-                            <ChevronRight className="h-3 w-3 text-slate-400" />
-                            <span>{trip.to}</span>
-                          </p>
-                        )}
-                      </div>
+                    {trip.from && trip.to && (
+                      <p className="flex items-center gap-1 text-xs text-slate-600 mt-0.5">
+                        <span>{trip.from}</span>
+                        <ChevronRight className="h-3 w-3 text-slate-400" />
+                        <span>{trip.to}</span>
+                      </p>
+                    )}
+                  </div>
                     </div>
                     <span
                       className={`text-xs rounded-full border px-2 py-0.5 capitalize ${statusBadgeCls(trip.status)} whitespace-nowrap ml-2`}
                     >
                       {trip.status ?? "—"}
-                    </span>
-                  </div>
+                  </span>
+                </div>
                   <div className="text-xs text-slate-500 space-y-0.5 pl-6">
                     {trip.departureDate && (
                       <p>📅 {formatDate(trip.departureDate)}</p>
                     )}
                     <p>👤 {drName ?? "Unassigned"}</p>
-                  </div>
+                </div>
                 </div>
 
                 {expandedTripId === trip._id && (
@@ -1915,15 +1915,15 @@ function TripDriverTab({
                             Actual Start
                           </span>
                           <span>{formatTimeIst(trip.actualStartTime)}</span>
-                        </div>
-                      )}
+        </div>
+      )}
                       {trip.actualEndTime && (
                         <div>
                           <span className="text-slate-400 block mb-0.5">
                             Actual End
                           </span>
                           <span>{formatTimeIst(trip.actualEndTime)}</span>
-                        </div>
+    </div>
                       )}
                       <EditableGridField
                         tripId={trip._id}
@@ -1946,13 +1946,13 @@ function TripDriverTab({
                         }
                       />
                       {trip.careOf?.name && (
-                        <div>
+          <div>
                           <span className="text-slate-400 block mb-0.5">
                             Care Of
                           </span>
                           {trip.careOf.name}{" "}
                           {trip.careOf.phone ? `(${trip.careOf.phone})` : ""}
-                        </div>
+          </div>
                       )}
                       <EditableGridField
                         tripId={trip._id}
@@ -1967,7 +1967,7 @@ function TripDriverTab({
                           label="Notes"
                           value={trip.notes || "—"}
                         />
-                      </div>
+        </div>
                       {trip.startingNote && (
                         <div className="col-span-2 sm:col-span-3">
                           <span className="text-slate-400 block mb-0.5">
@@ -1976,7 +1976,7 @@ function TripDriverTab({
                           <p className="whitespace-pre-wrap">
                             {trip.startingNote}
                           </p>
-                        </div>
+      </div>
                       )}
                       {trip.completionNote && (
                         <div className="col-span-2 sm:col-span-3">
@@ -1986,8 +1986,8 @@ function TripDriverTab({
                           <p className="whitespace-pre-wrap">
                             {trip.completionNote}
                           </p>
-                        </div>
-                      )}
+          </div>
+        )}
                       <div className="col-span-2 sm:col-span-3 grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-2 mt-2 border-t border-slate-100 pt-3">
                         <EditableGridField
                           tripId={trip._id}
@@ -2044,7 +2044,7 @@ function TripDriverTab({
                           value={trip.cabCost || 0}
                           isCurrency
                         />
-                        <div>
+              <div>
                           <span className="text-slate-400 block mb-0.5 text-[10px] uppercase">
                             Agency profit
                           </span>
@@ -2054,8 +2054,8 @@ function TripDriverTab({
                               "en-IN",
                             )}
                           </span>
-                        </div>
-                      </div>
+              </div>
+            </div>
                     </div>
                     <div className="flex flex-wrap gap-2 pt-2 border-t border-slate-100 pl-2 mt-3">
                       <button
@@ -2064,7 +2064,7 @@ function TripDriverTab({
                         className="flex-1 rounded-lg border border-slate-200 px-3 py-1.5 text-[11px] font-medium text-slate-700 hover:bg-slate-50"
                       >
                         Update
-                      </button>
+              </button>
                       <button
                         type="button"
                         onClick={() => onCancelTrip(trip._id)}
@@ -2090,8 +2090,8 @@ function TripDriverTab({
                           Assign Driver
                         </button>
                       )}
-                    </div>
-                  </div>
+            </div>
+          </div>
                 )}
               </section>
             );

@@ -27,10 +27,15 @@ import {
 } from "../cashInCashOutUiStorage";
 
 function fmtCurrency(v: number): string {
-  return `₹${v.toLocaleString("en-IN", {
+  return `₹${Math.abs(v).toLocaleString("en-IN", {
     minimumFractionDigits: 0,
     maximumFractionDigits: 0,
   })}`;
+}
+
+function fmtSignedCurrency(v: number): string {
+  if (v < 0) return `-${fmtCurrency(v)}`;
+  return fmtCurrency(v);
 }
 
 /** Bulk remaining (to receive) minus vehicle remaining (to pay). */
@@ -61,8 +66,8 @@ function buildAgencySummaryMetrics(
   detail: AgencyCashInCashOutDetail,
 ): EntitySummaryMetrics {
   return {
-    moneyGiven: detail.summary.cashOutAgencyProfit.paid,
-    moneyGot: detail.summary.cashInBulk.received,
+    moneyGiven: 0,
+    moneyGot: 0,
     bulkTrips: detail.summary.cashInBulk.fromTrips,
     vehicleTrips: detail.summary.cashOutAgencyProfit.fromTrips,
     remainingToGet: agencyTotalRemaining(detail),
@@ -92,7 +97,6 @@ function EntitySummaryCards({
   const cards: { label: string; value: number; highlight?: boolean }[] =
     entity === "driver"
       ? [
-          { label: "Total money given", value: metrics.moneyGiven },
           { label: "Total from bulk trips", value: metrics.bulkTrips },
           { label: "Total from vehicle trips", value: metrics.vehicleTrips },
           {
@@ -102,8 +106,6 @@ function EntitySummaryCards({
           },
         ]
       : [
-          { label: "Total money given", value: metrics.moneyGiven },
-          { label: "Total money got", value: metrics.moneyGot },
           { label: "Total from bulk trips", value: metrics.bulkTrips },
           { label: "Total from vehicle trips", value: metrics.vehicleTrips },
           {
@@ -115,8 +117,8 @@ function EntitySummaryCards({
 
   const gridCls =
     entity === "driver"
-      ? "mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-2 lg:grid-cols-2 xl:grid-cols-4"
-      : "mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-2 lg:grid-cols-3 xl:grid-cols-5";
+      ? "mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-2 lg:grid-cols-3 xl:grid-cols-3"
+      : "mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-2 lg:grid-cols-3 xl:grid-cols-3";
 
   return (
     <div className={gridCls}>
@@ -129,7 +131,7 @@ function EntitySummaryCards({
             : "text-amber-700"
           : "text-slate-900";
         const displayAmount = isRemaining
-          ? fmtCurrency(Math.abs(c.value))
+          ? fmtSignedCurrency(c.value)
           : fmtCurrency(c.value);
 
         return (
@@ -378,11 +380,18 @@ type DriverUnifiedTripRow = {
 type DriverUnifiedCashRow = {
   id: string;
   direction: CashDirection;
+  kind: string;
   date: string | null;
   amount: number;
   method: string;
   notes: string;
 };
+
+function driverCashKindBadgeCls(kind: string) {
+  if (kind === "Advance") return "bg-violet-100 text-violet-800";
+  if (kind === "Bulk advance") return "bg-amber-100 text-amber-800";
+  return "bg-amber-100 text-amber-800";
+}
 
 function buildDriverUnifiedTrips(
   detail: DriverCashInCashOutDetail,
@@ -422,6 +431,17 @@ function buildDriverUnifiedCashHistory(
   const bata = detail.tables.salaryPayments.map((r) => ({
     id: `salary-${r._id}`,
     direction: "Cash out" as const,
+    kind: "Bata (salary)",
+    date: r.date,
+    amount: r.amount,
+    method: "—",
+    notes: r.notes,
+    sortDate: parseSortDate(r.date),
+  }));
+  const advances = detail.tables.advanceLedger.map((r) => ({
+    id: `advance-${r._id}`,
+    direction: "Cash out" as const,
+    kind: "Advance",
     date: r.date,
     amount: r.amount,
     method: "—",
@@ -431,6 +451,7 @@ function buildDriverUnifiedCashHistory(
   const bulkPayouts = detail.tables.bulkAdvancePayouts.map((r) => ({
     id: `bulkpay-${r._id}`,
     direction: "Cash out" as const,
+    kind: "Bulk advance",
     date: r.paymentDate,
     amount: r.amount,
     method: r.paymentMethod,
@@ -438,7 +459,7 @@ function buildDriverUnifiedCashHistory(
     sortDate: parseSortDate(r.paymentDate),
   }));
 
-  return [...bata, ...bulkPayouts]
+  return [...advances, ...bata, ...bulkPayouts]
     .sort((a, b) => b.sortDate - a.sortDate)
     .map(({ sortDate: _s, ...row }) => row);
 }
@@ -655,6 +676,9 @@ export function CashInCashOutPage() {
   const [agencyPaymentKind, setAgencyPaymentKind] = useState<
     "cash_in" | "cash_out"
   >("cash_in");
+  const [driverPaymentKind, setDriverPaymentKind] = useState<
+    "cash_out" | "advance"
+  >("cash_out");
   const [payAmount, setPayAmount] = useState("");
   const [payDate, setPayDate] = useState(() => new Date().toISOString().split("T")[0]);
   const [payMethod, setPayMethod] = useState<string>("cash");
@@ -845,6 +869,7 @@ export function CashInCashOutPage() {
     setPayDate(new Date().toISOString().split("T")[0]);
     setPayMethod("cash");
     setPayNotes("");
+    setDriverPaymentKind("cash_out");
     setModal("driverMarkPayment");
   };
 
@@ -922,7 +947,35 @@ export function CashInCashOutPage() {
     }
   };
 
-  const submitDriverMarkPayment = async () => {
+  const submitDriverAdvance = async () => {
+    if (!selectedDriverId) return;
+    const amt = Number(payAmount);
+    if (!amt || amt <= 0) {
+      setPayMessage("Enter a valid amount.");
+      return;
+    }
+    setPaySaving(true);
+    setPayMessage(null);
+    try {
+      await createSalaryTransaction(selectedDriverId, {
+        type: "advance",
+        amount: amt,
+        date: payDate,
+        notes: payNotes.trim() || "Advance payment",
+      });
+      setModal(null);
+      await loadDriverDetail(selectedDriverId, detailMonth);
+    } catch (e: unknown) {
+      setPayMessage(
+        (e as { response?: { data?: { message?: string } } })?.response?.data
+          ?.message ?? "Failed to record advance.",
+      );
+    } finally {
+      setPaySaving(false);
+    }
+  };
+
+  const submitDriverCashOut = async () => {
     if (!selectedDriverId || !driverDetail) return;
     const amt = Number(payAmount);
     if (!amt || amt <= 0) {
@@ -986,6 +1039,14 @@ export function CashInCashOutPage() {
       );
     } finally {
       setPaySaving(false);
+    }
+  };
+
+  const submitDriverMarkPayment = async () => {
+    if (driverPaymentKind === "advance") {
+      await submitDriverAdvance();
+    } else {
+      await submitDriverCashOut();
     }
   };
 
@@ -1441,9 +1502,9 @@ export function CashInCashOutPage() {
                                 >
                                   <td className="whitespace-nowrap px-3 py-2">
                                     <span
-                                      className={`inline-block rounded-md px-1.5 py-0.5 text-[10px] font-semibold ${directionBadgeCls(r.direction)}`}
+                                      className={`inline-block rounded-md px-1.5 py-0.5 text-[10px] font-semibold ${driverCashKindBadgeCls(r.kind)}`}
                                     >
-                                      {r.direction}
+                                      {r.kind}
                                     </span>
                                   </td>
                                   <td className="whitespace-nowrap px-3 py-2">
@@ -1600,19 +1661,58 @@ export function CashInCashOutPage() {
       {modal === "driverMarkPayment" && driverDetail && (
         <Modal title="Cash out" onClose={() => setModal(null)}>
           <p className="mb-3 text-xs text-slate-500">
-            Record money given to this driver. Applied to bata first, then bulk
-            advance.
+            {driverPaymentKind === "advance"
+              ? "Advance paid to driver (same as Drivers → Salary tab). Reduces trip bata pending for this period."
+              : "Cash out to driver: applied to bata (salary) first, then bulk advance payout."}
             {driverSummaryMetrics && (
               <>
                 {" "}
-                Remaining to pay:{" "}
-                <strong>
-                  {fmtCurrency(Math.abs(driverSummaryMetrics.remainingToGet))}
-                </strong>
+                {driverPaymentKind === "advance" ? (
+                  <>
+                    Bata remaining:{" "}
+                    <strong>
+                      {fmtCurrency(driverDetail.summary.vehicleBata.remaining)}
+                    </strong>
+                  </>
+                ) : (
+                  <>
+                    Remaining to pay:{" "}
+                    <strong>
+                      {fmtSignedCurrency(driverSummaryMetrics.remainingToGet)}
+                    </strong>
+                  </>
+                )}
               </>
             )}
           </p>
-          <label className="block text-xs font-medium text-slate-600">
+          <fieldset className="block">
+            <legend className="text-xs font-medium text-slate-600">Type</legend>
+            <div className="mt-1.5 grid grid-cols-2 gap-1 rounded-xl border border-slate-200 bg-slate-50 p-1">
+              <button
+                type="button"
+                onClick={() => setDriverPaymentKind("cash_out")}
+                className={`min-h-[40px] rounded-lg px-2 py-2 text-xs font-semibold sm:text-sm ${
+                  driverPaymentKind === "cash_out"
+                    ? "bg-blue-600 text-white shadow-sm"
+                    : "text-slate-600 hover:bg-white"
+                }`}
+              >
+                Cash out
+              </button>
+              <button
+                type="button"
+                onClick={() => setDriverPaymentKind("advance")}
+                className={`min-h-[40px] rounded-lg px-2 py-2 text-xs font-semibold sm:text-sm ${
+                  driverPaymentKind === "advance"
+                    ? "bg-blue-600 text-white shadow-sm"
+                    : "text-slate-600 hover:bg-white"
+                }`}
+              >
+                Advance
+              </button>
+            </div>
+          </fieldset>
+          <label className="mt-3 block text-xs font-medium text-slate-600">
             Amount (₹)
             <input
               type="number"
@@ -1631,26 +1731,33 @@ export function CashInCashOutPage() {
               onChange={(e) => setPayDate(e.target.value)}
             />
           </label>
-          <label className="mt-3 block text-xs font-medium text-slate-600">
-            Method
-            <select
-              className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
-              value={payMethod}
-              onChange={(e) => setPayMethod(e.target.value)}
-            >
-              {PAYMENT_METHODS.map((m) => (
-                <option key={m} value={m}>
-                  {m}
-                </option>
-              ))}
-            </select>
-          </label>
+          {driverPaymentKind === "cash_out" && (
+            <label className="mt-3 block text-xs font-medium text-slate-600">
+              Method
+              <select
+                className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                value={payMethod}
+                onChange={(e) => setPayMethod(e.target.value)}
+              >
+                {PAYMENT_METHODS.map((m) => (
+                  <option key={m} value={m}>
+                    {m}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
           <label className="mt-3 block text-xs font-medium text-slate-600">
             Notes
             <input
               className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
               value={payNotes}
               onChange={(e) => setPayNotes(e.target.value)}
+              placeholder={
+                driverPaymentKind === "advance"
+                  ? "e.g. Advance for trip"
+                  : undefined
+              }
             />
           </label>
           {payMessage && <p className="mt-2 text-xs text-red-600">{payMessage}</p>}

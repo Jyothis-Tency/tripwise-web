@@ -27,6 +27,8 @@ import {
 } from "lucide-react";
 import jsPDF from "jspdf";
 import { useAuth } from "../../../hooks/useAuth";
+import { TimePicker12h } from "../../../components/ui/TimePicker12h";
+import { normalizeHHmm } from "../../../lib/timePickerUtils";
 import {
   fetchAgencies,
   createAgency,
@@ -698,9 +700,7 @@ function generateBulkTripsPDF(
       doc.setFontSize(9);
       const rawNotes = (r.notes || "").trim();
       const noteLines =
-        rawNotes.length > 0
-          ? doc.splitTextToSize(rawNotes, maxNotesW)
-          : ["—"];
+        rawNotes.length > 0 ? doc.splitTextToSize(rawNotes, maxNotesW) : ["—"];
       const rowH = Math.max(8, noteLines.length * noteLineMm + 2);
 
       if (y + rowH > pageH - 25) {
@@ -1402,6 +1402,25 @@ const CellInput = memo(function CellInput({
     setLocalVal(value);
   }, [value]);
 
+  if (type === "time") {
+    const timeVal = String(localVal ?? "");
+    return (
+      <TimePicker12h
+        value={timeVal}
+        allowEmpty
+        compact
+        disabled={disabled}
+        onChange={(v) => {
+          if (disabled) return;
+          const normalized = v ? normalizeHHmm(v) : "";
+          setLocalVal(normalized);
+          onChange(normalized);
+        }}
+        className={`w-full ${className}`}
+      />
+    );
+  }
+
   return (
     <input
       value={localVal}
@@ -1498,7 +1517,10 @@ function BulkEntryTable({
     }
 
     const reportGroups = buildBulkExportGroups(start, end);
-    const rowCount = reportGroups.reduce((s, g) => s + (g.rows?.length ?? 0), 0);
+    const rowCount = reportGroups.reduce(
+      (s, g) => s + (g.rows?.length ?? 0),
+      0,
+    );
     if (rowCount === 0) {
       setExportError("No trips found for the selected filter/date range.");
       return;
@@ -1506,7 +1528,8 @@ function BulkEntryTable({
 
     const today = new Date().toISOString().split("T")[0];
     const agencyPart = (agencyName || "Agency").replace(/\s+/g, "_");
-    const rangePart = start || end ? `${start || "from"}_${end || "to"}` : "all";
+    const rangePart =
+      start || end ? `${start || "from"}_${end || "to"}` : "all";
     const fileName = `BulkTrips_${agencyPart}_${rangePart}_${today}.pdf`;
 
     generateBulkTripsPDF(
@@ -1527,10 +1550,10 @@ function BulkEntryTable({
   const updateGroupField = useCallback(
     (gi: number, field: keyof DriverGroup, val: any) => {
       onChange((prev) => {
-      const next = [...prev];
+        const next = [...prev];
         next[gi] = { ...next[gi], [field]: val };
-      return next;
-    });
+        return next;
+      });
     },
     [onChange],
   );
@@ -1538,7 +1561,7 @@ function BulkEntryTable({
   const toggleComplete = useCallback(
     (gi: number, ri: number) => {
       onChange((prev) => {
-      const next = [...prev];
+        const next = [...prev];
         next[gi] = { ...next[gi], rows: [...next[gi].rows] };
         next[gi].rows[ri] = {
           ...next[gi].rows[ri],
@@ -1557,29 +1580,29 @@ function BulkEntryTable({
         next[gi] = { ...next[gi], rows: [...next[gi].rows] };
         const row = { ...next[gi].rows[ri], [field]: val };
 
-      // Auto-calculate distance
+        // Auto-calculate distance
         if (field === "startKm" || field === "endKm") {
-        const skm = Number(row.startKm) || 0;
-        const ekm = Number(row.endKm) || 0;
-        row.distance = ekm > skm ? ekm - skm : 0;
-      }
+          const skm = Number(row.startKm) || 0;
+          const ekm = Number(row.endKm) || 0;
+          row.distance = ekm > skm ? ekm - skm : 0;
+        }
 
-      // Auto-calculate hours
+        // Auto-calculate hours
         if (field === "startTime" || field === "endTime") {
           const [sh, sm] = (row.startTime || "00:00").split(":").map(Number);
           const [eh, em] = (row.endTime || "00:00").split(":").map(Number);
-        if (!isNaN(sh) && !isNaN(sm) && !isNaN(eh) && !isNaN(em)) {
+          if (!isNaN(sh) && !isNaN(sm) && !isNaN(eh) && !isNaN(em)) {
             let mins = eh * 60 + em - (sh * 60 + sm);
-          if (mins < 0) mins += 24 * 60; // handle overnight trips
-          row.hours = Number((mins / 60).toFixed(2));
-        } else {
-          row.hours = 0;
+            if (mins < 0) mins += 24 * 60; // handle overnight trips
+            row.hours = Number((mins / 60).toFixed(2));
+          } else {
+            row.hours = 0;
+          }
         }
-      }
 
         next[gi].rows[ri] = row;
-      return next;
-    });
+        return next;
+      });
     },
     [onChange],
   );
@@ -1587,10 +1610,10 @@ function BulkEntryTable({
   const addRow = useCallback(
     (gi: number) => {
       onChange((prev) => {
-      const next = [...prev];
-      next[gi] = { ...next[gi], rows: [...next[gi].rows, emptyBulkRow()] };
-      return next;
-    });
+        const next = [...prev];
+        next[gi] = { ...next[gi], rows: [...next[gi].rows, emptyBulkRow()] };
+        return next;
+      });
     },
     [onChange],
   );
@@ -1598,7 +1621,7 @@ function BulkEntryTable({
   const removeRow = useCallback(
     (gi: number, rowId: string) => {
       onChange((prev) => {
-      const next = [...prev];
+        const next = [...prev];
         if (next[gi].rows.length <= 1) {
           next[gi] = { ...next[gi], rows: [emptyBulkRow()] };
           return next;
@@ -1607,8 +1630,8 @@ function BulkEntryTable({
           ...next[gi],
           rows: next[gi].rows.filter((r) => r.clientRowId !== rowId),
         };
-      return next;
-    });
+        return next;
+      });
     },
     [onChange],
   );
@@ -1776,7 +1799,7 @@ function BulkEntryTable({
                   placeholder="Enter Name"
                   className="min-w-0 flex-1 sm:w-[180px]"
                 />
-            </div>
+              </div>
               <button
                 type="button"
                 onClick={() => deleteServerGroup(gi)}
@@ -1798,7 +1821,7 @@ function BulkEntryTable({
                   placeholder="KL01..."
                   className="min-w-0 flex-1 sm:w-[140px]"
                 />
-            </div>
+              </div>
             </div>
             <button
               type="button"
@@ -1995,7 +2018,7 @@ function BulkEntryTable({
                   <th className="px-2 py-2">Start KM</th>
                   <th className="px-2 py-2">End KM</th>
                   <th className="px-2 py-2">Dist.</th>
-                  <th className="px-2 py-2 min-w-[110px]">Time (Start/End)</th>
+                  <th className="px-2 py-2 min-w-[168px]">Time (Start/End)</th>
                   <th className="px-2 py-2">Hrs.</th>
                   <th className="px-2 py-2">Toll</th>
                   <th className="px-2 py-2">Advance</th>
@@ -2058,8 +2081,8 @@ function BulkEntryTable({
                     <td className="px-2 py-1.5 font-medium text-slate-700">
                       {r.distance}
                     </td>
-                    <td className="px-2 py-1.5">
-                      <div className="flex flex-col gap-1">
+                    <td className="px-2 py-1.5 min-w-[168px]">
+                      <div className="flex flex-col gap-1.5">
                         <CellInput
                           value={r.startTime}
                           onChange={(v) => updateRow(gi, ri, "startTime", v)}
@@ -2171,7 +2194,11 @@ function BulkEntryTable({
                 );
                 const balance = g.rows.reduce(
                   (s, r) =>
-                    s + calculateBalanceAmount(r.grandTotal || 0, r.advancePaid || 0),
+                    s +
+                    calculateBalanceAmount(
+                      r.grandTotal || 0,
+                      r.advancePaid || 0,
+                    ),
                   0,
                 );
                 return (
@@ -2645,7 +2672,9 @@ function NormalEntryTable({
                 );
                 if (fileName) {
                   const reportEntries = entries
-                    .filter((e) => e.driverName || e.vehicleNumber || e.mobileNumber)
+                    .filter(
+                      (e) => e.driverName || e.vehicleNumber || e.mobileNumber,
+                    )
                     .filter((e) => !isRowHidden(e.isCompleted));
                   generateNormalTripsPDF(
                     user?.name || "Owner",
@@ -2767,11 +2796,11 @@ export function BulkEntryPage() {
   // ── Backend sync callbacks (stable refs) ──
   const syncBulkToBackend = useCallback(
     async (groups: DriverGroup[]) => {
-    if (!selectedAgency) return;
+      if (!selectedAgency) return;
       const validGroups = groups.filter(
         (g) => g.driverName.trim() && g.vehicleNumber.trim(),
       );
-    if (validGroups.length === 0) return;
+      if (validGroups.length === 0) return;
       const res = await syncBulkEntry({
         agencyName: selectedAgency.name,
         driverGroups: validGroups,
@@ -2800,11 +2829,11 @@ export function BulkEntryPage() {
 
   const syncNormalToBackend = useCallback(
     async (entries: NormalEntryRow[]) => {
-    if (!selectedAgency) return;
+      if (!selectedAgency) return;
       const validEntries = entries.filter(
         (e) => e.driverName.trim() && e.vehicleNumber.trim(),
       );
-    if (validEntries.length === 0) return;
+      if (validEntries.length === 0) return;
       const res = await syncNormalEntry({
         agencyName: selectedAgency.name,
         entries: validEntries,
@@ -2945,29 +2974,29 @@ export function BulkEntryPage() {
           }
           const serverGroups: DriverGroup[] = Object.values(grouped).map(
             (grp) => {
-            const first = grp[0];
-            return {
+              const first = grp[0];
+              return {
                 driverName: first.driverName || "",
                 vehicleNumber: first.vehicleNumber || "",
                 rows: grp.map((t) => ({
                   // Preserve server clientRowId so refresh can dedupe against local drafts
                   clientRowId: (t as any).clientRowId ?? nextRowId(),
-                _id: t._id ?? t.id,
+                  _id: t._id ?? t.id,
                   startDate: t.startDate ? t.startDate.split("T")[0] : "",
                   endDate: t.endDate ? t.endDate.split("T")[0] : "",
                   startKm: String(t.startKm ?? ""),
                   endKm: String(t.endKm ?? ""),
                   startTime: t.startTime || "",
                   endTime: t.endTime || "",
-                distance: Number(t.distance ?? 0),
-                hours: Number(t.hours ?? 0),
-                toll: Number(t.toll ?? 0),
+                  distance: Number(t.distance ?? 0),
+                  hours: Number(t.hours ?? 0),
+                  toll: Number(t.toll ?? 0),
                   advancePaid: Number(t.advancePaid ?? 0),
-                grandTotal: Number(t.grandTotal ?? 0),
+                  grandTotal: Number(t.grandTotal ?? 0),
                   notes: t.notes || "",
                   isCompleted: !!t.isCompleted,
-              })),
-            };
+                })),
+              };
             },
           );
           setBulkGroupsRaw((prev) => {
@@ -3034,7 +3063,8 @@ export function BulkEntryPage() {
                 g.driverName.trim() ||
                 g.vehicleNumber.trim() ||
                 g.rows.some(
-                  (r) => r.startDate || r.startKm || r.grandTotal || r.advancePaid,
+                  (r) =>
+                    r.startDate || r.startKm || r.grandTotal || r.advancePaid,
                 ),
             );
 
@@ -3445,10 +3475,10 @@ export function BulkEntryPage() {
                 Back
               </button>
               <div className="flex items-center gap-2">
-              <Wallet className="h-5 w-5 text-emerald-500" />
-              <h2 className="text-base font-bold text-slate-800">
-                {selectedAgency.name} — Payout
-              </h2>
+                <Wallet className="h-5 w-5 text-emerald-500" />
+                <h2 className="text-base font-bold text-slate-800">
+                  {selectedAgency.name} — Payout
+                </h2>
               </div>
             </div>
             <AgencyPayoutTab

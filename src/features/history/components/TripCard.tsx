@@ -29,6 +29,8 @@ import {
   isoToTimeInputInTz,
   fmtTripDuration,
 } from "../historyTimeUtils";
+import { TimePicker12h } from "../../../components/ui/TimePicker12h";
+import { normalizeHHmm } from "../../../lib/timePickerUtils";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -235,6 +237,9 @@ function EditableRow({
         }
         val = parsed;
       }
+      if (TIME_FIELDS.has(fieldKey) && typeof val === "string") {
+        val = val ? normalizeHHmm(val) : "";
+      }
       const updatedTrip = await updateTripFields(tripId, {
         [fieldKey]: val,
       } as any);
@@ -277,24 +282,28 @@ function EditableRow({
           {label}
         </span>
         <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
-          <input
-            autoFocus
-            type={
-              NUMBER_FIELDS.has(fieldKey)
-                ? "number"
-                : fieldKey.toLowerCase().includes("time")
-                  ? "time"
-                  : "text"
-            }
-            value={editValue}
-            onChange={(e) => setEditValue(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") handleSave();
-              if (e.key === "Escape") handleCancel();
-            }}
-            className={`min-h-[32px] min-w-0 flex-1 basis-[6rem] rounded-md border border-blue-300 bg-white px-2 py-1.5 leading-tight outline-none focus:ring-2 focus:ring-blue-200 sm:basis-[8rem] ${NUMBER_FIELDS.has(fieldKey) || DATE_FIELDS.has(fieldKey) || TIME_FIELDS.has(fieldKey) ? "text-base sm:text-lg font-semibold tabular-nums" : "text-sm"}`}
-            disabled={saving}
-          />
+          {TIME_FIELDS.has(fieldKey) ? (
+            <TimePicker12h
+              value={normalizeHHmm(editValue) || editValue}
+              allowEmpty
+              disabled={saving}
+              onChange={(v) => setEditValue(v)}
+              className="min-w-0 flex-1"
+            />
+          ) : (
+            <input
+              autoFocus
+              type={NUMBER_FIELDS.has(fieldKey) ? "number" : "text"}
+              value={editValue}
+              onChange={(e) => setEditValue(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") handleSave();
+                if (e.key === "Escape") handleCancel();
+              }}
+              className={`min-h-[32px] min-w-0 flex-1 basis-[6rem] rounded-md border border-blue-300 bg-white px-2 py-1.5 leading-tight outline-none focus:ring-2 focus:ring-blue-200 sm:basis-[8rem] ${NUMBER_FIELDS.has(fieldKey) || DATE_FIELDS.has(fieldKey) ? "text-base sm:text-lg font-semibold tabular-nums" : "text-sm"}`}
+              disabled={saving}
+            />
+          )}
           <div className="flex shrink-0 items-center gap-0.5 rounded-md border border-slate-200/80 bg-white/80 p-0.5 shadow-sm">
             <button
               type="button"

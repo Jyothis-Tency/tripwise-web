@@ -19,6 +19,8 @@ import {
   Loader2,
 } from "lucide-react";
 import { AgencyNameCombobox } from "../../../components/AgencyNameCombobox";
+import { TimePicker12h } from "../../../components/ui/TimePicker12h";
+import { isoToHHmmInTz } from "../../../lib/timePickerUtils";
 import {
   fetchVehicles,
   fetchVehicleById,
@@ -213,6 +215,7 @@ function EditableGridField({
   tripId,
   highlight,
   isCurrency,
+  timeEditSeed,
 }: {
   label: string;
   value: string | number;
@@ -220,6 +223,8 @@ function EditableGridField({
   tripId: string;
   highlight?: boolean;
   isCurrency?: boolean;
+  /** HH:mm for startTime/endTime inline edit (from ISO) */
+  timeEditSeed?: string;
 }) {
   const initialValue = value == null || value === "" ? "—" : String(value);
   const [editing, setEditing] = useState(false);
@@ -267,22 +272,28 @@ function EditableGridField({
     setEditing(false);
   };
 
+  const isTimeField =
+    fieldKey === "startTime" || fieldKey === "endTime";
+
   if (editing) {
   return (
       <div className="col-span-1">
         <span className="text-slate-400 block mb-0.5 uppercase tracking-wide text-[10px] sm:text-[11px]">
           {label}
         </span>
-        <div className="flex items-center gap-1 mt-0.5">
+        <div className="flex items-center gap-1 mt-0.5 flex-wrap">
+          {isTimeField ? (
+            <TimePicker12h
+              value={editValue}
+              allowEmpty
+              disabled={saving}
+              onChange={(v) => setEditValue(v)}
+              className="min-w-0 flex-1"
+            />
+          ) : (
           <input
             autoFocus
-            type={
-              NUMBER_FIELDS.has(fieldKey)
-                ? "number"
-                : fieldKey.toLowerCase().includes("time")
-                  ? "time"
-                  : "text"
-            }
+            type={NUMBER_FIELDS.has(fieldKey) ? "number" : "text"}
             value={editValue}
             onChange={(e) => setEditValue(e.target.value)}
             onKeyDown={(e) => {
@@ -292,6 +303,7 @@ function EditableGridField({
             className="w-full min-w-[70px] border border-blue-300 rounded px-1.5 py-0.5 text-xs outline-none focus:ring-1 focus:ring-blue-200 bg-white"
             disabled={saving}
           />
+          )}
           <button
             type="button"
             onClick={handleSave}
@@ -325,11 +337,14 @@ function EditableGridField({
         <button
           type="button"
           onClick={() => {
-            setEditValue(
+            let seed =
               displayValue === "—"
                 ? ""
-                : String(displayValue).replace(/^₹/, "").replace(/,/g, ""),
-            );
+                : String(displayValue).replace(/^₹/, "").replace(/,/g, "");
+            if (isTimeField && timeEditSeed !== undefined) {
+              seed = timeEditSeed;
+            }
+            setEditValue(seed);
             setEditing(true);
           }}
           className="opacity-100 lg:opacity-0 lg:group-hover:opacity-100 text-slate-400 hover:text-blue-500 transition-opacity p-0.5"
@@ -1584,12 +1599,14 @@ function TripDriverTab({
                     fieldKey="startTime"
                     label="Start Time"
                     value={formatTimeIst(activeTrip.startTime ?? null)}
+                    timeEditSeed={isoToHHmmInTz(activeTrip.startTime)}
                   />
                   <EditableGridField
                     tripId={activeTrip._id}
                     fieldKey="endTime"
                     label="End Time"
                     value={formatTimeIst(activeTrip.endTime ?? null)}
+                    timeEditSeed={isoToHHmmInTz(activeTrip.endTime)}
                   />
                   {activeTrip.actualStartTime && (
                     <div>
@@ -1914,12 +1931,14 @@ function TripDriverTab({
                         fieldKey="startTime"
                         label="Start Time"
                         value={formatTimeIst(trip.startTime ?? null)}
+                        timeEditSeed={isoToHHmmInTz(trip.startTime)}
                       />
                       <EditableGridField
                         tripId={trip._id}
                         fieldKey="endTime"
                         label="End Time"
                         value={formatTimeIst(trip.endTime ?? null)}
+                        timeEditSeed={isoToHHmmInTz(trip.endTime)}
                       />
                       {trip.actualStartTime && (
                         <div>

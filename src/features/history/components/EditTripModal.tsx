@@ -2,6 +2,8 @@ import { useState } from 'react';
 import type { HistoryTrip } from '../api';
 import { updateTripFields } from '../api';
 import { isoToTimeInputInTz } from '../historyTimeUtils';
+import { TimePicker12h } from '../../../components/ui/TimePicker12h';
+import { normalizeHHmm } from '../../../lib/timePickerUtils';
 import { X, Save } from 'lucide-react';
 
 export function EditTripModal({
@@ -24,8 +26,8 @@ export function EditTripModal({
     customer: trip.customer || '',
     startDate: trip.startDate ? trip.startDate.split('T')[0] : (trip.date ? trip.date.split('T')[0] : ''),
     endDate: trip.endDate ? trip.endDate.split('T')[0] : '',
-    startTime: trip.startTime ? isoToTimeInputInTz(trip.startTime) : '',
-    endTime: trip.endTime ? isoToTimeInputInTz(trip.endTime) : '',
+    startTime: trip.startTime ? normalizeHHmm(isoToTimeInputInTz(trip.startTime)) : '',
+    endTime: trip.endTime ? normalizeHHmm(isoToTimeInputInTz(trip.endTime)) : '',
     startKilometers: trip.startKilometers?.toString() || '',
     endKilometers: trip.endKilometers?.toString() || '',
     distance: trip.distance?.toString() || '',
@@ -134,13 +136,21 @@ export function EditTripModal({
               <div className="grid grid-cols-2 gap-2">
                 <div>
                   <label className="block text-xs font-medium text-slate-600 mb-1">Start Time</label>
-                  <input type="time" value={fields.startTime} onChange={e => handleChange('startTime', e.target.value)}
-                    className="w-full border border-slate-200 rounded-lg px-2 py-2 text-sm outline-none focus:border-blue-400 focus:ring-1" />
+                  <TimePicker12h
+                    value={fields.startTime}
+                    allowEmpty
+                    onChange={(v) => handleChange('startTime', v ? normalizeHHmm(v) : '')}
+                    className="w-full"
+                  />
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-slate-600 mb-1">End Time</label>
-                  <input type="time" value={fields.endTime} onChange={e => handleChange('endTime', e.target.value)}
-                    className="w-full border border-slate-200 rounded-lg px-2 py-2 text-sm outline-none focus:border-blue-400 focus:ring-1" />
+                  <TimePicker12h
+                    value={fields.endTime}
+                    allowEmpty
+                    onChange={(v) => handleChange('endTime', v ? normalizeHHmm(v) : '')}
+                    className="w-full"
+                  />
                 </div>
               </div>
               

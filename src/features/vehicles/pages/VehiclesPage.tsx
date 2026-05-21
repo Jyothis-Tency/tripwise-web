@@ -14,6 +14,7 @@ import {
   AlertTriangle,
   Calculator,
   ArrowLeft,
+  ArrowRightLeft,
   X,
   Check,
   Loader2,
@@ -36,6 +37,7 @@ import {
   updateTrip,
   fetchTripById,
   cancelTrip,
+  switchTripVehicle,
   type Vehicle,
   type TripItem,
   type DriverItem,
@@ -75,6 +77,11 @@ function statusBadgeCls(status?: string) {
     default:
       return "bg-slate-100 text-slate-600 border-slate-200";
   }
+}
+
+function canSwitchTripVehicle(status?: string) {
+  const s = (status ?? "").toLowerCase().replace(/\s+/g, "_");
+  return s === "scheduled" || s === "in_progress";
 }
 
 function formatDate(d?: string) {
@@ -933,6 +940,166 @@ function CancelTripModal({
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// SWITCH VEHICLE MODAL
+// ═══════════════════════════════════════════════════════════════════════════════
+
+function SwitchVehicleModal({
+  tripId,
+  currentVehicleId,
+  onClose,
+  onSwitched,
+}: {
+  tripId: string;
+  currentVehicleId: string;
+  onClose: () => void;
+  onSwitched: () => void;
+}) {
+  const [vehicles, setVehicles] = useState<Vehicle[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
+  const [selectedId, setSelectedId] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetchVehicles({ page: 1, limit: 200 })
+      .then((res) => setVehicles(res.items))
+      .catch(() => setError("Failed to load vehicles"))
+      .finally(() => setLoading(false));
+  }, []);
+
+  const filtered = vehicles.filter((v) => {
+    if (v._id === currentVehicleId) return false;
+    const q = search.trim().toLowerCase();
+    if (!q) return true;
+    const num = (v.vehicleNumber ?? "").toLowerCase();
+    const model = (v.vehicleModel ?? "").toLowerCase();
+    const type = (v.vehicleType ?? "").toLowerCase();
+    return num.includes(q) || model.includes(q) || type.includes(q);
+  });
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedId) {
+      setError("Select a vehicle");
+      return;
+    }
+    setSaving(true);
+    setError(null);
+    try {
+      await switchTripVehicle(tripId, selectedId);
+      onSwitched();
+      onClose();
+    } catch (err: any) {
+      setError(err?.response?.data?.message ?? "Failed to switch vehicle");
+      setSaving(false);
+    }
+  };
+
+  const vehicleLabel = (v: Vehicle) => {
+    const meta = [v.vehicleType, v.vehicleModel].filter(Boolean).join(" ");
+    return meta ? `${v.vehicleNumber} — ${meta}` : v.vehicleNumber;
+  };
+
+  return (
+    <ModalShell title="Switch Vehicle" onClose={onClose} maxWidth="max-w-md">
+      <form onSubmit={submit} className="flex flex-col" style={{ maxHeight: "65vh" }}>
+        <div className="px-4 pt-4 pb-2 shrink-0">
+          <p className="mb-3 text-xs text-slate-500">
+            Move this trip to another vehicle in your fleet. Only scheduled and
+            in-progress trips can be switched.
+          </p>
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
+            <input
+              type="search"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search by number, name, or type…"
+              className={`${inputCls} pl-8`}
+              autoFocus
+            />
+          </div>
+          {error && (
+            <p className="mt-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-600">
+              {error}
+            </p>
+          )}
+        </div>
+
+        <div
+          className="mx-4 mb-2 min-h-48 max-h-60 overflow-y-auto rounded-lg border border-slate-200 bg-slate-50/50"
+          role="listbox"
+          aria-label="Fleet vehicles"
+        >
+          {loading ? (
+            <div className="space-y-1.5 p-2">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <div
+                  key={i}
+                  className="h-11 animate-pulse rounded-lg bg-slate-100"
+                />
+              ))}
+            </div>
+          ) : filtered.length === 0 ? (
+            <p className="px-3 py-8 text-center text-xs text-slate-400">
+              No other vehicles match your search
+            </p>
+          ) : (
+            <ul className="divide-y divide-slate-100 p-1">
+              {filtered.map((v) => {
+                const isSelected = selectedId === v._id;
+                return (
+                  <li key={v._id}>
+                    <button
+                      type="button"
+                      role="option"
+                      aria-selected={isSelected}
+                      onClick={() => setSelectedId(v._id)}
+                      className={`flex w-full items-center justify-between gap-2 rounded-md px-3 py-2.5 text-left text-sm transition ${
+                        isSelected
+                          ? "bg-blue-100 text-blue-900 ring-1 ring-blue-300"
+                          : "text-slate-800 hover:bg-white"
+                      }`}
+                    >
+                      <span className="font-medium">{vehicleLabel(v)}</span>
+                      {v.status && (
+                        <span
+                          className={`shrink-0 text-[10px] rounded-full border px-2 py-0.5 capitalize ${statusBadgeCls(v.status)}`}
+                        >
+                          {v.status}
+                        </span>
+                      )}
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </div>
+
+        <div className="flex justify-end gap-2 px-4 py-4 border-t border-slate-100 shrink-0">
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-lg border border-slate-200 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            disabled={saving || !selectedId || loading}
+            className="rounded-lg bg-blue-500 px-5 py-2 text-sm font-semibold text-white hover:bg-blue-600 disabled:opacity-50"
+          >
+            {saving ? "Switching…" : "Switch Vehicle"}
+          </button>
+        </div>
+      </form>
+    </ModalShell>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // DRIVER ASSIGNMENT MODAL
 // ═══════════════════════════════════════════════════════════════════════════════
 
@@ -1444,6 +1611,7 @@ interface TripDriverTabProps {
   onCancelTrip: (tripId: string) => void;
   onAssignDriver: (tripId?: string) => void;
   onUnassignDriver: (tripId?: string) => void;
+  onSwitchVehicle: (tripId: string) => void;
 }
 
 function TripDriverTab({
@@ -1453,6 +1621,7 @@ function TripDriverTab({
   onCancelTrip,
   onAssignDriver,
   onUnassignDriver,
+  onSwitchVehicle,
 }: TripDriverTabProps) {
   const [unassigning, setUnassigning] = useState(false);
   const [uErr, setUErr] = useState<string | null>(null);
@@ -1781,6 +1950,20 @@ function TripDriverTab({
                   >
               Cancel Trip
             </button>
+                  {canSwitchTripVehicle(activeTrip.status) && (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        onSwitchVehicle(
+                          activeTrip._id ?? activeTrip.id ?? activeTrip.tripId,
+                        )
+                      }
+                      className="flex items-center justify-center gap-1 rounded-lg border border-amber-200 bg-white px-3 py-1.5 text-xs font-medium text-amber-800 hover:bg-amber-50"
+                    >
+                      <ArrowRightLeft className="h-3.5 w-3.5" />
+                      Switch Vehicle
+                    </button>
+                  )}
                   {activeTripDriver ? (
                     <button
                       type="button"
@@ -2103,6 +2286,16 @@ function TripDriverTab({
                       >
                         Cancel
                       </button>
+                      {canSwitchTripVehicle(trip.status) && (
+                        <button
+                          type="button"
+                          onClick={() => onSwitchVehicle(trip._id)}
+                          className="flex items-center justify-center gap-1 rounded-lg border border-amber-200 px-3 py-1.5 text-[11px] font-medium text-amber-800 hover:bg-amber-50"
+                        >
+                          <ArrowRightLeft className="h-3 w-3" />
+                          Switch Vehicle
+                        </button>
+                      )}
                       {drName ? (
                         <button
                           type="button"
@@ -2140,7 +2333,8 @@ function TripDriverTab({
 type DetailModal =
   | { kind: "updateTrip"; tripId: string }
   | { kind: "cancelTrip"; tripId: string }
-  | { kind: "assignDriver"; tripId?: string };
+  | { kind: "assignDriver"; tripId?: string }
+  | { kind: "switchVehicle"; tripId: string };
 
 interface VehicleDetailPanelProps {
   vehicle: Vehicle;
@@ -2183,6 +2377,8 @@ function VehicleDetailPanel({
       if (tripId) onVehicleUpdated({ _updatedAt: Date.now() } as any);
       else onVehicleUpdated({ currentDriverName: undefined });
     },
+    onSwitchVehicle: (tripId: string) =>
+      setDetailModal({ kind: "switchVehicle", tripId }),
   };
 
   return (
@@ -2287,6 +2483,16 @@ function VehicleDetailPanel({
               onVehicleUpdated({ currentDriverName: name });
             }
           }}
+        />
+      )}
+      {detailModal?.kind === "switchVehicle" && (
+        <SwitchVehicleModal
+          tripId={detailModal.tripId}
+          currentVehicleId={vehicle._id}
+          onClose={closeDetailModal}
+          onSwitched={() =>
+            onVehicleUpdated({ _updatedAt: Date.now() } as any)
+          }
         />
       )}
     </div>

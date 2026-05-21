@@ -39,6 +39,7 @@ export const ApiEndpoints = {
   tripCancel: (id: string) => `/owners/vehicles/trip/cancel/${id}`,
   assignDriverToTrip: (tripId: string) => `/owners/trips/${tripId}/assign-driver`,
   unassignDriverFromTrip: (tripId: string) => `/owners/trips/${tripId}/unassign-driver`,
+  switchTripVehicle: (tripId: string) => `/owners/trips/${tripId}/switch-vehicle`,
 
   // HISTORY
   historyTrips: '/owners/trips/history',

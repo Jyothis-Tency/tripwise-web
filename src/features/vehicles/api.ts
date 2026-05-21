@@ -569,3 +569,15 @@ export async function updateTrip(
 export async function cancelTrip(tripId: string): Promise<void> {
   await apiClient.put(ApiEndpoints.tripCancel(tripId), {});
 }
+
+export async function switchTripVehicle(
+  tripId: string,
+  vehicleId: string,
+): Promise<TripItem> {
+  const res = await apiClient.put(ApiEndpoints.switchTripVehicle(tripId), {
+    vehicleId,
+  });
+  const raw: any = res.data ?? {};
+  const data = raw.data ?? raw;
+  return mapTrip(data);
+}

@@ -46,6 +46,10 @@ export const ApiEndpoints = {
   // ANALYTICS
   analyticsOverview: '/owners/analytics/overview',
 
+  // REPORTS
+  reportsCatalog: '/owners/reports/catalog',
+  reportsRun: '/owners/reports/run',
+
   // TRACKING
   trackingVehicles: '/owners/tracking/vehicles',
   trackingVehicleById: (id: string) => `/owners/tracking/vehicles/${id}`,

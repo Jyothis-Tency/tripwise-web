@@ -15,6 +15,7 @@ import RemindersPage from './features/reminders/pages/RemindersPage';
 import ExpensesPage from './features/expenses/pages/ExpensesPage';
 import { CreateNewTripPage } from './features/trips/pages/CreateNewTripPage';
 import { ComingSoonPage } from './components/ui/ComingSoonPage';
+import { ReportsPage } from './features/reports/pages/ReportsPage';
 
 function App() {
   return (
@@ -36,6 +37,7 @@ function App() {
         <Route path="trips" element={<Navigate to="/create-trip" replace />} />
         <Route path="bulk-entry" element={<BulkEntryPage />} />
         <Route path="expenses" element={<ExpensesPage />} />
+        <Route path="reports" element={<ReportsPage />} />
         <Route path="history" element={<HistoryPage />} />
         <Route path="history/payout" element={<HistoryPayoutPage />} />
         <Route path="cash-in-cash-out" element={<CashInCashOutPage />} />

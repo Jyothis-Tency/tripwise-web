@@ -300,6 +300,7 @@ function SalaryTab({ driver }: { driver: Driver }) {
         amount: amt,
         type: 'salary',
         notes: paymentNote.trim() || 'Salary payment',
+        monthValue: monthFilter || undefined,
       });
       setPaymentAmount('');
       setPaymentNote('');

@@ -145,6 +145,7 @@ export async function fetchTripHistory(params: HistoryParams = {}): Promise<{
   trips: HistoryTrip[];
   pagination: HistoryPagination;
   paymentSummary: HistoryPaymentSummary;
+  allTimePaymentSummary?: HistoryPaymentSummary;
 }> {
   // Strip empty/undefined params before sending
   const clean: Record<string, string | number> = {};
@@ -157,6 +158,7 @@ export async function fetchTripHistory(params: HistoryParams = {}): Promise<{
     trips: data.trips ?? [],
     pagination: data.pagination ?? { page: 1, limit: 10, total: 0, pages: 1, hasNext: false, hasPrev: false },
     paymentSummary: data.paymentSummary ?? { totalAmount: 0, totalPaid: 0, totalOutstanding: 0 },
+    allTimePaymentSummary: data.allTimePaymentSummary,
   };
 }
 

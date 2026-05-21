@@ -38,6 +38,130 @@ function fmtSignedCurrency(v: number): string {
   return fmtCurrency(v);
 }
 
+const MONEY_EPS = 0.01;
+
+function moneyEq(a: number, b: number): boolean {
+  return Math.abs(a - b) < MONEY_EPS;
+}
+
+function sumMoney(values: number[]): number {
+  const n = values.reduce((s, v) => s + (Number(v) || 0), 0);
+  return Math.round(n * 100) / 100;
+}
+
+/** Client-side checks: summary cards must match filtered table totals. */
+function verifyAgencyCashMath(detail: AgencyCashInCashOutDetail): string[] {
+  const issues: string[] = [];
+  const bulkTable = sumMoney(
+    detail.tables.bulkTripsCashIn.map((r) => r.grandTotal),
+  );
+  const vehicleTable = sumMoney(
+    detail.tables.vehicleTripsAgencyProfit.map((r) => r.agencyProfit),
+  );
+  const receiptsTable = sumMoney(
+    detail.tables.bulkReceiptPayments.map((r) => r.amount),
+  );
+  const payoutsTable = sumMoney(
+    detail.tables.agencyProfitPayoutPayments.map((r) => r.amount),
+  );
+
+  if (!moneyEq(bulkTable, detail.summary.cashInBulk.fromTrips)) {
+    issues.push(
+      `Bulk card (₹${detail.summary.cashInBulk.fromTrips}) ≠ sum of bulk trip Cash in column (₹${bulkTable}).`,
+    );
+  }
+  if (!moneyEq(vehicleTable, detail.summary.cashOutAgencyProfit.fromTrips)) {
+    issues.push(
+      `Vehicle card (₹${detail.summary.cashOutAgencyProfit.fromTrips}) ≠ sum of vehicle trip Cash out column (₹${vehicleTable}).`,
+    );
+  }
+  if (!moneyEq(receiptsTable, detail.summary.cashInBulk.received)) {
+    issues.push("Cash in received does not match cash history receipts total.");
+  }
+  if (!moneyEq(payoutsTable, detail.summary.cashOutAgencyProfit.paid)) {
+    issues.push("Cash out paid does not match cash history payouts total.");
+  }
+  const bulkRemainingCalc = sumMoney([
+    detail.summary.cashInBulk.totalOwed,
+    -detail.summary.cashInBulk.received,
+  ]);
+  if (!moneyEq(bulkRemainingCalc, detail.summary.cashInBulk.remaining)) {
+    issues.push("Bulk remaining ≠ total owed − received.");
+  }
+  const vehicleRemainingCalc = sumMoney([
+    detail.summary.cashOutAgencyProfit.totalOwed,
+    -detail.summary.cashOutAgencyProfit.paid,
+  ]);
+  if (!moneyEq(vehicleRemainingCalc, detail.summary.cashOutAgencyProfit.remaining)) {
+    issues.push("Vehicle remaining ≠ total owed − paid.");
+  }
+  const netCard = agencyTotalRemaining(detail);
+  const netCalc = sumMoney([
+    detail.summary.cashInBulk.remaining,
+    -detail.summary.cashOutAgencyProfit.remaining,
+  ]);
+  if (!moneyEq(netCard, netCalc)) {
+    issues.push("Net remaining card does not match bulk remaining − vehicle remaining.");
+  }
+  return issues;
+}
+
+function verifyDriverCashMath(detail: DriverCashInCashOutDetail): string[] {
+  const issues: string[] = [];
+  const vehicleTable = sumMoney(
+    detail.tables.vehicleTrips.map((r) => r.driverSalary),
+  );
+  const bulkTable = sumMoney(
+    detail.tables.bulkTripsAdvance.map((r) => r.advancePaid),
+  );
+  const salaryTable = sumMoney(
+    detail.tables.salaryPayments.map((r) => r.amount),
+  );
+  const advanceTable = sumMoney(
+    detail.tables.advanceLedger.map((r) => r.amount),
+  );
+  const bulkPayTable = sumMoney(
+    detail.tables.bulkAdvancePayouts.map((r) => r.amount),
+  );
+
+  if (!moneyEq(vehicleTable, detail.summary.vehicleBata.fromTrips)) {
+    issues.push(
+      `Vehicle card (₹${detail.summary.vehicleBata.fromTrips}) ≠ sum of vehicle trip Cash out column (₹${vehicleTable}).`,
+    );
+  }
+  if (!moneyEq(bulkTable, detail.summary.bulkAdvance.fromTrips)) {
+    issues.push(
+      `Bulk card (₹${detail.summary.bulkAdvance.fromTrips}) ≠ sum of bulk trip Cash out column (₹${bulkTable}).`,
+    );
+  }
+  if (!moneyEq(salaryTable, detail.summary.vehicleBata.paid)) {
+    issues.push("Bata paid does not match salary payment rows.");
+  }
+  if (!moneyEq(bulkPayTable, detail.summary.bulkAdvance.paid)) {
+    issues.push("Bulk advance paid does not match bulk payout rows.");
+  }
+  const bataRemainingCalc = sumMoney([
+    detail.summary.vehicleBata.totalOwed,
+    -advanceTable,
+    -detail.summary.vehicleBata.paid,
+  ]);
+  const bataRemainingClamped = Math.max(bataRemainingCalc, 0);
+  if (!moneyEq(bataRemainingClamped, detail.summary.vehicleBata.remaining)) {
+    issues.push(
+      "Bata remaining ≠ trip bata + manual extra − advances − salary paid (clamped at 0).",
+    );
+  }
+  const bulkRemainingCalc = sumMoney([
+    detail.summary.bulkAdvance.totalOwed,
+    -detail.summary.bulkAdvance.paid,
+  ]);
+  const bulkRemainingClamped = Math.max(bulkRemainingCalc, 0);
+  if (!moneyEq(bulkRemainingClamped, detail.summary.bulkAdvance.remaining)) {
+    issues.push("Bulk advance remaining ≠ total owed − paid (clamped at 0).");
+  }
+  return issues;
+}
+
 /** Bulk remaining (to receive) minus vehicle remaining (to pay). */
 function agencyTotalRemaining(detail: AgencyCashInCashOutDetail): number {
   return (
@@ -260,10 +384,29 @@ function DetailMonthFilter({
 type TabId = CashInCashOutTabId;
 type DetailTabId = CashInCashOutDetailTabId;
 
-function parseSortDate(d?: string | Date | null): number {
-  if (d == null || d === "") return 0;
-  const t = new Date(d).getTime();
-  return Number.isNaN(t) ? 0 : t;
+function mongoObjectIdSortTime(id?: string): number {
+  if (!id || !/^[a-f0-9]{24}$/i.test(id)) return 0;
+  return parseInt(id.slice(0, 8), 16) * 1000;
+}
+
+/** Latest-first sort key: row date, else Mongo record time from _id. */
+function cashInCashOutSortTime(
+  date?: string | Date | null,
+  recordId?: string,
+): number {
+  if (date != null && date !== "") {
+    const t = new Date(date).getTime();
+    if (!Number.isNaN(t)) return t;
+  }
+  return mongoObjectIdSortTime(recordId);
+}
+
+function compareCashInCashOutLatestFirst(
+  a: { sortDate: number; sortId: string },
+  b: { sortDate: number; sortId: string },
+): number {
+  if (b.sortDate !== a.sortDate) return b.sortDate - a.sortDate;
+  return b.sortId.localeCompare(a.sortId);
 }
 
 type AgencyUnifiedTripRow = {
@@ -292,7 +435,7 @@ type AgencyUnifiedCashRow = {
 function buildAgencyUnifiedTrips(
   detail: AgencyCashInCashOutDetail,
 ): AgencyUnifiedTripRow[] {
-  const bulk: Array<AgencyUnifiedTripRow & { sortDate: number }> =
+  const bulk: Array<AgencyUnifiedTripRow & { sortDate: number; sortId: string }> =
     detail.tables.bulkTripsCashIn.map((r) => ({
     id: `bulk-${r._id}`,
     source: "Bulk" as const,
@@ -303,9 +446,10 @@ function buildAgencyUnifiedTrips(
     cashOut: null,
     advance: r.advancePaid,
     status: r.status,
-    sortDate: parseSortDate(r.date),
+    sortDate: cashInCashOutSortTime(r.date, r._id),
+    sortId: r._id,
   }));
-  const vehicle: Array<AgencyUnifiedTripRow & { sortDate: number }> =
+  const vehicle: Array<AgencyUnifiedTripRow & { sortDate: number; sortId: string }> =
     detail.tables.vehicleTripsAgencyProfit.map((r) => ({
     id: `vehicle-${r._id}`,
     source: "Vehicle" as const,
@@ -316,11 +460,12 @@ function buildAgencyUnifiedTrips(
     cashOut: r.agencyProfit,
     advance: null,
     status: r.status,
-    sortDate: parseSortDate(r.date),
+    sortDate: cashInCashOutSortTime(r.date, r._id),
+    sortId: r._id,
   }));
   return [...bulk, ...vehicle]
-    .sort((a, b) => b.sortDate - a.sortDate)
-    .map(({ sortDate: _s, ...row }) => row);
+    .sort(compareCashInCashOutLatestFirst)
+    .map(({ sortDate: _s, sortId: _id, ...row }) => row);
 }
 
 function buildAgencyUnifiedCashHistory(
@@ -333,7 +478,8 @@ function buildAgencyUnifiedCashHistory(
     amount: r.amount,
     method: r.paymentMethod,
     notes: r.notes,
-    sortDate: parseSortDate(r.paymentDate),
+    sortDate: cashInCashOutSortTime(r.paymentDate, r._id),
+    sortId: r._id,
   }));
   const payouts = detail.tables.agencyProfitPayoutPayments.map((r) => ({
     id: `out-${r._id}`,
@@ -342,12 +488,13 @@ function buildAgencyUnifiedCashHistory(
     amount: r.amount,
     method: r.paymentMethod,
     notes: r.notes,
-    sortDate: parseSortDate(r.paymentDate),
+    sortDate: cashInCashOutSortTime(r.paymentDate, r._id),
+    sortId: r._id,
   }));
 
   return [...receipts, ...payouts]
-    .sort((a, b) => b.sortDate - a.sortDate)
-    .map(({ sortDate: _s, ...row }) => row);
+    .sort(compareCashInCashOutLatestFirst)
+    .map(({ sortDate: _s, sortId: _id, ...row }) => row);
 }
 
 function sourceBadgeCls(source: "Bulk" | "Vehicle") {
@@ -396,7 +543,7 @@ function driverCashKindBadgeCls(kind: string) {
 function buildDriverUnifiedTrips(
   detail: DriverCashInCashOutDetail,
 ): DriverUnifiedTripRow[] {
-  const vehicle: Array<DriverUnifiedTripRow & { sortDate: number }> =
+  const vehicle: Array<DriverUnifiedTripRow & { sortDate: number; sortId: string }> =
     detail.tables.vehicleTrips.map((r) => ({
     id: `vehicle-${r._id}`,
     source: "Vehicle" as const,
@@ -406,9 +553,10 @@ function buildDriverUnifiedTrips(
     cashOut: r.driverSalary,
     grandTotal: null,
     status: r.status,
-    sortDate: parseSortDate(r.date),
+    sortDate: cashInCashOutSortTime(r.date, r._id),
+    sortId: r._id,
   }));
-  const bulk: Array<DriverUnifiedTripRow & { sortDate: number }> =
+  const bulk: Array<DriverUnifiedTripRow & { sortDate: number; sortId: string }> =
     detail.tables.bulkTripsAdvance.map((r) => ({
     id: `bulk-${r._id}`,
     source: "Bulk" as const,
@@ -418,11 +566,12 @@ function buildDriverUnifiedTrips(
     cashOut: r.advancePaid,
     grandTotal: r.grandTotal,
     status: r.status,
-    sortDate: parseSortDate(r.date),
+    sortDate: cashInCashOutSortTime(r.date, r._id),
+    sortId: r._id,
   }));
   return [...vehicle, ...bulk]
-    .sort((a, b) => b.sortDate - a.sortDate)
-    .map(({ sortDate: _s, ...row }) => row);
+    .sort(compareCashInCashOutLatestFirst)
+    .map(({ sortDate: _s, sortId: _id, ...row }) => row);
 }
 
 function buildDriverUnifiedCashHistory(
@@ -436,7 +585,8 @@ function buildDriverUnifiedCashHistory(
     amount: r.amount,
     method: "—",
     notes: r.notes,
-    sortDate: parseSortDate(r.date),
+    sortDate: cashInCashOutSortTime(r.date, r._id),
+    sortId: r._id,
   }));
   const advances = detail.tables.advanceLedger.map((r) => ({
     id: `advance-${r._id}`,
@@ -446,7 +596,8 @@ function buildDriverUnifiedCashHistory(
     amount: r.amount,
     method: "—",
     notes: r.notes,
-    sortDate: parseSortDate(r.date),
+    sortDate: cashInCashOutSortTime(r.date, r._id),
+    sortId: r._id,
   }));
   const bulkPayouts = detail.tables.bulkAdvancePayouts.map((r) => ({
     id: `bulkpay-${r._id}`,
@@ -456,12 +607,13 @@ function buildDriverUnifiedCashHistory(
     amount: r.amount,
     method: r.paymentMethod,
     notes: r.notes,
-    sortDate: parseSortDate(r.paymentDate),
+    sortDate: cashInCashOutSortTime(r.paymentDate, r._id),
+    sortId: r._id,
   }));
 
   return [...advances, ...bata, ...bulkPayouts]
-    .sort((a, b) => b.sortDate - a.sortDate)
-    .map(({ sortDate: _s, ...row }) => row);
+    .sort(compareCashInCashOutLatestFirst)
+    .map(({ sortDate: _s, sortId: _id, ...row }) => row);
 }
 
 const PAYMENT_METHODS = [
@@ -863,6 +1015,16 @@ export function CashInCashOutPage() {
     [driverDetail],
   );
 
+  const agencyMathIssues = useMemo(
+    () => (agencyDetail ? verifyAgencyCashMath(agencyDetail) : []),
+    [agencyDetail],
+  );
+
+  const driverMathIssues = useMemo(
+    () => (driverDetail ? verifyDriverCashMath(driverDetail) : []),
+    [driverDetail],
+  );
+
   const openDriverMarkPaymentModal = () => {
     setPayMessage(null);
     setPayAmount("");
@@ -1231,6 +1393,19 @@ export function CashInCashOutPage() {
                     {agencySummaryMetrics && (
                       <EntitySummaryCards metrics={agencySummaryMetrics} />
                     )}
+                    {agencyMathIssues.length > 0 && (
+                      <div
+                        role="alert"
+                        className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900"
+                      >
+                        <p className="font-semibold">Totals check</p>
+                        <ul className="mt-1 list-inside list-disc">
+                          {agencyMathIssues.map((msg) => (
+                            <li key={msg}>{msg}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
 
                     {agencyDetailTab === "trips" && (
                       <TableShell title="Trips (bulk & vehicle)">
@@ -1417,6 +1592,19 @@ export function CashInCashOutPage() {
                         metrics={driverSummaryMetrics}
                         entity="driver"
                       />
+                    )}
+                    {driverMathIssues.length > 0 && (
+                      <div
+                        role="alert"
+                        className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900"
+                      >
+                        <p className="font-semibold">Totals check</p>
+                        <ul className="mt-1 list-inside list-disc">
+                          {driverMathIssues.map((msg) => (
+                            <li key={msg}>{msg}</li>
+                          ))}
+                        </ul>
+                      </div>
                     )}
 
                     {driverDetailTab === "trips" && (

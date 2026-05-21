@@ -1227,10 +1227,22 @@ function VehicleHistoryTab({ vehicle }: { vehicle: Vehicle }) {
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
             <div className="rounded-lg border border-blue-200 bg-white p-3">
               <div className="text-[11px] font-semibold uppercase tracking-wide text-blue-700">
-                Total Revenue
+                Billed revenue
               </div>
               <div className="text-sm font-bold text-slate-900 mt-1">
-                {formatMoney0(financialStats.totalRevenue)}
+                {formatMoney0(
+                  financialStats.billedRevenue ?? financialStats.totalRevenue,
+                )}
+              </div>
+            </div>
+            <div className="rounded-lg border border-blue-200 bg-white p-3">
+              <div className="text-[11px] font-semibold uppercase tracking-wide text-blue-700">
+                Cab fare
+              </div>
+              <div className="text-sm font-bold text-slate-900 mt-1">
+                {formatMoney0(
+                  financialStats.cabFare ?? financialStats.totalRevenue,
+                )}
               </div>
             </div>
             <div className="rounded-lg border border-blue-200 bg-white p-3">

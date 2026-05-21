@@ -178,8 +178,10 @@ export function HistoryPage() {
   // Always fetch all-time stats (unfiltered) for the banner
   const loadAllTimeStats = useCallback(async () => {
     try {
-      const result = await fetchTripHistory({ page: 1, limit: 1 });
-      setPaymentSummary(result.paymentSummary);
+      const result = await fetchTripHistory({ page: 1, limit: 1, status: 'all' });
+      const summary =
+        result.allTimePaymentSummary ?? result.paymentSummary;
+      setPaymentSummary(summary);
     } catch { /* ignore */ }
   }, []);
 

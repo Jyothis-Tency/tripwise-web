@@ -1386,12 +1386,16 @@ const CellInput = memo(function CellInput({
   placeholder,
   type = "text",
   className = "",
+  disabled = false,
+  title,
 }: {
   value: string | number;
   onChange: (v: string) => void;
   placeholder?: string;
   type?: string;
   className?: string;
+  disabled?: boolean;
+  title?: string;
 }) {
   const [localVal, setLocalVal] = useState(value);
   useEffect(() => {
@@ -1401,14 +1405,17 @@ const CellInput = memo(function CellInput({
   return (
     <input
       value={localVal}
+      disabled={disabled}
+      title={title}
       onChange={(e) => {
+        if (disabled) return;
         setLocalVal(e.target.value);
         onChange(e.target.value);
       }}
       type={type}
       placeholder={placeholder}
       className={`w-full rounded-md border border-slate-200 px-2.5 py-2 text-sm outline-none
-        focus:border-blue-400 focus:ring-1 focus:ring-blue-200 bg-white transition ${
+        focus:border-blue-400 focus:ring-1 focus:ring-blue-200 bg-white transition disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400 ${
           type === "number"
             ? "[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
             : ""
@@ -1938,6 +1945,12 @@ function BulkEntryTable({
                         updateRow(gi, ri, "advancePaid", Number(v) || 0)
                       }
                       type="number"
+                      disabled={ri > 0}
+                      title={
+                        ri > 0
+                          ? "Advance is recorded on the first row of this group"
+                          : undefined
+                      }
                     />
                   </div>
                   <div className="space-y-1">
@@ -2078,6 +2091,12 @@ function BulkEntryTable({
                           updateRow(gi, ri, "advancePaid", Number(v) || 0)
                         }
                         type="number"
+                        disabled={ri > 0}
+                        title={
+                          ri > 0
+                            ? "Advance is recorded on the first row of this group"
+                            : undefined
+                        }
                       />
                     </td>
                     <td className="px-2 py-1.5">

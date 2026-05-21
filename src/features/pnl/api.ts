@@ -7,8 +7,9 @@ export interface PLRevenue {
   commissionRevenue?: number;
   ownerRevenue?: number;
   tripRevenue: number;
+  billedRevenue?: number;
+  cabFare?: number;
   driverSalary: number;
-  /** Sum of (agency cost − cab cost) on trips; legacy API key was ownerProfit. */
   agencyProfit: number;
   ownerProfit?: number;
 }

@@ -10,6 +10,7 @@ import {
   History,
   ArrowRightLeft,
   TrendingUp,
+  FileBarChart,
   X,
   LogOut,
   CirclePlus,
@@ -29,6 +30,7 @@ const menuItems = [
   { label: 'Reminders', path: '/reminders', icon: Bell },
   { label: 'Bulk Entry', path: '/bulk-entry', icon: ListChecks },
   { label: 'Cash In / Cash Out', path: '/cash-in-cash-out', icon: ArrowRightLeft },
+  { label: 'Reports', path: '/reports', icon: FileBarChart },
   { label: 'History', path: '/history', icon: History },
 ];
 

@@ -295,6 +295,8 @@ export interface VehicleHistoryResponse {
   };
   financialStats?: {
     totalRevenue?: number;
+    billedRevenue?: number;
+    cabFare?: number;
     totalDriverSalary?: number;
     ownerRevenue?: number;
     totalExpenses?: number;

@@ -230,12 +230,14 @@ export async function createSalaryTransaction(driverId: string, payload: {
   description?: string;
   notes?: string;
   date?: string;
+  monthValue?: string;
 }): Promise<SalaryTransaction> {
   const body = {
     amount: payload.amount,
     type: payload.type,
     notes: payload.notes ?? payload.description,
     date: payload.date,
+    monthValue: payload.monthValue,
   };
   const { data } = await apiClient.post(`/owners/drivers/${driverId}/salary/transactions`, body);
   return data.data ?? data;

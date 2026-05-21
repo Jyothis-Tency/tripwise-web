@@ -16,7 +16,15 @@ export const RevenueBreakdown: React.FC<RevenueBreakdownProps> = ({
     revenue.commissionRevenue ||
     revenue.ownerRevenue ||
     0;
-  const tripsProfit = revenue.agencyProfit ?? revenue.ownerProfit ?? revenue.ownerRevenue ?? 0;
+  const tripsProfit =
+    revenue.agencyProfit ??
+    revenue.ownerProfit ??
+    revenue.ownerRevenue ??
+    0;
+  const tripRevenue =
+    revenue.tripRevenue ??
+    revenue.billedRevenue ??
+    0;
 
   return (
     <div className="space-y-4 sm:space-y-6">
@@ -104,7 +112,7 @@ export const RevenueBreakdown: React.FC<RevenueBreakdownProps> = ({
                 Trip Revenue
               </p>
               <h3 className="text-lg sm:text-xl font-bold text-slate-900">
-                ₹{revenue.tripRevenue.toLocaleString()}
+                ₹{tripRevenue.toLocaleString()}
               </h3>
             </div>
           </div>

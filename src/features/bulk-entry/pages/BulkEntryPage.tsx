@@ -88,6 +88,34 @@ function emptyDriverGroup(): DriverGroup {
   };
 }
 
+/** Day segment for bulk advance rules (matches backend `bulkEntryGroupKey`). */
+function bulkRowDayKey(startDate: string): string {
+  const raw = String(startDate ?? "").trim();
+  if (!raw) return "";
+  const t = new Date(`${raw}T00:00:00`).getTime();
+  if (!Number.isFinite(t)) return raw;
+  return new Date(t).toISOString().slice(0, 10);
+}
+
+/** Advance is editable only on the first row for each calendar day in a driver group. */
+function isAdvanceEditableRow(rows: BulkTripRow[], ri: number): boolean {
+  if (ri < 0 || ri >= rows.length) return false;
+  const dayKey = bulkRowDayKey(rows[ri].startDate ?? "");
+  const firstForDay = rows.findIndex(
+    (r) => bulkRowDayKey(r.startDate ?? "") === dayKey,
+  );
+  return firstForDay === ri;
+}
+
+function advanceFieldTitle(rows: BulkTripRow[], ri: number): string | undefined {
+  if (isAdvanceEditableRow(rows, ri)) return undefined;
+  const dayKey = bulkRowDayKey(rows[ri]?.startDate ?? "");
+  if (!dayKey) {
+    return "Enter advance on the first row in this group (or set a start date on this row)";
+  }
+  return "Advance is on the first trip row for this date — one advance per day";
+}
+
 function normalizeBulkGroups(groups: any[]): DriverGroup[] {
   return (groups || []).map((group) => {
     const fallbackAdvance = Number(group?.advancePaid) || 0;
@@ -1601,6 +1629,18 @@ function BulkEntryTable({
         }
 
         next[gi].rows[ri] = row;
+
+        // One advance per driver/vehicle/day — clear stray values on non-first rows
+        if (field === "startDate" || field === "advancePaid") {
+          next[gi].rows = next[gi].rows.map((r, idx) => {
+            if (isAdvanceEditableRow(next[gi].rows, idx)) return next[gi].rows[idx];
+            if ((r.advancePaid || 0) > 0) {
+              return { ...r, advancePaid: 0 };
+            }
+            return r;
+          });
+        }
+
         return next;
       });
     },
@@ -1968,12 +2008,8 @@ function BulkEntryTable({
                         updateRow(gi, ri, "advancePaid", Number(v) || 0)
                       }
                       type="number"
-                      disabled={ri > 0}
-                      title={
-                        ri > 0
-                          ? "Advance is recorded on the first row of this group"
-                          : undefined
-                      }
+                      disabled={!isAdvanceEditableRow(g.rows, ri)}
+                      title={advanceFieldTitle(g.rows, ri)}
                     />
                   </div>
                   <div className="space-y-1">
@@ -2114,12 +2150,8 @@ function BulkEntryTable({
                           updateRow(gi, ri, "advancePaid", Number(v) || 0)
                         }
                         type="number"
-                        disabled={ri > 0}
-                        title={
-                          ri > 0
-                            ? "Advance is recorded on the first row of this group"
-                            : undefined
-                        }
+                        disabled={!isAdvanceEditableRow(g.rows, ri)}
+                        title={advanceFieldTitle(g.rows, ri)}
                       />
                     </td>
                     <td className="px-2 py-1.5">

@@ -20,6 +20,11 @@ import {
   Loader2,
 } from "lucide-react";
 import { AgencyNameCombobox } from "../../../components/AgencyNameCombobox";
+import { resolveAgencyLabelFromName } from "../../../lib/agencyDisplay";
+import {
+  fetchAgencies,
+  type Agency,
+} from "../../bulk-entry/api";
 import { TimePicker12h } from "../../../components/ui/TimePicker12h";
 import { isoToHHmmInTz } from "../../../lib/timePickerUtils";
 import {
@@ -45,6 +50,8 @@ import {
   type VehicleHistoryResponse,
 } from "../api";
 import { VehicleListCard } from "../components/VehicleListCard";
+import { EditTripModal } from "../../history/components/EditTripModal";
+import { fetchHistoryTripById, type HistoryTrip } from "../../history/api";
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // UTILITIES
@@ -223,6 +230,7 @@ function EditableGridField({
   highlight,
   isCurrency,
   timeEditSeed,
+  displayOverride,
 }: {
   label: string;
   value: string | number;
@@ -232,20 +240,24 @@ function EditableGridField({
   isCurrency?: boolean;
   /** HH:mm for startTime/endTime inline edit (from ISO) */
   timeEditSeed?: string;
+  /** Shown when not editing (e.g. agency name + phone) */
+  displayOverride?: string;
 }) {
-  const initialValue = value == null || value === "" ? "—" : String(value);
+  const rawValue = value == null || value === "" ? "—" : String(value);
+  const initialValue = displayOverride?.trim() || rawValue;
   const [editing, setEditing] = useState(false);
   const [displayValue, setDisplayValue] = useState(initialValue);
   const [editValue, setEditValue] = useState(
-    initialValue === "—" ? "" : initialValue,
+    rawValue === "—" ? "" : rawValue,
   );
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    const v = value == null || value === "" ? "—" : String(value);
-    setDisplayValue(v);
-    setEditValue(v === "—" ? "" : v);
-  }, [value]);
+    const raw = value == null || value === "" ? "—" : String(value);
+    const shown = displayOverride?.trim() || raw;
+    setDisplayValue(shown);
+    setEditValue(raw === "—" ? "" : raw);
+  }, [value, displayOverride]);
 
   const handleSave = async () => {
     setSaving(true);
@@ -633,6 +645,8 @@ export function TripFormModal({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
+  const [agencyId, setAgencyId] = useState<string | undefined>(undefined);
+
   const [form, setForm] = useState({
     from: trip?.from ?? "",
     to: trip?.to ?? "",
@@ -684,6 +698,7 @@ export function TripFormModal({
         distance: form.distance ? parseFloat(form.distance) : undefined,
         customer: form.customer.trim() || undefined,
         agencyName: form.agencyName.trim(),
+        ...(agencyId ? { agencyId } : {}),
         agencyCost: form.agencyCost ? parseFloat(form.agencyCost) : undefined,
         cabCost: form.cabCost ? parseFloat(form.cabCost) : undefined,
         advance: form.advance ? parseFloat(form.advance) : undefined,
@@ -784,8 +799,13 @@ export function TripFormModal({
                 id="tagn"
                 required
                 value={form.agencyName}
-                onChange={(agencyName) =>
-                  setForm((prev) => ({ ...prev, agencyName }))
+                selectedAgencyId={agencyId}
+                onChange={(agencyName) => {
+                  setAgencyId(undefined);
+                  setForm((prev) => ({ ...prev, agencyName }));
+                }}
+                onAgencySelect={(agency) =>
+                  setAgencyId(agency._id ?? agency.id)
                 }
                 inputClassName={inputCls}
                 extraSuggestionNames={
@@ -1242,7 +1262,13 @@ function DriverAssignModal({
 // VEHICLE HISTORY (inline tab)
 // ═══════════════════════════════════════════════════════════════════════════════
 
-function VehicleHistoryTab({ vehicle }: { vehicle: Vehicle }) {
+function VehicleHistoryTab({
+  vehicle,
+  resolveAgencyLabel,
+}: {
+  vehicle: Vehicle;
+  resolveAgencyLabel: (agencyName?: string) => string;
+}) {
   const STATUS_OPTIONS = [
     "all",
     "completed",
@@ -1264,6 +1290,14 @@ function VehicleHistoryTab({ vehicle }: { vehicle: Vehicle }) {
   );
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const [editingTrip, setEditingTrip] = useState<HistoryTrip | null>(null);
+  const [editTripFallbacks, setEditTripFallbacks] = useState<{
+    driverName?: string;
+    vehicleNumber?: string;
+  }>({});
+  const [editTripLoadingId, setEditTripLoadingId] = useState<string | null>(
+    null,
+  );
 
   const loadHistory = useCallback(async () => {
     setLoading(true);
@@ -1325,6 +1359,25 @@ function VehicleHistoryTab({ vehicle }: { vehicle: Vehicle }) {
     return "—";
   };
 
+  const openEditTrip = async (row: HistoryTripItem) => {
+    setEditTripLoadingId(row._id);
+    setEditTripFallbacks({
+      driverName: resolveDriverName(row),
+      vehicleNumber:
+        (typeof row.vehicle === "object" && row.vehicle?.vehicleNumber) ||
+        vehicle.vehicleNumber,
+    });
+    try {
+      const full = await fetchHistoryTripById(row._id);
+      setEditingTrip(full);
+    } catch {
+      alert("Could not load trip details for editing.");
+      setEditTripFallbacks({});
+    } finally {
+      setEditTripLoadingId(null);
+    }
+  };
+
   const canPrev = (pagination?.current ?? 1) > 1;
   const canNext =
     pagination?.pages != null
@@ -1333,6 +1386,24 @@ function VehicleHistoryTab({ vehicle }: { vehicle: Vehicle }) {
 
   return (
     <div className="space-y-4">
+      {editingTrip && (
+        <EditTripModal
+          trip={editingTrip}
+          resolveAgencyLabel={resolveAgencyLabel}
+          driverNameFallback={editTripFallbacks.driverName}
+          vehicleNumberFallback={editTripFallbacks.vehicleNumber}
+          onClose={() => {
+            setEditingTrip(null);
+            setEditTripFallbacks({});
+          }}
+          onSuccess={() => {
+            setEditingTrip(null);
+            setEditTripFallbacks({});
+            void loadHistory();
+          }}
+        />
+      )}
+
       {/* Filters: sticky within tab scroll so list/stats scroll underneath */}
       <div className="sticky top-0 z-10 -mx-4 border-b border-slate-200 bg-slate-50 px-4 pb-3 pt-0">
         <div className="space-y-3">
@@ -1513,11 +1584,27 @@ function VehicleHistoryTab({ vehicle }: { vehicle: Vehicle }) {
                     </div>
                   </div>
 
-                  <span
-                    className={`rounded-full border px-2 py-0.5 capitalize text-[11px] ${statusBadgeCls(status)}`}
-                  >
-                    {status.replaceAll("_", " ")}
-                  </span>
+                  <div className="flex shrink-0 items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => openEditTrip(t)}
+                      disabled={editTripLoadingId === t._id}
+                      className="flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-600 hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700 transition disabled:opacity-60"
+                      title="Edit trip details"
+                    >
+                      {editTripLoadingId === t._id ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <Pencil className="h-3.5 w-3.5" />
+                      )}
+                      Edit
+                    </button>
+                    <span
+                      className={`rounded-full border px-2 py-0.5 capitalize text-[11px] ${statusBadgeCls(status)}`}
+                    >
+                      {status.replaceAll("_", " ")}
+                    </span>
+                  </div>
                 </div>
 
                 <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
@@ -1607,6 +1694,7 @@ function VehicleHistoryTab({ vehicle }: { vehicle: Vehicle }) {
 interface TripDriverTabProps {
   mode: "live" | "upcoming";
   vehicle: Vehicle;
+  resolveAgencyLabel: (agencyName?: string) => string;
   onUpdateTrip: (tripId: string) => void;
   onCancelTrip: (tripId: string) => void;
   onAssignDriver: (tripId?: string) => void;
@@ -1617,6 +1705,7 @@ interface TripDriverTabProps {
 function TripDriverTab({
   mode,
   vehicle,
+  resolveAgencyLabel,
   onUpdateTrip,
   onCancelTrip,
   onAssignDriver,
@@ -1742,6 +1831,7 @@ function TripDriverTab({
                     fieldKey="agencyName"
                     label="Agency"
                     value={activeTrip.agencyName || "—"}
+                    displayOverride={resolveAgencyLabel(activeTrip.agencyName)}
                   />
                   <EditableGridField
                     tripId={activeTrip._id}
@@ -2090,6 +2180,7 @@ function TripDriverTab({
                         fieldKey="agencyName"
                         label="Agency"
                         value={trip.agencyName || "—"}
+                        displayOverride={resolveAgencyLabel(trip.agencyName)}
                       />
                       <EditableGridField
                         tripId={trip._id}
@@ -2349,6 +2440,18 @@ function VehicleDetailPanel({
 }: VehicleDetailPanelProps) {
   const [tab, setTab] = useState<"upcoming" | "live" | "history">("live");
   const [detailModal, setDetailModal] = useState<DetailModal | null>(null);
+  const [ownerAgencies, setOwnerAgencies] = useState<Agency[]>([]);
+
+  useEffect(() => {
+    fetchAgencies(1, 500)
+      .then((res) => setOwnerAgencies(res.agencies))
+      .catch(() => setOwnerAgencies([]));
+  }, []);
+
+  const resolveAgencyLabel = useCallback(
+    (agencyName?: string) => resolveAgencyLabelFromName(agencyName, ownerAgencies),
+    [ownerAgencies],
+  );
 
   const closeDetailModal = () => setDetailModal(null);
 
@@ -2367,6 +2470,7 @@ function VehicleDetailPanel({
   ];
 
   const tripCallbacks = {
+    resolveAgencyLabel,
     onUpdateTrip: (tripId: string) =>
       setDetailModal({ kind: "updateTrip", tripId }),
     onCancelTrip: (tripId: string) =>
@@ -2440,7 +2544,12 @@ function VehicleDetailPanel({
         {tab === "upcoming" && (
           <TripDriverTab mode="upcoming" vehicle={vehicle} {...tripCallbacks} />
         )}
-        {tab === "history" && <VehicleHistoryTab vehicle={vehicle} />}
+        {tab === "history" && (
+          <VehicleHistoryTab
+            vehicle={vehicle}
+            resolveAgencyLabel={resolveAgencyLabel}
+          />
+        )}
       </div>
 
       {/* Detail-level modals */}

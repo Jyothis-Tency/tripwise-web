@@ -3,10 +3,20 @@ import { ApiEndpoints } from "../../services/apiEndpoints";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
+import {
+  formatAgencyLabel,
+  resolveAgencyLabelFromName,
+  buildAgencyLabelLookup,
+} from "../../lib/agencyDisplay";
+
+export type { AgencyDisplayFields } from "../../lib/agencyDisplay";
+export { formatAgencyLabel, resolveAgencyLabelFromName, buildAgencyLabelLookup };
+
 export interface Agency {
   _id?: string;
   id?: string;
   name: string;
+  phone?: string;
   owner?: string;
   createdAt?: string;
 }
@@ -95,6 +105,7 @@ export async function fetchAgencies(
       _id: a._id ?? a.id,
       id: a.id ?? a._id,
       name: a.name ?? "",
+      phone: a.phone ?? "",
       owner: a.owner,
       createdAt: a.createdAt,
     })),
@@ -103,11 +114,22 @@ export async function fetchAgencies(
 }
 
 /** Create an agency */
-export async function createAgency(name: string): Promise<Agency> {
-  const res = await apiClient.post(ApiEndpoints.agencies, { name });
+export async function createAgency(
+  name: string,
+  phone: string,
+): Promise<Agency> {
+  const res = await apiClient.post(ApiEndpoints.agencies, {
+    name: name.trim(),
+    phone: phone.trim(),
+  });
   const raw: any = res.data ?? {};
   const d = raw.data ?? raw;
-  return { _id: d._id ?? d.id, id: d.id ?? d._id, name: d.name ?? name };
+  return {
+    _id: d._id ?? d.id,
+    id: d.id ?? d._id,
+    name: d.name ?? name,
+    phone: d.phone ?? phone,
+  };
 }
 
 /** Delete an agency */
@@ -139,7 +161,8 @@ export async function fetchBulkEntryTrips(
 
 /** Sync bulk entry (autosave endpoint) */
 export async function syncBulkEntry(payload: {
-  agencyName: string;
+  agencyId?: string;
+  agencyName?: string;
   idempotencyKey?: string;
   driverGroups: DriverGroup[];
 }): Promise<{
@@ -168,7 +191,8 @@ export async function syncBulkEntry(payload: {
 
 /** Create bulk trips (submit) */
 export async function createBulkTrips(payload: {
-  agencyName: string;
+  agencyId?: string;
+  agencyName?: string;
   driverGroups: DriverGroup[];
 }): Promise<{ created: number; updated: number; failed: number }> {
   const res = await apiClient.post(ApiEndpoints.bulkEntryTrips, payload);
@@ -225,7 +249,8 @@ export async function createNormalEntries(payload: {
 
 /** Sync normal entry (autosave endpoint) */
 export async function syncNormalEntry(payload: {
-  agencyName: string;
+  agencyId?: string;
+  agencyName?: string;
   idempotencyKey?: string;
   entries: NormalEntryRow[];
 }): Promise<{

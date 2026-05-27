@@ -31,6 +31,7 @@ import {
 } from "../historyTimeUtils";
 import { TimePicker12h } from "../../../components/ui/TimePicker12h";
 import { normalizeHHmm } from "../../../lib/timePickerUtils";
+import { getHistoryTripExpenseBreakdown } from "../tripExpenseBreakdown";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -204,6 +205,7 @@ function EditableRow({
   tripId,
   onSaved,
   timeEditSeed,
+  readOnly,
 }: {
   label: string;
   value: string;
@@ -213,6 +215,7 @@ function EditableRow({
   onSaved: (fieldKey: string, updatedTrip: HistoryTrip) => void;
   /** For `type="time"` rows: HH:mm seed from ISO (not the AM/PM display string). */
   timeEditSeed?: string;
+  readOnly?: boolean;
 }) {
   const [editing, setEditing] = useState(false);
   const [displayValue, setDisplayValue] = useState(value);
@@ -274,6 +277,17 @@ function EditableRow({
     NUMBER_FIELDS.has(fieldKey) ||
     DATE_FIELDS.has(fieldKey) ||
     TIME_FIELDS.has(fieldKey);
+
+  if (readOnly) {
+    return (
+      <DetailRow
+        label={label}
+        value={displayValue}
+        highlight={highlight}
+        emphasizeValue={emphasizeDisplay}
+      />
+    );
+  }
 
   if (editing) {
     return (
@@ -564,21 +578,27 @@ function RecordPaymentModal({
 
 interface TripCardProps {
   trip: HistoryTrip;
-  onDeleted: () => void;
+  readOnly?: boolean;
+  defaultExpanded?: boolean;
+  onDeleted?: () => void;
   /** Called with server summary after a payment; parent can patch list without refetching. */
-  onPaymentRecorded: (
+  onPaymentRecorded?: (
     tripId: string,
     summary: RecordPaymentTripSummary,
   ) => void;
   /** After inline field save: merged trip so parent list order stays stable without refetch. */
   onTripUpdated?: (trip: HistoryTrip) => void;
+  resolveAgencyLabel?: (agencyName?: string) => string;
 }
 
 export function TripCard({
   trip: initialTrip,
+  readOnly = false,
+  defaultExpanded = false,
   onDeleted,
   onPaymentRecorded,
   onTripUpdated,
+  resolveAgencyLabel,
 }: TripCardProps) {
   const [trip, setTrip] = useState<HistoryTrip>(initialTrip);
 
@@ -586,7 +606,9 @@ export function TripCard({
     setTrip(initialTrip);
   }, [initialTrip]);
 
-  const [expanded, setExpanded] = useState(false);
+  const expenseBreakdown = getHistoryTripExpenseBreakdown(trip);
+
+  const [expanded, setExpanded] = useState(defaultExpanded);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -614,7 +636,7 @@ export function TripCard({
     setDeleting(true);
     try {
       await deleteTrip(trip._id);
-      onDeleted();
+      onDeleted?.();
     } catch {
       alert("Failed to delete trip.");
     } finally {
@@ -648,6 +670,7 @@ export function TripCard({
       value={value}
       fieldKey={fieldKey}
       tripId={trip._id}
+      readOnly={readOnly}
       onSaved={(savedFieldKey, updatedTrip) => {
         setTrip((prev) => {
           const next = mergeTripAfterInlineSave(
@@ -739,6 +762,7 @@ export function TripCard({
               </div>
             </div>
             <div className="flex flex-col items-end gap-1 shrink-0">
+              {!readOnly && (
               <button
                 type="button"
                 onClick={(e) => {
@@ -751,6 +775,7 @@ export function TripCard({
               >
                 <Trash2 className="h-4 w-4 sm:h-5 sm:w-5" />
               </button>
+              )}
               <button
                 type="button"
                 className="p-0.5 text-slate-400 hover:text-slate-600"
@@ -855,7 +880,15 @@ export function TripCard({
                     />
                   )}
                   {E("Customer", fmt(trip.customer || ""), "customer")}
-                  {E("Agency", fmt(trip.agencyName || ""), "agencyName")}
+                  {E(
+                    "Agency",
+                    fmt(
+                      resolveAgencyLabel
+                        ? resolveAgencyLabel(trip.agencyName)
+                        : trip.agencyName || "",
+                    ),
+                    "agencyName",
+                  )}
                   {trip.careOf?.name && (
                     <DetailRow label="Care Of" value={fmt(trip.careOf.name)} />
                   )}
@@ -881,17 +914,28 @@ export function TripCard({
                       "agencyCost",
                     )}
                     {E("Cab Cost", fmtCurrency(trip.cabCost), "cabCost")}
+                    <DetailRow
+                      label="Fuel expense"
+                      value={fmtCurrency(expenseBreakdown.fuelExpense)}
+                      emphasizeValue
+                    />
+                    <DetailRow
+                      label="Extra Expenses"
+                      value={fmtCurrency(expenseBreakdown.extraExpenses)}
+                      emphasizeValue
+                    />
+                    <DetailRow
+                      label="Total Cab Cost"
+                      value={fmtCurrency(expenseBreakdown.totalCabCost)}
+                      highlight
+                      emphasizeValue
+                    />
                     {E(
                       "Driver Salary",
                       fmtCurrency(trip.driver_salary),
                       "driver_salary",
                     )}
                     {E("Advance", fmtCurrency(trip.advance), "advance")}
-                    <DetailRow
-                      label="Total Expenses"
-                      value={fmtCurrency(trip.totalExpenses)}
-                      emphasizeValue
-                    />
                     <DetailRow
                       label="Agency profit"
                       value={fmtCurrency(
@@ -962,6 +1006,7 @@ export function TripCard({
                       emphasizeValue
                     />
                   </div>
+                  {!readOnly && (
                   <div className="flex flex-col sm:flex-row xl:flex-col gap-2.5">
                     <button
                       onClick={() => setShowPaymentModal(true)}
@@ -982,6 +1027,7 @@ export function TripCard({
                       History
                     </button>
                   </div>
+                  )}
                 </section>
               </div>
             </div>
@@ -989,7 +1035,7 @@ export function TripCard({
         )}
       </div>
 
-      {showPaymentModal && (
+      {!readOnly && showPaymentModal && (
         <RecordPaymentModal
           trip={trip}
           onClose={() => setShowPaymentModal(false)}
@@ -1011,12 +1057,12 @@ export function TripCard({
                 paymentStatus,
               },
             }));
-            onPaymentRecorded(trip._id, summary);
+            onPaymentRecorded?.(trip._id, summary);
           }}
         />
       )}
 
-      {showHistoryModal && (
+      {!readOnly && showHistoryModal && (
         <PaymentHistoryModal
           tripNumber={trip.tripNumber || trip._id}
           payments={payments}

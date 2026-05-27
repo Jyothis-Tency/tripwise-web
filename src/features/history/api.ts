@@ -1,5 +1,9 @@
 import apiClient from '../../services/axios';
 import { ApiEndpoints } from '../../services/apiEndpoints';
+import {
+  normalizeHistoryTripDriver,
+  normalizeHistoryTripVehicle,
+} from './historyTripDisplay';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -45,7 +49,15 @@ export interface HistoryTrip {
   cabCost?: number;
   driver_salary?: number;
   advance?: number;
+  /** All trip line expenses (fuel + non-fuel). */
   totalExpenses?: number;
+  /** Sum of fuel-type expense lines only. */
+  fuelExpense?: number;
+  /** Sum of non-fuel expense lines (toll, parking, etc.). */
+  extraExpenses?: number;
+  /** extraExpenses + cabCost */
+  totalCabCost?: number;
+  expenses?: { type?: string; amount?: number; description?: string }[];
   agencyProfit?: number;
   paidAmount?: number;
   paymentSummary?: {
@@ -83,6 +95,8 @@ export interface HistoryParams {
   sortOrder?: 'asc' | 'desc';
   driver?: string;
   vehicle?: string;
+  /** Case-insensitive exact match on trip agency name */
+  agencyName?: string;
   startDate?: string;  // YYYY-MM-DD
   endDate?: string;    // YYYY-MM-DD
 }
@@ -101,6 +115,7 @@ export interface HistoryPayoutAgency {
   _id: string;
   id?: string;
   name: string;
+  phone?: string;
   totalAmount?: number;
   paidAmount?: number;
   remainingAmount?: number;
@@ -221,7 +236,59 @@ export async function fetchPaymentHistory(tripId: string): Promise<{
 
 export async function updateTripFields(tripId: string, fields: Partial<HistoryTrip>): Promise<HistoryTrip> {
   const res = await apiClient.patch(`/owners/trips/${tripId}/fields`, { fields });
-  return res.data?.data;
+  const raw = res.data?.data;
+  return raw ? mapRawTripToHistoryTrip(raw) : raw;
+}
+
+/** Full trip document for edit modal (Trip Details module). */
+export function mapRawTripToHistoryTrip(t: any): HistoryTrip {
+  return {
+    _id: String(t._id ?? t.id ?? ''),
+    id: t.id,
+    tripNumber: t.tripNumber,
+    status: String(t.status ?? ''),
+    date: t.date,
+    startDate: t.startDate,
+    expectedEndDate: t.expectedEndDate,
+    endDate: t.expectedEndDate ?? t.endDate,
+    from: t.from,
+    to: t.to,
+    pickup: t.pickup,
+    drop: t.drop,
+    distance: t.distance,
+    customer: t.customer,
+    priority: t.priority,
+    agencyName: t.agencyName,
+    notes: t.notes,
+    completionNote: t.completionNote,
+    startTime: t.startTime,
+    endTime: t.endTime,
+    startKilometers: t.startKilometers,
+    endKilometers: t.endKilometers,
+    driver: normalizeHistoryTripDriver(t.driver, t.driverName),
+    vehicle: normalizeHistoryTripVehicle(t.vehicle, t.vehicleNumber),
+    careOf: t.careOf,
+    agencyCost: t.agencyCost,
+    cabCost: t.cabCost,
+    driver_salary: t.driver_salary,
+    advance: t.advance,
+    totalExpenses: t.totalExpenses,
+    fuelExpense: t.fuelExpense,
+    extraExpenses: t.extraExpenses,
+    totalCabCost: t.totalCabCost,
+    expenses: t.expenses,
+    agencyProfit: t.agencyProfit ?? t.ownerProfit,
+    paidAmount: t.paidAmount,
+    paymentSummary: t.paymentSummary,
+    createdAt: t.createdAt,
+    updatedAt: t.updatedAt,
+  };
+}
+
+export async function fetchHistoryTripById(tripId: string): Promise<HistoryTrip> {
+  const res = await apiClient.get(ApiEndpoints.tripById(tripId));
+  const raw = res.data?.data ?? res.data;
+  return mapRawTripToHistoryTrip(raw ?? {});
 }
 
 export async function fetchMainTripPayoutAgencies(): Promise<HistoryPayoutAgency[]> {
@@ -232,6 +299,7 @@ export async function fetchMainTripPayoutAgencies(): Promise<HistoryPayoutAgency
     _id: a._id ?? a.id,
     id: a.id ?? a._id,
     name: a.name ?? '',
+    phone: a.phone ?? '',
     totalAmount: Number(a.totalAmount) || 0,
     paidAmount: Number(a.paidAmount) || 0,
     remainingAmount: Number(a.remainingAmount) || 0,

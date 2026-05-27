@@ -1,5 +1,6 @@
 import apiClient from '../../services/axios';
 import { ApiEndpoints } from '../../services/apiEndpoints';
+import type { HistoryTrip } from '../history/api';
 
 // ─── Interfaces ───────────────────────────────────────────────────────────────
 
@@ -48,6 +49,7 @@ export interface TripItem {
   agencyCost?: number;
   cabCost?: number;
   agencyName?: string;
+  agencyId?: string;
   agencyProfit?: number | string;
   advance?: number;
   driver_salary?: number;
@@ -105,16 +107,29 @@ export interface HistoryTripItem {
   status?: string;
   departureDate?: string;
   startDate?: string;
+  expectedEndDate?: string;
   completedAt?: string;
+  startTime?: string;
+  endTime?: string;
+  customer?: string;
+  agencyName?: string;
+  notes?: string;
+  startingNote?: string;
+  completionNote?: string;
+  advance?: number;
   driverName?: string;
   distance?: string | number;
   startKilometers?: number;
   endKilometers?: number;
   totalExpenses?: number;
+  fuelExpense?: number;
+  extraExpenses?: number;
+  totalCabCost?: number;
   driver_salary?: number;
   agencyProfit?: number;
   agencyCost?: number;
   cabCost?: number;
+  careOf?: { name?: string; phone?: string };
   driver?: {
     _id?: string;
     firstName?: string;
@@ -349,12 +364,25 @@ export async function fetchVehicleHistoryDetailed(params: {
       to: t.to,
       status: t.status,
       startDate: t.startDate ?? t.departureDate ?? t.date,
+      expectedEndDate: t.expectedEndDate,
       departureDate: t.departureDate ?? t.date,
       completedAt: t.completedAt ?? t.updatedAt,
+      startTime: t.startTime,
+      endTime: t.endTime,
+      customer: t.customer,
+      agencyName: t.agencyName,
+      notes: t.notes,
+      startingNote: t.startingNote,
+      completionNote: t.completionNote,
+      advance: t.advance,
+      careOf: t.careOf,
       distance: t.distance,
       startKilometers: t.startKilometers,
       endKilometers: t.endKilometers,
       totalExpenses: t.totalExpenses,
+      fuelExpense: t.fuelExpense,
+      extraExpenses: t.extraExpenses,
+      totalCabCost: t.totalCabCost,
       driver_salary: t.driver_salary,
       agencyProfit: t.agencyProfit ?? t.ownerProfit,
       agencyCost: t.agencyCost,
@@ -368,6 +396,41 @@ export async function fetchVehicleHistoryDetailed(params: {
       driver: t.driver ?? null,
       vehicle: t.vehicle ?? null,
     })),
+  };
+}
+
+/** Map vehicle history row to History module trip shape for EditTripModal. */
+export function vehicleHistoryTripToHistoryTrip(t: HistoryTripItem): HistoryTrip {
+  return {
+    _id: t._id,
+    tripNumber: t.tripNumber,
+    status: t.status ?? '',
+    from: t.from,
+    to: t.to,
+    startDate: t.startDate,
+    expectedEndDate: t.expectedEndDate,
+    endDate: t.expectedEndDate,
+    customer: t.customer,
+    agencyName: t.agencyName,
+    startTime: t.startTime,
+    endTime: t.endTime,
+    startKilometers: t.startKilometers,
+    endKilometers: t.endKilometers,
+    distance: t.distance,
+    agencyCost: t.agencyCost,
+    cabCost: t.cabCost,
+    driver_salary: t.driver_salary,
+    advance: t.advance,
+    notes: t.notes ?? t.completionNote,
+    completionNote: t.completionNote,
+    careOf: t.careOf,
+    totalExpenses: t.totalExpenses,
+    fuelExpense: t.fuelExpense,
+    extraExpenses: t.extraExpenses,
+    totalCabCost: t.totalCabCost,
+    agencyProfit: t.agencyProfit,
+    driver: t.driver ?? undefined,
+    vehicle: t.vehicle ?? undefined,
   };
 }
 
@@ -511,6 +574,7 @@ export async function createTrip(payload: {
   agencyCost?: number | string;
   cabCost?: number | string;
   agencyName?: string;
+  agencyId?: string;
   agencyProfit?: number | string;
   advance?: number | string;
   amount?: number;
@@ -552,6 +616,7 @@ export async function updateTrip(
     agencyCost?: number | string;
     cabCost?: number | string;
     agencyName?: string;
+    agencyId?: string;
     agencyProfit?: number | string;
     advance?: number | string;
     amount?: number;

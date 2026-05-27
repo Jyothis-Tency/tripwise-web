@@ -23,6 +23,7 @@ import {
   type HistoryPayoutAgencyTrip,
   type TripPayment,
 } from "../api";
+import { formatAgencyLabel } from "../../../lib/agencyDisplay";
 
 function fmtCurrency(v: number): string {
   return `₹${v.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
@@ -508,7 +509,7 @@ export function HistoryPayoutPage() {
   const filteredAgencies = agencies.filter((a) => {
     const q = agencySearch.trim().toLowerCase();
     if (!q) return true;
-    return (a.name || "").toLowerCase().includes(q);
+    return formatAgencyLabel(a).toLowerCase().includes(q);
   });
 
   const selectedAgency = agencies.find(
@@ -588,7 +589,7 @@ export function HistoryPayoutPage() {
                     <div
                       className={`text-[13px] font-semibold ${active ? "text-blue-800" : "text-slate-700"} truncate`}
                     >
-                      {a.name}
+                      {formatAgencyLabel(a)}
                     </div>
                     <div className="mt-1 flex items-center justify-between text-[11px] font-medium">
                       <span className="text-slate-500">Balance:</span>
@@ -621,7 +622,7 @@ export function HistoryPayoutPage() {
             <div className="flex items-center justify-between gap-4 border-b border-slate-200 px-6 py-4 z-10 shrink-0">
               <div className="min-w-0">
                 <h3 className="text-lg font-semibold tracking-tight text-slate-800 truncate">
-                  {selectedAgency.name}
+                  {formatAgencyLabel(selectedAgency)}
                 </h3>
                 <p className="text-[11px] text-slate-500">
                   Main trip payouts and history

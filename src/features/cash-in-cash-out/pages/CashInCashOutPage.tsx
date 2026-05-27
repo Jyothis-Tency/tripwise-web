@@ -18,6 +18,7 @@ import {
   type DriverCashInCashOutDetail,
 } from "../api";
 import { fetchAgencies, addAgencyPayoutPayment, addDriverPayoutPayment, type Agency } from "../../bulk-entry/api";
+import { formatAgencyLabel, resolveAgencyLabelFromName } from "../../../lib/agencyDisplay";
 import { fetchDrivers, createSalaryTransaction, type Driver } from "../../drivers/api";
 import {
   loadCashInCashOutUi,
@@ -542,6 +543,7 @@ function driverCashKindBadgeCls(kind: string) {
 
 function buildDriverUnifiedTrips(
   detail: DriverCashInCashOutDetail,
+  resolveAgencyLabel?: (agencyName?: string) => string,
 ): DriverUnifiedTripRow[] {
   const vehicle: Array<DriverUnifiedTripRow & { sortDate: number; sortId: string }> =
     detail.tables.vehicleTrips.map((r) => ({
@@ -562,7 +564,9 @@ function buildDriverUnifiedTrips(
     source: "Bulk" as const,
     date: r.date,
     reference: r.vehicleNumber || "—",
-    details: r.agencyName || "—",
+    details: resolveAgencyLabel
+      ? resolveAgencyLabel(r.agencyName)
+      : r.agencyName || "—",
     cashOut: r.advancePaid,
     grandTotal: r.grandTotal,
     status: r.status,
@@ -969,10 +973,22 @@ export function CashInCashOutPage() {
     }
   }, [tab, selectedDriverId, detailMonth, loadDriverDetail]);
 
+  const resolveAgencyLabel = useCallback(
+    (agencyName?: string) => resolveAgencyLabelFromName(agencyName, agencies),
+    [agencies],
+  );
+
+  const selectedAgencyMeta = useMemo(
+    () => agencies.find((a) => (a._id ?? a.id ?? "") === selectedAgencyId),
+    [agencies, selectedAgencyId],
+  );
+
   const filteredAgencies = useMemo(() => {
     const q = listSearch.trim().toLowerCase();
     if (!q) return agencies;
-    return agencies.filter((a) => (a.name || "").toLowerCase().includes(q));
+    return agencies.filter((a) =>
+      formatAgencyLabel(a).toLowerCase().includes(q),
+    );
   }, [agencies, listSearch]);
 
   const filteredDrivers = useMemo(() => {
@@ -1001,8 +1017,11 @@ export function CashInCashOutPage() {
   );
 
   const driverUnifiedTrips = useMemo(
-    () => (driverDetail ? buildDriverUnifiedTrips(driverDetail) : []),
-    [driverDetail],
+    () =>
+      driverDetail
+        ? buildDriverUnifiedTrips(driverDetail, resolveAgencyLabel)
+        : [],
+    [driverDetail, resolveAgencyLabel],
   );
 
   const driverUnifiedCashHistory = useMemo(
@@ -1284,7 +1303,13 @@ export function CashInCashOutPage() {
                           <p className="truncate text-sm font-semibold text-slate-900">
                             {a.name}
                           </p>
-                          <p className="text-xs text-slate-400">Agency</p>
+                          {a.phone ? (
+                            <p className="truncate text-xs text-slate-400">
+                              {a.phone}
+                            </p>
+                          ) : (
+                            <p className="text-xs text-slate-400">Agency</p>
+                          )}
                         </div>
                       </div>
                     </button>
@@ -1348,7 +1373,9 @@ export function CashInCashOutPage() {
                     <ArrowLeft className="h-5 w-5" />
                   </button>
                   <h2 className="min-w-0 truncate text-base font-bold text-slate-900 sm:text-lg">
-                    {agencyDetail?.agency.name ?? "…"}
+                    {selectedAgencyMeta
+                      ? formatAgencyLabel(selectedAgencyMeta)
+                      : agencyDetail?.agency.name ?? "…"}
                   </h2>
                   <div className="ml-auto flex shrink-0">
                     <button

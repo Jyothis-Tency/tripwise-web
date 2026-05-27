@@ -13,6 +13,8 @@ import {
   RefreshCw,
 } from 'lucide-react';
 import { fetchTrackingVehicles, completeTrip, type TrackingVehicle } from '../api';
+import { fetchAgencies, type Agency } from '../../bulk-entry/api';
+import { resolveAgencyLabelFromName } from '../../../lib/agencyDisplay';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // UTILITIES
@@ -248,7 +250,13 @@ function DriverInfoTab({ item }: { item: TrackingVehicle }) {
   );
 }
 
-function ExpenseInfoTab({ item }: { item: TrackingVehicle }) {
+function ExpenseInfoTab({
+  item,
+  resolveAgencyLabel,
+}: {
+  item: TrackingVehicle;
+  resolveAgencyLabel: (agencyName?: string) => string;
+}) {
   const trip = item.activeTrip;
   if (!trip) return <p className ="py-8 text-center text-sm text-slate-400">No trip data</p>;
 
@@ -279,7 +287,7 @@ function ExpenseInfoTab({ item }: { item: TrackingVehicle }) {
   return (
     <div className="space-y-4">
       <InfoCard title="Cost Summary">
-        <InfoRow label="Agency Name" value={trip.agencyName} />
+        <InfoRow label="Agency Name" value={resolveAgencyLabel(trip.agencyName)} />
         <InfoRow label="Agency Cost" value={`₹${agencyCost.toLocaleString('en-IN')}`} />
         <InfoRow label="Cab Cost" value={`₹${cabCost.toLocaleString('en-IN')}`} />
         <div className="border-t border-slate-100 my-1" />
@@ -378,8 +386,16 @@ function CompleteTripModal({ tripId, startKm, onClose, onCompleted }: {
 // DETAIL PANEL
 // ═══════════════════════════════════════════════════════════════════════════════
 
-function DetailPanel({ item, onBack, onRefresh }: {
-  item: TrackingVehicle; onBack: () => void; onRefresh: () => void;
+function DetailPanel({
+  item,
+  onBack,
+  onRefresh,
+  resolveAgencyLabel,
+}: {
+  item: TrackingVehicle;
+  onBack: () => void;
+  onRefresh: () => void;
+  resolveAgencyLabel: (agencyName?: string) => string;
 }) {
   const [tab, setTab] = useState<'trip' | 'driver' | 'expense'>('trip');
   const [showComplete, setShowComplete] = useState(false);
@@ -442,7 +458,9 @@ function DetailPanel({ item, onBack, onRefresh }: {
       <div className="flex-1 overflow-y-auto p-4 sm:p-5">
         {tab === 'trip' && <TripInfoTab item={item} onComplete={() => setShowComplete(true)} />}
         {tab === 'driver' && <DriverInfoTab item={item} />}
-        {tab === 'expense' && <ExpenseInfoTab item={item} />}
+        {tab === 'expense' && (
+          <ExpenseInfoTab item={item} resolveAgencyLabel={resolveAgencyLabel} />
+        )}
       </div>
 
       {/* Complete trip modal */}
@@ -467,6 +485,13 @@ export function TrackingPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
+  const [ownerAgencies, setOwnerAgencies] = useState<Agency[]>([]);
+
+  const resolveAgencyLabel = useCallback(
+    (agencyName?: string) =>
+      resolveAgencyLabelFromName(agencyName, ownerAgencies),
+    [ownerAgencies],
+  );
 
   const selected = selectedIdx !== null ? vehicles[selectedIdx] ?? null : null;
 
@@ -482,6 +507,12 @@ export function TrackingPage() {
   }, []);
 
   useEffect(() => { load(); }, [load]);
+
+  useEffect(() => {
+    fetchAgencies(1, 500)
+      .then((res) => setOwnerAgencies(res.agencies))
+      .catch(() => setOwnerAgencies([]));
+  }, []);
 
   return (
     <div className="flex h-full overflow-hidden relative">
@@ -538,7 +569,12 @@ export function TrackingPage() {
         selectedIdx !== null ? 'flex flex-col' : 'hidden md:flex flex-col'
       }`}>
         {selected ? (
-          <DetailPanel item={selected} onBack={() => setSelectedIdx(null)} onRefresh={load} />
+          <DetailPanel
+            item={selected}
+            onBack={() => setSelectedIdx(null)}
+            onRefresh={load}
+            resolveAgencyLabel={resolveAgencyLabel}
+          />
         ) : !loading ? (
           <div className="flex h-full items-center justify-center">
             <div className="text-center">

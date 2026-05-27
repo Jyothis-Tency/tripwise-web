@@ -518,7 +518,11 @@ function SalaryTab({ driver }: { driver: Driver }) {
                 {trip.from ?? '—'} → {trip.to ?? '—'}
               </span>
               <span className="text-[11px] font-medium text-blue-600 ml-2">
-                {trip.driver_salary ? fmtCurrency(trip.driver_salary) : '—'}
+                {trip.status === 'completed' && trip.driver_salary
+                  ? fmtCurrency(trip.driver_salary)
+                  : trip.status === 'completed'
+                    ? '—'
+                    : 'Pending'}
               </span>
             </div>
           ))

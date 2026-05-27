@@ -10,6 +10,8 @@ import {
   type RecordPaymentTripSummary,
 } from '../api';
 import { TripCard } from '../components/TripCard';
+import { fetchAgencies, type Agency } from '../../bulk-entry/api';
+import { resolveAgencyLabelFromName } from '../../../lib/agencyDisplay';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -132,6 +134,18 @@ export function HistoryPage() {
   });
   const [loading, setLoading] = useState(false);
   const [error, setError]     = useState('');
+  const [ownerAgencies, setOwnerAgencies] = useState<Agency[]>([]);
+
+  useEffect(() => {
+    fetchAgencies(1, 500)
+      .then((res) => setOwnerAgencies(res.agencies))
+      .catch(() => setOwnerAgencies([]));
+  }, []);
+
+  const resolveAgencyLabel = useCallback(
+    (agencyName?: string) => resolveAgencyLabelFromName(agencyName, ownerAgencies),
+    [ownerAgencies],
+  );
 
   // Debounce search 500ms
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -430,7 +444,10 @@ export function HistoryPage() {
       const from = (trip as any).from ?? 'N/A';
       const to = (trip as any).to ?? 'N/A';
       const customer = (trip as any).customer ?? 'N/A';
-      const agency = (trip as any).agencyName ?? (trip as any).agency ?? 'N/A';
+      const agencyRaw = (trip as any).agencyName ?? (trip as any).agency ?? '';
+      const agency = agencyRaw
+        ? resolveAgencyLabel(String(agencyRaw))
+        : 'N/A';
       const date = fmtDate((trip as any).startDate ?? (trip as any).date ?? (trip as any).createdAt);
       const st = String((trip as any).status ?? 'N/A').toUpperCase();
       const distRaw = (trip as any).distance;
@@ -637,6 +654,7 @@ export function HistoryPage() {
             onDeleted={load}
             onPaymentRecorded={handlePaymentRecorded}
             onTripUpdated={handleTripUpdated}
+            resolveAgencyLabel={resolveAgencyLabel}
           />
         ))}
       </div>

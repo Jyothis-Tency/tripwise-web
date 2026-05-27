@@ -60,6 +60,7 @@ export function CreateNewTripPage() {
 
   const [vehicleId, setVehicleId] = useState("");
   const [driverId, setDriverId] = useState("");
+  const [agencyId, setAgencyId] = useState<string | undefined>(undefined);
 
   const [form, setForm] = useState({
     from: "",
@@ -162,6 +163,7 @@ export function CreateNewTripPage() {
         distance: form.distance ? parseFloat(form.distance) : undefined,
         customer: form.customer.trim() || undefined,
         agencyName: form.agencyName.trim(),
+        ...(agencyId ? { agencyId } : {}),
         agencyCost: form.agencyCost ? parseFloat(form.agencyCost) : undefined,
         cabCost: form.cabCost ? parseFloat(form.cabCost) : undefined,
         advance: form.advance ? parseFloat(form.advance) : undefined,
@@ -376,8 +378,13 @@ export function CreateNewTripPage() {
                       id="c-agn"
                       required
                       value={form.agencyName}
-                      onChange={(agencyName) =>
-                        setForm((prev) => ({ ...prev, agencyName }))
+                      selectedAgencyId={agencyId}
+                      onChange={(agencyName) => {
+                        setAgencyId(undefined);
+                        setForm((prev) => ({ ...prev, agencyName }));
+                      }}
+                      onAgencySelect={(agency) =>
+                        setAgencyId(agency._id ?? agency.id)
                       }
                       inputClassName={inputCls}
                     />

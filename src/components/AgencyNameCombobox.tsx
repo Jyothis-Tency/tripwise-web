@@ -3,6 +3,7 @@ import { X } from "lucide-react";
 import {
   fetchAgencies,
   createAgency,
+  formatAgencyLabel,
   type Agency,
 } from "../features/bulk-entry/api";
 
@@ -44,7 +45,7 @@ function ModalShell({
   );
 }
 
-function CreateAgencyModal({
+export function CreateAgencyModal({
   onClose,
   onCreated,
   initialName = "",
@@ -54,6 +55,7 @@ function CreateAgencyModal({
   initialName?: string;
 }) {
   const [name, setName] = useState(initialName);
+  const [phone, setPhone] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
@@ -62,10 +64,14 @@ function CreateAgencyModal({
       setErr("Agency name is required");
       return;
     }
+    if (!phone.trim()) {
+      setErr("Phone number is required");
+      return;
+    }
     setSubmitting(true);
     setErr(null);
     try {
-      const agency = await createAgency(name.trim());
+      const agency = await createAgency(name.trim(), phone.trim());
       onCreated(agency);
     } catch (e: unknown) {
       const msg =
@@ -82,6 +88,9 @@ function CreateAgencyModal({
   return (
     <ModalShell title="Create New Agency" onClose={onClose} maxWidth="max-w-sm">
       <div className="space-y-4 p-6">
+        <p className="text-xs text-slate-500">
+          Phone helps tell apart agencies with the same name.
+        </p>
         <div className="space-y-1.5">
           <label className="text-xs font-medium text-slate-600">
             Agency name <span className="text-red-500">*</span>
@@ -97,8 +106,25 @@ function CreateAgencyModal({
             onKeyDown={(e) => e.key === "Enter" && submit()}
             className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
           />
-          {err && <p className="text-xs text-red-600">{err}</p>}
         </div>
+        <div className="space-y-1.5">
+          <label className="text-xs font-medium text-slate-600">
+            Phone number <span className="text-red-500">*</span>
+          </label>
+          <input
+            value={phone}
+            onChange={(e) => {
+              setPhone(e.target.value);
+              setErr(null);
+            }}
+            placeholder="e.g. 9876543210"
+            type="tel"
+            inputMode="tel"
+            onKeyDown={(e) => e.key === "Enter" && submit()}
+            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+          />
+        </div>
+        {err && <p className="text-xs text-red-600">{err}</p>}
         <div className="flex justify-end gap-2 pt-2">
           <button
             type="button"
@@ -125,6 +151,8 @@ export type AgencyNameComboboxProps = {
   id: string;
   value: string;
   onChange: (name: string) => void;
+  onAgencySelect?: (agency: Agency) => void;
+  selectedAgencyId?: string;
   inputClassName: string;
   required?: boolean;
   placeholder?: string;
@@ -140,6 +168,8 @@ export function AgencyNameCombobox({
   id,
   value,
   onChange,
+  onAgencySelect,
+  selectedAgencyId,
   inputClassName,
   required,
   placeholder = "Agency name",
@@ -164,35 +194,60 @@ export function AgencyNameCombobox({
   }, [reload]);
 
   const suggestionPool = useMemo(() => {
-    const byKey = new Map<string, string>();
+    const byId = new Map<string, Agency>();
     for (const a of agencies) {
-      const n = a.name?.trim();
-      if (n) byKey.set(n.toLowerCase(), n);
+      const key = a._id ?? a.id;
+      if (key) byId.set(key, a);
     }
     for (const ex of extraSuggestionNames) {
       const n = ex?.trim();
-      if (n && !byKey.has(n.toLowerCase())) byKey.set(n.toLowerCase(), n);
+      if (!n) continue;
+      const match = agencies.filter(
+        (a) => a.name?.trim().toLowerCase() === n.toLowerCase(),
+      );
+      if (match.length === 0) {
+        byId.set(`legacy:${n.toLowerCase()}`, { name: n });
+      }
     }
-    return Array.from(byKey.values()).sort((a, b) => a.localeCompare(b));
+    return Array.from(byId.values()).sort((a, b) =>
+      formatAgencyLabel(a).localeCompare(formatAgencyLabel(b)),
+    );
   }, [agencies, extraSuggestionNames]);
 
   const filtered = useMemo(() => {
     const q = value.trim().toLowerCase();
-    if (!q) return suggestionPool.slice(0, 10);
+    if (!q) return suggestionPool.slice(0, 12);
     return suggestionPool
-      .filter((n) => n.toLowerCase().includes(q))
-      .slice(0, 10);
+      .filter((a) => {
+        const label = formatAgencyLabel(a).toLowerCase();
+        const name = (a.name ?? "").toLowerCase();
+        const phone = (a.phone ?? "").toLowerCase();
+        return label.includes(q) || name.includes(q) || phone.includes(q);
+      })
+      .slice(0, 12);
   }, [suggestionPool, value]);
 
   const exactMatch = useMemo(() => {
     const q = value.trim().toLowerCase();
     if (!q) return false;
-    return suggestionPool.some((n) => n.toLowerCase() === q);
-  }, [suggestionPool, value]);
+    return suggestionPool.some(
+      (a) =>
+        (a.name ?? "").trim().toLowerCase() === q &&
+        (!selectedAgencyId ||
+          (a._id ?? a.id) === selectedAgencyId ||
+          !(a._id ?? a.id)),
+    );
+  }, [suggestionPool, value, selectedAgencyId]);
 
   const openCreate = (preset: string) => {
     setCreatePreset(preset);
     setCreateOpen(true);
+    setShowSuggestions(false);
+  };
+
+  const pickAgency = (agency: Agency) => {
+    onChange(agency.name?.trim() ?? "");
+    onAgencySelect?.(agency);
     setShowSuggestions(false);
   };
 
@@ -220,20 +275,26 @@ export function AgencyNameCombobox({
         />
         {panelVisible && (
           <div className="absolute z-30 mt-1 max-h-52 w-full overflow-auto rounded-md border border-slate-200 bg-white shadow-lg">
-            {filtered.map((name) => (
-              <button
-                key={name}
-                type="button"
-                className="w-full px-3 py-2 text-left text-sm hover:bg-blue-50"
-                onMouseDown={(e) => {
-                  e.preventDefault();
-                  onChange(name);
-                  setShowSuggestions(false);
-                }}
-              >
-                {name}
-              </button>
-            ))}
+            {filtered.map((agency) => {
+              const key = agency._id ?? agency.id ?? agency.name;
+              const label = formatAgencyLabel(agency);
+              const isSelected =
+                selectedAgencyId &&
+                (agency._id ?? agency.id) === selectedAgencyId;
+              return (
+                <button
+                  key={key}
+                  type="button"
+                  className={`w-full px-3 py-2 text-left text-sm hover:bg-blue-50 ${isSelected ? "bg-blue-50 font-medium text-blue-800" : ""}`}
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    pickAgency(agency);
+                  }}
+                >
+                  {label}
+                </button>
+              );
+            })}
             {value.trim() && !exactMatch && (
               <button
                 type="button"
@@ -254,7 +315,7 @@ export function AgencyNameCombobox({
           initialName={createPreset}
           onClose={() => setCreateOpen(false)}
           onCreated={async (a) => {
-            onChange(a.name);
+            pickAgency(a);
             setCreateOpen(false);
             await reload();
           }}

@@ -29,9 +29,10 @@ import jsPDF from "jspdf";
 import { useAuth } from "../../../hooks/useAuth";
 import { TimePicker12h } from "../../../components/ui/TimePicker12h";
 import { normalizeHHmm } from "../../../lib/timePickerUtils";
+import { CreateAgencyModal } from "../../../components/AgencyNameCombobox";
 import {
   fetchAgencies,
-  createAgency,
+  formatAgencyLabel,
   fetchBulkEntryTrips,
   fetchNormalEntryTrips,
   deleteBulkEntryTrip,
@@ -1332,75 +1333,6 @@ function DriverPayoutPanel({
         </button>
       )}
     </div>
-  );
-}
-
-function CreateAgencyModal({
-  onClose,
-  onCreated,
-}: {
-  onClose: () => void;
-  onCreated: (a: Agency) => void;
-}) {
-  const [name, setName] = useState("");
-  const [submitting, setSubmitting] = useState(false);
-  const [err, setErr] = useState<string | null>(null);
-
-  const submit = async () => {
-    if (!name.trim()) {
-      setErr("Agency name is required");
-      return;
-    }
-    setSubmitting(true);
-    try {
-      const agency = await createAgency(name.trim());
-      onCreated(agency);
-    } catch (e: any) {
-      setErr(e?.response?.data?.message ?? "Failed to create agency");
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  return (
-    <ModalShell title="Create New Agency" onClose={onClose} maxWidth="max-w-sm">
-      <div className="p-6 space-y-4">
-        <div className="space-y-1.5">
-          <label className="text-xs font-medium text-slate-600">
-            Agency Name <span className="text-red-500">*</span>
-          </label>
-          <input
-            value={name}
-            onChange={(e) => {
-              setName(e.target.value);
-              setErr(null);
-            }}
-            placeholder="Enter agency name"
-            autoFocus
-            onKeyDown={(e) => e.key === "Enter" && submit()}
-            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-          />
-          {err && <p className="text-xs text-red-600">{err}</p>}
-        </div>
-        <div className="flex justify-end gap-2 pt-2">
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-lg border border-slate-200 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            onClick={submit}
-            disabled={submitting}
-            className="rounded-lg bg-blue-500 px-5 py-2 text-sm font-semibold text-white hover:bg-blue-600 disabled:opacity-50"
-          >
-            {submitting ? "Creating…" : "Create"}
-          </button>
-        </div>
-      </div>
-    </ModalShell>
   );
 }
 
@@ -2834,6 +2766,7 @@ export function BulkEntryPage() {
       );
       if (validGroups.length === 0) return;
       const res = await syncBulkEntry({
+        agencyId: selectedAgency._id ?? selectedAgency.id,
         agencyName: selectedAgency.name,
         driverGroups: validGroups,
       });
@@ -2867,6 +2800,7 @@ export function BulkEntryPage() {
       );
       if (validEntries.length === 0) return;
       const res = await syncNormalEntry({
+        agencyId: selectedAgency._id ?? selectedAgency.id,
         agencyName: selectedAgency.name,
         entries: validEntries,
       });
@@ -3306,7 +3240,9 @@ export function BulkEntryPage() {
             >
               <Building2 className="h-4.5 w-4.5 text-slate-400 shrink-0" />
               <span className="truncate text-slate-700 font-medium">
-                {selectedAgency?.name ?? "Select Agency"}
+                {selectedAgency
+                  ? formatAgencyLabel(selectedAgency)
+                  : "Select Agency"}
               </span>
               <ChevronDown className="h-4 w-4 text-slate-400 ml-auto shrink-0" />
             </button>
@@ -3336,7 +3272,9 @@ export function BulkEntryPage() {
                           : "text-slate-700"
                       }`}
                     >
-                      {a.name}
+                      <span className="block font-medium truncate">
+                        {formatAgencyLabel(a)}
+                      </span>
                     </button>
                   ))
                 )}
@@ -3509,13 +3447,13 @@ export function BulkEntryPage() {
               <div className="flex items-center gap-2">
                 <Wallet className="h-5 w-5 text-emerald-500" />
                 <h2 className="text-base font-bold text-slate-800">
-                  {selectedAgency.name} — Payout
+                  {formatAgencyLabel(selectedAgency)} — Payout
                 </h2>
               </div>
             </div>
             <AgencyPayoutTab
               agencyId={selectedAgency._id ?? selectedAgency.id ?? ""}
-              agencyName={selectedAgency.name}
+              agencyName={formatAgencyLabel(selectedAgency)}
             />
           </div>
         ) : activeTab === "bulk" ? (
@@ -3526,7 +3464,7 @@ export function BulkEntryPage() {
             onDeleteTrip={handleDeleteTrip}
             onDeleteTrips={handleDeleteTrips}
             agencyId={selectedAgency._id ?? selectedAgency.id ?? ""}
-            agencyName={selectedAgency.name}
+            agencyName={formatAgencyLabel(selectedAgency)}
           />
         ) : (
           <NormalEntryTable
@@ -3534,7 +3472,7 @@ export function BulkEntryPage() {
             onChange={setNormalEntries}
             filterStatus={filterStatus}
             onDeleteTrip={handleDeleteTrip}
-            agencyName={selectedAgency.name}
+            agencyName={formatAgencyLabel(selectedAgency)}
           />
         )}
       </div>

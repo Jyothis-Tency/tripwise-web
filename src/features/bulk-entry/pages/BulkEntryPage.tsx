@@ -30,6 +30,9 @@ import { useAuth } from "../../../hooks/useAuth";
 import { TimePicker12h } from "../../../components/ui/TimePicker12h";
 import { normalizeHHmm } from "../../../lib/timePickerUtils";
 import { CreateAgencyModal } from "../../../components/AgencyNameCombobox";
+import { DriverNameCombobox } from "../../../components/DriverNameCombobox";
+import { driverDisplayName } from "../../../lib/driverDisplay";
+import type { Driver } from "../../drivers/api";
 import {
   fetchAgencies,
   formatAgencyLabel,
@@ -123,6 +126,8 @@ function normalizeBulkGroups(groups: any[]): DriverGroup[] {
     const rows = Array.isArray(group?.rows) ? group.rows : [];
     return {
       driverName: group?.driverName || "",
+      driverId: group?.driverId,
+      driverPhone: group?.driverPhone,
       vehicleNumber: group?.vehicleNumber || "",
       rows: rows.length
         ? rows.map((row: any, idx: number) => ({
@@ -1765,10 +1770,35 @@ function BulkEntryTable({
                 <span className="text-xs sm:text-sm font-semibold text-slate-600 shrink-0">
                   Driver:
                 </span>
-                <CellInput
+                <DriverNameCombobox
                   value={g.driverName}
-                  onChange={(v) => updateGroupField(gi, "driverName", v)}
-                  placeholder="Enter Name"
+                  selectedDriverId={g.driverId}
+                  onChange={(v) => {
+                    onChange((prev) => {
+                      const next = [...prev];
+                      next[gi] = {
+                        ...next[gi],
+                        driverName: v,
+                        driverId: undefined,
+                        driverPhone: undefined,
+                      };
+                      return next;
+                    });
+                  }}
+                  onDriverSelect={(d: Driver) => {
+                    const digits = String(d.phone ?? "").replace(/\D/g, "");
+                    onChange((prev) => {
+                      const next = [...prev];
+                      next[gi] = {
+                        ...next[gi],
+                        driverName: driverDisplayName(d),
+                        driverId: d._id ?? d.id,
+                        driverPhone: digits || undefined,
+                      };
+                      return next;
+                    });
+                  }}
+                  placeholder="Select driver"
                   className="min-w-0 flex-1 sm:w-[180px]"
                 />
               </div>
@@ -2436,10 +2466,34 @@ function NormalEntryTable({
                 <label className="text-xs font-semibold text-slate-500 uppercase">
                   Driver Name
                 </label>
-                <CellInput
+                <DriverNameCombobox
                   value={e.driverName}
-                  onChange={(v) => update(i, "driverName", v)}
-                  placeholder="Driver Name"
+                  selectedDriverId={e.driverId}
+                  onChange={(v) => {
+                    onChange((prev) => {
+                      const next = [...prev];
+                      next[i] = {
+                        ...next[i],
+                        driverName: v,
+                        driverId: undefined,
+                      };
+                      return next;
+                    });
+                  }}
+                  onDriverSelect={(d: Driver) => {
+                    const digits = String(d.phone ?? "").replace(/\D/g, "");
+                    onChange((prev) => {
+                      const next = [...prev];
+                      next[i] = {
+                        ...next[i],
+                        driverName: driverDisplayName(d),
+                        driverId: d._id ?? d.id,
+                        mobileNumber: digits || next[i].mobileNumber,
+                      };
+                      return next;
+                    });
+                  }}
+                  placeholder="Driver name"
                 />
               </div>
               <div className="space-y-1">
@@ -2448,7 +2502,17 @@ function NormalEntryTable({
                 </label>
                 <CellInput
                   value={e.mobileNumber}
-                  onChange={(v) => update(i, "mobileNumber", v)}
+                  onChange={(v) => {
+                    onChange((prev) => {
+                      const next = [...prev];
+                      next[i] = {
+                        ...next[i],
+                        mobileNumber: v,
+                        driverId: undefined,
+                      };
+                      return next;
+                    });
+                  }}
                   placeholder="9876543210"
                 />
               </div>
@@ -2522,16 +2586,50 @@ function NormalEntryTable({
                     />
                   </td>
                   <td className="px-2 py-1.5">
-                    <CellInput
+                    <DriverNameCombobox
                       value={e.driverName}
-                      onChange={(v) => update(i, "driverName", v)}
-                      placeholder="Driver Name"
+                      selectedDriverId={e.driverId}
+                      onChange={(v) => {
+                        onChange((prev) => {
+                          const next = [...prev];
+                          next[i] = {
+                            ...next[i],
+                            driverName: v,
+                            driverId: undefined,
+                          };
+                          return next;
+                        });
+                      }}
+                      onDriverSelect={(d: Driver) => {
+                        const digits = String(d.phone ?? "").replace(/\D/g, "");
+                        onChange((prev) => {
+                          const next = [...prev];
+                          next[i] = {
+                            ...next[i],
+                            driverName: driverDisplayName(d),
+                            driverId: d._id ?? d.id,
+                            mobileNumber: digits || next[i].mobileNumber,
+                          };
+                          return next;
+                        });
+                      }}
+                      placeholder="Driver name"
                     />
                   </td>
                   <td className="px-2 py-1.5">
                     <CellInput
                       value={e.mobileNumber}
-                      onChange={(v) => update(i, "mobileNumber", v)}
+                      onChange={(v) => {
+                        onChange((prev) => {
+                          const next = [...prev];
+                          next[i] = {
+                            ...next[i],
+                            mobileNumber: v,
+                            driverId: undefined,
+                          };
+                          return next;
+                        });
+                      }}
                       placeholder="9876543210"
                     />
                   </td>

@@ -33,6 +33,28 @@ function fmtCurrency(v: number | undefined | null): string {
   return `₹${n.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
+function formatTripStatusLabel(status?: string): string {
+  const s = String(status ?? '').trim();
+  if (!s) return '—';
+  return s.replaceAll('_', ' ');
+}
+
+function tripStatusBadgeCls(status?: string): string {
+  switch ((status ?? '').toLowerCase()) {
+    case 'scheduled':
+      return 'bg-blue-100 text-blue-700 border-blue-200';
+    case 'in_progress':
+    case 'in progress':
+      return 'bg-amber-100 text-amber-800 border-amber-200';
+    case 'completed':
+      return 'bg-emerald-100 text-emerald-800 border-emerald-200';
+    case 'cancelled':
+      return 'bg-rose-100 text-rose-800 border-rose-200';
+    default:
+      return 'bg-slate-100 text-slate-600 border-slate-200';
+  }
+}
+
 /** Month input value `YYYY-MM` → ISO range for ledger API */
 function monthInputToIsoRange(month: string): { startDate: string; endDate: string } | undefined {
   if (!month || !/^\d{4}-\d{2}$/.test(month)) return undefined;
@@ -234,9 +256,6 @@ function SalaryTab({ driver }: { driver: Driver }) {
   const [advanceDesc, setAdvanceDesc] = useState('');
   const [addingSalary, setAddingSalary] = useState(false);
   const [monthFilter, setMonthFilter] = useState('');
-  const [paymentAmount, setPaymentAmount] = useState('');
-  const [paymentNote, setPaymentNote] = useState('');
-  const [recordingPayment, setRecordingPayment] = useState(false);
 
   const driverId = driver._id ?? (driver as any).id;
 
@@ -291,33 +310,6 @@ function SalaryTab({ driver }: { driver: Driver }) {
     }
   };
 
-  const handleRecordSalaryPayment = async () => {
-    const amt = parseFloat(paymentAmount);
-    if (!amt || amt <= 0) return;
-    setRecordingPayment(true);
-    try {
-      await createSalaryTransaction(driverId, {
-        amount: amt,
-        type: 'salary',
-        notes: paymentNote.trim() || 'Salary payment',
-        monthValue: monthFilter || undefined,
-      });
-      setPaymentAmount('');
-      setPaymentNote('');
-      loadData();
-    } catch {
-      alert('Failed to record salary payment');
-    } finally {
-      setRecordingPayment(false);
-    }
-  };
-
-  const handlePayFullPending = () => {
-    const pending = salaryData?.pendingTripSalary ?? 0;
-    if (pending <= 0) return;
-    setPaymentAmount(String(pending));
-  };
-
   const handleDeleteTransaction = async (txId: string) => {
     if (!confirm('Delete this transaction?')) return;
     try {
@@ -339,8 +331,6 @@ function SalaryTab({ driver }: { driver: Driver }) {
   if (error) {
     return <p className="text-center text-red-500 text-sm py-8">{error}</p>;
   }
-
-  const pending = salaryData?.pendingTripSalary ?? 0;
 
   return (
     <div className="space-y-4">
@@ -367,45 +357,6 @@ function SalaryTab({ driver }: { driver: Driver }) {
         <StatCard icon={<TrendingUp className="h-4 w-4 text-blue-500" />} label="Trips" value={String(salaryData?.totalTrips ?? 0)} />
         <StatCard icon={<MapPin className="h-4 w-4 text-blue-500" />} label="Total KM" value={`${salaryData?.totalKm ?? 0} km`} />
       </div>
-
-      {/* Record salary payment */}
-      <Card title="Manage salary — mark as paid" icon={<Banknote className="h-3.5 w-3.5" />}>
-        <p className="text-[10px] text-slate-500 mb-2">
-          Record a payout toward trip Bata for this period. Pending = trip Bata − advances − salary payments already logged.
-        </p>
-        <div className="flex flex-wrap items-center gap-2 mb-2">
-          <input
-            type="number"
-            value={paymentAmount}
-            onChange={e => setPaymentAmount(e.target.value)}
-            placeholder="Amount paying now"
-            className="w-28 border border-slate-200 rounded px-2 py-1.5 text-xs outline-none focus:border-blue-300"
-          />
-          <input
-            type="text"
-            value={paymentNote}
-            onChange={e => setPaymentNote(e.target.value)}
-            placeholder="Note (e.g. UPI ref, cash)"
-            className="flex-1 min-w-[120px] border border-slate-200 rounded px-2 py-1.5 text-xs outline-none focus:border-blue-300"
-          />
-          <button
-            type="button"
-            onClick={handlePayFullPending}
-            disabled={pending <= 0}
-            className="px-2 py-1.5 rounded border border-slate-200 text-[11px] font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-40"
-          >
-            Use full pending
-          </button>
-          <button
-            type="button"
-            onClick={handleRecordSalaryPayment}
-            disabled={recordingPayment || !paymentAmount || parseFloat(paymentAmount) <= 0}
-            className="px-3 py-1.5 bg-emerald-600 text-white rounded text-[11px] font-semibold disabled:opacity-50"
-          >
-            {recordingPayment ? 'Saving…' : 'Record payment'}
-          </button>
-        </div>
-      </Card>
 
       {/* Advance Payments */}
       <Card
@@ -509,23 +460,38 @@ function SalaryTab({ driver }: { driver: Driver }) {
         {trips.length === 0 ? (
           <p className="text-[11px] text-slate-400 py-2">No trips found</p>
         ) : (
-          trips.slice(0, 10).map(trip => (
-            <div key={trip._id} className="flex items-baseline py-[3px]">
-              <span className="w-[80px] shrink-0 text-[10px] text-slate-400">
-                {trip.startDate ? new Date(trip.startDate).toLocaleDateString() : '—'}
-              </span>
-              <span className="text-[11px] text-slate-700 flex-1 truncate">
-                {trip.from ?? '—'} → {trip.to ?? '—'}
-              </span>
-              <span className="text-[11px] font-medium text-blue-600 ml-2">
-                {trip.status === 'completed' && trip.driver_salary
-                  ? fmtCurrency(trip.driver_salary)
-                  : trip.status === 'completed'
-                    ? '—'
-                    : 'Pending'}
-              </span>
-            </div>
-          ))
+          <div className="overflow-x-auto -mx-1">
+            <table className="w-full text-[11px]">
+              <thead>
+                <tr className="text-left text-slate-400 border-b border-slate-100">
+                  <th className="py-1.5 pr-2 font-medium">Date</th>
+                  <th className="py-1.5 pr-2 font-medium">Route</th>
+                  <th className="py-1.5 pr-2 font-medium">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {trips.slice(0, 10).map(trip => (
+                  <tr key={trip._id} className="border-b border-slate-50 last:border-0">
+                    <td className="py-1.5 pr-2 text-slate-600 whitespace-nowrap">
+                      {trip.startDate
+                        ? new Date(trip.startDate).toLocaleDateString()
+                        : '—'}
+                    </td>
+                    <td className="py-1.5 pr-2 text-slate-700 max-w-[160px] truncate">
+                      {trip.from ?? '—'} → {trip.to ?? '—'}
+                    </td>
+                    <td className="py-1.5 pr-2">
+                      <span
+                        className={`inline-block rounded border px-1.5 py-0.5 text-[10px] font-semibold capitalize ${tripStatusBadgeCls(trip.status)}`}
+                      >
+                        {formatTripStatusLabel(trip.status)}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </Card>
     </div>

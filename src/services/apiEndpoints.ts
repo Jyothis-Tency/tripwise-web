@@ -4,6 +4,8 @@ export const ApiEndpoints = {
   // AUTH
   ownerLogin: '/auth/owner/login',
   ownerLogout: '/auth/owner/logout',
+  ownerForgotPassword: '/auth/owner/forgot-password',
+  ownerResetPassword: '/auth/owner/reset-password',
   adminLogin: '/admin/auth/login',
   adminLogout: '/admin/auth/logout',
 

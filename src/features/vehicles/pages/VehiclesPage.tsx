@@ -27,6 +27,7 @@ import {
 } from "../../bulk-entry/api";
 import { TimePicker12h } from "../../../components/ui/TimePicker12h";
 import { isoToHHmmInTz } from "../../../lib/timePickerUtils";
+import { computeAgencyProfitPreview } from "../../history/tripExpenseBreakdown";
 import {
   fetchVehicles,
   fetchVehicleById,
@@ -672,9 +673,10 @@ export function TripFormModal({
     ) =>
       setForm((prev) => ({ ...prev, [k]: e.target.value }));
 
-  const profit = (
-    parseFloat(form.agencyCost || "0") - parseFloat(form.cabCost || "0")
-  ).toFixed(2);
+  const profitPreview = computeAgencyProfitPreview(
+    form.agencyCost,
+    form.cabCost,
+  );
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -702,7 +704,6 @@ export function TripFormModal({
         agencyCost: form.agencyCost ? parseFloat(form.agencyCost) : undefined,
         cabCost: form.cabCost ? parseFloat(form.cabCost) : undefined,
         advance: form.advance ? parseFloat(form.advance) : undefined,
-        agencyProfit: profit,
         amount: form.agencyCost ? parseFloat(form.agencyCost) : undefined, // Fallback
         notes: form.notes.trim() || undefined,
       };
@@ -854,7 +855,10 @@ export function TripFormModal({
           <div className="flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 p-3 text-blue-700">
             <Calculator className="h-5 w-5 shrink-0" />
             <span className="text-sm font-semibold">
-              Agency profit: ₹{profit}
+              Agency profit: ₹{profitPreview.toLocaleString("en-IN", {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              })}
             </span>
           </div>
 
@@ -1480,7 +1484,7 @@ function VehicleHistoryTab({
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
             <div className="rounded-lg border border-blue-200 bg-white p-3">
               <div className="text-[11px] font-semibold uppercase tracking-wide text-blue-700">
-                Billed revenue
+                Total agency cost
               </div>
               <div className="text-sm font-bold text-slate-900 mt-1">
                 {formatMoney0(
@@ -1490,7 +1494,7 @@ function VehicleHistoryTab({
             </div>
             <div className="rounded-lg border border-blue-200 bg-white p-3">
               <div className="text-[11px] font-semibold uppercase tracking-wide text-blue-700">
-                Cab fare
+                Total cab cost
               </div>
               <div className="text-sm font-bold text-slate-900 mt-1">
                 {formatMoney0(

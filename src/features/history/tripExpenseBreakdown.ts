@@ -44,6 +44,20 @@ export function computeTripExpenseBreakdownFromLines(
   };
 }
 
+/** Live preview: agency profit from agency cost, cab cost, and optional expense lines. */
+export function computeAgencyProfitPreview(
+  agencyCost: unknown,
+  cabCost: unknown,
+  expenses?: TripExpenseLine[],
+): number {
+  const agency = Number(agencyCost) || 0;
+  const { totalCabCost } = computeTripExpenseBreakdownFromLines(
+    expenses,
+    cabCost,
+  );
+  return roundMoney(Math.max(agency - totalCabCost, 0));
+}
+
 export function getHistoryTripExpenseBreakdown(trip: {
   expenses?: TripExpenseLine[];
   cabCost?: number;

@@ -70,6 +70,10 @@ export interface BulkTripRow {
 
 export interface DriverGroup {
   driverName: string;
+  /** Set when picked from drivers list or after create — links bulk trips to Driver doc. */
+  driverId?: string;
+  /** Phone for new-driver creation on sync (from create modal or normal entry mobile). */
+  driverPhone?: string;
   vehicleNumber: string;
   rows: BulkTripRow[];
 }
@@ -79,6 +83,7 @@ export interface NormalEntryRow {
   clientRowId?: string;
   date: string;
   driverName: string;
+  driverId?: string;
   mobileNumber: string;
   vehicleNumber: string;
   vehicleType: string;

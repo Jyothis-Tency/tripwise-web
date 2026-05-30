@@ -160,6 +160,15 @@ function verifyDriverCashMath(detail: DriverCashInCashOutDetail): string[] {
   if (!moneyEq(bulkRemainingClamped, detail.summary.bulkAdvance.remaining)) {
     issues.push("Bulk advance remaining ≠ total owed − paid (clamped at 0).");
   }
+  const totalRemainingCalc = sumMoney([
+    detail.summary.vehicleBata.remaining,
+    detail.summary.bulkAdvance.remaining,
+  ]);
+  if (!moneyEq(totalRemainingCalc, driverTotalRemaining(detail))) {
+    issues.push(
+      "Total remaining to pay ≠ bata remaining + bulk advance remaining.",
+    );
+  }
   return issues;
 }
 
@@ -171,10 +180,10 @@ function agencyTotalRemaining(detail: AgencyCashInCashOutDetail): number {
   );
 }
 
-/** Bata remaining minus bulk advance remaining (net owed to driver). */
+/** Trip bata + bulk advance still owed to the driver (cash out). */
 function driverTotalRemaining(detail: DriverCashInCashOutDetail): number {
   return (
-    detail.summary.vehicleBata.remaining -
+    detail.summary.vehicleBata.remaining +
     detail.summary.bulkAdvance.remaining
   );
 }

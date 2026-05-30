@@ -1,7 +1,8 @@
-import { useNavigate } from 'react-router-dom';
+import { useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { useFormik } from 'formik';
 import * as Yup from 'yup';
-import { Mail, Lock } from 'lucide-react';
+import { Mail, Lock, Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '../../../hooks/useAuth';
 
 const validationSchema = Yup.object({
@@ -12,6 +13,7 @@ const validationSchema = Yup.object({
 export function LoginPage() {
   const navigate = useNavigate();
   const { login, loading, error } = useAuth();
+  const [showPassword, setShowPassword] = useState(false);
 
   const formik = useFormik({
     initialValues: {
@@ -92,22 +94,42 @@ export function LoginPage() {
                 Password
               </label>
               <div className="group flex items-center rounded-xl border border-slate-200 bg-white px-4 py-3 transition-all focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-500/10 hover:border-slate-300">
-                <Lock className="mr-3 h-5 w-5 text-slate-400 group-focus-within:text-blue-500 transition-colors" />
+                <Lock className="mr-3 h-5 w-5 shrink-0 text-slate-400 group-focus-within:text-blue-500 transition-colors" />
                 <input
                   id="password"
                   name="password"
-                  type="password"
+                  type={showPassword ? 'text' : 'password'}
                   autoComplete="current-password"
                   onChange={formik.handleChange}
                   onBlur={formik.handleBlur}
                   value={formik.values.password}
-                  className="h-6 w-full border-none bg-transparent text-sm font-medium text-slate-900 placeholder-slate-400 outline-none"
+                  className="h-6 min-w-0 flex-1 border-none bg-transparent text-sm font-medium text-slate-900 placeholder-slate-400 outline-none"
                   placeholder="••••••••"
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((v) => !v)}
+                  className="ml-2 shrink-0 rounded-lg p-1 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600"
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                >
+                  {showPassword ? (
+                    <EyeOff className="h-5 w-5" />
+                  ) : (
+                    <Eye className="h-5 w-5" />
+                  )}
+                </button>
               </div>
               {formik.touched.password && formik.errors.password && (
                 <p className="text-xs font-medium text-red-500 mt-1">{formik.errors.password}</p>
               )}
+              <div className="flex justify-end">
+                <Link
+                  to="/forgot-password"
+                  className="text-xs font-medium text-blue-600 hover:text-blue-700 hover:underline"
+                >
+                  Forgot password?
+                </Link>
+              </div>
             </div>
 
             <button

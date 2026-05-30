@@ -16,6 +16,7 @@ import {
   type TripItem,
   type Vehicle,
 } from "../../vehicles/api";
+import { computeAgencyProfitPreview } from "../../history/tripExpenseBreakdown";
 
 /** Comfortable tap/read size; fits more in view via layout, not shrinking type */
 const inputCls =
@@ -113,9 +114,10 @@ export function CreateNewTripPage() {
     ) =>
       setForm((prev) => ({ ...prev, [k]: e.target.value }));
 
-  const profit = (
-    parseFloat(form.agencyCost || "0") - parseFloat(form.cabCost || "0")
-  ).toFixed(2);
+  const profitPreview = computeAgencyProfitPreview(
+    form.agencyCost,
+    form.cabCost,
+  );
 
   const resetFormFields = useCallback(() => {
     setForm({
@@ -167,7 +169,6 @@ export function CreateNewTripPage() {
         agencyCost: form.agencyCost ? parseFloat(form.agencyCost) : undefined,
         cabCost: form.cabCost ? parseFloat(form.cabCost) : undefined,
         advance: form.advance ? parseFloat(form.advance) : undefined,
-        agencyProfit: profit,
         amount: form.agencyCost ? parseFloat(form.agencyCost) : undefined,
         notes: form.notes.trim() || undefined,
       };
@@ -426,7 +427,10 @@ export function CreateNewTripPage() {
                   <div className="flex items-center gap-3 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3">
                     <Calculator className="h-6 w-6 shrink-0 text-blue-600" />
                     <span className="text-base font-bold text-blue-900">
-                      Agency profit: ₹{profit}
+                      Agency profit: ₹{profitPreview.toLocaleString("en-IN", {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      })}
                     </span>
                   </div>
 

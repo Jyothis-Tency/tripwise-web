@@ -31,7 +31,10 @@ import {
 } from "../historyTimeUtils";
 import { TimePicker12h } from "../../../components/ui/TimePicker12h";
 import { normalizeHHmm } from "../../../lib/timePickerUtils";
-import { getHistoryTripExpenseBreakdown } from "../tripExpenseBreakdown";
+import {
+  getHistoryTripExpenseBreakdown,
+  resolveTripAgencyProfitDisplay,
+} from "../tripExpenseBreakdown";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -938,13 +941,7 @@ export function TripCard({
                     {E("Advance", fmtCurrency(trip.advance), "advance")}
                     <DetailRow
                       label="Agency profit"
-                      value={fmtCurrency(
-                        Number(
-                          trip.agencyProfit ??
-                            (trip as { ownerProfit?: number }).ownerProfit ??
-                            0,
-                        ),
-                      )}
+                      value={fmtCurrency(resolveTripAgencyProfitDisplay(trip))}
                       highlight
                       emphasizeValue
                     />

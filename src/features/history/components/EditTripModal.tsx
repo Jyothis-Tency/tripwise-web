@@ -2,7 +2,10 @@ import { useEffect, useMemo, useState } from "react";
 import type { HistoryTrip } from "../api";
 import { fetchPaymentHistory, updateTripFields } from "../api";
 import { isoToTimeInputInTz, fmtTripDuration } from "../historyTimeUtils";
-import { getHistoryTripExpenseBreakdown } from "../tripExpenseBreakdown";
+import {
+  computeAgencyProfitPreview,
+  getHistoryTripExpenseBreakdown,
+} from "../tripExpenseBreakdown";
 import { TimePicker12h } from "../../../components/ui/TimePicker12h";
 import { normalizeHHmm } from "../../../lib/timePickerUtils";
 import { AgencyNameCombobox } from "../../../components/AgencyNameCombobox";
@@ -148,8 +151,14 @@ export function EditTripModal({
       ? trip.endKilometers - trip.startKilometers
       : null;
 
-  const agencyProfit = Number(
-    trip.agencyProfit ?? (trip as { ownerProfit?: number }).ownerProfit ?? 0,
+  const agencyProfit = useMemo(
+    () =>
+      computeAgencyProfitPreview(
+        fields.agencyCost,
+        fields.cabCost,
+        trip.expenses,
+      ),
+    [fields.agencyCost, fields.cabCost, trip.expenses],
   );
 
   const driverDisplay = historyDriverName(trip.driver, driverNameFallback);

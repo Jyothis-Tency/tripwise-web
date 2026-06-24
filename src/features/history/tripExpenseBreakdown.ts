@@ -2,7 +2,7 @@
 
 export type TripExpenseLine = {
   type?: string;
-  amount?: number;
+  amount?: number | string;
 };
 
 export type TripExpenseBreakdown = {
@@ -55,6 +55,27 @@ export function computeAgencyProfitPreview(
     expenses,
     cabCost,
   );
+  return roundMoney(Math.max(agency - totalCabCost, 0));
+}
+
+/** Display profit on History/Tracking — matches backend tripAgencyProfitNumber. */
+export function resolveTripAgencyProfitDisplay(trip: {
+  agencyCost?: unknown;
+  cabCost?: unknown;
+  expenses?: TripExpenseLine[];
+  fuelExpense?: number;
+  extraExpenses?: number;
+  totalExpenses?: number;
+  totalCabCost?: number;
+}): number {
+  const agency = Number(trip.agencyCost) || 0;
+  const { totalCabCost } = getHistoryTripExpenseBreakdown({
+    expenses: trip.expenses,
+    cabCost: Number(trip.cabCost) || 0,
+    fuelExpense: trip.fuelExpense,
+    extraExpenses: trip.extraExpenses,
+    totalExpenses: trip.totalExpenses,
+  });
   return roundMoney(Math.max(agency - totalCabCost, 0));
 }
 

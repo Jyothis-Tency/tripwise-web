@@ -15,6 +15,7 @@ import {
 import { fetchTrackingVehicles, completeTrip, type TrackingVehicle } from '../api';
 import { fetchAgencies, type Agency } from '../../bulk-entry/api';
 import { resolveAgencyLabelFromName } from '../../../lib/agencyDisplay';
+import { resolveTripAgencyProfitDisplay } from '../../history/tripExpenseBreakdown';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // UTILITIES
@@ -262,13 +263,12 @@ function ExpenseInfoTab({
 
   const agencyCost = trip.agencyCost != null ? Number(trip.agencyCost) : 0;
   const cabCost = trip.cabCost != null ? Number(trip.cabCost) : 0;
-  const agencyProfitAmt =
-    trip.agencyProfit != null
-      ? Number(trip.agencyProfit)
-      : (trip as { ownerProfit?: number | string }).ownerProfit != null
-        ? Number((trip as { ownerProfit?: number | string }).ownerProfit)
-        : 0;
   const expenses = trip.expenses ?? [];
+  const agencyProfitAmt = resolveTripAgencyProfitDisplay({
+    agencyCost: trip.agencyCost,
+    cabCost: trip.cabCost,
+    expenses,
+  });
 
   // Categorise expenses
   let fuel = 0, toll = 0, taxPermit = 0, parking = 0, other = 0;

@@ -508,7 +508,7 @@ export function ReportsPage() {
                     onClick={() => {
                       const all = {} as ReportFieldSelection;
                       const bulkOnlyFields = ["advance", "balance", "toll", "notes", "vehicleType", "mobileNumber"];
-                      const vehicleOnlyFields = ["customer", "startKilometers", "startTime", "totalKm", "totalTime"];
+                      const vehicleOnlyFields = ["from", "to", "customer", "startKilometers", "startTime", "totalKm", "totalTime"];
                       for (const f of REPORT_FIELD_DEFS) {
                         if (tripSource === "bulk" && vehicleOnlyFields.includes(f.id)) continue;
                         if (tripSource === "vehicle" && bulkOnlyFields.includes(f.id)) continue;
@@ -526,7 +526,7 @@ export function ReportsPage() {
               <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                 {REPORT_FIELD_DEFS.filter(f => {
                   const bulkOnlyFields = ["advance", "balance", "toll", "notes", "vehicleType", "mobileNumber"];
-                  const vehicleOnlyFields = ["customer", "startKilometers", "startTime", "totalKm", "totalTime"];
+                  const vehicleOnlyFields = ["from", "to", "customer", "startKilometers", "startTime", "totalKm", "totalTime"];
                   if (tripSource === "bulk" && vehicleOnlyFields.includes(f.id)) return false;
                   if (tripSource === "vehicle" && bulkOnlyFields.includes(f.id)) return false;
                   return true;

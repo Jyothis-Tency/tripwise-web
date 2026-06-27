@@ -72,7 +72,7 @@ export function defaultReportFieldSelection(
         continue;
       }
       // Unselect vehicle-specific fields
-      if (["customer", "startKilometers", "startTime", "totalKm", "totalTime"].includes(f.id)) {
+      if (["from", "to", "customer", "startKilometers", "startTime", "totalKm", "totalTime"].includes(f.id)) {
         sel[f.id] = false;
         continue;
       }

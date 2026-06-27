@@ -58,6 +58,10 @@ export interface HistoryTrip {
   /** extraExpenses + cabCost */
   totalCabCost?: number;
   expenses?: { type?: string; amount?: number; description?: string }[];
+  toll?: number;
+  vehicleType?: string;
+  mobileNumber?: string;
+  balanceAmount?: number;
   agencyProfit?: number;
   paidAmount?: number;
   paymentSummary?: {
@@ -99,6 +103,7 @@ export interface HistoryParams {
   agencyName?: string;
   startDate?: string;  // YYYY-MM-DD
   endDate?: string;    // YYYY-MM-DD
+  tripSource?: 'vehicle' | 'bulk';
 }
 
 export interface TripPayment {

@@ -114,8 +114,9 @@ export function ReportsPage() {
   const [endDate, setEndDate] = useState("");
   const [filterMode, setFilterMode] =
     useState<ReportDateFilter["filterMode"]>("month");
+  const [tripSource, setTripSource] = useState<"vehicle" | "bulk">("vehicle");
   const [fieldSelection, setFieldSelection] = useState<ReportFieldSelection>(
-    () => defaultReportFieldSelection(),
+    () => defaultReportFieldSelection("vehicle"),
   );
 
   const [drivers, setDrivers] = useState<Driver[]>([]);
@@ -209,7 +210,7 @@ export function ReportsPage() {
           entityFilter,
           status,
           dateFilter,
-          { page, limit: PREVIEW_LIMIT },
+          { page, limit: PREVIEW_LIMIT, tripSource },
         );
         const result = await fetchTripHistory(params);
         setPreviewTrips(result.trips);
@@ -223,7 +224,7 @@ export function ReportsPage() {
         setLoadingPreview(false);
       }
     },
-    [entityFilter, status, dateFilter],
+    [entityFilter, status, dateFilter, tripSource],
   );
 
   const handlePreview = () => {
@@ -245,7 +246,7 @@ export function ReportsPage() {
         entityFilter,
         status,
         dateFilter,
-        { page: 1, limit: PDF_LIMIT },
+        { page: 1, limit: PDF_LIMIT, tripSource },
       );
       const result = await fetchTripHistory(params);
       if (!result.trips.length) {
@@ -276,7 +277,8 @@ export function ReportsPage() {
     setPreviewLoaded(false);
     setPreviewTrips([]);
     setTripSearchQuery("");
-    setFieldSelection(defaultReportFieldSelection());
+    setTripSource("vehicle");
+    setFieldSelection(defaultReportFieldSelection("vehicle"));
   };
 
   const toggleReportField = (id: (typeof REPORT_FIELD_DEFS)[number]["id"]) => {
@@ -363,6 +365,44 @@ export function ReportsPage() {
             />
 
             <div className="space-y-3">
+              <div>
+                <label className="mb-1 block text-xs font-medium text-slate-600">
+                  Trip Source
+                </label>
+                <div className="flex rounded-lg border border-slate-200 bg-slate-50/50 p-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setTripSource("vehicle");
+                      setFieldSelection(defaultReportFieldSelection("vehicle"));
+                      setPreviewLoaded(false);
+                    }}
+                    className={`flex-1 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+                      tripSource === "vehicle"
+                        ? "bg-white text-blue-700 shadow-sm ring-1 ring-slate-200/50"
+                        : "text-slate-600 hover:text-slate-900"
+                    }`}
+                  >
+                    Vehicle Trips
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setTripSource("bulk");
+                      setFieldSelection(defaultReportFieldSelection("bulk"));
+                      setPreviewLoaded(false);
+                    }}
+                    className={`flex-1 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+                      tripSource === "bulk"
+                        ? "bg-white text-blue-700 shadow-sm ring-1 ring-slate-200/50"
+                        : "text-slate-600 hover:text-slate-900"
+                    }`}
+                  >
+                    Bulk Entry
+                  </button>
+                </div>
+              </div>
+
               <div>
                 <label className="mb-1 block text-xs font-medium text-slate-600">
                   Status
@@ -467,7 +507,13 @@ export function ReportsPage() {
                     type="button"
                     onClick={() => {
                       const all = {} as ReportFieldSelection;
-                      for (const f of REPORT_FIELD_DEFS) all[f.id] = true;
+                      const bulkOnlyFields = ["advance", "balance", "toll", "notes", "vehicleType", "mobileNumber"];
+                      const vehicleOnlyFields = ["customer", "startKilometers", "startTime", "totalKm", "totalTime"];
+                      for (const f of REPORT_FIELD_DEFS) {
+                        if (tripSource === "bulk" && vehicleOnlyFields.includes(f.id)) continue;
+                        if (tripSource === "vehicle" && bulkOnlyFields.includes(f.id)) continue;
+                        all[f.id] = true;
+                      }
                       setFieldSelection(all);
                       setPreviewLoaded(false);
                     }}
@@ -478,7 +524,13 @@ export function ReportsPage() {
                 </div>
               </div>
               <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                {REPORT_FIELD_DEFS.map((f) => (
+                {REPORT_FIELD_DEFS.filter(f => {
+                  const bulkOnlyFields = ["advance", "balance", "toll", "notes", "vehicleType", "mobileNumber"];
+                  const vehicleOnlyFields = ["customer", "startKilometers", "startTime", "totalKm", "totalTime"];
+                  if (tripSource === "bulk" && vehicleOnlyFields.includes(f.id)) return false;
+                  if (tripSource === "vehicle" && bulkOnlyFields.includes(f.id)) return false;
+                  return true;
+                }).map((f) => (
                   <label
                     key={f.id}
                     className="flex items-center gap-2 rounded-lg border border-slate-100 bg-slate-50/80 px-2.5 py-2 text-sm text-slate-700 cursor-pointer hover:border-blue-200 hover:bg-blue-50/50 has-checked:border-blue-300 has-checked:bg-blue-50"

@@ -12,7 +12,7 @@ export function buildTripReportHistoryParams(
   entity: ReportEntityFilter | null,
   status: string,
   dates: ReportDateFilter,
-  opts?: { page?: number; limit?: number },
+  opts?: { page?: number; limit?: number; tripSource?: 'vehicle' | 'bulk' },
 ): HistoryParams {
   const params: HistoryParams = {
     page: opts?.page ?? 1,
@@ -20,6 +20,7 @@ export function buildTripReportHistoryParams(
     status: status === "all" ? undefined : status,
     sortBy: "startDate",
     sortOrder: "desc",
+    tripSource: opts?.tripSource ?? "vehicle",
   };
 
   if (dates.filterMode === "month" && dates.month && dates.month !== "all_time") {

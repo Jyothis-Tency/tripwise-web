@@ -13,7 +13,13 @@ export type ReportFieldId =
   | "startTime"
   | "totalKm"
   | "totalTime"
-  | "cabCost";
+  | "cabCost"
+  | "advance"
+  | "balance"
+  | "toll"
+  | "notes"
+  | "vehicleType"
+  | "mobileNumber";
 
 export type ReportFieldSection = "header" | "left" | "middle" | "right";
 
@@ -44,13 +50,33 @@ export const REPORT_FIELD_DEFS: ReportFieldDef[] = [
   { id: "totalKm", label: "Total KM", section: "middle", defaultOn: true },
   { id: "totalTime", label: "Total Time", section: "middle", defaultOn: true },
   { id: "cabCost", label: "Cab Cost", section: "right", defaultOn: true },
+  { id: "advance", label: "Advance", section: "right", defaultOn: false },
+  { id: "balance", label: "Balance", section: "right", defaultOn: false },
+  { id: "toll", label: "Toll", section: "right", defaultOn: false },
+  { id: "notes", label: "Notes", section: "left", defaultOn: false },
+  { id: "vehicleType", label: "Vehicle Type", section: "header", defaultOn: false },
+  { id: "mobileNumber", label: "Mobile Number", section: "header", defaultOn: false },
 ];
 
 export type ReportFieldSelection = Record<ReportFieldId, boolean>;
 
-export function defaultReportFieldSelection(): ReportFieldSelection {
+export function defaultReportFieldSelection(
+  tripSource: "vehicle" | "bulk" = "vehicle",
+): ReportFieldSelection {
   const sel = {} as ReportFieldSelection;
   for (const f of REPORT_FIELD_DEFS) {
+    if (tripSource === "bulk") {
+      // For bulk trips, select bulk-specific fields by default
+      if (["advance", "balance", "notes", "vehicleType", "mobileNumber", "toll"].includes(f.id)) {
+        sel[f.id] = true;
+        continue;
+      }
+      // Unselect vehicle-specific fields
+      if (["customer", "startKilometers", "startTime", "totalKm", "totalTime"].includes(f.id)) {
+        sel[f.id] = false;
+        continue;
+      }
+    }
     sel[f.id] = f.defaultOn;
   }
   return sel;

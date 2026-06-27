@@ -78,6 +78,12 @@ export function toTripReportRow(
     totalKm: reportTotalKm(trip),
     totalTime: fmtTripDuration(trip.startTime, trip.endTime),
     cabCost: reportFmtRs(trip.cabCost ?? 0),
+    advance: reportFmtRs(trip.advance ?? 0),
+    balance: reportFmtRs(trip.balanceAmount ?? trip.paymentSummary?.remainingBalance ?? 0),
+    toll: reportFmtRs(trip.toll ?? 0),
+    notes: trip.notes ?? "N/A",
+    vehicleType: trip.vehicleType ?? "N/A",
+    mobileNumber: trip.mobileNumber ?? "N/A",
   };
 }
 
@@ -98,6 +104,12 @@ export function reportFieldLabel(id: ReportFieldId): string {
     totalKm: "Total KM:",
     totalTime: "Total Time:",
     cabCost: "Cab Cost",
+    advance: "Advance",
+    balance: "Balance",
+    toll: "Toll",
+    notes: "Notes",
+    vehicleType: "Vehicle Type:",
+    mobileNumber: "Mobile:",
   };
   return labels[id];
 }

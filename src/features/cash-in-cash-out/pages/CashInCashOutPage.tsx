@@ -17,10 +17,9 @@ import {
   type AgencyCashInCashOutDetail,
   type DriverCashInCashOutDetail,
 } from "../api";
-import { fetchAgencies, addAgencyPayoutPayment, type Agency } from "../../bulk-entry/api";
+import { fetchAgencies, addAgencyPayoutPayment, addDriverPayoutPayment, type Agency } from "../../bulk-entry/api";
 import { formatAgencyLabel, resolveAgencyLabelFromName } from "../../../lib/agencyDisplay";
-import { fetchDrivers, type Driver } from "../../drivers/api";
-import { DriverPayModal } from "../../drivers/components/DriverPayModal";
+import { fetchDrivers, createSalaryTransaction, type Driver } from "../../drivers/api";
 import {
   loadCashInCashOutUi,
   saveCashInCashOutUi,
@@ -49,6 +48,30 @@ function moneyEq(a: number, b: number): boolean {
 function sumMoney(values: number[]): number {
   const n = values.reduce((s, v) => s + (Number(v) || 0), 0);
   return Math.round(n * 100) / 100;
+}
+
+function pickAgencyIdForDriverBulkPayout(
+  detail: DriverCashInCashOutDetail,
+  agencies: Agency[],
+): string {
+  const rows = detail.tables.bulkTripsAdvance.filter((r) => r.agencyId);
+  if (rows.length > 0) {
+    const counts = new Map<string, number>();
+    for (const r of rows) {
+      counts.set(r.agencyId, (counts.get(r.agencyId) ?? 0) + 1);
+    }
+    let best = rows[0].agencyId;
+    let max = 0;
+    for (const [id, c] of counts) {
+      if (c > max) {
+        max = c;
+        best = id;
+      }
+    }
+    return best;
+  }
+  const first = agencies[0];
+  return first?._id ?? first?.id ?? "";
 }
 
 /** Client-side checks: summary cards must match filtered table totals. */
@@ -828,6 +851,9 @@ export function CashInCashOutPage() {
   const [agencyPaymentKind, setAgencyPaymentKind] = useState<
     "cash_in" | "cash_out"
   >("cash_in");
+  const [driverPaymentKind, setDriverPaymentKind] = useState<
+    "cash_out" | "advance"
+  >("cash_out");
   const [payAmount, setPayAmount] = useState("");
   const [payDate, setPayDate] = useState(() => new Date().toISOString().split("T")[0]);
   const [payMethod, setPayMethod] = useState<string>("cash");

@@ -85,6 +85,8 @@ export function TripReportPreviewDocument({
     totalAmount: number;
     totalPaid: number;
     totalOutstanding: number;
+    totalReceived?: number;
+    totalRemaining?: number;
   } | null;
 }) {
   const generatedOn = (() => {

@@ -11,6 +11,7 @@ import {
   fetchTripHistory,
   type HistoryTrip,
   type HistoryPagination,
+  type HistoryPaymentSummary,
 } from "../../history/api";
 import { TripReportPreviewDocument } from "../components/TripReportPreviewDocument";
 import { fetchAgencies, type Agency } from "../../bulk-entry/api";

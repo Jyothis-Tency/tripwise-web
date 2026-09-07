@@ -313,10 +313,12 @@ export interface DriverPayoutSummary {
 
 export async function fetchAgencyPayoutSummary(
   agencyId: string,
+  month?: string,
 ): Promise<AgencyPayoutSummary> {
-  const res = await apiClient.get(
-    `/owners/agencies/${agencyId}/payout-summary`,
-  );
+  const url = month
+    ? `/owners/agencies/${agencyId}/payout-summary?month=${encodeURIComponent(month)}`
+    : `/owners/agencies/${agencyId}/payout-summary`;
+  const res = await apiClient.get(url);
   const raw: any = res.data ?? {};
   return raw.data ?? raw;
 }
@@ -345,9 +347,14 @@ export async function deletePayoutPayment(paymentId: string): Promise<void> {
 export async function fetchDriverPayoutSummary(
   agencyId: string,
   driverName: string,
+  month?: string,
 ): Promise<DriverPayoutSummary> {
+  const queryParts = [`driverName=${encodeURIComponent(driverName)}`];
+  if (month) {
+    queryParts.push(`month=${encodeURIComponent(month)}`);
+  }
   const res = await apiClient.get(
-    `/owners/agencies/${agencyId}/driver-payout-summary?driverName=${encodeURIComponent(driverName)}`,
+    `/owners/agencies/${agencyId}/driver-payout-summary?${queryParts.join("&")}`,
   );
   const raw: any = res.data ?? {};
   return raw.data ?? raw;

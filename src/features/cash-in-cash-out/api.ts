@@ -5,6 +5,7 @@ export interface CashInCashOutMoneyBlock {
   totalOwed: number;
   received?: number;
   paid?: number;
+  advances?: number;
   remaining: number;
 }
 
@@ -79,6 +80,7 @@ export interface AgencyCashSummaryBlock {
   totalOwed: number;
   received?: number;
   paid?: number;
+  advances?: number;
   remaining: number;
 }
 

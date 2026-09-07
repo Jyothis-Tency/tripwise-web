@@ -9,6 +9,9 @@ export const ApiEndpoints = {
   adminLogin: '/admin/auth/login',
   adminLogout: '/admin/auth/logout',
 
+  // OWNER PROFILE
+  ownerProfile: '/owners/profile',
+
   // DASHBOARD
   dashboardOverview: '/owners/dashboard/overview',
   dashboardOngoingTrips: '/owners/dashboard/ongoing-trips',

@@ -12,6 +12,14 @@ export type TripReportPdfOptions = {
   subtitle?: string;
   resolveAgencyLabel?: (agencyName?: string) => string;
   fieldSelection: ReportFieldSelection;
+  tripSource?: "vehicle" | "bulk";
+  paymentSummary?: {
+    totalAmount: number;
+    totalPaid: number;
+    totalOutstanding: number;
+    totalReceived?: number;
+    totalRemaining?: number;
+  } | null;
 };
 
 export function downloadTripReportPdf(
@@ -93,11 +101,31 @@ export function downloadTripReportPdf(
   };
 
   writeText(title, leftX, y, { size: 18, bold: true });
-  const totalTripsText = `Total Trips: ${trips.length}`;
-  writeText(totalTripsText, rightX - textWidth(totalTripsText), y, {
-    size: 11,
-    bold: true,
-  });
+  
+  let rightY = y;
+  const writeRight = (text: string, size: number, bold: boolean) => {
+    writeText(text, rightX - textWidth(text), rightY, { size, bold });
+    rightY += 6;
+  };
+
+  writeRight(`Total Trips: ${trips.length}`, 11, true);
+
+  if (options.tripSource === "bulk") {
+    const totalGrand = trips.reduce((sum, t) => sum + (Number(t.cabCost) || 0), 0);
+    const totalAdvance = trips.reduce((sum, t) => sum + (Number(t.advance) || 0), 0);
+    const totalBalance = trips.reduce((sum, t) => sum + (Number(t.balanceAmount) || 0), 0);
+    
+    writeRight(`Grand Total: Rs. ${totalGrand.toLocaleString("en-IN", { minimumFractionDigits: 2 })}`, 10, true);
+    writeRight(`Total Advance: Rs. ${totalAdvance.toLocaleString("en-IN", { minimumFractionDigits: 2 })}`, 10, false);
+    writeRight(`Total Balance: Rs. ${totalBalance.toLocaleString("en-IN", { minimumFractionDigits: 2 })}`, 10, false);
+    
+    if (options.paymentSummary && options.paymentSummary.totalReceived !== undefined && options.paymentSummary.totalRemaining !== undefined) {
+      rightY += 2;
+      writeRight(`Payouts Received: Rs. ${options.paymentSummary.totalReceived.toLocaleString("en-IN", { minimumFractionDigits: 2 })}`, 10, true);
+      writeRight(`Remaining: Rs. ${options.paymentSummary.totalRemaining.toLocaleString("en-IN", { minimumFractionDigits: 2 })}`, 10, false);
+    }
+  }
+
   y += 7;
   writeText(`Generated on: ${fmtDate(new Date())}`, leftX, y, {
     size: 10,
@@ -111,7 +139,7 @@ export function downloadTripReportPdf(
     });
     y += 6;
   }
-  y += 3;
+  y = Math.max(y, rightY) + 3;
 
   doc.setDrawColor(60, 60, 60);
   doc.line(leftX, y, rightX, y);

@@ -71,6 +71,7 @@ export function TripReportPreviewDocument({
   resolveAgencyLabel,
   pageNote,
   tripIndexOffset = 0,
+  paymentSummary,
 }: {
   trips: HistoryTrip[];
   totalTrips: number;
@@ -80,6 +81,11 @@ export function TripReportPreviewDocument({
   resolveAgencyLabel: (agencyName?: string) => string;
   pageNote?: string;
   tripIndexOffset?: number;
+  paymentSummary?: {
+    totalAmount: number;
+    totalPaid: number;
+    totalOutstanding: number;
+  } | null;
 }) {
   const generatedOn = (() => {
     const d = new Date();
@@ -101,9 +107,34 @@ export function TripReportPreviewDocument({
               <p className="mt-0.5 text-sm text-slate-500">{subtitle}</p>
             )}
           </div>
-          <p className="text-sm font-bold text-slate-900 tabular-nums">
-            Total Trips: {totalTrips.toLocaleString("en-IN")}
-          </p>
+          <div className="text-right">
+            <p className="text-sm font-bold text-slate-900 tabular-nums">
+              Total Trips: {totalTrips.toLocaleString("en-IN")}
+            </p>
+            {paymentSummary && (
+              <div className="mt-2 flex flex-col gap-0.5 items-end">
+                <p className="text-xs font-bold text-slate-900">
+                  Grand Total: Rs. {paymentSummary.totalAmount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                </p>
+                <p className="text-[11px] text-slate-700">
+                  Total Advance: Rs. {paymentSummary.totalPaid.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                </p>
+                <p className="text-[11px] text-slate-700">
+                  Total Balance: Rs. {paymentSummary.totalOutstanding.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                </p>
+                {paymentSummary.totalReceived !== undefined && paymentSummary.totalRemaining !== undefined && (
+                  <div className="mt-1 pt-1 border-t border-slate-200">
+                    <p className="text-xs font-bold text-slate-800">
+                      Payouts Received: Rs. {paymentSummary.totalReceived.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                    </p>
+                    <p className="text-[11px] text-slate-700">
+                      Remaining: Rs. {paymentSummary.totalRemaining.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
         </div>
 
         <hr className="my-5 border-slate-300" />

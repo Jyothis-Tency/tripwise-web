@@ -647,7 +647,7 @@ export function TripFormModal({
   const [error, setError] = useState<string | null>(null);
   
   const [agencyId, setAgencyId] = useState<string | undefined>(undefined);
-
+  
   const [form, setForm] = useState({
     from: trip?.from ?? "",
     to: trip?.to ?? "",
@@ -1608,7 +1608,7 @@ function VehicleHistoryTab({
                     >
                       {status.replaceAll("_", " ")}
                     </span>
-                  </div>
+      </div>
                 </div>
 
                 <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">

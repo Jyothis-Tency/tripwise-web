@@ -15,6 +15,8 @@ export const authApi = {
         name: user.name ?? user.fullName ?? '',
         email: user.email ?? '',
         role: (user.role as string) ?? 'owner',
+        company: user.company ?? '',
+        phone: user.phone ?? '',
       },
     };
   },
@@ -48,6 +50,19 @@ export const authApi = {
     });
     const raw: any = res.data ?? {};
     return { message: raw.message ?? 'Password updated successfully.' };
+  },
+
+  async getOwnerProfile() {
+    const res = await apiClient.get(ApiEndpoints.ownerProfile);
+    const raw: any = res.data ?? {};
+    const data = raw.data ?? raw;
+    return {
+      id: data._id ?? data.id ?? '',
+      name: data.name ?? data.fullName ?? '',
+      email: data.email ?? '',
+      company: data.company ?? '',
+      phone: data.phone ?? '',
+    };
   },
 };
 

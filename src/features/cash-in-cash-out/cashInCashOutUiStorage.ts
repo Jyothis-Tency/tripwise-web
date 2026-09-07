@@ -25,7 +25,7 @@ function defaultUi(): CashInCashOutUiPersisted {
     selectedDriverId: null,
     agencyDetailTab: "trips",
     driverDetailTab: "trips",
-    detailMonth: currentMonthValue(),
+    detailMonth: "all_time",
     listSearch: "",
   };
 }

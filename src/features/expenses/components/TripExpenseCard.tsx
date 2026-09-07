@@ -24,7 +24,14 @@ const TripExpenseCard: React.FC<Props> = ({ trip, onRefresh }) => {
 
   const tripId = trip._id || (trip as any).id || '';
   const expenses = trip.expenses ?? [];
-  const total = trip.totalExpenses ?? expenses.reduce((s, e) => s + (e.amount || 0), 0);
+  const isFuel = (type?: string) => {
+    const t = String(type ?? '').toLowerCase().trim();
+    return t === 'fuel' || t === 'petrol' || t === 'diesel';
+  };
+  const total = trip.totalExpenses ?? expenses.reduce((s, e) => {
+    if (isFuel(e.type)) return s;
+    return s + (Number(e.amount) || 0);
+  }, 0);
 
   const handleDeleteExp = async (expId: string) => {
     if (!confirm('Delete this expense?')) return;

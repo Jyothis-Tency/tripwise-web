@@ -141,6 +141,7 @@ export function ReportsPage() {
     hasNext: false,
     hasPrev: false,
   });
+  const [previewPaymentSummary, setPreviewPaymentSummary] = useState<HistoryPaymentSummary | null>(null);
   const [previewLoaded, setPreviewLoaded] = useState(false);
   const [loadingPreview, setLoadingPreview] = useState(false);
   const [previewError, setPreviewError] = useState<string | null>(null);
@@ -215,10 +216,12 @@ export function ReportsPage() {
         const result = await fetchTripHistory(params);
         setPreviewTrips(result.trips);
         setPreviewPagination(result.pagination);
+        setPreviewPaymentSummary(result.paymentSummary || null);
         setPreviewLoaded(true);
       } catch {
         setPreviewError("Failed to load report preview.");
         setPreviewTrips([]);
+        setPreviewPaymentSummary(null);
         setPreviewLoaded(false);
       } finally {
         setLoadingPreview(false);
@@ -259,6 +262,8 @@ export function ReportsPage() {
         subtitle: subtitle || undefined,
         resolveAgencyLabel,
         fieldSelection,
+        tripSource,
+        paymentSummary: result.paymentSummary,
       });
     } catch {
       alert("Failed to generate report PDF.");
@@ -276,6 +281,7 @@ export function ReportsPage() {
     setFilterMode("month");
     setPreviewLoaded(false);
     setPreviewTrips([]);
+    setPreviewPaymentSummary(null);
     setTripSearchQuery("");
     setTripSource("vehicle");
     setFieldSelection(defaultReportFieldSelection("vehicle"));
@@ -569,13 +575,16 @@ export function ReportsPage() {
                 Report preview
               </h2>
               {previewLoaded && (
-                <span className="text-xs text-slate-500 tabular-nums">
-                  {previewPagination.total} trip
-                  {previewPagination.total === 1 ? "" : "s"}
-                  {filterSummary ? ` · ${filterSummary}` : ""}
-                </span>
+                <div className="flex flex-col items-end gap-1">
+                  <span className="text-xs text-slate-500 tabular-nums">
+                    {previewPagination.total} trip
+                    {previewPagination.total === 1 ? "" : "s"}
+                    {filterSummary ? ` · ${filterSummary}` : ""}
+                  </span>
+                </div>
               )}
             </div>
+
 
             {!previewLoaded && !loadingPreview && (
               <div className="rounded-xl border border-dashed border-slate-200 bg-white px-6 py-14 text-center">
@@ -626,6 +635,7 @@ export function ReportsPage() {
                   title="Trip History Report"
                   subtitle={filterSummary || undefined}
                   resolveAgencyLabel={resolveAgencyLabel}
+                  paymentSummary={tripSource === "bulk" ? previewPaymentSummary : undefined}
                   pageNote={
                     previewPagination.pages > 1
                       ? `Showing page ${previewPagination.page} of ${previewPagination.pages} (${previewTrips.length} trips on this page). PDF export includes all ${previewPagination.total} trips.`

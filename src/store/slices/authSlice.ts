@@ -48,8 +48,15 @@ const authSlice = createSlice({
 
       if (token && userData) {
         try {
-          const user = JSON.parse(userData) as User;
-          state.user = user;
+          const raw = JSON.parse(userData) as any;
+          state.user = {
+            id: raw.id ?? raw._id ?? '',
+            name: raw.name ?? raw.fullName ?? '',
+            email: raw.email ?? '',
+            role: (raw.role as User['role']) ?? 'owner',
+            company: raw.company ?? '',
+            phone: raw.phone ?? '',
+          };
           state.tokens = { accessToken: token };
           state.isAuthenticated = true;
         } catch {
@@ -89,6 +96,8 @@ const authSlice = createSlice({
           name: rawUser.name ?? rawUser.fullName ?? '',
           email: rawUser.email ?? '',
           role: (rawUser.role as any) ?? 'owner',
+          company: rawUser.company ?? '',
+          phone: rawUser.phone ?? '',
         };
 
         state.user = user;
@@ -96,6 +105,7 @@ const authSlice = createSlice({
         state.tokens = { accessToken: token };
         state.isAuthenticated = true;
         state.error = null;
+        localStorage.setItem('userData', JSON.stringify(user));
       })
       .addCase(loginUser.rejected, (state, action) => {
         state.loading = false;

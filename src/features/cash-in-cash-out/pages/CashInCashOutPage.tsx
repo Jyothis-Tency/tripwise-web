@@ -17,9 +17,10 @@ import {
   type AgencyCashInCashOutDetail,
   type DriverCashInCashOutDetail,
 } from "../api";
-import { fetchAgencies, addAgencyPayoutPayment, addDriverPayoutPayment, type Agency } from "../../bulk-entry/api";
+import { fetchAgencies, addAgencyPayoutPayment, type Agency } from "../../bulk-entry/api";
 import { formatAgencyLabel, resolveAgencyLabelFromName } from "../../../lib/agencyDisplay";
-import { fetchDrivers, createSalaryTransaction, type Driver } from "../../drivers/api";
+import { fetchDrivers, type Driver } from "../../drivers/api";
+import { DriverPayModal } from "../../drivers/components/DriverPayModal";
 import {
   loadCashInCashOutUi,
   saveCashInCashOutUi,
@@ -56,6 +57,9 @@ function verifyAgencyCashMath(detail: AgencyCashInCashOutDetail): string[] {
   const bulkTable = sumMoney(
     detail.tables.bulkTripsCashIn.map((r) => r.grandTotal),
   );
+  const bulkAdvancesTable = sumMoney(
+    detail.tables.bulkTripsCashIn.map((r) => Number((r as any).advancePaid) || 0),
+  );
   const vehicleTable = sumMoney(
     detail.tables.vehicleTripsAgencyProfit.map((r) => r.agencyProfit),
   );
@@ -69,6 +73,12 @@ function verifyAgencyCashMath(detail: AgencyCashInCashOutDetail): string[] {
   if (!moneyEq(bulkTable, detail.summary.cashInBulk.fromTrips)) {
     issues.push(
       `Bulk card (₹${detail.summary.cashInBulk.fromTrips}) ≠ sum of bulk trip Cash in column (₹${bulkTable}).`,
+    );
+  }
+  const advances = detail.summary.cashInBulk.advances ?? 0;
+  if (!moneyEq(bulkAdvancesTable, advances)) {
+    issues.push(
+      `Bulk advances (₹${advances}) ≠ sum of bulk trip Advance column (₹${bulkAdvancesTable}).`,
     );
   }
   if (!moneyEq(vehicleTable, detail.summary.cashOutAgencyProfit.fromTrips)) {
@@ -85,9 +95,10 @@ function verifyAgencyCashMath(detail: AgencyCashInCashOutDetail): string[] {
   const bulkRemainingCalc = sumMoney([
     detail.summary.cashInBulk.totalOwed,
     -detail.summary.cashInBulk.received,
+    -advances,
   ]);
   if (!moneyEq(bulkRemainingCalc, detail.summary.cashInBulk.remaining)) {
-    issues.push("Bulk remaining ≠ total owed − received.");
+    issues.push("Bulk remaining ≠ total owed − received − advances.");
   }
   const vehicleRemainingCalc = sumMoney([
     detail.summary.cashOutAgencyProfit.totalOwed,
@@ -301,30 +312,6 @@ function EntitySummaryCards({
       })}
     </div>
   );
-}
-
-function pickAgencyIdForDriverBulkPayout(
-  detail: DriverCashInCashOutDetail,
-  agencies: Agency[],
-): string {
-  const rows = detail.tables.bulkTripsAdvance.filter((r) => r.agencyId);
-  if (rows.length > 0) {
-    const counts = new Map<string, number>();
-    for (const r of rows) {
-      counts.set(r.agencyId, (counts.get(r.agencyId) ?? 0) + 1);
-    }
-    let best = rows[0].agencyId;
-    let max = 0;
-    for (const [id, c] of counts) {
-      if (c > max) {
-        max = c;
-        best = id;
-      }
-    }
-    return best;
-  }
-  const first = agencies[0];
-  return first?._id ?? first?.id ?? "";
 }
 
 function formatDate(d?: string | Date | null): string {
@@ -841,9 +828,6 @@ export function CashInCashOutPage() {
   const [agencyPaymentKind, setAgencyPaymentKind] = useState<
     "cash_in" | "cash_out"
   >("cash_in");
-  const [driverPaymentKind, setDriverPaymentKind] = useState<
-    "cash_out" | "advance"
-  >("cash_out");
   const [payAmount, setPayAmount] = useState("");
   const [payDate, setPayDate] = useState(() => new Date().toISOString().split("T")[0]);
   const [payMethod, setPayMethod] = useState<string>("cash");
@@ -1054,12 +1038,6 @@ export function CashInCashOutPage() {
   );
 
   const openDriverMarkPaymentModal = () => {
-    setPayMessage(null);
-    setPayAmount("");
-    setPayDate(new Date().toISOString().split("T")[0]);
-    setPayMethod("cash");
-    setPayNotes("");
-    setDriverPaymentKind("cash_out");
     setModal("driverMarkPayment");
   };
 

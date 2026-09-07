@@ -282,7 +282,7 @@ function ExpenseInfoTab({
       default: other += amt;
     }
   });
-  const totalExpenses = fuel + toll + taxPermit + parking + other;
+  const totalExpenses = toll + taxPermit + parking + other;
 
   return (
     <div className="space-y-4">

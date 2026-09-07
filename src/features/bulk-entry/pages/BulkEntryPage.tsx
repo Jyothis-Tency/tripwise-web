@@ -27,6 +27,7 @@ import {
 } from "lucide-react";
 import jsPDF from "jspdf";
 import { useAuth } from "../../../hooks/useAuth";
+import { authApi } from "../../auth/api";
 import { TimePicker12h } from "../../../components/ui/TimePicker12h";
 import { normalizeHHmm } from "../../../lib/timePickerUtils";
 import { CreateAgencyModal } from "../../../components/AgencyNameCombobox";
@@ -856,6 +857,22 @@ function generateNormalTripsPDF(
 // AGENCY PAYOUT TAB
 // ═══════════════════════════════════════════════════════════════════════════════
 
+function payoutMonthOptions(): { value: string; label: string }[] {
+  const opts: { value: string; label: string }[] = [
+    { value: "all_time", label: "All time" },
+  ];
+  const now = new Date();
+  for (let i = 0; i < 24; i++) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const value = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+    const label = d.toLocaleString("en-IN", { month: "long", year: "numeric" });
+    opts.push({ value, label });
+  }
+  return opts;
+}
+
+const PAYOUT_MONTH_OPTIONS = payoutMonthOptions();
+
 function AgencyPayoutTab({
   agencyId,
   agencyName,
@@ -874,17 +891,18 @@ function AgencyPayoutTab({
   );
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [month, setMonth] = useState("all_time");
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      setData(await fetchAgencyPayoutSummary(agencyId));
+      setData(await fetchAgencyPayoutSummary(agencyId, month));
     } catch {
       setData(null);
     } finally {
       setLoading(false);
     }
-  }, [agencyId]);
+  }, [agencyId, month]);
 
   useEffect(() => {
     load();
@@ -926,7 +944,7 @@ function AgencyPayoutTab({
   };
 
   if (loading)
-    return (
+  return (
       <div className="flex items-center justify-center py-16">
         <Loader2 className="h-6 w-6 animate-spin text-blue-400" />
       </div>
@@ -939,6 +957,24 @@ function AgencyPayoutTab({
 
   return (
     <div className="space-y-5">
+      {/* Month Filter */}
+      <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
+        <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
+          Filter Month:
+        </span>
+        <select
+          value={month}
+          onChange={(e) => setMonth(e.target.value)}
+          className="min-h-[36px] rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-800 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 sm:text-sm"
+        >
+          {PAYOUT_MONTH_OPTIONS.map((o) => (
+            <option key={o.value} value={o.value}>
+              {o.label}
+            </option>
+          ))}
+        </select>
+      </div>
+
       {/* Summary cards */}
       <div className="grid grid-cols-3 gap-3">
         {[
@@ -1152,18 +1188,19 @@ function DriverPayoutPanel({
   const [notes, setNotes] = useState("");
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [month, setMonth] = useState("all_time");
 
   const load = useCallback(async () => {
     if (!driverName.trim()) return;
     setLoading(true);
     try {
-      setData(await fetchDriverPayoutSummary(agencyId, driverName));
+      setData(await fetchDriverPayoutSummary(agencyId, driverName, month));
     } catch {
       setData(null);
     } finally {
       setLoading(false);
     }
-  }, [agencyId, driverName]);
+  }, [agencyId, driverName, month]);
 
   useEffect(() => {
     load();
@@ -1224,6 +1261,24 @@ function DriverPayoutPanel({
 
   return (
     <div className="px-4 py-3 space-y-3">
+      {/* Month Filter */}
+      <div className="flex items-center gap-2 border-b border-slate-100 pb-2">
+        <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide">
+          Filter:
+        </span>
+        <select
+          value={month}
+          onChange={(e) => setMonth(e.target.value)}
+          className="min-h-[30px] rounded-md border border-slate-200 bg-white px-2 py-1 text-[11px] font-medium text-slate-800 outline-none focus:border-blue-400"
+        >
+          {PAYOUT_MONTH_OPTIONS.map((o) => (
+            <option key={o.value} value={o.value}>
+              {o.label}
+            </option>
+          ))}
+        </select>
+      </div>
+
       {/* Summary row */}
       <div className="grid grid-cols-3 gap-2">
         {[
@@ -1250,7 +1305,7 @@ function DriverPayoutPanel({
       </div>
 
       {/* Add payment */}
-      {err && <p className="text-xs text-red-600">{err}</p>}
+          {err && <p className="text-xs text-red-600">{err}</p>}
       <div className="flex flex-wrap gap-2">
         <input
           type="number"
@@ -1291,7 +1346,7 @@ function DriverPayoutPanel({
           <Plus className="h-3.5 w-3.5" />
           {saving ? "…" : "Pay"}
         </button>
-      </div>
+        </div>
 
       {/* History */}
       {(data?.payments?.length ?? 0) > 0 && (
@@ -1315,10 +1370,10 @@ function DriverPayoutPanel({
                 className="text-red-400 hover:text-red-600"
               >
                 <Trash2 className="h-3.5 w-3.5" />
-              </button>
-            </div>
-          ))}
+          </button>
         </div>
+          ))}
+      </div>
       )}
 
       {/* Download PDF */}
@@ -1369,7 +1424,7 @@ const CellInput = memo(function CellInput({
 
   if (type === "time") {
     const timeVal = String(localVal ?? "");
-    return (
+  return (
       <TimePicker12h
         value={timeVal}
         allowEmpty
@@ -1439,7 +1494,85 @@ function BulkEntryTable({
   const [exportOpen, setExportOpen] = useState(false);
   const [exportStartDate, setExportStartDate] = useState("");
   const [exportEndDate, setExportEndDate] = useState("");
+  const [exportFileName, setExportFileName] = useState("");
+  const [exportFromName, setExportFromName] = useState("");
+  const [exportOwnerPhone, setExportOwnerPhone] = useState("");
+  const [exportShowPhone, setExportShowPhone] = useState(true);
+  const [exportProfileLoading, setExportProfileLoading] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
+
+  const ownerDisplayBase = useCallback(() => {
+    const company = String(user?.company ?? "").trim();
+    const name = String(user?.name ?? "").trim();
+    return company || name || "Owner";
+  }, [user?.company, user?.name]);
+
+  const buildExportFromLine = useCallback(
+    (baseName: string, showPhone: boolean, phoneValue: string) => {
+      const base = baseName.trim() || ownerDisplayBase();
+      const phone = phoneValue.trim();
+      if (showPhone && phone) return `${base} - ${phone}`;
+      return base;
+    },
+    [ownerDisplayBase],
+  );
+
+  const buildDefaultBulkPdfFileName = useCallback(
+    (start: string, end: string) => {
+      const today = new Date().toISOString().split("T")[0];
+      const agencyPart = (agencyName || "Agency").replace(/\s+/g, "_");
+      const rangePart =
+        start || end ? `${start || "from"}_${end || "to"}` : "all";
+      return `BulkTrips_${agencyPart}_${rangePart}_${today}.pdf`;
+    },
+    [agencyName],
+  );
+
+  const openBulkExportModal = useCallback(async () => {
+    setExportError(null);
+    setExportFileName(
+      buildDefaultBulkPdfFileName(exportStartDate, exportEndDate),
+    );
+    setExportFromName(ownerDisplayBase());
+    setExportOwnerPhone(String(user?.phone ?? "").trim());
+    setExportShowPhone(true);
+    setExportOpen(true);
+    setExportProfileLoading(true);
+    try {
+      const profile = await authApi.getOwnerProfile();
+      const company = String(profile.company ?? "").trim();
+      const name = String(profile.name ?? "").trim();
+      const phone = String(profile.phone ?? "").trim();
+      setExportFromName(company || name || ownerDisplayBase());
+      setExportOwnerPhone(phone);
+      try {
+        const raw = localStorage.getItem("userData");
+        const prev = raw ? JSON.parse(raw) : {};
+        const next = {
+          ...prev,
+          id: profile.id || prev.id || prev._id || "",
+          name: name || prev.name || "",
+          email: profile.email || prev.email || "",
+          company,
+          phone,
+          role: prev.role || "owner",
+        };
+        localStorage.setItem("userData", JSON.stringify(next));
+      } catch {
+        // ignore localStorage sync errors
+      }
+    } catch {
+      // Keep fallback values from auth user if profile fetch fails
+    } finally {
+      setExportProfileLoading(false);
+    }
+  }, [
+    buildDefaultBulkPdfFileName,
+    exportEndDate,
+    exportStartDate,
+    ownerDisplayBase,
+    user?.phone,
+  ]);
 
   const buildBulkExportGroups = useCallback(
     (start: string, end: string) => {
@@ -1491,14 +1624,16 @@ function BulkEntryTable({
       return;
     }
 
-    const today = new Date().toISOString().split("T")[0];
-    const agencyPart = (agencyName || "Agency").replace(/\s+/g, "_");
-    const rangePart =
-      start || end ? `${start || "from"}_${end || "to"}` : "all";
-    const fileName = `BulkTrips_${agencyPart}_${rangePart}_${today}.pdf`;
+    const trimmedName = exportFileName.trim();
+    if (!trimmedName) {
+      setExportError("Please enter a PDF file name.");
+      return;
+    }
+    const safeBase = trimmedName.replace(/[<>:"/\\|?*\u0000-\u001F]/g, "_");
+    const fileName = /\.pdf$/i.test(safeBase) ? safeBase : `${safeBase}.pdf`;
 
     generateBulkTripsPDF(
-      user?.name || "Owner",
+      buildExportFromLine(exportFromName, exportShowPhone, exportOwnerPhone),
       agencyName || "Agency",
       fileName,
       reportGroups,
@@ -1508,17 +1643,21 @@ function BulkEntryTable({
   }, [
     agencyName,
     buildBulkExportGroups,
+    buildExportFromLine,
     exportEndDate,
+    exportFileName,
+    exportFromName,
+    exportOwnerPhone,
+    exportShowPhone,
     exportStartDate,
-    user?.name,
   ]);
   const updateGroupField = useCallback(
     (gi: number, field: keyof DriverGroup, val: any) => {
       onChange((prev) => {
-        const next = [...prev];
+      const next = [...prev];
         next[gi] = { ...next[gi], [field]: val };
-        return next;
-      });
+      return next;
+    });
     },
     [onChange],
   );
@@ -1526,7 +1665,7 @@ function BulkEntryTable({
   const toggleComplete = useCallback(
     (gi: number, ri: number) => {
       onChange((prev) => {
-        const next = [...prev];
+      const next = [...prev];
         next[gi] = { ...next[gi], rows: [...next[gi].rows] };
         next[gi].rows[ri] = {
           ...next[gi].rows[ri],
@@ -1545,25 +1684,25 @@ function BulkEntryTable({
         next[gi] = { ...next[gi], rows: [...next[gi].rows] };
         const row = { ...next[gi].rows[ri], [field]: val };
 
-        // Auto-calculate distance
+      // Auto-calculate distance
         if (field === "startKm" || field === "endKm") {
-          const skm = Number(row.startKm) || 0;
-          const ekm = Number(row.endKm) || 0;
-          row.distance = ekm > skm ? ekm - skm : 0;
-        }
+        const skm = Number(row.startKm) || 0;
+        const ekm = Number(row.endKm) || 0;
+        row.distance = ekm > skm ? ekm - skm : 0;
+      }
 
-        // Auto-calculate hours
+      // Auto-calculate hours
         if (field === "startTime" || field === "endTime") {
           const [sh, sm] = (row.startTime || "00:00").split(":").map(Number);
           const [eh, em] = (row.endTime || "00:00").split(":").map(Number);
-          if (!isNaN(sh) && !isNaN(sm) && !isNaN(eh) && !isNaN(em)) {
+        if (!isNaN(sh) && !isNaN(sm) && !isNaN(eh) && !isNaN(em)) {
             let mins = eh * 60 + em - (sh * 60 + sm);
-            if (mins < 0) mins += 24 * 60; // handle overnight trips
-            row.hours = Number((mins / 60).toFixed(2));
-          } else {
-            row.hours = 0;
-          }
+          if (mins < 0) mins += 24 * 60; // handle overnight trips
+          row.hours = Number((mins / 60).toFixed(2));
+        } else {
+          row.hours = 0;
         }
+      }
 
         next[gi].rows[ri] = row;
 
@@ -1578,8 +1717,8 @@ function BulkEntryTable({
           });
         }
 
-        return next;
-      });
+      return next;
+    });
     },
     [onChange],
   );
@@ -1587,10 +1726,10 @@ function BulkEntryTable({
   const addRow = useCallback(
     (gi: number) => {
       onChange((prev) => {
-        const next = [...prev];
-        next[gi] = { ...next[gi], rows: [...next[gi].rows, emptyBulkRow()] };
-        return next;
-      });
+      const next = [...prev];
+      next[gi] = { ...next[gi], rows: [...next[gi].rows, emptyBulkRow()] };
+      return next;
+    });
     },
     [onChange],
   );
@@ -1598,7 +1737,7 @@ function BulkEntryTable({
   const removeRow = useCallback(
     (gi: number, rowId: string) => {
       onChange((prev) => {
-        const next = [...prev];
+      const next = [...prev];
         if (next[gi].rows.length <= 1) {
           next[gi] = { ...next[gi], rows: [emptyBulkRow()] };
           return next;
@@ -1607,8 +1746,8 @@ function BulkEntryTable({
           ...next[gi],
           rows: next[gi].rows.filter((r) => r.clientRowId !== rowId),
         };
-        return next;
-      });
+      return next;
+    });
     },
     [onChange],
   );
@@ -1670,8 +1809,7 @@ function BulkEntryTable({
         <div className="flex justify-end mb-2">
           <button
             onClick={() => {
-              setExportError(null);
-              setExportOpen(true);
+              void openBulkExportModal();
             }}
             className="flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-100 transition shadow-sm"
           >
@@ -1724,6 +1862,74 @@ function BulkEntryTable({
               </div>
             </div>
 
+            <div>
+              <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1">
+                From
+              </label>
+              <input
+                type="text"
+                value={exportFromName}
+                onChange={(e) => setExportFromName(e.target.value)}
+                placeholder="Company or owner name"
+                className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-200 bg-white"
+              />
+              <label className="mt-2 flex items-center gap-2 text-sm text-slate-700 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={exportShowPhone}
+                  onChange={(e) => setExportShowPhone(e.target.checked)}
+                  className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                />
+                Show phone number after From name
+              </label>
+              {exportShowPhone && (
+                <div className="mt-2">
+                  <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1">
+                    Phone Number
+                  </label>
+                  <input
+                    type="text"
+                    value={exportOwnerPhone}
+                    onChange={(e) => setExportOwnerPhone(e.target.value)}
+                    placeholder={
+                      exportProfileLoading
+                        ? "Loading phone…"
+                        : "Owner phone number"
+                    }
+                    className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-200 bg-white"
+                  />
+                </div>
+              )}
+              <p className="mt-1.5 text-[11px] text-slate-500">
+                PDF will show:{" "}
+                <span className="font-semibold text-slate-700">
+                  From:{" "}
+                  {buildExportFromLine(
+                    exportFromName,
+                    exportShowPhone,
+                    exportOwnerPhone,
+                  )}
+                </span>
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1">
+                PDF File Name
+              </label>
+              <input
+                type="text"
+                value={exportFileName}
+                onChange={(e) => setExportFileName(e.target.value)}
+                placeholder="e.g. BulkTrips_Agency_all_2026-09-07.pdf"
+                className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-200 bg-white"
+              />
+              <p className="mt-1 text-[11px] text-slate-500">
+                Change the download name if needed. `.pdf` is added automatically
+                when missing.
+              </p>
+            </div>
+
             {exportError && (
               <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs font-semibold text-red-700">
                 {exportError}
@@ -1736,6 +1942,10 @@ function BulkEntryTable({
                 onClick={() => {
                   setExportStartDate("");
                   setExportEndDate("");
+                  setExportFileName(buildDefaultBulkPdfFileName("", ""));
+                  setExportFromName(ownerDisplayBase());
+                  setExportOwnerPhone(String(user?.phone ?? "").trim());
+                  setExportShowPhone(true);
                   setExportError(null);
                 }}
                 className="flex-1 rounded-xl border border-slate-200 bg-white py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50"
@@ -1801,7 +2011,7 @@ function BulkEntryTable({
                   placeholder="Select driver"
                   className="min-w-0 flex-1 sm:w-[180px]"
                 />
-              </div>
+            </div>
               <button
                 type="button"
                 onClick={() => deleteServerGroup(gi)}
@@ -1823,7 +2033,7 @@ function BulkEntryTable({
                   placeholder="KL01..."
                   className="min-w-0 flex-1 sm:w-[140px]"
                 />
-              </div>
+            </div>
             </div>
             <button
               type="button"
@@ -2858,11 +3068,11 @@ export function BulkEntryPage() {
   // ── Backend sync callbacks (stable refs) ──
   const syncBulkToBackend = useCallback(
     async (groups: DriverGroup[]) => {
-      if (!selectedAgency) return;
+    if (!selectedAgency) return;
       const validGroups = groups.filter(
         (g) => g.driverName.trim() && g.vehicleNumber.trim(),
       );
-      if (validGroups.length === 0) return;
+    if (validGroups.length === 0) return;
       const res = await syncBulkEntry({
         agencyId: selectedAgency._id ?? selectedAgency.id,
         agencyName: selectedAgency.name,
@@ -2892,11 +3102,11 @@ export function BulkEntryPage() {
 
   const syncNormalToBackend = useCallback(
     async (entries: NormalEntryRow[]) => {
-      if (!selectedAgency) return;
+    if (!selectedAgency) return;
       const validEntries = entries.filter(
         (e) => e.driverName.trim() && e.vehicleNumber.trim(),
       );
-      if (validEntries.length === 0) return;
+    if (validEntries.length === 0) return;
       const res = await syncNormalEntry({
         agencyId: selectedAgency._id ?? selectedAgency.id,
         agencyName: selectedAgency.name,
@@ -3038,29 +3248,29 @@ export function BulkEntryPage() {
           }
           const serverGroups: DriverGroup[] = Object.values(grouped).map(
             (grp) => {
-              const first = grp[0];
-              return {
+            const first = grp[0];
+            return {
                 driverName: first.driverName || "",
                 vehicleNumber: first.vehicleNumber || "",
                 rows: grp.map((t) => ({
                   // Preserve server clientRowId so refresh can dedupe against local drafts
                   clientRowId: (t as any).clientRowId ?? nextRowId(),
-                  _id: t._id ?? t.id,
+                _id: t._id ?? t.id,
                   startDate: t.startDate ? t.startDate.split("T")[0] : "",
                   endDate: t.endDate ? t.endDate.split("T")[0] : "",
                   startKm: String(t.startKm ?? ""),
                   endKm: String(t.endKm ?? ""),
                   startTime: t.startTime || "",
                   endTime: t.endTime || "",
-                  distance: Number(t.distance ?? 0),
-                  hours: Number(t.hours ?? 0),
-                  toll: Number(t.toll ?? 0),
+                distance: Number(t.distance ?? 0),
+                hours: Number(t.hours ?? 0),
+                toll: Number(t.toll ?? 0),
                   advancePaid: Number(t.advancePaid ?? 0),
-                  grandTotal: Number(t.grandTotal ?? 0),
+                grandTotal: Number(t.grandTotal ?? 0),
                   notes: t.notes || "",
                   isCompleted: !!t.isCompleted,
-                })),
-              };
+              })),
+            };
             },
           );
           setBulkGroupsRaw((prev) => {

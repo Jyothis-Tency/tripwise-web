@@ -87,6 +87,8 @@ export interface HistoryPaymentSummary {
   totalAmount: number;
   totalPaid: number;
   totalOutstanding: number;
+  totalReceived?: number;
+  totalRemaining?: number;
 }
 
 export interface HistoryParams {

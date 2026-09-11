@@ -102,6 +102,26 @@ function bulkRowDayKey(startDate: string): string {
   return new Date(t).toISOString().slice(0, 10);
 }
 
+function bulkRowDateMs(startDate: string): number {
+  const key = bulkRowDayKey(startDate);
+  if (!key) return Number.POSITIVE_INFINITY;
+  const t = new Date(`${key}T00:00:00`).getTime();
+  return Number.isFinite(t) ? t : Number.POSITIVE_INFINITY;
+}
+
+/** Oldest start date first; blank dates last. Same date: lower start KM first. */
+function sortBulkRowsByDate(rows: BulkTripRow[]): BulkTripRow[] {
+  return [...rows].sort((a, b) => {
+    const da = bulkRowDateMs(a.startDate ?? "");
+    const db = bulkRowDateMs(b.startDate ?? "");
+    if (da !== db) return da - db;
+    const ka = Number(a.startKm) || 0;
+    const kb = Number(b.startKm) || 0;
+    if (ka !== kb) return ka - kb;
+    return String(a.clientRowId ?? "").localeCompare(String(b.clientRowId ?? ""));
+  });
+}
+
 /** Advance is editable only on the first row for each calendar day in a driver group. */
 function isAdvanceEditableRow(rows: BulkTripRow[], ri: number): boolean {
   if (ri < 0 || ri >= rows.length) return false;
@@ -125,23 +145,24 @@ function normalizeBulkGroups(groups: any[]): DriverGroup[] {
   return (groups || []).map((group) => {
     const fallbackAdvance = Number(group?.advancePaid) || 0;
     const rows = Array.isArray(group?.rows) ? group.rows : [];
+    const mappedRows = rows.length
+      ? rows.map((row: any, idx: number) => ({
+          ...emptyBulkRow(),
+          ...row,
+          advancePaid:
+            row?.advancePaid !== undefined
+              ? Number(row.advancePaid) || 0
+              : idx === 0
+                ? fallbackAdvance
+                : 0,
+        }))
+      : [emptyBulkRow()];
     return {
       driverName: group?.driverName || "",
       driverId: group?.driverId,
       driverPhone: group?.driverPhone,
       vehicleNumber: group?.vehicleNumber || "",
-      rows: rows.length
-        ? rows.map((row: any, idx: number) => ({
-            ...emptyBulkRow(),
-            ...row,
-            advancePaid:
-              row?.advancePaid !== undefined
-                ? Number(row.advancePaid) || 0
-                : idx === 0
-                  ? fallbackAdvance
-                  : 0,
-          }))
-        : [emptyBulkRow()],
+      rows: sortBulkRowsByDate(mappedRows),
     };
   });
 }
@@ -1592,8 +1613,10 @@ function BulkEntryTable({
       return groups
         .map((g) => ({
           ...g,
-          rows: (g.rows ?? []).filter(
-            (r) => !isRowHidden(r.isCompleted) && dateOk(r.startDate),
+          rows: sortBulkRowsByDate(
+            (g.rows ?? []).filter(
+              (r) => !isRowHidden(r.isCompleted) && dateOk(r.startDate),
+            ),
           ),
         }))
         .filter((g) => (g.rows ?? []).length > 0);
@@ -1705,6 +1728,10 @@ function BulkEntryTable({
       }
 
         next[gi].rows[ri] = row;
+
+        if (field === "startDate") {
+          next[gi].rows = sortBulkRowsByDate(next[gi].rows);
+        }
 
         // One advance per driver/vehicle/day — clear stray values on non-first rows
         if (field === "startDate" || field === "advancePaid") {
@@ -3029,7 +3056,13 @@ export function BulkEntryPage() {
   // Functional updater wrappers — allow children to pass updater functions
   const setBulkGroups = useCallback(
     (updater: DriverGroup[] | ((prev: DriverGroup[]) => DriverGroup[])) => {
-      setBulkGroupsRaw(typeof updater === "function" ? updater : () => updater);
+      setBulkGroupsRaw((prev) => {
+        const next = typeof updater === "function" ? updater(prev) : updater;
+        return (next || []).map((g) => ({
+          ...g,
+          rows: sortBulkRowsByDate(g.rows?.length ? g.rows : [emptyBulkRow()]),
+        }));
+      });
     },
     [],
   );
@@ -3252,7 +3285,7 @@ export function BulkEntryPage() {
             return {
                 driverName: first.driverName || "",
                 vehicleNumber: first.vehicleNumber || "",
-                rows: grp.map((t) => ({
+                rows: sortBulkRowsByDate(grp.map((t) => ({
                   // Preserve server clientRowId so refresh can dedupe against local drafts
                   clientRowId: (t as any).clientRowId ?? nextRowId(),
                 _id: t._id ?? t.id,
@@ -3269,7 +3302,7 @@ export function BulkEntryPage() {
                 grandTotal: Number(t.grandTotal ?? 0),
                   notes: t.notes || "",
                   isCompleted: !!t.isCompleted,
-              })),
+              }))),
             };
             },
           );
@@ -3331,7 +3364,10 @@ export function BulkEntryPage() {
               existingRowKeysByGroup.set(k, seen);
             }
 
-            const merged = Array.from(outByKey.values());
+            const merged = Array.from(outByKey.values()).map((g) => ({
+              ...g,
+              rows: sortBulkRowsByDate(g.rows),
+            }));
             const hasAnyData = merged.some(
               (g) =>
                 g.driverName.trim() ||
@@ -3494,7 +3530,11 @@ export function BulkEntryPage() {
       `${LS_BULK_PREFIX}${id}`,
       [],
     );
-    setBulkGroupsRaw(savedBulk.length > 0 ? savedBulk : [emptyDriverGroup()]);
+    setBulkGroupsRaw(
+      savedBulk.length > 0
+        ? normalizeBulkGroups(savedBulk)
+        : [emptyDriverGroup()],
+    );
     const savedNormal = loadFromLocalStorage<NormalEntryRow[]>(
       `${LS_NORMAL_PREFIX}${id}`,
       [],

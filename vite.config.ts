@@ -11,4 +11,8 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
     },
   },
+  server: {
+    // Cloudflare quick tunnels use random *.trycloudflare.com hosts
+    allowedHosts: true,
+  },
 });

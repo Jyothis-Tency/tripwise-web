@@ -180,6 +180,14 @@ export function DriverPayModal({
 
     const bataRemaining = detail.summary.vehicleBata.remaining;
     const bulkRemaining = detail.summary.bulkAdvance.remaining;
+    const maxPayable = bataRemaining + bulkRemaining;
+
+    if (amt > maxPayable + 0.01) {
+      setPayMessage(
+        `Amount exceeds payable balance (₹${maxPayable.toLocaleString("en-IN")}).`,
+      );
+      return;
+    }
 
     setPaySaving(true);
     setPayMessage(null);
@@ -214,15 +222,6 @@ export function DriverPayModal({
           notes: payNotes,
         });
         left -= pay;
-      }
-
-      if (left > 0) {
-        await createSalaryTransaction(driverId, {
-          type: "salary",
-          amount: left,
-          date: payDate,
-          notes: payNotes,
-        });
       }
 
       onSuccess();

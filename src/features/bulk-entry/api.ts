@@ -299,8 +299,18 @@ export interface PayoutPayment {
 
 export interface AgencyPayoutSummary {
   grandTotal: number;
+  /** Advances on trips in the selected period */
+  totalAdvance: number;
+  /** Agency receipt payments only (does not include advances) */
   totalReceived: number;
+  /** advance + payments */
+  totalApplied?: number;
   remaining: number;
+  overpaid?: number;
+  month?: string;
+  monthLabel?: string;
+  agencyRemainingAllTime?: number;
+  agencyOverpaidAllTime?: number;
   payments: PayoutPayment[];
 }
 

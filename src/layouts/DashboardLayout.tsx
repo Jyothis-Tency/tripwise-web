@@ -6,6 +6,7 @@ import { useAuth } from '../hooks/useAuth';
 
 const routeTitle: Record<string, string> = {
   '/': 'Dashboard',
+  '/profile': 'Owner Profile',
   '/vehicles': 'Trip Details',
   '/create-trip': 'Create New Trip',
   '/trips': 'Create New Trip',
@@ -15,6 +16,8 @@ const routeTitle: Record<string, string> = {
   '/history': 'History',
   '/history/payout': 'Agency Payout',
   '/cash-in-cash-out': 'Cash In / Cash Out',
+  '/transaction': 'Transaction',
+  '/transaction-history': 'Transaction History',
   '/reports': 'Reports',
   '/analytics': 'Analytics',
   '/pl': 'P&L',
@@ -31,7 +34,7 @@ const routeBreadcrumbs: Record<string, { label: string; to?: string }[]> = {
   ],
 };
 
-const fullHeightPaths = ['/vehicles', '/drivers', '/tracking', '/create-trip', '/expenses', '/cash-in-cash-out', '/reports'];
+const fullHeightPaths = ['/vehicles', '/drivers', '/tracking', '/create-trip', '/expenses', '/cash-in-cash-out', '/transaction', '/transaction-history', '/reports'];
 
 export function DashboardLayout() {
   const { pathname } = useLocation();

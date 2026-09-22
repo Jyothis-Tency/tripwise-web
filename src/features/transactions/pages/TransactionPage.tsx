@@ -1,0 +1,533 @@
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import {
+  ArrowDownLeft,
+  ArrowUpRight,
+  Building2,
+  CheckCircle2,
+  Loader2,
+  User,
+  Wallet,
+} from "lucide-react";
+import {
+  fetchAgencies,
+  fetchDrivers,
+  fetchCashInCashOutDriverDetail,
+  addAgencyPayoutPayment,
+  addDriverPayoutPayment,
+  recordAgencyProfitPayout,
+  createSalaryTransaction,
+  type Agency,
+  type Driver,
+  type DriverCashInCashOutDetail,
+} from "../api";
+import { FilterLabel, SearchInput } from "../components/FilterControls";
+
+type EntityType = "agency" | "driver";
+type CashKind = "cash_in" | "cash_out";
+
+const PAYMENT_METHODS = [
+  { value: "cash", label: "Cash" },
+  { value: "bank_transfer", label: "Bank Transfer" },
+  { value: "cheque", label: "Cheque" },
+  { value: "online", label: "Online" },
+  { value: "upi", label: "UPI" },
+  { value: "other", label: "Other" },
+] as const;
+
+const fieldCls =
+  "w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100";
+
+function driverDisplayName(d: Driver) {
+  const full = (d as { fullName?: string }).fullName?.trim();
+  if (full) return full;
+  return `${d.firstName ?? ""} ${d.lastName ?? ""}`.trim() || "Driver";
+}
+
+function pickAgencyIdForDriverBulkPayout(
+  detail: DriverCashInCashOutDetail,
+  agencies: Agency[],
+): string | null {
+  const fromTrips = detail.tables.bulkTripsAdvance.find((t) => t.agencyId);
+  if (fromTrips?.agencyId) return fromTrips.agencyId;
+  const fromPay = detail.tables.bulkAdvancePayouts.find((t) => t.agencyId);
+  if (fromPay?.agencyId) return fromPay.agencyId;
+  return agencies[0]?._id ?? agencies[0]?.id ?? null;
+}
+
+function FieldLabel({ children }: { children: ReactNode }) {
+  return <FilterLabel>{children}</FilterLabel>;
+}
+
+export function TransactionPage() {
+  const [entityType, setEntityType] = useState<EntityType>("agency");
+  const [nameQuery, setNameQuery] = useState("");
+  const [selectedId, setSelectedId] = useState("");
+  const [cashKind, setCashKind] = useState<CashKind>("cash_in");
+  const [amount, setAmount] = useState("");
+  const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [method, setMethod] = useState("cash");
+  const [notes, setNotes] = useState("");
+  const [agencies, setAgencies] = useState<Agency[]>([]);
+  const [drivers, setDrivers] = useState<Driver[]>([]);
+  const [loadingLists, setLoadingLists] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+  const [success, setSuccess] = useState(false);
+
+  const loadLists = useCallback(async () => {
+    setLoadingLists(true);
+    try {
+      const [a, d] = await Promise.all([
+        fetchAgencies(1, 200),
+        fetchDrivers({ page: 1, limit: 200, blockFilter: "unblocked" }),
+      ]);
+      setAgencies(a.agencies);
+      setDrivers(d.drivers);
+    } catch {
+      setMessage("Failed to load agencies / drivers.");
+    } finally {
+      setLoadingLists(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadLists();
+  }, [loadLists]);
+
+  useEffect(() => {
+    setSelectedId("");
+    setNameQuery("");
+    setMessage(null);
+    setSuccess(false);
+    setCashKind(entityType === "driver" ? "cash_out" : "cash_in");
+  }, [entityType]);
+
+  const nameOptions = useMemo(() => {
+    const q = nameQuery.trim().toLowerCase();
+    if (entityType === "agency") {
+      return agencies
+        .map((a) => ({
+          id: a._id ?? a.id ?? "",
+          label: a.name,
+          sub: a.phone || "Agency",
+        }))
+        .filter((o) => o.id && (!q || o.label.toLowerCase().includes(q)));
+    }
+    return drivers
+      .map((d) => ({
+        id: d._id,
+        label: driverDisplayName(d),
+        sub: d.phone || "Driver",
+      }))
+      .filter(
+        (o) =>
+          o.id &&
+          (!q ||
+            o.label.toLowerCase().includes(q) ||
+            o.sub.toLowerCase().includes(q)),
+      );
+  }, [entityType, agencies, drivers, nameQuery]);
+
+  const selected = nameOptions.find((o) => o.id === selectedId);
+
+  const directionHint =
+    entityType === "agency"
+      ? cashKind === "cash_in"
+        ? "Money received from agency"
+        : "Money paid to agency"
+      : cashKind === "cash_in"
+        ? "Advance given to driver"
+        : "Salary / bata payment to driver";
+
+  const submit = async () => {
+    setMessage(null);
+    setSuccess(false);
+    const amt = Number(amount);
+    if (!selectedId) {
+      setMessage(
+        `Select ${entityType === "agency" ? "an agency" : "a driver"}.`,
+      );
+      return;
+    }
+    if (!amt || amt <= 0) {
+      setMessage("Enter a valid amount.");
+      return;
+    }
+
+    setSaving(true);
+    try {
+      if (entityType === "agency") {
+        if (cashKind === "cash_in") {
+          await addAgencyPayoutPayment(selectedId, {
+            amount: amt,
+            paymentDate: date,
+            paymentMethod: method,
+            notes,
+          });
+        } else {
+          await recordAgencyProfitPayout(selectedId, {
+            amount: amt,
+            paymentDate: date,
+            paymentMethod: method,
+            notes,
+          });
+        }
+      } else if (cashKind === "cash_in") {
+        await createSalaryTransaction(selectedId, {
+          type: "advance",
+          amount: amt,
+          date,
+          notes: notes.trim() || "Advance",
+        });
+      } else {
+        const detail = await fetchCashInCashOutDriverDetail(selectedId);
+        let left = amt;
+        const bataRemaining = detail.summary.vehicleBata.remaining;
+        const bulkRemaining = detail.summary.bulkAdvance.remaining;
+        const maxPayable = bataRemaining + bulkRemaining;
+
+        if (amt > maxPayable + 0.01) {
+          throw new Error(
+            `Amount exceeds payable balance (₹${maxPayable.toLocaleString("en-IN")}). Bata ₹${bataRemaining.toLocaleString("en-IN")} + bulk advance ₹${bulkRemaining.toLocaleString("en-IN")}.`,
+          );
+        }
+
+        // Waterfall: vehicle bata first, then bulk advance payout (matches CICO).
+        if (left > 0 && bataRemaining > 0) {
+          const pay = Math.min(left, bataRemaining);
+          await createSalaryTransaction(selectedId, {
+            type: "salary",
+            amount: pay,
+            date,
+            notes,
+          });
+          left -= pay;
+        }
+
+        if (left > 0 && bulkRemaining > 0) {
+          const agencyId = pickAgencyIdForDriverBulkPayout(detail, agencies);
+          if (!agencyId) {
+            throw new Error(
+              "Could not record advance payout: no agency linked. Link a trip to an agency first.",
+            );
+          }
+          const pay = Math.min(left, bulkRemaining);
+          await addDriverPayoutPayment(agencyId, {
+            driverName: detail.driver.displayName,
+            amount: pay,
+            paymentDate: date,
+            paymentMethod: method,
+            notes,
+          });
+          left -= pay;
+        }
+      }
+
+      setSuccess(true);
+      setAmount("");
+      setNotes("");
+      setMessage("Transaction recorded successfully.");
+    } catch (e: unknown) {
+      const msg =
+        (e as { message?: string })?.message ||
+        (e as { response?: { data?: { message?: string } } })?.response?.data
+          ?.message ||
+        "Failed to record transaction.";
+      setMessage(msg);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="flex h-full flex-col overflow-hidden bg-slate-50">
+      <div className="mx-auto flex h-full w-full max-w-6xl flex-col px-4 py-4 sm:px-6 sm:py-5">
+        <div className="mb-4 flex shrink-0 items-start gap-3">
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue-600 text-white shadow-sm">
+            <Wallet className="h-5 w-5" />
+          </div>
+          <div>
+            <h1 className="text-xl font-bold text-slate-900">Transaction</h1>
+            <p className="mt-0.5 text-sm text-slate-500">
+              Record cash in or cash out for an agency or driver.
+            </p>
+          </div>
+        </div>
+
+        {loadingLists ? (
+          <div className="flex flex-1 items-center justify-center rounded-2xl border border-slate-200 bg-white">
+            <Loader2 className="h-7 w-7 animate-spin text-blue-500" />
+          </div>
+        ) : (
+          <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 md:grid-cols-2 md:gap-5">
+            {/* Left: who */}
+            <section className="flex min-h-0 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+              <div className="shrink-0 border-b border-slate-100 px-4 py-3 sm:px-5">
+                <h2 className="text-sm font-semibold text-slate-800">Party</h2>
+                <p className="text-xs text-slate-400">
+                  Choose agency or driver
+                </p>
+              </div>
+
+              <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden p-4 sm:p-5">
+                <div
+                  className="grid shrink-0 grid-cols-2 rounded-full border border-slate-200 bg-slate-100 p-1"
+                  role="tablist"
+                >
+                  {(
+                    [
+                      ["agency", "Agency", Building2],
+                      ["driver", "Driver", User],
+                    ] as const
+                  ).map(([id, label, Icon]) => (
+                    <button
+                      key={id}
+                      type="button"
+                      role="tab"
+                      aria-selected={entityType === id}
+                      onClick={() => setEntityType(id)}
+                      className={`flex h-9 items-center justify-center gap-2 rounded-full text-sm font-semibold transition ${
+                        entityType === id
+                          ? "bg-white text-blue-600 shadow-sm"
+                          : "bg-transparent text-slate-500 hover:text-slate-700"
+                      }`}
+                    >
+                      <Icon className="h-4 w-4" />
+                      {label}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="shrink-0">
+                  <FieldLabel>
+                    Search {entityType === "agency" ? "agency" : "driver"}
+                  </FieldLabel>
+                  <SearchInput
+                    value={nameQuery}
+                    onChange={setNameQuery}
+                    placeholder={
+                      entityType === "agency"
+                        ? "Search by name or phone…"
+                        : "Search by name or phone…"
+                    }
+                    resultCount={nameOptions.length}
+                  />
+                </div>
+
+                <div className="min-h-0 flex-1 space-y-1.5 overflow-y-auto rounded-xl border border-slate-100 bg-slate-50/70 p-1.5">
+                  {nameOptions.length === 0 ? (
+                    <p className="px-3 py-8 text-center text-xs text-slate-400">
+                      No matches
+                    </p>
+                  ) : (
+                    nameOptions.map((o) => {
+                      const sel = o.id === selectedId;
+                      return (
+                        <button
+                          key={o.id}
+                          type="button"
+                          onClick={() => setSelectedId(o.id)}
+                          className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition ${
+                            sel
+                              ? "border border-blue-300 bg-blue-50 shadow-sm"
+                              : "border border-transparent bg-white hover:border-slate-200"
+                          }`}
+                        >
+                          <div
+                            className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${
+                              entityType === "agency"
+                                ? "bg-blue-100 text-blue-600"
+                                : "bg-violet-100 text-violet-600"
+                            }`}
+                          >
+                            {entityType === "agency" ? (
+                              <Building2 className="h-4 w-4" />
+                            ) : (
+                              <User className="h-4 w-4" />
+                            )}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-sm font-semibold text-slate-900">
+                              {o.label}
+                            </p>
+                            <p className="truncate text-xs text-slate-400">
+                              {o.sub}
+                            </p>
+                          </div>
+                          {sel && (
+                            <CheckCircle2 className="h-4 w-4 shrink-0 text-blue-500" />
+                          )}
+                        </button>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+            </section>
+
+            {/* Right: payment */}
+            <section className="flex min-h-0 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+              <div className="shrink-0 border-b border-slate-100 px-4 py-3 sm:px-5">
+                <h2 className="text-sm font-semibold text-slate-800">
+                  Payment details
+                </h2>
+                <p className="truncate text-xs text-slate-400">
+                  {selected
+                    ? `For ${selected.label}`
+                    : "Select a party on the left first"}
+                </p>
+              </div>
+
+              <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4 sm:p-5">
+                <div>
+                  <FieldLabel>Direction</FieldLabel>
+                  <div className="grid grid-cols-2 gap-2">
+                    {entityType === "agency" ? (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => setCashKind("cash_in")}
+                          className={`flex items-center justify-center gap-2 rounded-xl border px-3 py-3 text-sm font-semibold transition ${
+                            cashKind === "cash_in"
+                              ? "border-emerald-400 bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200"
+                              : "border-slate-200 bg-white text-slate-500 hover:bg-slate-50"
+                          }`}
+                        >
+                          <ArrowDownLeft className="h-4 w-4" />
+                          Cash In
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setCashKind("cash_out")}
+                          className={`flex items-center justify-center gap-2 rounded-xl border px-3 py-3 text-sm font-semibold transition ${
+                            cashKind === "cash_out"
+                              ? "border-amber-400 bg-amber-50 text-amber-700 ring-1 ring-amber-200"
+                              : "border-slate-200 bg-white text-slate-500 hover:bg-slate-50"
+                          }`}
+                        >
+                          <ArrowUpRight className="h-4 w-4" />
+                          Cash Out
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => setCashKind("cash_out")}
+                          className={`flex items-center justify-center gap-2 rounded-xl border px-3 py-3 text-sm font-semibold transition ${
+                            cashKind === "cash_out"
+                              ? "border-amber-400 bg-amber-50 text-amber-700 ring-1 ring-amber-200"
+                              : "border-slate-200 bg-white text-slate-500 hover:bg-slate-50"
+                          }`}
+                        >
+                          <ArrowUpRight className="h-4 w-4" />
+                          Cash Out
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setCashKind("cash_in")}
+                          className={`flex items-center justify-center gap-2 rounded-xl border px-3 py-3 text-sm font-semibold transition ${
+                            cashKind === "cash_in"
+                              ? "border-sky-400 bg-sky-50 text-sky-700 ring-1 ring-sky-200"
+                              : "border-slate-200 bg-white text-slate-500 hover:bg-slate-50"
+                          }`}
+                        >
+                          <Wallet className="h-4 w-4" />
+                          Advance
+                        </button>
+                      </>
+                    )}
+                  </div>
+                  <p className="mt-2 text-xs text-slate-400">{directionHint}</p>
+                </div>
+
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <div>
+                    <FieldLabel>Amount (₹)</FieldLabel>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={amount}
+                      onChange={(e) => setAmount(e.target.value)}
+                      placeholder="0"
+                      className={fieldCls}
+                    />
+                  </div>
+                  <div>
+                    <FieldLabel>Date</FieldLabel>
+                    <input
+                      type="date"
+                      value={date}
+                      onChange={(e) => setDate(e.target.value)}
+                      className={fieldCls}
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <FieldLabel>Method</FieldLabel>
+                  <select
+                    value={method}
+                    onChange={(e) => setMethod(e.target.value)}
+                    className={fieldCls}
+                  >
+                    {PAYMENT_METHODS.map((m) => (
+                      <option key={m.value} value={m.value}>
+                        {m.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <FieldLabel>Notes</FieldLabel>
+                  <textarea
+                    value={notes}
+                    onChange={(e) => setNotes(e.target.value)}
+                    rows={3}
+                    placeholder="Optional note…"
+                    className={`${fieldCls} resize-none`}
+                  />
+                </div>
+
+                {message && (
+                  <div
+                    className={`flex items-start gap-2 rounded-xl px-3 py-2.5 text-sm ${
+                      success
+                        ? "border border-emerald-200 bg-emerald-50 text-emerald-800"
+                        : "border border-rose-200 bg-rose-50 text-rose-700"
+                    }`}
+                  >
+                    {success && (
+                      <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
+                    )}
+                    <span>{message}</span>
+                  </div>
+                )}
+
+                <div className="mt-auto pt-1">
+                  <button
+                    type="button"
+                    disabled={saving || !selectedId}
+                    onClick={submit}
+                    className="flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {saving ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Saving…
+                      </>
+                    ) : (
+                      "Save Transaction"
+                    )}
+                  </button>
+                </div>
+              </div>
+            </section>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

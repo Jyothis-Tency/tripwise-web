@@ -524,35 +524,61 @@ function generateAgencyPayoutPDF(
   const doc = new jsPDF("p", "mm", "a4");
   let y = drawPDFHeader(doc, `Agency Payout Report`, ownerName, 0);
 
-  // Agency name
+  // Agency name + period (must match on-screen filter)
   doc.setFont("helvetica", "bold");
   doc.setFontSize(12);
   doc.setTextColor(49, 46, 129);
   doc.text(`Agency: ${agencyName}`, 20, y);
-  y += 14;
+  y += 7;
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(10);
+  doc.setTextColor(71, 85, 105);
+  doc.text(`Period: ${data.monthLabel || "All time"}`, 20, y);
+  y += 6;
+  doc.setFontSize(8);
+  doc.setTextColor(148, 163, 184);
+  doc.text(
+    `Generated: ${new Date().toLocaleString("en-IN")}`,
+    20,
+    y,
+  );
+  y += 10;
 
   // Separator
   const pw = doc.internal.pageSize.getWidth();
   doc.setDrawColor(226, 232, 240);
   doc.line(20, y - 4, pw - 20, y - 4);
 
-  // Summary
+  const advance = data.totalAdvance ?? 0;
+  const received = data.totalReceived ?? 0;
+  const applied = data.totalApplied ?? advance + received;
+  const remaining = data.remaining ?? 0;
+  const overpaid = data.overpaid ?? 0;
+
+  // Summary — same ledger as payout screen
   y = drawSummaryRow(doc, "Grand Total", INR(data.grandTotal), y, true);
-  y = drawSummaryRow(doc, "Total Received", INR(data.totalReceived), y);
-  y = drawSummaryRow(doc, "Remaining Balance", INR(data.remaining), y, true);
+  y = drawSummaryRow(doc, "Total Advance", INR(advance), y);
+  y = drawSummaryRow(doc, "Payments Received", INR(received), y);
+  y = drawSummaryRow(doc, "Total Applied (Advance + Payments)", INR(applied), y);
+  y = drawSummaryRow(doc, "Remaining Balance", INR(remaining), y, true);
+  if (overpaid > 0) {
+    y = drawSummaryRow(doc, "Surplus / Overpaid", INR(overpaid), y);
+  }
   y += 6;
 
   // Status
   const status =
-    data.remaining <= 0
-      ? "FULLY PAID"
-      : data.totalReceived > 0
+    remaining <= 0
+      ? overpaid > 0
+        ? "OVERPAID"
+        : "FULLY PAID"
+      : applied > 0
         ? "PARTIALLY PAID"
         : "UNPAID";
   const statusColor: [number, number, number] =
-    data.remaining <= 0
+    remaining <= 0
       ? [16, 185, 129]
-      : data.totalReceived > 0
+      : applied > 0
         ? [245, 158, 11]
         : [239, 68, 68];
   doc.setFont("helvetica", "bold");
@@ -572,8 +598,9 @@ function generateAgencyPayoutPDF(
   }
 
   drawFooter(doc);
+  const periodTag = (data.month || "all_time").replace(/\s+/g, "_");
   doc.save(
-    `Payout_${agencyName.replace(/\s+/g, "_")}_${new Date().toISOString().split("T")[0]}.pdf`,
+    `Payout_${agencyName.replace(/\s+/g, "_")}_${periodTag}_${new Date().toISOString().split("T")[0]}.pdf`,
   );
 }
 
@@ -972,9 +999,12 @@ function AgencyPayoutTab({
     );
 
   const gt = data?.grandTotal ?? 0;
+  const advance = data?.totalAdvance ?? 0;
   const received = data?.totalReceived ?? 0;
+  const applied = data?.totalApplied ?? advance + received;
   const remaining = data?.remaining ?? 0;
-  const pct = gt > 0 ? Math.min((received / gt) * 100, 100) : 0;
+  const overpaid = data?.overpaid ?? 0;
+  const pct = gt > 0 ? Math.min((applied / gt) * 100, 100) : 0;
 
   return (
     <div className="space-y-5">
@@ -996,8 +1026,8 @@ function AgencyPayoutTab({
         </select>
       </div>
 
-      {/* Summary cards */}
-      <div className="grid grid-cols-3 gap-3">
+      {/* Summary cards — same ledger as PDF */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
           {
             label: "Grand Total",
@@ -1006,19 +1036,32 @@ function AgencyPayoutTab({
             bg: "bg-slate-50 border-slate-200",
           },
           {
-            label: "Received",
+            label: "Advance",
+            value: advance,
+            color: "text-sky-700",
+            bg: "bg-sky-50 border-sky-200",
+          },
+          {
+            label: "Payments",
             value: received,
             color: "text-emerald-700",
             bg: "bg-emerald-50 border-emerald-200",
           },
           {
-            label: "Remaining",
-            value: remaining,
-            color: remaining > 0 ? "text-amber-700" : "text-slate-400",
+            label: remaining > 0 ? "Remaining" : overpaid > 0 ? "Surplus" : "Remaining",
+            value: remaining > 0 ? remaining : overpaid > 0 ? overpaid : 0,
+            color:
+              remaining > 0
+                ? "text-amber-700"
+                : overpaid > 0
+                  ? "text-violet-700"
+                  : "text-slate-400",
             bg:
               remaining > 0
                 ? "bg-amber-50 border-amber-200"
-                : "bg-slate-50 border-slate-200",
+                : overpaid > 0
+                  ? "bg-violet-50 border-violet-200"
+                  : "bg-slate-50 border-slate-200",
           },
         ].map((c) => (
           <div key={c.label} className={`rounded-xl border px-4 py-3 ${c.bg}`}>
@@ -1032,11 +1075,20 @@ function AgencyPayoutTab({
         ))}
       </div>
 
+      {overpaid > 0 && month !== "all_time" && (
+        <p className="text-xs text-violet-700 bg-violet-50 border border-violet-100 rounded-lg px-3 py-2">
+          Payments in this month exceed this month’s trip total by ₹
+          {overpaid.toLocaleString("en-IN")}. Extra cash is applied to earlier dues.
+          Agency overall remaining: ₹
+          {(data?.agencyRemainingAllTime ?? 0).toLocaleString("en-IN")}.
+        </p>
+      )}
+
       {/* Progress bar */}
       {gt > 0 && (
         <div>
           <div className="flex justify-between text-xs text-slate-500 mb-1">
-            <span>Payment Progress</span>
+            <span>Payment Progress (Advance + Payments)</span>
             <span>{pct.toFixed(0)}%</span>
           </div>
           <div className="h-2.5 rounded-full bg-slate-100 overflow-hidden">

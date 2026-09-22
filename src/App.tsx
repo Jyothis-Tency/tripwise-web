@@ -2,6 +2,7 @@ import { Route, Routes, Navigate } from 'react-router-dom';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { LoginPage } from './features/auth/pages/Login';
 import { ForgotPasswordPage } from './features/auth/pages/ForgotPasswordPage';
+import { ProfilePage } from './features/auth/pages/ProfilePage';
 import { DashboardLayout } from './layouts/DashboardLayout';
 import { DashboardPage } from './features/dashboard/pages/DashboardPage';
 import { VehiclesPage } from './features/vehicles/pages/VehiclesPage';
@@ -11,6 +12,8 @@ import { BulkEntryPage } from './features/bulk-entry/pages/BulkEntryPage';
 import { HistoryPage } from './features/history/pages/HistoryPage';
 import { HistoryPayoutPage } from './features/history/pages/HistoryPayoutPage';
 import { CashInCashOutPage } from './features/cash-in-cash-out/pages/CashInCashOutPage';
+import { TransactionPage } from './features/transactions/pages/TransactionPage';
+import { TransactionHistoryPage } from './features/transactions/pages/TransactionHistoryPage';
 import DriversPage from './features/drivers/pages/DriversPage';
 import RemindersPage from './features/reminders/pages/RemindersPage';
 import ExpensesPage from './features/expenses/pages/ExpensesPage';
@@ -33,6 +36,7 @@ function App() {
         }
       >
         <Route index element={<DashboardPage />} />
+        <Route path="profile" element={<ProfilePage />} />
         <Route path="vehicles" element={<VehiclesPage />} />
         <Route path="drivers" element={<DriversPage />} />
         <Route path="create-trip" element={<CreateNewTripPage />} />
@@ -44,6 +48,8 @@ function App() {
         <Route path="history/payout" element={<HistoryPayoutPage />} />
         <Route path="cash-in-cash-out" element={<CashInCashOutPage />} />
         <Route path="pay-in-pay-out" element={<Navigate to="/cash-in-cash-out" replace />} />
+        <Route path="transaction" element={<TransactionPage />} />
+        <Route path="transaction-history" element={<TransactionHistoryPage />} />
         <Route path="analytics" element={<ComingSoonPage title="Analytics" description="Comprehensive fleet analytics with charts, trends, and insights." icon="📊" />} />
         <Route path="pl" element={<PLPage />} />
         <Route path="reminders" element={<RemindersPage />} />

@@ -346,12 +346,17 @@ export function TransactionHistoryPage() {
 
   const agencyCards = useMemo(() => {
     if (!agencyDetail) return null;
-    // Same ledger as Cash In / Cash Out:
-    // To Receive = bulk remaining (GT − receipts − trip advances)
-    // To Pay = vehicle agency-profit remaining (owed − payouts)
-    // Remaining = net (positive ⇒ collect, negative ⇒ pay)
-    const toReceive = agencyDetail.summary.cashInBulk.remaining;
-    const toPay = agencyDetail.summary.cashOutAgencyProfit.remaining;
+    // Match Bulk Payout "Balance": still to collect in cash =
+    //   cash-in owed − receipts (trip advances are NOT subtracted here).
+    // To Pay = vehicle agency-profit still to pay.
+    // Remaining = To Receive − To Pay.
+    const cashInOwed = agencyDetail.summary.cashInBulk.totalOwed;
+    const cashInReceived = agencyDetail.summary.cashInBulk.received ?? 0;
+    const toReceive = Math.max(cashInOwed - cashInReceived, 0);
+    const toPay = Math.max(
+      agencyDetail.summary.cashOutAgencyProfit.remaining,
+      0,
+    );
     const grandTotal =
       agencyDetail.summary.cashInBulk.totalOwed +
       agencyDetail.summary.cashOutAgencyProfit.totalOwed;
@@ -689,7 +694,7 @@ export function TransactionHistoryPage() {
                     <SummaryCard
                       label="To Receive"
                       value={agencyCards.toReceive}
-                      hint="Still to collect"
+                      hint="Grand Total − Payments"
                       tone="receive"
                     />
                     <SummaryCard

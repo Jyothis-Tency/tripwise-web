@@ -559,6 +559,12 @@ function generateAgencyPayoutPDF(
   y = drawSummaryRow(doc, "Grand Total", INR(data.grandTotal), y, true);
   y = drawSummaryRow(doc, "Total Advance", INR(advance), y);
   y = drawSummaryRow(doc, "Payments Received", INR(received), y);
+  y = drawSummaryRow(
+    doc,
+    "Balance (Grand Total − Payments)",
+    INR(Math.abs((data.grandTotal ?? 0) - received)),
+    y,
+  );
   y = drawSummaryRow(doc, "Total Applied (Advance + Payments)", INR(applied), y);
   y = drawSummaryRow(doc, "Remaining Balance", INR(remaining), y, true);
   if (overpaid > 0) {
@@ -1004,6 +1010,8 @@ function AgencyPayoutTab({
   const applied = data?.totalApplied ?? advance + received;
   const remaining = data?.remaining ?? 0;
   const overpaid = data?.overpaid ?? 0;
+  /** Balance vs cash receipts only (does not subtract trip advances). */
+  const balanceVsPayments = gt - received;
   const pct = gt > 0 ? Math.min((applied / gt) * 100, 100) : 0;
 
   return (
@@ -1026,57 +1034,97 @@ function AgencyPayoutTab({
         </select>
       </div>
 
-      {/* Summary cards — same ledger as PDF */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      {/* Summary cards — ledger: Remaining = GT − Advance − Payments */}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
         {[
           {
+            key: "gt",
             label: "Grand Total",
+            hint: "Trip fare total",
             value: gt,
             color: "text-slate-800",
             bg: "bg-slate-50 border-slate-200",
+            signed: false,
           },
           {
+            key: "adv",
             label: "Advance",
+            hint: "On trip rows",
             value: advance,
             color: "text-sky-700",
             bg: "bg-sky-50 border-sky-200",
+            signed: false,
           },
           {
+            key: "pay",
             label: "Payments",
+            hint: "Cash receipts",
             value: received,
             color: "text-emerald-700",
             bg: "bg-emerald-50 border-emerald-200",
+            signed: false,
           },
           {
+            key: "balance",
+            label: "Balance",
+            hint: "Grand Total − Payments",
+            value: balanceVsPayments,
+            color:
+              balanceVsPayments > 0
+                ? "text-amber-700"
+                : balanceVsPayments < 0
+                  ? "text-violet-700"
+                  : "text-slate-500",
+            bg:
+              balanceVsPayments > 0
+                ? "bg-amber-50 border-amber-200"
+                : balanceVsPayments < 0
+                  ? "bg-violet-50 border-violet-200"
+                  : "bg-slate-50 border-slate-200",
+            signed: true,
+          },
+          {
+            key: "ledger",
             label: remaining > 0 ? "Remaining" : overpaid > 0 ? "Surplus" : "Remaining",
+            hint:
+              remaining > 0
+                ? "GT − Advance − Payments"
+                : overpaid > 0
+                  ? "Overpaid after advance"
+                  : "GT − Advance − Payments",
             value: remaining > 0 ? remaining : overpaid > 0 ? overpaid : 0,
             color:
               remaining > 0
                 ? "text-amber-700"
                 : overpaid > 0
                   ? "text-violet-700"
-                  : "text-slate-400",
+                  : "text-slate-500",
             bg:
               remaining > 0
                 ? "bg-amber-50 border-amber-200"
                 : overpaid > 0
                   ? "bg-violet-50 border-violet-200"
                   : "bg-slate-50 border-slate-200",
+            signed: false,
           },
         ].map((c) => (
-          <div key={c.label} className={`rounded-xl border px-4 py-3 ${c.bg}`}>
-            <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
+          <div key={c.key} className={`rounded-xl border px-3 py-3 sm:px-4 ${c.bg}`}>
+            <div className="mb-0.5 text-[10px] font-bold uppercase tracking-wider text-slate-500">
               {c.label}
             </div>
-            <div className={`text-lg font-bold ${c.color}`}>
-              ₹{c.value.toLocaleString("en-IN")}
+            {c.hint && (
+              <div className="mb-1 text-[9px] font-medium text-slate-400">{c.hint}</div>
+            )}
+            <div className={`text-base font-bold tabular-nums sm:text-lg ${c.color}`}>
+              {c.signed && c.value < 0 ? "−" : ""}₹
+              {Math.abs(c.value).toLocaleString("en-IN")}
             </div>
           </div>
         ))}
       </div>
 
       {overpaid > 0 && month !== "all_time" && (
-        <p className="text-xs text-violet-700 bg-violet-50 border border-violet-100 rounded-lg px-3 py-2">
+        <p className="rounded-lg border border-violet-100 bg-violet-50 px-3 py-2 text-xs text-violet-700">
           Payments in this month exceed this month’s trip total by ₹
           {overpaid.toLocaleString("en-IN")}. Extra cash is applied to earlier dues.
           Agency overall remaining: ₹
@@ -1087,11 +1135,11 @@ function AgencyPayoutTab({
       {/* Progress bar */}
       {gt > 0 && (
         <div>
-          <div className="flex justify-between text-xs text-slate-500 mb-1">
+          <div className="mb-1 flex justify-between text-xs text-slate-500">
             <span>Payment Progress (Advance + Payments)</span>
             <span>{pct.toFixed(0)}%</span>
           </div>
-          <div className="h-2.5 rounded-full bg-slate-100 overflow-hidden">
+          <div className="h-2.5 overflow-hidden rounded-full bg-slate-100">
             <div
               className="h-full rounded-full bg-emerald-500 transition-all"
               style={{ width: `${pct}%` }}

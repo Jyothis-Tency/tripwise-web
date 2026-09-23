@@ -933,7 +933,8 @@ function payoutMonthOptions(): { value: string; label: string }[] {
 
 const PAYOUT_MONTH_OPTIONS = payoutMonthOptions();
 
-function AgencyPayoutTab({
+/** Kept for when Payout UI is re-enabled */
+export function AgencyPayoutTab({
   agencyId,
   agencyName,
 }: {
@@ -1270,7 +1271,8 @@ function AgencyPayoutTab({
 // DRIVER PAYOUT PANEL (inside each DriverGroup card)
 // ═══════════════════════════════════════════════════════════════════════════════
 
-function DriverPayoutPanel({
+/** Kept for when Payout UI is re-enabled */
+export function DriverPayoutPanel({
   agencyId,
   driverName,
   agencyName,
@@ -1574,7 +1576,7 @@ function BulkEntryTable({
   onChange,
   onDeleteTrip,
   onDeleteTrips,
-  agencyId,
+  agencyId: _agencyId,
   agencyName,
   filterStatus = "all",
 }: {
@@ -1586,6 +1588,7 @@ function BulkEntryTable({
   agencyName?: string;
   filterStatus?: "all" | "pending" | "completed";
 }) {
+  void _agencyId;
   const isRowHidden = (isCompleted?: boolean) => {
     if (filterStatus === "pending") return !!isCompleted;
     if (filterStatus === "completed") return !isCompleted;

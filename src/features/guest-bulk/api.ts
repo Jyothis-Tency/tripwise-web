@@ -1,8 +1,9 @@
 import apiClient from "../../services/axios";
 import { ApiEndpoints } from "../../services/apiEndpoints";
+import { getApiBaseUrl } from "../../lib/apiBase";
 import type { Agency, DriverGroup } from "../bulk-entry/api";
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "https://heyanoop.site";
+const API_BASE = getApiBaseUrl();
 
 export interface GuestAgencyBlock {
   clientId: string;

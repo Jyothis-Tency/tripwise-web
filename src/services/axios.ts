@@ -3,8 +3,9 @@ import axios, {
   type InternalAxiosRequestConfig,
   type AxiosError,
 } from 'axios';
+import { getApiBaseUrl } from '../lib/apiBase';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'https://heyanoop.site';
+const API_BASE_URL = getApiBaseUrl();
 
 export const apiClient: AxiosInstance = axios.create({
   baseURL: API_BASE_URL,

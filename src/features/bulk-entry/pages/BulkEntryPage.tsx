@@ -11,7 +11,7 @@ import {
 import {
   Plus,
   Trash2,
-  ArrowLeft,
+  // ArrowLeft, // used by disabled Payout UI
   ChevronDown,
   FileSpreadsheet,
   Building2,
@@ -22,8 +22,9 @@ import {
   CloudOff,
   Copy,
   CheckCircle,
-  Wallet,
+  // Wallet, // used by disabled Payout UI
   FileDown,
+  ListChecks,
 } from "lucide-react";
 import jsPDF from "jspdf";
 import { useAuth } from "../../../hooks/useAuth";
@@ -57,6 +58,11 @@ import {
   type DriverPayoutSummary,
   type PayoutPayment,
 } from "../api";
+import {
+  GuestInvitesPanel,
+  GuestLinkButton,
+} from "../../guest-bulk/components/GuestInvitesPanel";
+import { fetchGuestBulkInvites } from "../../guest-bulk/api";
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // HELPERS
@@ -1008,7 +1014,6 @@ function AgencyPayoutTab({
   const advance = data?.totalAdvance ?? 0;
   const received = data?.totalReceived ?? 0;
   const applied = data?.totalApplied ?? advance + received;
-  const remaining = data?.remaining ?? 0;
   const overpaid = data?.overpaid ?? 0;
   /** Balance vs cash receipts only (does not subtract trip advances). */
   const balanceVsPayments = gt - received;
@@ -1034,8 +1039,8 @@ function AgencyPayoutTab({
         </select>
       </div>
 
-      {/* Summary cards — ledger: Remaining = GT − Advance − Payments */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+      {/* Summary cards */}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         {[
           {
             key: "gt",
@@ -1082,30 +1087,6 @@ function AgencyPayoutTab({
                   ? "bg-violet-50 border-violet-200"
                   : "bg-slate-50 border-slate-200",
             signed: true,
-          },
-          {
-            key: "ledger",
-            label: remaining > 0 ? "Remaining" : overpaid > 0 ? "Surplus" : "Remaining",
-            hint:
-              remaining > 0
-                ? "GT − Advance − Payments"
-                : overpaid > 0
-                  ? "Overpaid after advance"
-                  : "GT − Advance − Payments",
-            value: remaining > 0 ? remaining : overpaid > 0 ? overpaid : 0,
-            color:
-              remaining > 0
-                ? "text-amber-700"
-                : overpaid > 0
-                  ? "text-violet-700"
-                  : "text-slate-500",
-            bg:
-              remaining > 0
-                ? "bg-amber-50 border-amber-200"
-                : overpaid > 0
-                  ? "bg-violet-50 border-violet-200"
-                  : "bg-slate-50 border-slate-200",
-            signed: false,
           },
         ].map((c) => (
           <div key={c.key} className={`rounded-xl border px-3 py-3 sm:px-4 ${c.bg}`}>
@@ -1611,7 +1592,7 @@ function BulkEntryTable({
     return false;
   };
   const { user } = useAuth();
-  const [expandedPayoutGi, setExpandedPayoutGi] = useState<number | null>(null);
+  // const [expandedPayoutGi, setExpandedPayoutGi] = useState<number | null>(null); // Driver Payout UI disabled
   const [exportOpen, setExportOpen] = useState(false);
   const [exportStartDate, setExportStartDate] = useState("");
   const [exportEndDate, setExportEndDate] = useState("");
@@ -2110,6 +2091,8 @@ function BulkEntryTable({
                 <DriverNameCombobox
                   value={g.driverName}
                   selectedDriverId={g.driverId}
+                  inlineCreate
+                  seedPhone={g.driverPhone}
                   onChange={(v) => {
                     onChange((prev) => {
                       const next = [...prev];
@@ -2135,7 +2118,7 @@ function BulkEntryTable({
                       return next;
                     });
                   }}
-                  placeholder="Select driver"
+                  placeholder="Select or type driver"
                   className="min-w-0 flex-1 sm:w-[180px]"
                 />
             </div>
@@ -2558,7 +2541,7 @@ function BulkEntryTable({
             </div>
           </div>
 
-          {/* Driver Payout collapsible */}
+          {/* Driver Payout — temporarily disabled
           {agencyId && g.driverName.trim() && (
             <div className="border-t border-slate-100">
               <button
@@ -2580,6 +2563,7 @@ function BulkEntryTable({
               )}
             </div>
           )}
+          */}
         </div>
       ))}
 
@@ -2673,12 +2657,15 @@ function NormalEntryTable({
   onDeleteTrip,
   agencyName,
   filterStatus = "all",
+  onSendDriverToBulk,
 }: {
   filterStatus?: "all" | "pending" | "completed";
   entries: NormalEntryRow[];
   onChange: Dispatch<SetStateAction<NormalEntryRow[]>>;
   onDeleteTrip: (id: string) => Promise<void> | void;
   agencyName?: string;
+  /** Copy one Normal row's driver into Bulk Entry (one click = one driver). */
+  onSendDriverToBulk?: (entry: NormalEntryRow) => void;
 }) {
   const isRowHidden = (isCompleted?: boolean) => {
     if (filterStatus === "pending") return !!isCompleted;
@@ -2757,6 +2744,16 @@ function NormalEntryTable({
                     className="flex items-center gap-1 text-blue-600 hover:text-blue-800 text-xs font-semibold transition"
                   >
                     <Copy className="h-3.5 w-3.5" /> Copy
+                  </button>
+                )}
+                {e.driverName?.trim() && onSendDriverToBulk && (
+                  <button
+                    type="button"
+                    onClick={() => onSendDriverToBulk(e)}
+                    title="Add this driver to Bulk Entry"
+                    className="flex items-center gap-1 text-emerald-600 hover:text-emerald-800 text-xs font-semibold transition"
+                  >
+                    <ListChecks className="h-3.5 w-3.5" /> To Bulk
                   </button>
                 )}
                 {(e as any)._id ? (
@@ -3005,6 +3002,16 @@ function NormalEntryTable({
                           <Copy className="h-3 w-3" /> Copy
                         </button>
                       )}
+                      {e.driverName?.trim() && onSendDriverToBulk && (
+                        <button
+                          type="button"
+                          onClick={() => onSendDriverToBulk(e)}
+                          title="Add this driver to Bulk Entry"
+                          className="flex items-center gap-1 text-emerald-600 hover:text-emerald-800 text-[10px] font-semibold transition"
+                        >
+                          <ListChecks className="h-3 w-3" /> To Bulk
+                        </button>
+                      )}
                       <button
                         type="button"
                         onClick={() => toggleComplete(i)}
@@ -3113,6 +3120,8 @@ export function BulkEntryPage() {
   const [agencyLoading, setAgencyLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showDropdown, setShowDropdown] = useState(false);
+  const [showGuestPanel, setShowGuestPanel] = useState(false);
+  const [guestPendingCount, setGuestPendingCount] = useState(0);
 
   // Delete confirmations (prevents rapid double-deletes & gives server time)
   type PendingDelete = { ids: string[]; title: string; message: string };
@@ -3130,7 +3139,9 @@ export function BulkEntryPage() {
     () => {
       try {
         const v = localStorage.getItem(LS_ENTRY_MODE) as any;
-        if (v === "normal" || v === "payout") return v;
+        // Payout UI temporarily disabled — fall back to bulk
+        // if (v === "normal" || v === "payout") return v;
+        if (v === "normal") return v;
         return "bulk";
       } catch {
         return "bulk";
@@ -3364,6 +3375,25 @@ export function BulkEntryPage() {
   useEffect(() => {
     loadAgencies();
   }, [loadAgencies]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const inv = await fetchGuestBulkInvites();
+        if (!cancelled) {
+          setGuestPendingCount(
+            inv.reduce((n, i) => n + (i.pendingSubmissions ?? 0), 0),
+          );
+        }
+      } catch {
+        /* silent */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [showGuestPanel]);
 
   // ── Load trips when agency/mode changes ──
   const loadTrips = useCallback(async () => {
@@ -3652,6 +3682,68 @@ export function BulkEntryPage() {
     } catch {}
   }, []);
 
+  /** One Normal row → one new Bulk driver group (not all rows at once). */
+  const sendNormalDriverToBulk = useCallback(
+    (entry: NormalEntryRow) => {
+      const driverName = String(entry.driverName ?? "").trim();
+      if (!driverName) {
+        window.alert("Enter a driver name first.");
+        return;
+      }
+
+      const vehicleNumber = String(entry.vehicleNumber ?? "")
+        .trim()
+        .toUpperCase();
+      const digits = String(entry.mobileNumber ?? "").replace(/\D/g, "");
+      // Only keep DB id when this row is already linked to a registered driver
+      const driverId = entry.driverId || undefined;
+      const isRegistered = Boolean(driverId);
+
+      const already = bulkGroups.some(
+        (g) =>
+          String(g.driverName ?? "").trim().toLowerCase() ===
+            driverName.toLowerCase() &&
+          String(g.vehicleNumber ?? "").trim().toUpperCase() === vehicleNumber,
+      );
+      if (already) {
+        toggleMode("bulk");
+        window.alert(
+          `"${driverName}"${vehicleNumber ? ` / ${vehicleNumber}` : ""} is already in Bulk.`,
+        );
+        return;
+      }
+
+      const group: DriverGroup = {
+        ...emptyDriverGroup(),
+        driverName,
+        vehicleNumber,
+        // New / unregistered → no id so Bulk shows the phone field
+        driverId: isRegistered ? driverId : undefined,
+        driverPhone: digits || undefined,
+      };
+
+      setBulkGroups((prev) => {
+        const onlyEmpty =
+          prev.length === 1 &&
+          !String(prev[0].driverName ?? "").trim() &&
+          !String(prev[0].vehicleNumber ?? "").trim() &&
+          !(prev[0].rows ?? []).some(
+            (r) =>
+              r.startDate ||
+              r.endDate ||
+              r.grandTotal ||
+              r.advancePaid ||
+              r.notes ||
+              r._id,
+          );
+        return onlyEmpty ? [group] : [...prev, group];
+      });
+
+      toggleMode("bulk");
+    },
+    [bulkGroups, setBulkGroups, toggleMode],
+  );
+
   // Close dropdown on outside click
   useEffect(() => {
     if (!showDropdown) return;
@@ -3740,7 +3832,14 @@ export function BulkEntryPage() {
             <span className="sm:hidden">New</span>
           </button>
 
-          {/* Payout Button */}
+          {isBulkMode && (
+            <GuestLinkButton
+              pendingCount={guestPendingCount}
+              onClick={() => setShowGuestPanel(true)}
+            />
+          )}
+
+          {/* Payout — temporarily disabled
           {selectedAgency && (
             <button
               type="button"
@@ -3755,6 +3854,7 @@ export function BulkEntryPage() {
               <span className="hidden sm:inline">Payout</span>
             </button>
           )}
+          */}
 
           {/* Agency Total Balance Display */}
           {selectedAgency && isBulkMode && (
@@ -3881,7 +3981,7 @@ export function BulkEntryPage() {
               Choose from the dropdown above, or create a new agency.
             </p>
           </div>
-        ) : activeTab === "payout" ? (
+        ) : /* activeTab === "payout" ? (
           <div className="max-w-2xl mx-auto">
             <div className="mb-5 flex items-center justify-between gap-2">
               <button
@@ -3904,7 +4004,7 @@ export function BulkEntryPage() {
               agencyName={formatAgencyLabel(selectedAgency)}
             />
           </div>
-        ) : activeTab === "bulk" ? (
+        ) : */ activeTab === "bulk" ? (
           <BulkEntryTable
             groups={bulkGroups}
             onChange={setBulkGroups}
@@ -3921,6 +4021,7 @@ export function BulkEntryPage() {
             filterStatus={filterStatus}
             onDeleteTrip={handleDeleteTrip}
             agencyName={formatAgencyLabel(selectedAgency)}
+            onSendDriverToBulk={sendNormalDriverToBulk}
           />
         )}
       </div>
@@ -3965,6 +4066,11 @@ export function BulkEntryPage() {
           </div>
         </ModalShell>
       )}
+
+      <GuestInvitesPanel
+        open={showGuestPanel}
+        onClose={() => setShowGuestPanel(false)}
+      />
     </div>
   );
 }

@@ -83,6 +83,26 @@ export const ApiEndpoints = {
   bulkEntrySync: '/owners/bulk-entry/sync',
   bulkEntryTripById: (id: string) => `/owners/bulk-entry/trips/${id}`,
 
+  // GUEST BULK (owner)
+  guestBulkInvites: '/owners/guest-bulk/invites',
+  guestBulkInviteById: (id: string) => `/owners/guest-bulk/invites/${id}`,
+  guestBulkInviteRevoke: (id: string) =>
+    `/owners/guest-bulk/invites/${id}/revoke`,
+  guestBulkInviteUnrevoke: (id: string) =>
+    `/owners/guest-bulk/invites/${id}/unrevoke`,
+  guestBulkSubmissions: '/owners/guest-bulk/submissions',
+  guestBulkSubmissionAccept: (id: string) =>
+    `/owners/guest-bulk/submissions/${id}/accept`,
+  guestBulkSubmissionReject: (id: string) =>
+    `/owners/guest-bulk/submissions/${id}/reject`,
+
+  // GUEST BULK (public token)
+  guestBulkByToken: (token: string) => `/guest/bulk/${token}`,
+  guestBulkCreateAgency: (token: string) => `/guest/bulk/${token}/agencies`,
+  guestBulkSync: (token: string) => `/guest/bulk/${token}/sync`,
+  guestBulkApprove: (token: string) => `/guest/bulk/${token}/approve`,
+  guestBulkSubmit: (token: string) => `/guest/bulk/${token}/submit`,
+
   // NORMAL ENTRY
   normalEntry: '/owners/normal-entry',
   normalEntryTrips: '/owners/normal-entry/trips',

@@ -88,7 +88,7 @@ export function CreateDriverModal({
       const driver = await createDriver({
         firstName: firstName.toUpperCase(),
         lastName: (lastName || "").toUpperCase(),
-        email: `bulk.${digits}@tripwise.com`,
+        email: `bulk.${digits}.${Date.now().toString(36)}@tripwise.com`,
         phone: digits,
         place: "N/A",
       });
@@ -179,6 +179,13 @@ export type DriverNameComboboxProps = {
   required?: boolean;
   placeholder?: string;
   extraSuggestionNames?: string[];
+  /**
+   * Bulk-style create: when a new name is typed, show a phone field.
+   * At 10 digits, register the driver automatically (no Create button / modal).
+   */
+  inlineCreate?: boolean;
+  /** Prefill the inline phone field (e.g. after Send to Bulk from Normal). */
+  seedPhone?: string;
 };
 
 /**
@@ -196,11 +203,18 @@ export function DriverNameCombobox({
   required,
   placeholder = "Driver name",
   extraSuggestionNames = [],
+  inlineCreate = false,
+  seedPhone,
 }: DriverNameComboboxProps) {
   const [drivers, setDrivers] = useState<Driver[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
   const [createPreset, setCreatePreset] = useState("");
+  const [inlinePhone, setInlinePhone] = useState("");
+  const [inlineErr, setInlineErr] = useState<string | null>(null);
+  const [creating, setCreating] = useState(false);
+  const creatingRef = useRef(false);
+  const lastAutoKeyRef = useRef("");
 
   const reload = useCallback(async () => {
     try {
@@ -256,6 +270,18 @@ export function DriverNameCombobox({
       .slice(0, 12);
   }, [suggestionPool, value]);
 
+  const registeredExact = useMemo(() => {
+    const q = value.trim().toLowerCase();
+    if (!q) return null;
+    return (
+      suggestionPool.find((d) => {
+        const id = String(d._id ?? d.id ?? "");
+        if (id.startsWith("legacy:")) return false;
+        return driverDisplayName(d).trim().toLowerCase() === q;
+      }) ?? null
+    );
+  }, [suggestionPool, value]);
+
   const exactMatch = useMemo(() => {
     const q = value.trim().toLowerCase();
     if (!q) return false;
@@ -268,20 +294,143 @@ export function DriverNameCombobox({
     );
   }, [suggestionPool, value, selectedDriverId]);
 
+  const needsPhone =
+    inlineCreate && !!value.trim() && !registeredExact && !selectedDriverId;
+
+  useEffect(() => {
+    if (!needsPhone) {
+      setInlinePhone("");
+      setInlineErr(null);
+      lastAutoKeyRef.current = "";
+      return;
+    }
+    const digits = String(seedPhone ?? "")
+      .replace(/\D/g, "")
+      .slice(0, 10);
+    if (digits) {
+      setInlinePhone(digits);
+    }
+  }, [needsPhone, value, seedPhone]);
+
   const openCreate = (preset: string) => {
     setCreatePreset(preset);
     setCreateOpen(true);
     setShowSuggestions(false);
   };
 
-  const pickDriver = (driver: Driver) => {
-    onChange(driverDisplayName(driver));
-    onDriverSelect?.(driver);
-    setShowSuggestions(false);
-  };
+  const pickDriver = useCallback(
+    (driver: Driver) => {
+      onChange(driverDisplayName(driver));
+      onDriverSelect?.(driver);
+      setShowSuggestions(false);
+      setInlineErr(null);
+      setInlinePhone("");
+    },
+    [onChange, onDriverSelect],
+  );
+
+  const registerNewDriver = useCallback(
+    async (fullName: string, phoneDigits: string) => {
+      const key = `${fullName.toLowerCase()}|${phoneDigits}`;
+      if (creatingRef.current) return;
+      if (lastAutoKeyRef.current === key) return;
+      if (phoneDigits.length !== 10) return;
+
+      const { firstName, lastName } = splitDriverFullName(fullName);
+      if (!firstName) {
+        setInlineErr("Driver name is required");
+        return;
+      }
+
+      const typedName = fullName.trim();
+      const sameName = (d: Driver) =>
+        driverDisplayName(d).trim().toLowerCase() === typedName.toLowerCase();
+
+      // Lock this attempt immediately so React re-renders cannot re-fire create
+      lastAutoKeyRef.current = key;
+      creatingRef.current = true;
+      setCreating(true);
+      setInlineErr(null);
+
+      const findByPhone = (list: Driver[]) =>
+        list.find(
+          (d) => String(d.phone ?? "").replace(/\D/g, "") === phoneDigits,
+        );
+
+      try {
+        const existingLocal = findByPhone(drivers);
+        if (existingLocal) {
+          if (sameName(existingLocal)) {
+            // Same person re-entered → just select them
+            pickDriver(existingLocal);
+          } else {
+            // Do NOT overwrite typed name with another driver's name
+            setInlineErr(
+              `This number belongs to another driver (${driverDisplayName(existingLocal)}). Enter a different phone for "${typedName}".`,
+            );
+          }
+          return;
+        }
+
+        const driver = await createDriver({
+          firstName: firstName.toUpperCase(),
+          lastName: (lastName || "").toUpperCase(),
+          email: `bulk.${phoneDigits}.${Date.now().toString(36)}@tripwise.com`,
+          phone: phoneDigits,
+          place: "N/A",
+        });
+        pickDriver(driver);
+        await reload();
+      } catch (e: unknown) {
+        const msg =
+          e && typeof e === "object" && "response" in e
+            ? (e as { response?: { data?: { message?: string } } }).response
+                ?.data?.message
+            : undefined;
+
+        try {
+          const { drivers: list } = await fetchDrivers({
+            page: 1,
+            limit: 500,
+          });
+          setDrivers(list);
+          const existing = findByPhone(list);
+          if (existing && sameName(existing)) {
+            pickDriver(existing);
+            setInlineErr(null);
+            return;
+          }
+          if (existing) {
+            setInlineErr(
+              `This number belongs to another driver (${driverDisplayName(existing)}). Enter a different phone for "${typedName}".`,
+            );
+            return;
+          }
+        } catch {
+          /* fall through */
+        }
+
+        setInlineErr(msg ?? "Failed to create driver.");
+      } finally {
+        creatingRef.current = false;
+        setCreating(false);
+      }
+    },
+    [drivers, pickDriver, reload],
+  );
+
+  useEffect(() => {
+    if (!needsPhone || creating || creatingRef.current) return;
+    const digits = inlinePhone.replace(/\D/g, "");
+    if (digits.length === 10 && value.trim()) {
+      void registerNewDriver(value.trim(), digits);
+    }
+  }, [inlinePhone, needsPhone, value, creating, registerNewDriver]);
 
   const panelVisible =
-    showSuggestions && (filtered.length > 0 || (!!value.trim() && !exactMatch));
+    showSuggestions &&
+    (filtered.length > 0 ||
+      (!!value.trim() && !exactMatch && !inlineCreate));
 
   const inputCls = inputClassName ?? DRIVER_INPUT_CLS;
 
@@ -295,6 +444,8 @@ export function DriverNameCombobox({
           onChange={(e) => {
             onChange(e.target.value);
             setShowSuggestions(true);
+            setInlineErr(null);
+            lastAutoKeyRef.current = "";
           }}
           onFocus={() => setShowSuggestions(true)}
           onBlur={() => {
@@ -326,7 +477,7 @@ export function DriverNameCombobox({
                 </button>
               );
             })}
-            {value.trim() && !exactMatch && (
+            {!inlineCreate && value.trim() && !exactMatch && (
               <button
                 type="button"
                 className="w-full border-t border-slate-100 px-3 py-2 text-left text-sm font-medium text-blue-700 hover:bg-blue-50"
@@ -340,8 +491,42 @@ export function DriverNameCombobox({
             )}
           </div>
         )}
+
+        {needsPhone && (
+          <div className="mt-1.5 space-y-1">
+            <input
+              type="tel"
+              inputMode="numeric"
+              value={inlinePhone}
+              onChange={(e) => {
+                setInlinePhone(e.target.value.replace(/\D/g, "").slice(0, 10));
+                setInlineErr(null);
+                lastAutoKeyRef.current = "";
+              }}
+              placeholder="Phone (10 digits) — auto saves"
+              autoComplete="off"
+              className={inputCls}
+              aria-label="New driver phone number"
+            />
+            {creating && (
+              <p className="text-[11px] font-medium text-blue-600">
+                Registering driver…
+              </p>
+            )}
+            {!creating && inlinePhone.replace(/\D/g, "").length > 0 &&
+              inlinePhone.replace(/\D/g, "").length < 10 && (
+                <p className="text-[11px] text-slate-400">
+                  Enter {10 - inlinePhone.replace(/\D/g, "").length} more digit
+                  {10 - inlinePhone.replace(/\D/g, "").length === 1 ? "" : "s"}
+                </p>
+              )}
+            {inlineErr && (
+              <p className="text-[11px] font-medium text-red-600">{inlineErr}</p>
+            )}
+          </div>
+        )}
       </div>
-      {createOpen && (
+      {!inlineCreate && createOpen && (
         <CreateDriverModal
           initialName={createPreset}
           onClose={() => setCreateOpen(false)}

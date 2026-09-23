@@ -9,9 +9,10 @@ import { VehiclesPage } from './features/vehicles/pages/VehiclesPage';
 import { PLPage } from './features/pnl/pages/PLPage';
 import { TrackingPage } from './features/tracking/pages/TrackingPage';
 import { BulkEntryPage } from './features/bulk-entry/pages/BulkEntryPage';
+import { GuestBulkEntryPage } from './features/guest-bulk/pages/GuestBulkEntryPage';
 import { HistoryPage } from './features/history/pages/HistoryPage';
 import { HistoryPayoutPage } from './features/history/pages/HistoryPayoutPage';
-import { CashInCashOutPage } from './features/cash-in-cash-out/pages/CashInCashOutPage';
+// import { CashInCashOutPage } from './features/cash-in-cash-out/pages/CashInCashOutPage';
 import { TransactionPage } from './features/transactions/pages/TransactionPage';
 import { TransactionHistoryPage } from './features/transactions/pages/TransactionHistoryPage';
 import DriversPage from './features/drivers/pages/DriversPage';
@@ -26,6 +27,7 @@ function App() {
     <Routes>
       <Route path="/login" element={<LoginPage />} />
       <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+      <Route path="/guest-bulk/:token" element={<GuestBulkEntryPage />} />
 
       <Route
         path="/"
@@ -46,8 +48,10 @@ function App() {
         <Route path="reports" element={<ReportsPage />} />
         <Route path="history" element={<HistoryPage />} />
         <Route path="history/payout" element={<HistoryPayoutPage />} />
-        <Route path="cash-in-cash-out" element={<CashInCashOutPage />} />
-        <Route path="pay-in-pay-out" element={<Navigate to="/cash-in-cash-out" replace />} />
+        {/* Cash In / Cash Out — temporarily hidden; use Transaction instead */}
+        {/* <Route path="cash-in-cash-out" element={<CashInCashOutPage />} /> */}
+        <Route path="cash-in-cash-out" element={<Navigate to="/transaction" replace />} />
+        <Route path="pay-in-pay-out" element={<Navigate to="/transaction" replace />} />
         <Route path="transaction" element={<TransactionPage />} />
         <Route path="transaction-history" element={<TransactionHistoryPage />} />
         <Route path="analytics" element={<ComingSoonPage title="Analytics" description="Comprehensive fleet analytics with charts, trends, and insights." icon="📊" />} />

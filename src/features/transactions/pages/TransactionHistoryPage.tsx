@@ -346,22 +346,31 @@ export function TransactionHistoryPage() {
 
   const agencyCards = useMemo(() => {
     if (!agencyDetail) return null;
-    // Match Bulk Payout "Balance": still to collect in cash =
-    //   cash-in owed − receipts (trip advances are NOT subtracted here).
+    // To Receive = Σ Balance − Cash In receipts
+    //   Balance per bulk row = Grand Total − Advance
+    //   ≡ totalOwed − advances − received (same as cashInBulk.remaining).
     // To Pay = vehicle agency-profit still to pay.
-    // Remaining = To Receive − To Pay.
-    const cashInOwed = agencyDetail.summary.cashInBulk.totalOwed;
-    const cashInReceived = agencyDetail.summary.cashInBulk.received ?? 0;
-    const toReceive = Math.max(cashInOwed - cashInReceived, 0);
+    // Net = To Receive − To Pay.
+    const bulk = agencyDetail.summary.cashInBulk;
+    const toReceive = Math.max(
+      Number(
+        bulk.remaining ??
+          (bulk.totalOwed ?? 0) -
+            (bulk.advances ?? 0) -
+            (bulk.received ?? 0),
+      ) || 0,
+      0,
+    );
     const toPay = Math.max(
       agencyDetail.summary.cashOutAgencyProfit.remaining,
       0,
     );
-    const grandTotal =
-      agencyDetail.summary.cashInBulk.totalOwed +
-      agencyDetail.summary.cashOutAgencyProfit.totalOwed;
+    const balanceOwed = Math.max(
+      (bulk.totalOwed ?? 0) - (bulk.advances ?? 0),
+      0,
+    );
     return {
-      grandTotal,
+      grandTotal: balanceOwed,
       toReceive,
       toPay,
       remaining: toReceive - toPay,
@@ -688,13 +697,14 @@ export function TransactionHistoryPage() {
                 {tab === "agencies" && agencyCards && (
                   <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
                     <SummaryCard
-                      label="Grand Total"
+                      label="Balance"
                       value={agencyCards.grandTotal}
+                      hint="Σ (Grand Total − Advance)"
                     />
                     <SummaryCard
                       label="To Receive"
                       value={agencyCards.toReceive}
-                      hint="Grand Total − Payments"
+                      hint="Balance − Cash In"
                       tone="receive"
                     />
                     <SummaryCard

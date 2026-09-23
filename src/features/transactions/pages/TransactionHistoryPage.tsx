@@ -126,16 +126,42 @@ function buildAgencyTxRows(detail: AgencyCashInCashOutDetail): TxRow[] {
     notes: r.notes || "",
     sortTime: sortTime(r.paymentDate, r._id),
   }));
+
+  // Vehicle-trip agency/owner profit → Cash Out only after trip is completed.
+  const profitTrips = (detail.tables.vehicleTripsAgencyProfit || [])
+    .filter(
+      (t) =>
+        String(t.status || "").toLowerCase() === "completed" &&
+        Number(t.agencyProfit) > 0,
+    )
+    .map((t) => {
+      const route = [t.from, t.to].filter(Boolean).join(" → ");
+      const tripLabel = t.tripNumber ? `Trip ${t.tripNumber}` : "Vehicle trip";
+      return {
+        id: `profit-${t._id}`,
+        date: t.date,
+        amount: Number(t.agencyProfit) || 0,
+        direction: "Cash out" as const,
+        method: "—",
+        notes: [tripLabel, route, "Agency profit"]
+          .filter(Boolean)
+          .join(" · "),
+        sortTime: sortTime(t.date, t._id),
+      };
+    });
+
+  // Actual profit payouts recorded by owner.
   const payouts = detail.tables.agencyProfitPayoutPayments.map((r) => ({
     id: `out-${r._id}`,
     date: r.paymentDate,
     amount: r.amount,
     direction: "Cash out" as const,
     method: r.paymentMethod || "—",
-    notes: r.notes || "",
+    notes: r.notes || "Profit payout",
     sortTime: sortTime(r.paymentDate, r._id),
   }));
-  return [...receipts, ...payouts];
+
+  return [...receipts, ...profitTrips, ...payouts];
 }
 
 function buildDriverTxRows(detail: DriverCashInCashOutDetail): TxRow[] {
@@ -346,34 +372,19 @@ export function TransactionHistoryPage() {
 
   const agencyCards = useMemo(() => {
     if (!agencyDetail) return null;
-    // To Receive = Σ Balance − Cash In receipts
-    //   Balance per bulk row = Grand Total − Advance
-    //   ≡ totalOwed − advances − received (same as cashInBulk.remaining).
-    // To Pay = vehicle agency-profit still to pay.
-    // Net = To Receive − To Pay.
+    // Bulk: Grand Total (not Balance / not GT−Advance).
+    // Remaining = Grand Total − Received − vehicle profit still to pay.
+    //   Cash In lowers Remaining; vehicle agency profit also lowers Remaining.
     const bulk = agencyDetail.summary.cashInBulk;
-    const toReceive = Math.max(
-      Number(
-        bulk.remaining ??
-          (bulk.totalOwed ?? 0) -
-            (bulk.advances ?? 0) -
-            (bulk.received ?? 0),
-      ) || 0,
-      0,
-    );
-    const toPay = Math.max(
-      agencyDetail.summary.cashOutAgencyProfit.remaining,
-      0,
-    );
-    const balanceOwed = Math.max(
-      (bulk.totalOwed ?? 0) - (bulk.advances ?? 0),
-      0,
-    );
+    const profit = agencyDetail.summary.cashOutAgencyProfit;
+    const grandTotal = Math.max(Number(bulk.totalOwed) || 0, 0);
+    const received = Math.max(Number(bulk.received) || 0, 0);
+    const profitStillToPay = Math.max(Number(profit.remaining) || 0, 0);
+    const remaining = grandTotal - received - profitStillToPay;
     return {
-      grandTotal: balanceOwed,
-      toReceive,
-      toPay,
-      remaining: toReceive - toPay,
+      grandTotal,
+      received,
+      remaining,
     };
   }, [agencyDetail]);
 
@@ -695,28 +706,22 @@ export function TransactionHistoryPage() {
                 </div>
 
                 {tab === "agencies" && agencyCards && (
-                  <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
+                  <div className="grid grid-cols-3 gap-2">
                     <SummaryCard
-                      label="Balance"
+                      label="Grand Total"
                       value={agencyCards.grandTotal}
-                      hint="Σ (Grand Total − Advance)"
+                      hint="Bulk trips"
                     />
                     <SummaryCard
-                      label="To Receive"
-                      value={agencyCards.toReceive}
-                      hint="Balance − Cash In"
+                      label="Received"
+                      value={agencyCards.received}
+                      hint="Cash In"
                       tone="receive"
-                    />
-                    <SummaryCard
-                      label="To Pay"
-                      value={agencyCards.toPay}
-                      hint="Still to pay"
-                      tone="pay"
                     />
                     <SummaryCard
                       label="Remaining"
                       value={agencyCards.remaining}
-                      hint="To Receive − To Pay"
+                      hint="Grand Total − Received − vehicle profit due"
                       tone="remaining"
                       signed
                     />

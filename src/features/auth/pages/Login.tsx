@@ -6,7 +6,20 @@ import { Mail, Lock, Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '../../../hooks/useAuth';
 
 const validationSchema = Yup.object({
-  email: Yup.string().email('Invalid email').required('Email is required'),
+  email: Yup.string()
+    .required('Email or phone number is required')
+    .test(
+      'email-or-phone',
+      'Enter a valid email or phone number',
+      (value) => {
+        const v = String(value || '').trim();
+        if (!v) return false;
+        const isEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
+        const digits = v.replace(/\D/g, '');
+        const isPhone = digits.length >= 10;
+        return isEmail || isPhone;
+      },
+    ),
   password: Yup.string().required('Password is required'),
 });
 
@@ -23,7 +36,7 @@ export function LoginPage() {
     validationSchema,
     onSubmit: async (values) => {
       try {
-        await login(values.email, values.password);
+        await login(values.email.trim(), values.password);
         navigate('/', { replace: true });
       } catch {
         // handled via error state
@@ -68,20 +81,21 @@ export function LoginPage() {
           <form onSubmit={formik.handleSubmit} className="space-y-5">
             <div className="space-y-2">
               <label htmlFor="email" className="text-xs font-semibold text-slate-600 uppercase tracking-wide">
-                Email Address
+                Email or phone
               </label>
               <div className="group flex items-center rounded-xl border border-slate-200 bg-white px-4 py-3 transition-all focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-500/10 hover:border-slate-300">
                 <Mail className="mr-3 h-5 w-5 text-slate-400 group-focus-within:text-blue-500 transition-colors" />
                 <input
                   id="email"
                   name="email"
-                  type="email"
-                  autoComplete="email"
+                  type="text"
+                  inputMode="email"
+                  autoComplete="username"
                   onChange={formik.handleChange}
                   onBlur={formik.handleBlur}
                   value={formik.values.email}
                   className="h-6 w-full border-none bg-transparent text-sm font-medium text-slate-900 placeholder-slate-400 outline-none"
-                  placeholder="name@company.com"
+                  placeholder="Email or phone number"
                 />
               </div>
               {formik.touched.email && formik.errors.email && (

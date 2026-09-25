@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   ArrowLeft,
@@ -28,8 +28,16 @@ import {
   SearchSortBar,
   filterControlCls,
 } from "../components/FilterControls";
+import {
+  loadCashInCashOutUi,
+  saveCashInCashOutUi,
+  type CashInCashOutDetailTabId,
+  type CashInCashOutTabId,
+} from "../../cash-in-cash-out/cashInCashOutUiStorage";
+import { formatAgencyLabel } from "../../../lib/agencyDisplay";
 
-type EntityTab = "agencies" | "drivers";
+type EntityTab = CashInCashOutTabId;
+type DetailTabId = CashInCashOutDetailTabId;
 type SortDir = "desc" | "asc";
 type DirectionFilter = "all" | "Cash in" | "Cash out";
 
@@ -52,6 +60,22 @@ function fmtCurrency(n: number) {
 function fmtSignedCurrency(n: number) {
   const sign = n < 0 ? "−" : n > 0 ? "+" : "";
   return `${sign}${fmtCurrency(n)}`;
+}
+
+/** Same as Cash In / Cash Out: bulk remaining − vehicle remaining. */
+function agencyTotalRemaining(detail: AgencyCashInCashOutDetail): number {
+  return (
+    detail.summary.cashInBulk.remaining -
+    detail.summary.cashOutAgencyProfit.remaining
+  );
+}
+
+/** Same as Cash In / Cash Out: bata + bulk advance still owed. */
+function driverTotalRemaining(detail: DriverCashInCashOutDetail): number {
+  return (
+    detail.summary.vehicleBata.remaining +
+    detail.summary.bulkAdvance.remaining
+  );
 }
 
 function mongoIdTime(id?: string) {
@@ -260,56 +284,121 @@ function SummaryCard({
 }
 
 export function TransactionHistoryPage() {
-  const [tab, setTab] = useState<EntityTab>("agencies");
+  // Same persisted UI state as Cash In / Cash Out (shared localStorage key).
+  const savedUi = useMemo(() => loadCashInCashOutUi(), []);
+  const prevAgencyIdRef = useRef<string | null>(savedUi.selectedAgencyId);
+  const prevDriverIdRef = useRef<string | null>(savedUi.selectedDriverId);
+
+  const [tab, setTab] = useState<EntityTab>(savedUi.tab);
+  const [listSearch, setListSearch] = useState(savedUi.listSearch);
+
   const [agencies, setAgencies] = useState<Agency[]>([]);
   const [drivers, setDrivers] = useState<Driver[]>([]);
   const [listLoading, setListLoading] = useState(true);
-  const [listSearch, setListSearch] = useState("");
-  const [selectedAgencyId, setSelectedAgencyId] = useState<string | null>(null);
-  const [selectedDriverId, setSelectedDriverId] = useState<string | null>(null);
+
+  const [selectedAgencyId, setSelectedAgencyId] = useState<string | null>(
+    savedUi.selectedAgencyId,
+  );
+  const [agencyDetailTab, setAgencyDetailTab] = useState<DetailTabId>(
+    savedUi.agencyDetailTab,
+  );
+  const [selectedDriverId, setSelectedDriverId] = useState<string | null>(
+    savedUi.selectedDriverId,
+  );
+  const [driverDetailTab, setDriverDetailTab] = useState<DetailTabId>(
+    savedUi.driverDetailTab,
+  );
+
   const [agencyDetail, setAgencyDetail] =
     useState<AgencyCashInCashOutDetail | null>(null);
   const [driverDetail, setDriverDetail] =
     useState<DriverCashInCashOutDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
-  const [month, setMonth] = useState("all_time");
+  const [detailMonth, setDetailMonth] = useState(savedUi.detailMonth);
+  const [error, setError] = useState<string | null>(null);
+
+  // Table-only filters (History-specific; not part of CICO shared UI).
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [tableSearch, setTableSearch] = useState("");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [directionFilter, setDirectionFilter] =
     useState<DirectionFilter>("all");
-  const [error, setError] = useState<string | null>(null);
 
-  const loadLists = useCallback(async () => {
+  const loadAgencies = useCallback(async () => {
     setListLoading(true);
     setError(null);
     try {
-      const [a, d] = await Promise.all([
-        fetchAgencies(1, 200),
-        fetchDrivers({ page: 1, limit: 200, blockFilter: "unblocked" }),
-      ]);
-      setAgencies(a.agencies);
-      setDrivers(d.drivers);
+      const { agencies: list } = await fetchAgencies(1, 300);
+      setAgencies(list);
     } catch {
-      setError("Failed to load list.");
+      setAgencies([]);
+      setError("Failed to load agencies.");
+    } finally {
+      setListLoading(false);
+    }
+  }, []);
+
+  const loadDrivers = useCallback(async () => {
+    setListLoading(true);
+    setError(null);
+    try {
+      const { drivers: list } = await fetchDrivers({ page: 1, limit: 300 });
+      setDrivers(list ?? []);
+    } catch {
+      setDrivers([]);
+      setError("Failed to load drivers.");
     } finally {
       setListLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    loadLists();
-  }, [loadLists]);
+    if (tab === "agencies") loadAgencies();
+    else loadDrivers();
+  }, [tab, loadAgencies, loadDrivers]);
 
-  const loadAgencyDetail = useCallback(async (id: string, m: string) => {
+  useEffect(() => {
+    saveCashInCashOutUi({
+      tab,
+      selectedAgencyId,
+      selectedDriverId,
+      agencyDetailTab,
+      driverDetailTab,
+      detailMonth,
+      listSearch,
+    });
+  }, [
+    tab,
+    selectedAgencyId,
+    selectedDriverId,
+    agencyDetailTab,
+    driverDetailTab,
+    detailMonth,
+    listSearch,
+  ]);
+
+  useEffect(() => {
+    if (listLoading || tab !== "agencies" || !selectedAgencyId) return;
+    const exists = agencies.some(
+      (a) => (a._id ?? a.id ?? "") === selectedAgencyId,
+    );
+    if (!exists) setSelectedAgencyId(null);
+  }, [agencies, listLoading, tab, selectedAgencyId]);
+
+  useEffect(() => {
+    if (listLoading || tab !== "drivers" || !selectedDriverId) return;
+    const exists = drivers.some(
+      (d) => (d._id ?? d.id ?? "") === selectedDriverId,
+    );
+    if (!exists) setSelectedDriverId(null);
+  }, [drivers, listLoading, tab, selectedDriverId]);
+
+  const loadAgencyDetail = useCallback(async (agencyId: string, month: string) => {
     setDetailLoading(true);
     setError(null);
     try {
-      const detail = await fetchCashInCashOutAgencyDetail(
-        id,
-        m === "all_time" ? undefined : m,
-      );
+      const detail = await fetchCashInCashOutAgencyDetail(agencyId, month);
       setAgencyDetail(detail);
     } catch {
       setAgencyDetail(null);
@@ -319,14 +408,11 @@ export function TransactionHistoryPage() {
     }
   }, []);
 
-  const loadDriverDetail = useCallback(async (id: string, m: string) => {
+  const loadDriverDetail = useCallback(async (driverId: string, month: string) => {
     setDetailLoading(true);
     setError(null);
     try {
-      const detail = await fetchCashInCashOutDriverDetail(
-        id,
-        m === "all_time" ? undefined : m,
-      );
+      const detail = await fetchCashInCashOutDriverDetail(driverId, month);
       setDriverDetail(detail);
     } catch {
       setDriverDetail(null);
@@ -337,26 +423,46 @@ export function TransactionHistoryPage() {
   }, []);
 
   useEffect(() => {
-    if (tab === "agencies" && selectedAgencyId) {
-      loadAgencyDetail(selectedAgencyId, month);
+    if (
+      prevAgencyIdRef.current !== null &&
+      prevAgencyIdRef.current !== selectedAgencyId
+    ) {
+      setAgencyDetailTab("trips");
     }
-  }, [tab, selectedAgencyId, month, loadAgencyDetail]);
+    prevAgencyIdRef.current = selectedAgencyId;
+  }, [selectedAgencyId]);
+
+  useEffect(() => {
+    if (
+      prevDriverIdRef.current !== null &&
+      prevDriverIdRef.current !== selectedDriverId
+    ) {
+      setDriverDetailTab("trips");
+    }
+    prevDriverIdRef.current = selectedDriverId;
+  }, [selectedDriverId]);
+
+  useEffect(() => {
+    if (tab === "agencies" && selectedAgencyId) {
+      loadAgencyDetail(selectedAgencyId, detailMonth);
+    } else {
+      setAgencyDetail(null);
+    }
+  }, [tab, selectedAgencyId, detailMonth, loadAgencyDetail]);
 
   useEffect(() => {
     if (tab === "drivers" && selectedDriverId) {
-      loadDriverDetail(selectedDriverId, month);
+      loadDriverDetail(selectedDriverId, detailMonth);
+    } else {
+      setDriverDetail(null);
     }
-  }, [tab, selectedDriverId, month, loadDriverDetail]);
+  }, [tab, selectedDriverId, detailMonth, loadDriverDetail]);
 
   const filteredAgencies = useMemo(() => {
     const q = listSearch.trim().toLowerCase();
     if (!q) return agencies;
-    return agencies.filter(
-      (a) =>
-        a.name.toLowerCase().includes(q) ||
-        String(a.phone ?? "")
-          .toLowerCase()
-          .includes(q),
+    return agencies.filter((a) =>
+      formatAgencyLabel(a).toLowerCase().includes(q),
     );
   }, [agencies, listSearch]);
 
@@ -370,33 +476,34 @@ export function TransactionHistoryPage() {
     });
   }, [drivers, listSearch]);
 
+  // Cards: same source fields as Cash In / Cash Out summary.
+  // Grand Total = bulk (+) − vehicle (−); Remaining = CICO net remaining.
   const agencyCards = useMemo(() => {
     if (!agencyDetail) return null;
-    // Bulk: Grand Total (not Balance / not GT−Advance).
-    // Remaining = Grand Total − Received − vehicle profit still to pay.
-    //   Cash In lowers Remaining; vehicle agency profit also lowers Remaining.
     const bulk = agencyDetail.summary.cashInBulk;
     const profit = agencyDetail.summary.cashOutAgencyProfit;
-    const grandTotal = Math.max(Number(bulk.totalOwed) || 0, 0);
-    const received = Math.max(Number(bulk.received) || 0, 0);
-    const profitStillToPay = Math.max(Number(profit.remaining) || 0, 0);
-    const remaining = grandTotal - received - profitStillToPay;
+    const bulkTotal = Number(bulk.fromTrips) || 0;
+    const vehicleOut = Number(profit.fromTrips) || 0;
+    const grandTotal = bulkTotal - vehicleOut;
+    const received = Number(bulk.received) || 0;
+    const remaining = agencyTotalRemaining(agencyDetail);
     return {
       grandTotal,
       received,
       remaining,
+      bulkTotal,
+      vehicleOut,
     };
   }, [agencyDetail]);
 
   const driverCards = useMemo(() => {
     if (!driverDetail) return null;
-    const grandTotal =
-      driverDetail.summary.vehicleBata.totalOwed +
-      driverDetail.summary.bulkAdvance.totalOwed;
-    const toPay =
-      driverDetail.summary.vehicleBata.remaining +
-      driverDetail.summary.bulkAdvance.remaining;
-    return { grandTotal, toPay };
+    const bulkTrips = Number(driverDetail.summary.bulkAdvance.fromTrips) || 0;
+    const vehicleTrips = Number(driverDetail.summary.vehicleBata.fromTrips) || 0;
+    return {
+      grandTotal: bulkTrips + vehicleTrips,
+      toPay: driverTotalRemaining(driverDetail),
+    };
   }, [driverDetail]);
 
   const txRows = useMemo(() => {
@@ -450,14 +557,14 @@ export function TransactionHistoryPage() {
     !!dateTo ||
     !!tableSearch.trim() ||
     directionFilter !== "all" ||
-    month !== "all_time";
+    detailMonth !== "all_time";
 
   const clearFilters = () => {
     setDateFrom("");
     setDateTo("");
     setTableSearch("");
     setDirectionFilter("all");
-    setMonth("all_time");
+    setDetailMonth("all_time");
     setSortDir("desc");
   };
 
@@ -466,21 +573,36 @@ export function TransactionHistoryPage() {
 
   const selectedTitle =
     tab === "agencies"
-      ? agencies.find((a) => (a._id ?? a.id) === selectedAgencyId)?.name ??
-        agencyDetail?.agency.name ??
-        "Agency"
+      ? (() => {
+          const a = agencies.find(
+            (x) => (x._id ?? x.id) === selectedAgencyId,
+          );
+          return a
+            ? formatAgencyLabel(a)
+            : agencyDetail?.agency.name ?? "Agency";
+        })()
       : (() => {
-          const d = drivers.find((x) => x._id === selectedDriverId);
+          const d = drivers.find(
+            (x) => (x._id ?? x.id) === selectedDriverId,
+          );
           return d
             ? driverName(d)
             : driverDetail?.driver.displayName ?? "Driver";
         })();
 
   const clearDetail = () => {
-    setSelectedAgencyId(null);
-    setSelectedDriverId(null);
-    setAgencyDetail(null);
-    setDriverDetail(null);
+    if (tab === "agencies") setSelectedAgencyId(null);
+    else setSelectedDriverId(null);
+  };
+
+  const refreshAll = () => {
+    if (tab === "agencies") {
+      loadAgencies();
+      if (selectedAgencyId) loadAgencyDetail(selectedAgencyId, detailMonth);
+    } else {
+      loadDrivers();
+      if (selectedDriverId) loadDriverDetail(selectedDriverId, detailMonth);
+    }
   };
 
   return (
@@ -507,10 +629,7 @@ export function TransactionHistoryPage() {
                   ? "bg-blue-600 text-white shadow-sm"
                   : "bg-transparent text-slate-500 hover:text-slate-700"
               }`}
-              onClick={() => {
-                setTab(id);
-                clearDetail();
-              }}
+              onClick={() => setTab(id)}
             >
               <Icon className="h-3.5 w-3.5 shrink-0" />
               <span className="truncate">{label}</span>
@@ -528,11 +647,7 @@ export function TransactionHistoryPage() {
           </Link>
           <button
             type="button"
-            onClick={() => {
-              loadLists();
-              if (selectedAgencyId) loadAgencyDetail(selectedAgencyId, month);
-              if (selectedDriverId) loadDriverDetail(selectedDriverId, month);
-            }}
+            onClick={refreshAll}
             className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 sm:h-9 sm:w-9"
             title="Refresh"
           >
@@ -592,11 +707,7 @@ export function TransactionHistoryPage() {
                     <button
                       key={id}
                       type="button"
-                      onClick={() => {
-                        setSelectedAgencyId(id);
-                        setSelectedDriverId(null);
-                        setDriverDetail(null);
-                      }}
+                      onClick={() => setSelectedAgencyId(id)}
                       className={`w-full rounded-xl border p-3 text-left transition ${
                         sel
                           ? "border-blue-400 bg-blue-50 shadow-sm"
@@ -609,7 +720,7 @@ export function TransactionHistoryPage() {
                         </div>
                         <div className="min-w-0 flex-1">
                           <p className="truncate text-sm font-semibold text-slate-900">
-                            {a.name}
+                            {formatAgencyLabel(a)}
                           </p>
                           <p className="truncate text-xs text-slate-400">
                             {a.phone || "Agency"}
@@ -629,11 +740,7 @@ export function TransactionHistoryPage() {
                   <button
                     key={d._id}
                     type="button"
-                    onClick={() => {
-                      setSelectedDriverId(d._id);
-                      setSelectedAgencyId(null);
-                      setAgencyDetail(null);
-                    }}
+                    onClick={() => setSelectedDriverId(d._id)}
                     className={`w-full rounded-xl border p-3 text-left transition ${
                       sel
                         ? "border-blue-400 bg-blue-50 shadow-sm"
@@ -710,7 +817,8 @@ export function TransactionHistoryPage() {
                     <SummaryCard
                       label="Grand Total"
                       value={agencyCards.grandTotal}
-                      hint="Bulk trips"
+                      hint={`Bulk +₹${agencyCards.bulkTotal.toLocaleString("en-IN")} · Vehicle −₹${agencyCards.vehicleOut.toLocaleString("en-IN")}`}
+                      signed
                     />
                     <SummaryCard
                       label="Received"
@@ -721,7 +829,7 @@ export function TransactionHistoryPage() {
                     <SummaryCard
                       label="Remaining"
                       value={agencyCards.remaining}
-                      hint="Grand Total − Received − vehicle profit due"
+                      hint="Net to collect (bulk remaining − vehicle remaining)"
                       tone="remaining"
                       signed
                     />
@@ -775,8 +883,8 @@ export function TransactionHistoryPage() {
                       <div>
                         <FilterLabel>Month</FilterLabel>
                         <select
-                          value={month}
-                          onChange={(e) => setMonth(e.target.value)}
+                          value={detailMonth}
+                          onChange={(e) => setDetailMonth(e.target.value)}
                           className={filterControlCls}
                         >
                           {MONTH_OPTIONS.map((o) => (
@@ -834,13 +942,13 @@ export function TransactionHistoryPage() {
 
                     {hasActiveFilters && (
                       <div className="flex flex-wrap gap-1.5 border-t border-slate-200/80 pt-2.5">
-                        {month !== "all_time" && (
+                        {detailMonth !== "all_time" && (
                           <ActiveFilterPill
                             label={
-                              MONTH_OPTIONS.find((o) => o.value === month)
-                                ?.label || month
+                              MONTH_OPTIONS.find((o) => o.value === detailMonth)
+                                ?.label || detailMonth
                             }
-                            onClear={() => setMonth("all_time")}
+                            onClear={() => setDetailMonth("all_time")}
                           />
                         )}
                         {dateFrom && (

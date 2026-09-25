@@ -23,7 +23,9 @@ export default defineConfig({
     proxy: {
       '/auth': { target: BACKEND, changeOrigin: true },
       '/owners': { target: BACKEND, changeOrigin: true },
-      '/guest': { target: BACKEND, changeOrigin: true },
+      // Use trailing slash so SPA route /guest-bulk/:token is NOT proxied.
+      // API paths are /guest/bulk/:token.
+      '/guest/': { target: BACKEND, changeOrigin: true },
       '/drivers': { target: BACKEND, changeOrigin: true },
       '/admin': { target: BACKEND, changeOrigin: true },
       '/health': { target: BACKEND, changeOrigin: true },

@@ -173,7 +173,11 @@ export const PLPage: React.FC = () => {
 
       {data && (
         <div className="space-y-4 sm:space-y-6 lg:space-y-8">
-          <RevenueBreakdown revenue={data.revenue} summary={data.summary} />
+          <RevenueBreakdown
+            revenue={data.revenue}
+            summary={data.summary}
+            onRefresh={() => loadData(startDate, endDate, true)}
+          />
           <TripStatistics trips={data.trips} />
           <TopRoutes routes={data.topRoutes} />
         </div>

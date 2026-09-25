@@ -1,4 +1,4 @@
-import { NavLink, useLocation, useNavigate } from 'react-router-dom';
+import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import {
   LayoutDashboard,
   Car,
@@ -16,26 +16,32 @@ import {
   X,
   LogOut,
   CirclePlus,
+  FileCheck2,
   ChevronsLeft,
   ChevronsRight,
-} from 'lucide-react';
-import { useAuth } from '../hooks/useAuth';
+} from "lucide-react";
+import { useAuth } from "../hooks/useAuth";
 
 const menuItems = [
-  { label: 'Dashboard', path: '/', icon: LayoutDashboard },
-  { label: 'Create Trip', path: '/create-trip', icon: CirclePlus },
-  { label: 'P&L', path: '/pl', icon: TrendingUp },
-  { label: 'Trip Details', path: '/vehicles', icon: Car },
-  { label: 'Tracking', path: '/tracking', icon: Navigation },
-  { label: 'Drivers', path: '/drivers', icon: Users },
-  { label: 'Expenses', path: '/expenses', icon: Receipt },
-  { label: 'Reminders', path: '/reminders', icon: Bell },
-  { label: 'Bulk Entry', path: '/bulk-entry', icon: ListChecks },
+  { label: "Dashboard", path: "/", icon: LayoutDashboard },
+  { label: "Create Trip", path: "/create-trip", icon: CirclePlus },
+  { label: "Trip Confirmation", path: "/trip-confirmation", icon: FileCheck2 },
+  { label: "P&L", path: "/pl", icon: TrendingUp },
+  { label: "Trip Details", path: "/vehicles", icon: Car },
+  { label: "Tracking", path: "/tracking", icon: Navigation },
+  { label: "Drivers", path: "/drivers", icon: Users },
+  { label: "Expenses", path: "/expenses", icon: Receipt },
+  { label: "Reminders", path: "/reminders", icon: Bell },
+  { label: "Bulk Entry", path: "/bulk-entry", icon: ListChecks },
   // { label: 'Cash In / Cash Out', path: '/cash-in-cash-out', icon: ArrowRightLeft },
-  { label: 'Transaction', path: '/transaction', icon: Wallet },
-  { label: 'Transaction History', path: '/transaction-history', icon: ScrollText },
-  { label: 'Reports', path: '/reports', icon: FileBarChart },
-  { label: 'History', path: '/history', icon: History },
+  { label: "Transaction", path: "/transaction", icon: Wallet },
+  {
+    label: "Transaction History",
+    path: "/transaction-history",
+    icon: ScrollText,
+  },
+  { label: "Reports", path: "/reports", icon: FileBarChart },
+  { label: "History", path: "/history", icon: History },
 ];
 
 interface SidebarProps {
@@ -44,26 +50,32 @@ interface SidebarProps {
   onToggleCollapse?: () => void;
 }
 
-export function Sidebar({ onClose, collapsed, onToggleCollapse }: SidebarProps) {
+export function Sidebar({
+  onClose,
+  collapsed,
+  onToggleCollapse,
+}: SidebarProps) {
   const { user, logout } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
 
-  const userName = user?.name || 'Owner';
+  const userName = user?.name || "Owner";
   const initials = userName
-    .split(' ')
+    .split(" ")
     .map((n: string) => n[0])
-    .join('')
+    .join("")
     .slice(0, 2)
     .toUpperCase();
 
   const goProfile = () => {
-    navigate('/profile');
+    navigate("/profile");
     onClose?.();
   };
-  
+
   return (
-    <aside className={`flex h-full shrink-0 flex-col bg-white border-r border-slate-200 transition-all duration-200 ${collapsed ? 'w-16' : 'w-60'}`}>
+    <aside
+      className={`flex h-full shrink-0 flex-col bg-white border-r border-slate-200 transition-all duration-200 ${collapsed ? "w-16" : "w-60"}`}
+    >
       {/* Logo Header */}
       <div className="flex h-14 items-center justify-between border-b border-slate-100 px-3 shrink-0">
         <div className="flex items-center gap-2.5 min-w-0">
@@ -71,7 +83,9 @@ export function Sidebar({ onClose, collapsed, onToggleCollapse }: SidebarProps) 
             <Car className="h-4 w-4" />
           </span>
           {!collapsed && (
-            <span className="text-sm font-bold text-slate-900 truncate">Tripwise</span>
+            <span className="text-sm font-bold text-slate-900 truncate">
+              Tripwise
+            </span>
           )}
         </div>
         {onClose && (
@@ -90,27 +104,29 @@ export function Sidebar({ onClose, collapsed, onToggleCollapse }: SidebarProps) 
           const Icon = item.icon;
           // Avoid "/transaction" matching "/transaction-history"
           const isActive =
-            item.path === '/'
-              ? location.pathname === '/'
+            item.path === "/"
+              ? location.pathname === "/"
               : location.pathname === item.path ||
                 location.pathname.startsWith(`${item.path}/`);
-          
+
           return (
             <NavLink
               key={item.path}
               to={item.path}
-              end={item.path === '/' || item.path === '/transaction'}
+              end={item.path === "/" || item.path === "/transaction"}
               className={`group flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-[13px] font-medium transition-colors duration-150 ${
                 isActive
-                  ? 'bg-blue-50 text-blue-600'
-                  : 'text-slate-600 hover:bg-slate-50 hover:text-slate-800'
-              } ${collapsed ? 'justify-center px-0' : ''}`}
+                  ? "bg-blue-50 text-blue-600"
+                  : "text-slate-600 hover:bg-slate-50 hover:text-slate-800"
+              } ${collapsed ? "justify-center px-0" : ""}`}
               onClick={onClose}
               title={collapsed ? item.label : undefined}
             >
               <Icon
                 className={`h-[18px] w-[18px] shrink-0 ${
-                  isActive ? 'text-blue-600' : 'text-slate-400 group-hover:text-slate-500'
+                  isActive
+                    ? "text-blue-600"
+                    : "text-slate-400 group-hover:text-slate-500"
                 }`}
               />
               {!collapsed && <span className="truncate">{item.label}</span>}
@@ -125,7 +141,7 @@ export function Sidebar({ onClose, collapsed, onToggleCollapse }: SidebarProps) 
           <button
             onClick={onToggleCollapse}
             className="flex w-full items-center justify-center gap-2 rounded-lg px-3 py-2 text-xs font-medium text-slate-400 hover:bg-slate-50 hover:text-slate-600 transition-colors"
-            title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
           >
             {collapsed ? (
               <ChevronsRight className="h-4 w-4" />
@@ -141,7 +157,9 @@ export function Sidebar({ onClose, collapsed, onToggleCollapse }: SidebarProps) 
 
       {/* User Footer */}
       <div className="border-t border-slate-200 p-2 shrink-0">
-        <div className={`flex items-center gap-2.5 rounded-lg p-2 ${collapsed ? 'justify-center' : ''}`}>
+        <div
+          className={`flex items-center gap-2.5 rounded-lg p-2 ${collapsed ? "justify-center" : ""}`}
+        >
           {!collapsed ? (
             <>
               <button
@@ -149,22 +167,29 @@ export function Sidebar({ onClose, collapsed, onToggleCollapse }: SidebarProps) 
                 onClick={goProfile}
                 title="View profile"
                 className={`flex min-w-0 flex-1 items-center gap-2.5 rounded-lg p-1 text-left transition-colors hover:bg-slate-50 ${
-                  location.pathname === '/profile' ? 'bg-blue-50' : ''
+                  location.pathname === "/profile" ? "bg-blue-50" : ""
                 }`}
               >
                 <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-blue-50 text-blue-600 text-xs font-bold">
                   {initials}
                 </span>
                 <div className="min-w-0 flex-1">
-                  <div className="truncate text-sm font-medium text-slate-700">{userName}</div>
+                  <div className="truncate text-sm font-medium text-slate-700">
+                    {userName}
+                  </div>
                   {user?.email && (
-                    <div className="truncate text-[11px] text-slate-400">{user.email}</div>
+                    <div className="truncate text-[11px] text-slate-400">
+                      {user.email}
+                    </div>
                   )}
                 </div>
               </button>
               <button
                 type="button"
-                onClick={() => { logout(); onClose?.(); }}
+                onClick={() => {
+                  logout();
+                  onClose?.();
+                }}
                 title="Sign out"
                 className="flex shrink-0 items-center justify-center rounded-lg p-2 text-slate-400 hover:bg-red-50 hover:text-red-500 transition-colors"
               >
@@ -178,16 +203,19 @@ export function Sidebar({ onClose, collapsed, onToggleCollapse }: SidebarProps) 
                 onClick={goProfile}
                 title="View profile"
                 className={`flex h-8 w-8 items-center justify-center rounded-full text-xs font-bold transition-colors ${
-                  location.pathname === '/profile'
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-blue-50 text-blue-600 hover:bg-blue-100'
+                  location.pathname === "/profile"
+                    ? "bg-blue-600 text-white"
+                    : "bg-blue-50 text-blue-600 hover:bg-blue-100"
                 }`}
               >
                 {initials}
               </button>
               <button
                 type="button"
-                onClick={() => { logout(); onClose?.(); }}
+                onClick={() => {
+                  logout();
+                  onClose?.();
+                }}
                 title="Sign out"
                 className="flex items-center justify-center rounded-lg p-2 text-slate-400 hover:bg-red-50 hover:text-red-500 transition-colors"
               >

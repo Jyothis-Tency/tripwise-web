@@ -52,6 +52,7 @@ export const ApiEndpoints = {
 
   // ANALYTICS
   analyticsOverview: '/owners/analytics/overview',
+  extraCommissions: '/owners/analytics/extra-commissions',
 
   // REPORTS
   reportsCatalog: '/owners/reports/catalog',

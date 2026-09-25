@@ -18,7 +18,6 @@ import {
   CloudOff,
   Copy,
   Check,
-  Link2,
   Ban,
   RotateCcw,
 } from "lucide-react";
@@ -129,15 +128,43 @@ function VehicleGroupsEditor({
   onChange: Dispatch<SetStateAction<DriverGroup[]>>;
   readOnly?: boolean;
 }) {
+  const updateRowField = (
+    gi: number,
+    ri: number,
+    field: string,
+    type: "date" | "number" | "text",
+    raw: string,
+  ) => {
+    onChange((prev) => {
+      const next = [...prev];
+      const rows = [...next[gi].rows];
+      const val = type === "number" ? Number(raw) || 0 : raw;
+      rows[ri] = { ...rows[ri], [field]: val };
+      next[gi] = { ...next[gi], rows };
+      return next;
+    });
+  };
+
+  const fields = [
+    ["startDate", "date", "Start date"],
+    ["endDate", "date", "End date"],
+    ["startKm", "text", "Start KM"],
+    ["endKm", "text", "End KM"],
+    ["toll", "number", "Toll"],
+    ["advancePaid", "number", "Advance"],
+    ["grandTotal", "number", "Total"],
+    ["notes", "text", "Notes"],
+  ] as const;
+
   return (
     <div className="space-y-3">
       {groups.map((g, gi) => (
         <div
           key={gi}
-          className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden"
+          className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm"
         >
-          <div className="flex flex-wrap items-center gap-2 border-b border-slate-100 bg-blue-50/50 px-4 py-3">
-            <span className="flex h-7 w-7 items-center justify-center rounded-full bg-blue-100 text-xs font-bold text-blue-600">
+          <div className="flex items-center gap-2 border-b border-slate-100 bg-blue-50/50 px-3 py-2.5 sm:px-4 sm:py-3">
+            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-blue-100 text-xs font-bold text-blue-600">
               {gi + 1}
             </span>
             <input
@@ -152,7 +179,7 @@ function VehicleGroupsEditor({
                 });
               }}
               placeholder="Vehicle number"
-              className="min-w-[140px] flex-1 rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium disabled:bg-slate-50"
+              className="min-w-0 flex-1 rounded-lg border border-slate-200 px-3 py-2.5 text-sm font-medium disabled:bg-slate-50"
             />
             {!readOnly && groups.length > 1 && (
               <button
@@ -160,15 +187,90 @@ function VehicleGroupsEditor({
                 onClick={() =>
                   onChange((prev) => prev.filter((_, i) => i !== gi))
                 }
-                className="p-1 text-red-400 hover:text-red-600"
+                className="shrink-0 rounded-lg p-2 text-red-400 hover:bg-red-50 hover:text-red-600"
+                aria-label="Remove vehicle"
               >
                 <Trash2 className="h-4 w-4" />
               </button>
             )}
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm min-w-[720px]">
+          {/* Mobile: stacked trip cards */}
+          <div className="space-y-3 p-3 md:hidden">
+            {g.rows.map((r, ri) => (
+              <div
+                key={r.clientRowId}
+                className="rounded-xl border border-slate-200 bg-slate-50/80 p-3"
+              >
+                <div className="mb-2 flex items-center justify-between gap-2">
+                  <span className="text-[10px] font-bold uppercase tracking-wide text-slate-400">
+                    Trip {ri + 1}
+                  </span>
+                  {!readOnly && g.rows.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        onChange((prev) => {
+                          const next = [...prev];
+                          next[gi] = {
+                            ...next[gi],
+                            rows: next[gi].rows.filter((_, i) => i !== ri),
+                          };
+                          return next;
+                        })
+                      }
+                      className="rounded-lg p-1.5 text-red-400 hover:bg-red-50 hover:text-red-500"
+                      aria-label="Remove trip"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  )}
+                </div>
+                <div className="grid grid-cols-2 gap-2.5">
+                  {fields.map(([field, type, label]) => (
+                    <label
+                      key={field}
+                      className={
+                        field === "notes" || field === "grandTotal"
+                          ? "col-span-2 block"
+                          : "block"
+                      }
+                    >
+                      <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+                        {label}
+                      </span>
+                      <input
+                        disabled={readOnly}
+                        type={
+                          type === "date"
+                            ? "date"
+                            : type === "number"
+                              ? "number"
+                              : "text"
+                        }
+                        inputMode={
+                          type === "number" ? "decimal" : undefined
+                        }
+                        value={
+                          type === "number"
+                            ? String((r as any)[field] || "")
+                            : String((r as any)[field] ?? "")
+                        }
+                        onChange={(e) =>
+                          updateRowField(gi, ri, field, type, e.target.value)
+                        }
+                        className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-2.5 py-2.5 text-sm disabled:bg-slate-50"
+                      />
+                    </label>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Desktop: table */}
+          <div className="hidden overflow-x-auto md:block">
+            <table className="w-full min-w-[720px] text-sm">
               <thead>
                 <tr className="border-b border-slate-100 text-left text-xs text-slate-500">
                   <th className="px-3 py-2 font-semibold">Start</th>
@@ -179,24 +281,13 @@ function VehicleGroupsEditor({
                   <th className="px-3 py-2 font-semibold">Advance</th>
                   <th className="px-3 py-2 font-semibold">Total</th>
                   <th className="px-3 py-2 font-semibold">Notes</th>
-                  <th className="px-2 py-2 w-8" />
+                  <th className="w-8 px-2 py-2" />
                 </tr>
               </thead>
               <tbody>
                 {g.rows.map((r, ri) => (
                   <tr key={r.clientRowId} className="border-b border-slate-50">
-                    {(
-                      [
-                        ["startDate", "date"],
-                        ["endDate", "date"],
-                        ["startKm", "text"],
-                        ["endKm", "text"],
-                        ["toll", "number"],
-                        ["advancePaid", "number"],
-                        ["grandTotal", "number"],
-                        ["notes", "text"],
-                      ] as const
-                    ).map(([field, type]) => (
+                    {fields.map(([field, type]) => (
                       <td key={field} className="px-2 py-1.5">
                         <input
                           disabled={readOnly}
@@ -212,18 +303,15 @@ function VehicleGroupsEditor({
                               ? String((r as any)[field] || "")
                               : String((r as any)[field] ?? "")
                           }
-                          onChange={(e) => {
-                            const raw = e.target.value;
-                            onChange((prev) => {
-                              const next = [...prev];
-                              const rows = [...next[gi].rows];
-                              const val =
-                                type === "number" ? Number(raw) || 0 : raw;
-                              rows[ri] = { ...rows[ri], [field]: val };
-                              next[gi] = { ...next[gi], rows };
-                              return next;
-                            });
-                          }}
+                          onChange={(e) =>
+                            updateRowField(
+                              gi,
+                              ri,
+                              field,
+                              type,
+                              e.target.value,
+                            )
+                          }
                           className="w-full min-w-[88px] rounded border border-slate-200 px-2 py-1.5 text-sm disabled:bg-slate-50"
                         />
                       </td>
@@ -253,8 +341,9 @@ function VehicleGroupsEditor({
               </tbody>
             </table>
           </div>
+
           {!readOnly && (
-            <div className="px-4 py-2 border-t border-slate-50">
+            <div className="border-t border-slate-50 px-3 py-2.5 sm:px-4">
               <button
                 type="button"
                 onClick={() =>
@@ -267,7 +356,7 @@ function VehicleGroupsEditor({
                     return next;
                   })
                 }
-                className="text-xs font-semibold text-blue-600 hover:text-blue-700"
+                className="w-full rounded-lg py-2 text-xs font-semibold text-blue-600 hover:bg-blue-50 hover:text-blue-700 sm:w-auto sm:py-1"
               >
                 + Add row
               </button>
@@ -279,10 +368,8 @@ function VehicleGroupsEditor({
       {!readOnly && (
         <button
           type="button"
-          onClick={() =>
-            onChange((prev) => [...prev, emptyVehicleGroup()])
-          }
-          className="flex items-center gap-2 rounded-lg border border-dashed border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-600 hover:border-blue-300 hover:text-blue-600 w-full justify-center"
+          onClick={() => onChange((prev) => [...prev, emptyVehicleGroup()])}
+          className="flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-600 hover:border-blue-300 hover:text-blue-600"
         >
           <Plus className="h-4 w-4" /> Add vehicle
         </button>
@@ -613,39 +700,43 @@ export function GuestBulkEntryPage() {
     : "";
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      <header className="sticky top-0 z-20 border-b border-slate-200 bg-white/95 backdrop-blur px-4 py-3 shadow-sm">
-        <div className="mx-auto max-w-5xl flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
+    <div className="min-h-screen bg-slate-50 pb-[env(safe-area-inset-bottom)]">
+      <header className="sticky top-0 z-20 border-b border-slate-200 bg-white/95 px-3 py-2.5 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-white/90 sm:px-4 sm:py-3">
+        <div className="mx-auto flex max-w-5xl flex-col gap-2.5 sm:flex-row sm:items-center sm:gap-4">
           <div className="min-w-0 flex-1">
             <p className="text-[10px] font-bold uppercase tracking-wider text-blue-500">
               {isOwner
                 ? "Tripware · owner review"
                 : "Tripware · driver entry"}
             </p>
-            <h1 className="text-base font-bold text-slate-800 truncate">
+            <h1 className="truncate text-base font-bold leading-snug text-slate-800 sm:text-lg">
               {invite.label}
             </h1>
             {expiresLabel && (
-              <p className="text-xs text-slate-400">Expires {expiresLabel}</p>
+              <p className="mt-0.5 text-[11px] text-slate-400 sm:text-xs">
+                Expires {expiresLabel}
+              </p>
             )}
           </div>
-          <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex flex-wrap items-center gap-2">
             <SyncBadge status={syncStatus} />
             <button
               type="button"
               onClick={copyShareLink}
               title="Copy share link"
-              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-xs sm:text-sm font-semibold text-slate-600 hover:border-blue-300 hover:text-blue-600 shadow-sm"
+              className="inline-flex min-h-10 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 shadow-sm hover:border-blue-300 hover:text-blue-600 sm:text-sm"
             >
               {linkCopied ? (
                 <Check className="h-4 w-4 text-emerald-600" />
               ) : (
                 <Copy className="h-4 w-4" />
               )}
+              <span className="sm:hidden">
+                {linkCopied ? "Copied" : "Link"}
+              </span>
               <span className="hidden sm:inline">
                 {linkCopied ? "Copied" : "Copy link"}
               </span>
-              <Link2 className="h-3.5 w-3.5 sm:hidden" />
             </button>
             {isOwner && (
               <button
@@ -657,7 +748,7 @@ export function GuestBulkEntryPage() {
                     ? "Unrevoke — allow drivers"
                     : "Revoke — block drivers"
                 }
-                className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-2.5 text-xs sm:text-sm font-semibold shadow-sm disabled:opacity-60 ${
+                className={`inline-flex min-h-10 items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-semibold shadow-sm disabled:opacity-60 sm:text-sm ${
                   invite.status === "revoked"
                     ? "border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
                     : "border-red-200 bg-white text-red-600 hover:bg-red-50"
@@ -668,7 +759,7 @@ export function GuestBulkEntryPage() {
                 ) : (
                   <Ban className="h-4 w-4" />
                 )}
-                <span className="hidden sm:inline">
+                <span>
                   {invite.status === "revoked" ? "Unrevoke" : "Revoke"}
                 </span>
               </button>
@@ -678,7 +769,7 @@ export function GuestBulkEntryPage() {
                 type="button"
                 disabled={Boolean(approving)}
                 onClick={() => onApprove()}
-                className="rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-emerald-700 disabled:opacity-60 shadow-sm"
+                className="min-h-10 flex-1 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-bold text-white shadow-sm hover:bg-emerald-700 disabled:opacity-60 sm:flex-none"
               >
                 {approving === "__all__" ? "Approving…" : "Approve all"}
               </button>
@@ -687,23 +778,23 @@ export function GuestBulkEntryPage() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-5xl p-4 sm:p-6 space-y-4">
+      <main className="mx-auto max-w-5xl space-y-3 p-3 sm:space-y-4 sm:p-6">
         {isOwner && (
-          <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800 space-y-2">
-            <p>
+          <div className="space-y-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-3 text-sm text-emerald-800 sm:rounded-lg sm:px-4">
+            <p className="text-xs leading-relaxed sm:text-sm">
               You are viewing this as the owner. Edits still autosave. Use{" "}
               <strong>Approve</strong> to merge into Bulk Entry. You can open
               this link anytime — even if revoked or expired.
             </p>
             {(invite.status === "revoked" || invite.expired) && (
-              <p className="text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-xs">
+              <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
                 {invite.status === "revoked"
                   ? "Revoked — drivers cannot open this link."
                   : "Expired — drivers cannot open this link."}{" "}
                 Unrevoke / extend expiry to restore driver access.
               </p>
             )}
-            <label className="flex flex-wrap items-center gap-2 text-xs text-emerald-900">
+            <label className="flex flex-col gap-1.5 text-xs text-emerald-900 sm:flex-row sm:flex-wrap sm:items-center sm:gap-2">
               <span className="font-semibold">Expires</span>
               <input
                 type="datetime-local"
@@ -715,23 +806,23 @@ export function GuestBulkEntryPage() {
                   const prev = toLocalInputValue(invite.expiresAt);
                   if (next && next !== prev) void onOwnerExpiryChange(next);
                 }}
-                className="rounded-lg border border-emerald-200 bg-white px-2 py-1.5 text-xs text-slate-700"
+                className="w-full rounded-lg border border-emerald-200 bg-white px-2 py-2 text-xs text-slate-700 sm:w-auto sm:py-1.5"
               />
             </label>
           </div>
         )}
 
         {approveError && (
-          <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-3 text-sm text-red-700 sm:px-4">
             {approveError}
           </div>
         )}
 
-        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm space-y-3">
+        <div className="space-y-3 rounded-xl border border-slate-200 bg-white p-3 shadow-sm sm:p-4">
           <p className="text-xs font-bold uppercase tracking-wider text-slate-500">
             Driver details
           </p>
-          <div className="grid sm:grid-cols-2 gap-3">
+          <div className="grid gap-3 sm:grid-cols-2">
             <label className="block">
               <span className="text-xs font-semibold text-slate-500">
                 Name *
@@ -739,7 +830,7 @@ export function GuestBulkEntryPage() {
               <input
                 value={driverName}
                 onChange={(e) => setDriverName(e.target.value)}
-                className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm"
                 placeholder="Driver name"
               />
             </label>
@@ -748,7 +839,8 @@ export function GuestBulkEntryPage() {
               <input
                 value={driverPhone}
                 onChange={(e) => setDriverPhone(e.target.value)}
-                className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                inputMode="tel"
+                className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm"
                 placeholder="Mobile number"
               />
             </label>
@@ -760,15 +852,15 @@ export function GuestBulkEntryPage() {
           return (
             <section
               key={block.clientId}
-              className={`rounded-2xl border p-4 sm:p-5 space-y-3 ${
+              className={`space-y-3 rounded-2xl border p-3 sm:p-5 ${
                 accepted
                   ? "border-emerald-200 bg-emerald-50/40"
                   : "border-slate-200 bg-white shadow-sm"
               }`}
             >
-              <div className="flex flex-wrap items-center gap-2 justify-between">
-                <div className="flex items-center gap-2 min-w-0">
-                  <Building2 className="h-4 w-4 text-slate-400 shrink-0" />
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex min-w-0 items-center gap-2">
+                  <Building2 className="h-4 w-4 shrink-0 text-slate-400" />
                   <h2 className="text-sm font-bold text-slate-800">
                     Agency {bi + 1}
                   </h2>
@@ -784,7 +876,7 @@ export function GuestBulkEntryPage() {
                       type="button"
                       disabled={Boolean(approving)}
                       onClick={() => onApprove(block.clientId)}
-                      className="rounded-lg bg-emerald-600 px-3 py-2 text-xs font-bold text-white hover:bg-emerald-700 disabled:opacity-60"
+                      className="min-h-9 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-bold text-white hover:bg-emerald-700 disabled:opacity-60"
                     >
                       {approving === block.clientId ? "…" : "Approve"}
                     </button>
@@ -797,8 +889,9 @@ export function GuestBulkEntryPage() {
                           prev.filter((b) => b.clientId !== block.clientId),
                         )
                       }
-                      className="p-1.5 text-red-400 hover:text-red-600"
+                      className="rounded-lg p-2 text-red-400 hover:bg-red-50 hover:text-red-600"
                       title="Remove agency"
+                      aria-label="Remove agency"
                     >
                       <Trash2 className="h-4 w-4" />
                     </button>
@@ -807,7 +900,7 @@ export function GuestBulkEntryPage() {
               </div>
 
               {!accepted ? (
-                <div className="flex flex-wrap gap-2">
+                <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
                   <select
                     value={block.agencyId ?? ""}
                     onChange={(e) => {
@@ -818,7 +911,7 @@ export function GuestBulkEntryPage() {
                         agencyName: a?.name ?? "",
                       });
                     }}
-                    className="flex-1 min-w-[180px] rounded-lg border border-slate-200 px-3 py-2.5 text-sm"
+                    className="min-h-11 w-full min-w-0 flex-1 rounded-lg border border-slate-200 px-3 py-2.5 text-sm sm:min-w-[180px]"
                   >
                     <option value="">Select agency…</option>
                     {agencies.map((a) => (
@@ -831,9 +924,9 @@ export function GuestBulkEntryPage() {
                     <button
                       type="button"
                       onClick={() => setShowCreateFor(block.clientId)}
-                      className="flex items-center gap-1.5 rounded-lg bg-blue-500 px-3 py-2.5 text-sm font-semibold text-white hover:bg-blue-600"
+                      className="inline-flex min-h-11 w-full items-center justify-center gap-1.5 rounded-lg bg-blue-500 px-3 py-2.5 text-sm font-semibold text-white hover:bg-blue-600 sm:w-auto"
                     >
-                      <Plus className="h-4 w-4" /> New
+                      <Plus className="h-4 w-4" /> New agency
                     </button>
                   )}
                 </div>
@@ -866,12 +959,12 @@ export function GuestBulkEntryPage() {
         <button
           type="button"
           onClick={() => setBlocks((prev) => [...prev, emptyBlock()])}
-          className="flex items-center gap-2 rounded-lg border border-dashed border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-600 hover:border-blue-300 hover:text-blue-600 w-full justify-center"
+          className="flex min-h-12 w-full items-center justify-center gap-2 rounded-lg border border-dashed border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-600 hover:border-blue-300 hover:text-blue-600"
         >
           <Plus className="h-4 w-4" /> Add another agency
         </button>
 
-        <p className="text-center text-xs text-slate-400 pb-8">
+        <p className="pb-8 text-center text-xs text-slate-400">
           Autosaves as you type · no submit needed
           {invite.maxRows ? ` · max ${invite.maxRows} rows` : ""}
         </p>
@@ -879,12 +972,12 @@ export function GuestBulkEntryPage() {
 
       {showCreateFor && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-0 sm:items-center sm:p-4"
           onClick={(e) =>
             e.target === e.currentTarget && setShowCreateFor(null)
           }
         >
-          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl space-y-4">
+          <div className="w-full max-w-md space-y-4 rounded-t-2xl bg-white p-5 shadow-xl sm:rounded-2xl sm:p-6">
             <h3 className="text-base font-semibold text-slate-900">
               New agency
             </h3>
@@ -898,13 +991,14 @@ export function GuestBulkEntryPage() {
               value={newPhone}
               onChange={(e) => setNewPhone(e.target.value)}
               placeholder="Phone (10+ digits)"
+              inputMode="tel"
               className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm"
             />
-            <div className="flex gap-2">
+            <div className="flex gap-2 pb-[env(safe-area-inset-bottom)] sm:pb-0">
               <button
                 type="button"
                 onClick={() => setShowCreateFor(null)}
-                className="flex-1 rounded-lg border border-slate-200 py-2.5 text-sm font-semibold text-slate-600"
+                className="min-h-11 flex-1 rounded-lg border border-slate-200 py-2.5 text-sm font-semibold text-slate-600"
               >
                 Cancel
               </button>
@@ -912,7 +1006,7 @@ export function GuestBulkEntryPage() {
                 type="button"
                 disabled={creating}
                 onClick={onCreateAgency}
-                className="flex-1 rounded-lg bg-blue-600 py-2.5 text-sm font-bold text-white disabled:opacity-60"
+                className="min-h-11 flex-1 rounded-lg bg-blue-600 py-2.5 text-sm font-bold text-white disabled:opacity-60"
               >
                 {creating ? "Creating…" : "Create"}
               </button>

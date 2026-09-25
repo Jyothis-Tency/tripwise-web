@@ -12,6 +12,10 @@ export interface PLRevenue {
   driverSalary: number;
   agencyProfit: number;
   ownerProfit?: number;
+  /** Bulk-only commission (before extra add-ins). */
+  commissionFromBulk?: number;
+  /** Sum of manual Extra Commission add-ins in the period. */
+  extraCommission?: number;
 }
 
 export interface PLSummary {
@@ -45,6 +49,14 @@ export interface PLDataResponse {
   drivers?: any;
 }
 
+export interface ExtraCommissionEntry {
+  _id: string;
+  amount: number;
+  paymentDate: string | null;
+  notes: string;
+  createdAt: string | null;
+}
+
 export const fetchPLData = async (
   period?: string,
   startDate?: string,
@@ -66,3 +78,20 @@ export const fetchPLData = async (
     throw new Error('Failed to fetch P&L data');
   }
 };
+
+export async function fetchExtraCommissions(): Promise<ExtraCommissionEntry[]> {
+  const res = await apiClient.get(ApiEndpoints.extraCommissions);
+  const raw: any = res.data ?? {};
+  const data = raw.data ?? raw;
+  return Array.isArray(data) ? data : [];
+}
+
+export async function addExtraCommission(payload: {
+  amount: number;
+  paymentDate?: string;
+  notes?: string;
+}): Promise<ExtraCommissionEntry> {
+  const res = await apiClient.post(ApiEndpoints.extraCommissions, payload);
+  const raw: any = res.data ?? {};
+  return (raw.data ?? raw) as ExtraCommissionEntry;
+}

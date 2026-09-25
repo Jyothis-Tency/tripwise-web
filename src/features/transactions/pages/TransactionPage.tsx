@@ -11,6 +11,7 @@ import {
 import {
   fetchAgencies,
   fetchDrivers,
+  fetchCashInCashOutAgencyDetail,
   fetchCashInCashOutDriverDetail,
   addAgencyPayoutPayment,
   addDriverPayoutPayment,
@@ -43,6 +44,16 @@ function driverDisplayName(d: Driver) {
   return `${d.firstName ?? ""} ${d.lastName ?? ""}`.trim() || "Driver";
 }
 
+function fmtCurrency(n: number) {
+  return `₹${Math.abs(Math.round(n)).toLocaleString("en-IN")}`;
+}
+
+function fmtSignedCurrency(n: number) {
+  if (n < 0) return `−${fmtCurrency(n)}`;
+  if (n > 0) return `+${fmtCurrency(n)}`;
+  return fmtCurrency(n);
+}
+
 function pickAgencyIdForDriverBulkPayout(
   detail: DriverCashInCashOutDetail,
   agencies: Agency[],
@@ -56,6 +67,43 @@ function pickAgencyIdForDriverBulkPayout(
 
 function FieldLabel({ children }: { children: ReactNode }) {
   return <FilterLabel>{children}</FilterLabel>;
+}
+
+function BalanceStat({
+  label,
+  value,
+  loading,
+  tone = "neutral",
+}: {
+  label: string;
+  value: number | null;
+  loading: boolean;
+  tone?: "neutral" | "remaining";
+}) {
+  const positive = (value ?? 0) >= 0;
+  const valueCls =
+    tone === "remaining"
+      ? positive
+        ? "text-emerald-600"
+        : "text-amber-600"
+      : "text-slate-800";
+
+  return (
+    <div className="text-right">
+      <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+        {label}
+      </p>
+      {loading || value == null ? (
+        <div className="mt-0.5 flex h-5 items-center justify-end">
+          <Loader2 className="h-3.5 w-3.5 animate-spin text-slate-400" />
+        </div>
+      ) : (
+        <p className={`mt-0.5 text-sm font-bold tabular-nums leading-none ${valueCls}`}>
+          {tone === "remaining" ? fmtSignedCurrency(value) : fmtCurrency(value)}
+        </p>
+      )}
+    </div>
+  );
 }
 
 export function TransactionPage() {
@@ -73,6 +121,9 @@ export function TransactionPage() {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const [grandTotal, setGrandTotal] = useState<number | null>(null);
+  const [remaining, setRemaining] = useState<number | null>(null);
+  const [balanceLoading, setBalanceLoading] = useState(false);
 
   const loadLists = useCallback(async () => {
     setLoadingLists(true);
@@ -99,8 +150,60 @@ export function TransactionPage() {
     setNameQuery("");
     setMessage(null);
     setSuccess(false);
+    setGrandTotal(null);
+    setRemaining(null);
     setCashKind(entityType === "driver" ? "cash_out" : "cash_in");
   }, [entityType]);
+
+  const loadBalance = useCallback(
+    async (id: string, type: EntityType) => {
+      if (!id) {
+        setGrandTotal(null);
+        setRemaining(null);
+        return;
+      }
+      setBalanceLoading(true);
+      try {
+        if (type === "agency") {
+          const detail = await fetchCashInCashOutAgencyDetail(id, "all_time");
+          const bulk = Number(detail.summary.cashInBulk.fromTrips) || 0;
+          const vehicle =
+            Number(detail.summary.cashOutAgencyProfit.fromTrips) || 0;
+          // Same as History: Grand Total = bulk (+) − vehicle (−)
+          setGrandTotal(bulk - vehicle);
+          setRemaining(
+            detail.summary.cashInBulk.remaining -
+              detail.summary.cashOutAgencyProfit.remaining,
+          );
+        } else {
+          const detail = await fetchCashInCashOutDriverDetail(id, "all_time");
+          setGrandTotal(
+            (Number(detail.summary.bulkAdvance.fromTrips) || 0) +
+              (Number(detail.summary.vehicleBata.fromTrips) || 0),
+          );
+          setRemaining(
+            detail.summary.vehicleBata.remaining +
+              detail.summary.bulkAdvance.remaining,
+          );
+        }
+      } catch {
+        setGrandTotal(null);
+        setRemaining(null);
+      } finally {
+        setBalanceLoading(false);
+      }
+    },
+    [],
+  );
+
+  useEffect(() => {
+    if (!selectedId) {
+      setGrandTotal(null);
+      setRemaining(null);
+      return;
+    }
+    loadBalance(selectedId, entityType);
+  }, [selectedId, entityType, loadBalance]);
 
   const nameOptions = useMemo(() => {
     const q = nameQuery.trim().toLowerCase();
@@ -227,6 +330,7 @@ export function TransactionPage() {
       setAmount("");
       setNotes("");
       setMessage("Transaction recorded successfully.");
+      if (selectedId) loadBalance(selectedId, entityType);
     } catch (e: unknown) {
       const msg =
         (e as { message?: string })?.message ||
@@ -376,15 +480,36 @@ export function TransactionPage() {
 
                 {/* Payment */}
                 <div className="flex flex-col gap-4 border-t border-slate-100 pt-6 md:border-l md:border-t-0 md:pl-8 md:pt-0">
-                  <div>
-                    <h3 className="text-xs font-bold uppercase tracking-wide text-slate-500">
-                      Payment
-                    </h3>
-                    <p className="mt-0.5 truncate text-xs text-slate-400">
-                      {selected
-                        ? `For ${selected.label}`
-                        : "Select a party first"}
-                    </p>
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <h3 className="text-xs font-bold uppercase tracking-wide text-slate-500">
+                        Payment
+                      </h3>
+                      <p className="mt-0.5 truncate text-xs text-slate-400">
+                        {selected
+                          ? `For ${selected.label}`
+                          : "Select a party first"}
+                      </p>
+                    </div>
+                    {selectedId && (
+                      <div className="flex shrink-0 items-center gap-3 sm:gap-4">
+                        <BalanceStat
+                          label="Grand Total"
+                          value={grandTotal}
+                          loading={balanceLoading}
+                        />
+                        <div
+                          className="h-8 w-px bg-slate-200"
+                          aria-hidden
+                        />
+                        <BalanceStat
+                          label="Remaining"
+                          value={remaining}
+                          loading={balanceLoading}
+                          tone="remaining"
+                        />
+                      </div>
+                    )}
                   </div>
 
                   <div>

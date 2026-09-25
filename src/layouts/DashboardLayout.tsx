@@ -1,40 +1,56 @@
-import { Outlet, useLocation, Link } from 'react-router-dom';
-import { Sidebar } from './Sidebar';
-import { Menu, ChevronRight } from 'lucide-react';
-import { useState, useEffect } from 'react';
-import { useAuth } from '../hooks/useAuth';
+import { Outlet, useLocation, Link } from "react-router-dom";
+import { Sidebar } from "./Sidebar";
+import { Menu, ChevronRight } from "lucide-react";
+import { useState, useEffect } from "react";
+import { useAuth } from "../hooks/useAuth";
 
 const routeTitle: Record<string, string> = {
-  '/': 'Dashboard',
-  '/profile': 'Owner Profile',
-  '/vehicles': 'Trip Details',
-  '/create-trip': 'Create New Trip',
-  '/trips': 'Create New Trip',
-  '/drivers': 'Drivers',
-  '/bulk-entry': 'Bulk Entry',
-  '/expenses': 'Expenses',
-  '/history': 'History',
-  '/history/payout': 'Agency Payout',
-  '/cash-in-cash-out': 'Cash In / Cash Out',
-  '/transaction': 'Transaction',
-  '/transaction-history': 'Transaction History',
-  '/reports': 'Reports',
-  '/analytics': 'Analytics',
-  '/pl': 'P&L',
-  '/reminders': 'Reminders',
-  '/credit-debit': 'Credit / Debit',
-  '/tracking': 'Tracking',
-  '/admin': 'Admin',
+  "/": "Dashboard",
+  "/profile": "Owner Profile",
+  "/vehicles": "Trip Details",
+  "/create-trip": "Create New Trip",
+  "/trips": "Create New Trip",
+  "/trip-confirmation": "Trip Confirmation",
+  "/trip-confirmation/template": "Confirmation Template",
+  "/drivers": "Drivers",
+  "/bulk-entry": "Bulk Entry",
+  "/expenses": "Expenses",
+  "/history": "History",
+  "/history/payout": "Agency Payout",
+  "/cash-in-cash-out": "Cash In / Cash Out",
+  "/transaction": "Transaction",
+  "/transaction-history": "Transaction History",
+  "/reports": "Reports",
+  "/analytics": "Analytics",
+  "/pl": "P&L",
+  "/reminders": "Reminders",
+  "/credit-debit": "Credit / Debit",
+  "/tracking": "Tracking",
+  "/admin": "Admin",
 };
 
 const routeBreadcrumbs: Record<string, { label: string; to?: string }[]> = {
-  '/history/payout': [
-    { label: 'History', to: '/history' },
-    { label: 'Agency Payout' },
+  "/history/payout": [
+    { label: "History", to: "/history" },
+    { label: "Agency Payout" },
+  ],
+  "/trip-confirmation/template": [
+    { label: "Trip Confirmation", to: "/trip-confirmation" },
+    { label: "Template" },
   ],
 };
 
-const fullHeightPaths = ['/vehicles', '/drivers', '/tracking', '/create-trip', '/expenses', '/cash-in-cash-out', '/transaction', '/transaction-history', '/reports'];
+const fullHeightPaths = [
+  "/vehicles",
+  "/drivers",
+  "/tracking",
+  "/create-trip",
+  "/expenses",
+  "/cash-in-cash-out",
+  "/transaction",
+  "/transaction-history",
+  "/reports",
+];
 
 export function DashboardLayout() {
   const { pathname } = useLocation();
@@ -47,17 +63,17 @@ export function DashboardLayout() {
     setIsMobileMenuOpen(false);
   }, [pathname]);
 
-  const title = routeTitle[pathname] ?? (user?.name || 'Dashboard');
+  const title = routeTitle[pathname] ?? (user?.name || "Dashboard");
   const isFull = fullHeightPaths.some((p) => pathname.startsWith(p));
   const breadcrumbs = routeBreadcrumbs[pathname];
 
   const closeMobileMenu = () => setIsMobileMenuOpen(false);
 
-  const userName = user?.name || 'Owner';
+  const userName = user?.name || "Owner";
   const initials = userName
-    .split(' ')
+    .split(" ")
     .map((n: string) => n[0])
-    .join('')
+    .join("")
     .slice(0, 2)
     .toUpperCase();
 
@@ -74,13 +90,13 @@ export function DashboardLayout() {
       {/* Sidebar — mobile: fixed drawer, desktop: static with collapse */}
       <div
         className={`fixed inset-y-0 left-0 z-50 transform bg-white transition-transform duration-200 ease-out lg:static lg:translate-x-0 ${
-          isMobileMenuOpen ? 'translate-x-0 shadow-xl' : '-translate-x-full'
+          isMobileMenuOpen ? "translate-x-0 shadow-xl" : "-translate-x-full"
         }`}
       >
         <Sidebar
           onClose={closeMobileMenu}
           collapsed={isSidebarCollapsed}
-          onToggleCollapse={() => setIsSidebarCollapsed(c => !c)}
+          onToggleCollapse={() => setIsSidebarCollapsed((c) => !c)}
         />
       </div>
 
@@ -95,25 +111,34 @@ export function DashboardLayout() {
             >
               <Menu className="h-5 w-5" />
             </button>
-            
+
             <div className="min-w-0">
               {breadcrumbs ? (
                 <nav className="flex items-center gap-1 text-sm">
                   {breadcrumbs.map((crumb, i) => (
                     <span key={i} className="flex items-center gap-1">
-                      {i > 0 && <ChevronRight className="h-3.5 w-3.5 text-slate-300 shrink-0" />}
+                      {i > 0 && (
+                        <ChevronRight className="h-3.5 w-3.5 text-slate-300 shrink-0" />
+                      )}
                       {crumb.to ? (
-                        <Link to={crumb.to} className="text-slate-400 hover:text-blue-600 font-medium transition-colors">
+                        <Link
+                          to={crumb.to}
+                          className="text-slate-400 hover:text-blue-600 font-medium transition-colors"
+                        >
                           {crumb.label}
                         </Link>
                       ) : (
-                        <span className="text-slate-800 font-semibold">{crumb.label}</span>
+                        <span className="text-slate-800 font-semibold">
+                          {crumb.label}
+                        </span>
                       )}
                     </span>
                   ))}
                 </nav>
               ) : (
-                <h1 className="text-sm font-semibold text-slate-800 truncate">{title}</h1>
+                <h1 className="text-sm font-semibold text-slate-800 truncate">
+                  {title}
+                </h1>
               )}
             </div>
           </div>
@@ -132,7 +157,9 @@ export function DashboardLayout() {
         </header>
 
         {/* Content area */}
-        <main className={`flex-1 overflow-hidden ${isFull ? '' : 'overflow-y-auto p-4 sm:p-6'}`}>
+        <main
+          className={`flex-1 overflow-hidden ${isFull ? "" : "overflow-y-auto p-4 sm:p-6"}`}
+        >
           <Outlet />
         </main>
       </div>

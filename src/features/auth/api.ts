@@ -14,8 +14,11 @@ export type OwnerProfile = {
 };
 
 export const authApi = {
-  async login(email: string, password: string) {
-    const res = await apiClient.post(ApiEndpoints.ownerLogin, { email, password });
+  async login(emailOrPhone: string, password: string) {
+    const res = await apiClient.post(ApiEndpoints.ownerLogin, {
+      email: emailOrPhone,
+      password,
+    });
     const raw: any = res.data ?? {};
     const data = raw.data ?? raw;
     const user = data.owner ?? data.user ?? {};

@@ -252,31 +252,38 @@ function SummaryCard({
   signed?: boolean;
 }) {
   const tones = {
-    neutral: "border-slate-200 bg-white",
-    receive: "border-emerald-200 bg-emerald-50/70",
-    pay: "border-amber-200 bg-amber-50/70",
-    remaining: "border-blue-300 bg-blue-50/80 ring-1 ring-blue-100",
+    neutral:
+      "border-slate-200 bg-[var(--bg-card)] dark:border-[#1e2638]",
+    receive:
+      "border-emerald-200 bg-emerald-50/70 dark:border-emerald-500/30 dark:bg-emerald-500/10",
+    pay: "border-rose-200 bg-rose-50/70 dark:border-rose-500/30 dark:bg-rose-500/10",
+    remaining:
+      "border-indigo-300 bg-indigo-50/80 ring-1 ring-indigo-100 dark:border-indigo-500/40 dark:bg-indigo-500/10 dark:ring-indigo-500/20",
   };
   const valueCls =
     tone === "remaining"
       ? value >= 0
-        ? "text-emerald-700"
-        : "text-amber-700"
+        ? "text-emerald-700 dark:text-emerald-400"
+        : "text-amber-700 dark:text-amber-400"
       : tone === "receive"
-        ? "text-emerald-700"
+        ? "text-emerald-700 dark:text-emerald-400"
         : tone === "pay"
-          ? "text-amber-700"
-          : "text-slate-900";
+          ? "text-rose-700 dark:text-rose-400"
+          : "text-slate-900 dark:text-slate-100";
 
   return (
     <div className={`rounded-xl border p-3 sm:p-4 ${tones[tone]}`}>
-      <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+      <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
         {label}
       </p>
       {hint && (
-        <p className="mt-0.5 text-[10px] font-medium text-slate-400">{hint}</p>
+        <p className="mt-0.5 text-[10px] font-medium text-slate-400 dark:text-slate-500">
+          {hint}
+        </p>
       )}
-      <p className={`mt-2 text-xl font-bold tabular-nums sm:text-2xl ${valueCls}`}>
+      <p
+        className={`mt-2 font-mono text-xl font-bold tabular-nums sm:text-2xl ${valueCls}`}
+      >
         {signed ? fmtSignedCurrency(value) : fmtCurrency(value)}
       </p>
     </div>
@@ -606,11 +613,11 @@ export function TransactionHistoryPage() {
   };
 
   return (
-    <div className="flex h-full flex-col overflow-hidden bg-slate-50">
+    <div className="flex h-full flex-col overflow-hidden bg-[var(--bg-main)]">
       {/* Top bar */}
-      <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-slate-200 bg-white px-3 py-2.5 sm:px-4">
+      <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-slate-200 bg-[var(--bg-card)] px-3 py-2.5 dark:border-[#1e2638] sm:px-4">
         <div
-          className="grid h-10 w-full min-w-0 flex-1 grid-cols-2 rounded-full border border-slate-200 bg-slate-100 p-1 sm:max-w-sm"
+          className="grid h-10 w-full min-w-0 flex-1 grid-cols-2 rounded-xl border border-slate-200 bg-slate-100 p-1 dark:border-[#1e2638] dark:bg-[#060e20] sm:max-w-sm"
           role="tablist"
         >
           {(
@@ -624,10 +631,10 @@ export function TransactionHistoryPage() {
               type="button"
               role="tab"
               aria-selected={tab === id}
-              className={`flex h-full min-w-0 items-center justify-center gap-1.5 rounded-full px-2 text-xs font-semibold transition sm:text-sm ${
+              className={`flex h-full min-w-0 items-center justify-center gap-1.5 rounded-lg px-2 text-xs font-semibold transition sm:text-sm ${
                 tab === id
-                  ? "bg-blue-600 text-white shadow-sm"
-                  : "bg-transparent text-slate-500 hover:text-slate-700"
+                  ? "border border-indigo-500/40 bg-[var(--bg-card)] text-indigo-600 shadow-xs dark:bg-[#131b2e] dark:text-indigo-300"
+                  : "bg-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
               }`}
               onClick={() => setTab(id)}
             >
@@ -640,7 +647,7 @@ export function TransactionHistoryPage() {
         <div className="flex items-center gap-2">
           <Link
             to="/transaction"
-            className="inline-flex h-10 items-center gap-1.5 rounded-lg bg-blue-600 px-3 text-xs font-semibold text-white hover:bg-blue-700 sm:h-9 sm:text-sm"
+            className="inline-flex h-10 items-center gap-1.5 rounded-lg bg-indigo-600 px-3 text-xs font-semibold text-white hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-400 sm:h-9 sm:text-sm"
           >
             <Plus className="h-4 w-4" />
             <span className="hidden sm:inline">New Transaction</span>
@@ -648,7 +655,7 @@ export function TransactionHistoryPage() {
           <button
             type="button"
             onClick={refreshAll}
-            className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 sm:h-9 sm:w-9"
+            className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-slate-200 bg-[var(--bg-elevated)] text-slate-600 hover:bg-slate-50 dark:border-[#1e2638] dark:text-slate-300 dark:hover:bg-white/5 sm:h-9 sm:w-9"
             title="Refresh"
           >
             <RefreshCw className="h-4 w-4" />
@@ -657,7 +664,7 @@ export function TransactionHistoryPage() {
       </div>
 
       {error && (
-        <div className="border-b border-rose-100 bg-rose-50 px-4 py-2 text-xs font-medium text-rose-700">
+        <div className="border-b border-rose-100 bg-rose-50 px-4 py-2 text-xs font-medium text-rose-700 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-300">
           {error}
         </div>
       )}
@@ -665,11 +672,11 @@ export function TransactionHistoryPage() {
       <div className="flex min-h-0 flex-1 overflow-hidden">
         {/* Sidebar list */}
         <div
-          className={`flex w-full shrink-0 flex-col border-r border-slate-200 bg-white sm:w-64 md:w-72 lg:w-80 ${
+          className={`flex w-full shrink-0 flex-col border-r border-slate-200 bg-[var(--bg-card)] dark:border-[#1e2638] sm:w-64 md:w-72 lg:w-80 ${
             hasSelection ? "hidden md:flex" : "flex"
           }`}
         >
-          <div className="border-b border-slate-100 px-3 py-3 sm:px-4">
+          <div className="border-b border-slate-100 px-3 py-3 dark:border-[#1e2638] sm:px-4">
             <SearchInput
               value={listSearch}
               onChange={setListSearch}
@@ -691,12 +698,12 @@ export function TransactionHistoryPage() {
               Array.from({ length: 6 }).map((_, i) => (
                 <div
                   key={i}
-                  className="h-[4.5rem] animate-pulse rounded-xl bg-slate-100"
+                  className="h-[4.5rem] animate-pulse rounded-xl bg-slate-100 dark:bg-white/5"
                 />
               ))
             ) : tab === "agencies" ? (
               filteredAgencies.length === 0 ? (
-                <p className="p-4 text-center text-xs text-slate-400">
+                <p className="p-4 text-center text-xs text-slate-400 dark:text-slate-500">
                   No agencies
                 </p>
               ) : (
@@ -710,19 +717,25 @@ export function TransactionHistoryPage() {
                       onClick={() => setSelectedAgencyId(id)}
                       className={`w-full rounded-xl border p-3 text-left transition ${
                         sel
-                          ? "border-blue-400 bg-blue-50 shadow-sm"
-                          : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50"
+                          ? "border-2 border-indigo-500/80 bg-indigo-50 shadow-sm dark:bg-indigo-500/10 dark:border-indigo-500/70"
+                          : "border-slate-200 bg-[var(--bg-elevated)] hover:border-slate-300 hover:bg-slate-50 dark:border-[#1e2638] dark:hover:border-white/15 dark:hover:bg-white/[0.04]"
                       }`}
                     >
                       <div className="flex items-start gap-3">
-                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-blue-100">
-                          <Building2 className="h-5 w-5 text-blue-600" />
+                        <div
+                          className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${
+                            sel
+                              ? "border border-indigo-500/40 bg-indigo-500/15 text-indigo-600 dark:text-indigo-300"
+                              : "bg-indigo-100 text-indigo-600 dark:bg-indigo-500/10 dark:text-indigo-400"
+                          }`}
+                        >
+                          <Building2 className="h-5 w-5" />
                         </div>
                         <div className="min-w-0 flex-1">
-                          <p className="truncate text-sm font-semibold text-slate-900">
+                          <p className="truncate text-sm font-semibold text-slate-900 dark:text-slate-100">
                             {formatAgencyLabel(a)}
                           </p>
-                          <p className="truncate text-xs text-slate-400">
+                          <p className="truncate font-mono text-xs text-slate-400 dark:text-slate-500">
                             {a.phone || "Agency"}
                           </p>
                         </div>
@@ -732,7 +745,9 @@ export function TransactionHistoryPage() {
                 })
               )
             ) : filteredDrivers.length === 0 ? (
-              <p className="p-4 text-center text-xs text-slate-400">No drivers</p>
+              <p className="p-4 text-center text-xs text-slate-400 dark:text-slate-500">
+                No drivers
+              </p>
             ) : (
               filteredDrivers.map((d) => {
                 const sel = d._id === selectedDriverId;
@@ -743,19 +758,25 @@ export function TransactionHistoryPage() {
                     onClick={() => setSelectedDriverId(d._id)}
                     className={`w-full rounded-xl border p-3 text-left transition ${
                       sel
-                        ? "border-blue-400 bg-blue-50 shadow-sm"
-                        : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50"
+                        ? "border-2 border-indigo-500/80 bg-indigo-50 shadow-sm dark:bg-indigo-500/10 dark:border-indigo-500/70"
+                        : "border-slate-200 bg-[var(--bg-elevated)] hover:border-slate-300 hover:bg-slate-50 dark:border-[#1e2638] dark:hover:border-white/15 dark:hover:bg-white/[0.04]"
                     }`}
                   >
                     <div className="flex items-start gap-3">
-                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-violet-100">
-                        <User className="h-5 w-5 text-violet-600" />
+                      <div
+                        className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${
+                          sel
+                            ? "border border-indigo-500/40 bg-indigo-500/15 text-indigo-600 dark:text-indigo-300"
+                            : "bg-violet-100 text-violet-600 dark:bg-violet-500/10 dark:text-violet-300"
+                        }`}
+                      >
+                        <User className="h-5 w-5" />
                       </div>
                       <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-semibold text-slate-900">
+                        <p className="truncate text-sm font-semibold text-slate-900 dark:text-slate-100">
                           {driverName(d)}
                         </p>
-                        <p className="truncate text-xs text-slate-400">
+                        <p className="truncate font-mono text-xs text-slate-400 dark:text-slate-500">
                           {d.phone || "Driver"}
                         </p>
                       </div>
@@ -775,37 +796,37 @@ export function TransactionHistoryPage() {
         >
           {!hasSelection ? (
             <div className="flex flex-1 flex-col items-center justify-center gap-3 p-8 text-center">
-              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-100 text-slate-400">
+              <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-slate-200 bg-[var(--bg-elevated)] text-slate-400 dark:border-[#1e2638] dark:text-slate-500">
                 <Wallet className="h-7 w-7" />
               </div>
-              <p className="text-sm font-medium text-slate-600">
+              <p className="text-sm font-medium text-slate-600 dark:text-slate-300">
                 Select an {tab === "agencies" ? "agency" : "driver"}
               </p>
-              <p className="max-w-xs text-xs text-slate-400">
+              <p className="max-w-xs text-xs text-slate-400 dark:text-slate-500">
                 View money summary and full transaction history with filters.
               </p>
             </div>
           ) : detailLoading && !agencyDetail && !driverDetail ? (
             <div className="flex flex-1 items-center justify-center">
-              <Loader2 className="h-7 w-7 animate-spin text-blue-500" />
+              <Loader2 className="h-7 w-7 animate-spin text-indigo-500" />
             </div>
           ) : (
             <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
               {/* Header + summary */}
-              <div className="shrink-0 space-y-3 border-b border-slate-200 bg-white px-3 py-3 sm:px-4 sm:py-4">
+              <div className="shrink-0 space-y-3 border-b border-slate-200 bg-[var(--bg-card)] px-3 py-3 dark:border-[#1e2638] sm:px-4 sm:py-4">
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
-                    className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 md:hidden"
+                    className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-white/5 md:hidden"
                     onClick={clearDetail}
                   >
                     <ArrowLeft className="h-5 w-5" />
                   </button>
                   <div className="min-w-0 flex-1">
-                    <h2 className="truncate text-base font-bold text-slate-900 sm:text-lg">
+                    <h2 className="truncate text-base font-bold text-slate-900 dark:text-white sm:text-lg">
                       {selectedTitle}
                     </h2>
-                    <p className="text-xs text-slate-400">
+                    <p className="text-xs text-slate-400 dark:text-slate-500">
                       Transaction history
                       {detailLoading ? " · Updating…" : ""}
                     </p>
@@ -852,9 +873,9 @@ export function TransactionHistoryPage() {
                 )}
 
                 {/* Filters */}
-                <div className="rounded-xl border border-slate-200 bg-slate-50/90 p-3">
+                <div className="rounded-xl border border-slate-200 bg-slate-50/90 p-3 dark:border-[#1e2638] dark:bg-white/[0.03]">
                   <div className="mb-2.5 flex flex-wrap items-center justify-between gap-2">
-                    <div className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-slate-500">
+                    <div className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">
                       <CalendarRange className="h-3.5 w-3.5" />
                       Search & filters
                     </div>
@@ -862,7 +883,7 @@ export function TransactionHistoryPage() {
                       <button
                         type="button"
                         onClick={clearFilters}
-                        className="text-[11px] font-semibold text-blue-600 hover:text-blue-700"
+                        className="text-[11px] font-semibold text-indigo-600 hover:text-indigo-700 dark:text-indigo-400 dark:hover:text-indigo-300"
                       >
                         Reset all
                       </button>
@@ -915,7 +936,7 @@ export function TransactionHistoryPage() {
                     </div>
 
                     <div className="flex flex-wrap items-center gap-1.5">
-                      <span className="mr-1 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+                      <span className="mr-1 text-[11px] font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">
                         Type
                       </span>
                       <FilterChip
@@ -941,7 +962,7 @@ export function TransactionHistoryPage() {
                     </div>
 
                     {hasActiveFilters && (
-                      <div className="flex flex-wrap gap-1.5 border-t border-slate-200/80 pt-2.5">
+                      <div className="flex flex-wrap gap-1.5 border-t border-slate-200/80 pt-2.5 dark:border-white/10">
                         {detailMonth !== "all_time" && (
                           <ActiveFilterPill
                             label={
@@ -987,18 +1008,18 @@ export function TransactionHistoryPage() {
                   detailLoading ? "opacity-60" : ""
                 }`}
               >
-                <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-                  <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50 px-3 py-2.5 sm:px-4">
-                    <h4 className="text-xs font-semibold text-slate-800 sm:text-sm">
+                <div className="overflow-hidden rounded-xl border border-slate-200 bg-[var(--bg-card)] shadow-sm dark:border-[#1e2638]">
+                  <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50 px-3 py-2.5 dark:border-[#1e2638] dark:bg-white/[0.03] sm:px-4">
+                    <h4 className="text-xs font-semibold text-slate-800 dark:text-slate-200 sm:text-sm">
                       Transactions
                     </h4>
-                    <span className="rounded-full bg-slate-200/70 px-2 py-0.5 text-[10px] font-semibold text-slate-600">
+                    <span className="rounded-full bg-slate-200/70 px-2 py-0.5 text-[10px] font-semibold text-slate-600 dark:bg-white/10 dark:text-slate-300">
                       {txRows.length}
                     </span>
                   </div>
                   <div className="overflow-x-auto">
                     <table className="w-full min-w-[680px] text-left text-xs">
-                      <thead className="border-b border-slate-100 bg-white text-[10px] uppercase tracking-wide text-slate-500">
+                      <thead className="border-b border-slate-100 bg-[var(--bg-card)] text-[10px] uppercase tracking-wide text-slate-500 dark:border-[#1e2638] dark:text-slate-400">
                         <tr>
                           <th className="px-3 py-2.5 font-semibold sm:px-4">
                             Date
@@ -1018,7 +1039,7 @@ export function TransactionHistoryPage() {
                           <tr>
                             <td
                               colSpan={7}
-                              className="px-3 py-12 text-center text-slate-400"
+                              className="px-3 py-12 text-center text-slate-400 dark:text-slate-500"
                             >
                               No transactions for these filters
                             </td>
@@ -1027,39 +1048,39 @@ export function TransactionHistoryPage() {
                           txRows.map((r) => (
                             <tr
                               key={r.id}
-                              className="border-b border-slate-50 last:border-0 hover:bg-slate-50/70"
+                              className="border-b border-slate-50 last:border-0 hover:bg-slate-50/70 dark:border-[#1e2638] dark:hover:bg-white/[0.03]"
                             >
-                              <td className="whitespace-nowrap px-3 py-3 font-medium text-slate-700 sm:px-4">
+                              <td className="whitespace-nowrap px-3 py-3 font-medium text-slate-700 dark:text-slate-200 sm:px-4">
                                 {formatDate(r.date)}
                               </td>
-                              <td className="whitespace-nowrap px-3 py-3 text-slate-500">
+                              <td className="whitespace-nowrap px-3 py-3 font-mono text-slate-500 dark:text-slate-400">
                                 {formatTime(r.date)}
                               </td>
-                              <td className="whitespace-nowrap px-3 py-3 text-slate-600">
+                              <td className="whitespace-nowrap px-3 py-3 text-slate-600 dark:text-slate-400">
                                 {formatMonth(r.date)}
                               </td>
                               <td className="px-3 py-3">
                                 <span
                                   className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold ${
                                     r.direction === "Cash in"
-                                      ? "bg-emerald-100 text-emerald-800"
-                                      : "bg-amber-100 text-amber-800"
+                                      ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-300"
+                                      : "bg-rose-100 text-rose-800 dark:bg-rose-500/15 dark:text-rose-300"
                                   }`}
                                 >
                                   {r.direction}
                                 </span>
                               </td>
-                              <td className="px-3 py-3 capitalize text-slate-600">
+                              <td className="px-3 py-3 capitalize text-slate-600 dark:text-slate-400">
                                 {String(r.method).replace(/_/g, " ")}
                               </td>
-                              <td className="max-w-[200px] truncate px-3 py-3 text-slate-500">
+                              <td className="max-w-[200px] truncate px-3 py-3 text-slate-500 dark:text-slate-500">
                                 {r.notes || "—"}
                               </td>
                               <td
-                                className={`whitespace-nowrap px-3 py-3 text-right font-bold tabular-nums sm:px-4 ${
+                                className={`whitespace-nowrap px-3 py-3 text-right font-mono font-bold tabular-nums sm:px-4 ${
                                   r.direction === "Cash in"
-                                    ? "text-emerald-700"
-                                    : "text-amber-700"
+                                    ? "text-emerald-700 dark:text-emerald-400"
+                                    : "text-rose-700 dark:text-rose-400"
                                 }`}
                               >
                                 {fmtCurrency(r.amount)}

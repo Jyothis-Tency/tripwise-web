@@ -148,7 +148,7 @@ function AgencyPayoutManager({
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20">
-        <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
+        <Loader2 className="h-8 w-8 animate-spin text-indigo-500" />
       </div>
     );
   }
@@ -161,18 +161,18 @@ function AgencyPayoutManager({
     <div className="space-y-6">
       {/* Top Value Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="relative overflow-hidden rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+        <div className="relative overflow-hidden rounded-xl border border-slate-200 bg-[var(--bg-card)] p-4 shadow-sm dark:border-[#1e2638]">
           <div className="relative z-10 flex flex-col justify-between h-full">
             <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
               Grand Total
             </span>
-            <span className="mt-1 text-xl flex items-baseline font-bold text-slate-800">
+            <span className="mt-1 text-xl flex items-baseline font-bold text-slate-800 dark:text-slate-100">
               {fmtCurrency(gt)}
             </span>
           </div>
         </div>
 
-        <div className="relative overflow-hidden rounded-xl border border-slate-200 bg-emerald-50 p-4 shadow-sm">
+        <div className="relative overflow-hidden rounded-xl border border-slate-200 bg-emerald-50 p-4 shadow-sm dark:border-[#1e2638]">
           <div className="relative z-10 flex flex-col justify-between h-full">
             <span className="text-xs font-semibold uppercase tracking-wider text-emerald-600">
               Total Received
@@ -183,7 +183,7 @@ function AgencyPayoutManager({
           </div>
         </div>
 
-        <div className="relative overflow-hidden rounded-xl border border-slate-200 bg-amber-50 p-4 shadow-sm">
+        <div className="relative overflow-hidden rounded-xl border border-slate-200 bg-amber-50 p-4 shadow-sm dark:border-[#1e2638]">
           <div className="relative z-10 flex flex-col justify-between h-full">
             <span className="text-xs font-semibold uppercase tracking-wider text-amber-600">
               Amount Remaining
@@ -205,22 +205,22 @@ function AgencyPayoutManager({
       {/* Trips Table */}
       <div className="space-y-3">
         <h4 className="flex items-center text-sm font-semibold text-slate-700">
-          <History className="mr-2 h-4 w-4 text-blue-500" />
+          <History className="mr-2 h-4 w-4 text-indigo-500" />
           Agency Trips (Trip-wise Payout)
         </h4>
 
         {trips.length === 0 ? (
-          <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-slate-300 bg-slate-50 py-12 text-center">
+          <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-slate-300 bg-slate-50 dark:bg-white/[0.03] py-12 text-center dark:border-[#1e2638]">
             <Building2 className="h-8 w-8 text-slate-300 mb-3" />
             <p className="text-sm text-slate-500">
               No trips found for this agency.
             </p>
           </div>
         ) : (
-          <div className="rounded-xl border border-slate-200 bg-white overflow-hidden shadow-sm">
+          <div className="rounded-xl border border-slate-200 bg-[var(--bg-card)] overflow-hidden shadow-sm dark:border-[#1e2638]">
             <div className="w-full overflow-x-auto">
               <table className="w-full text-left text-xs whitespace-nowrap">
-                <thead className="bg-slate-50 border-b border-slate-200">
+                <thead className="bg-slate-50 dark:bg-white/[0.03] border-b border-slate-200 dark:border-[#1e2638]">
                   <tr>
                     <th className="px-3 py-2.5 font-semibold text-slate-600">
                       Trip Info
@@ -261,10 +261,10 @@ function AgencyPayoutManager({
 
                     return (
                       <Fragment key={tripId}>
-                        <tr className="group transition-colors hover:bg-slate-50">
+                        <tr className="group transition-colors hover:bg-slate-50 dark:hover:bg-white/5">
                           {/* Trip Info */}
                           <td className="px-3 py-2.5">
-                            <div className="font-semibold text-slate-800">
+                            <div className="font-semibold text-slate-800 dark:text-slate-100">
                               {t.tripNumber || "—"}
                             </div>
                             <div className="text-[10px] text-slate-500 mt-0.5">
@@ -311,7 +311,7 @@ function AgencyPayoutManager({
                             </span>
                           </td>
 
-                          <td className="px-2 py-2.5 text-right font-bold text-blue-600">
+                          <td className="px-2 py-2.5 text-right font-bold text-indigo-600">
                             {fmtCurrency(t.agencyProfit || 0)}
                           </td>
 
@@ -319,7 +319,7 @@ function AgencyPayoutManager({
                           <td className="px-3 py-2.5">
                             <div className="flex items-center justify-end gap-1.5">
                               {/* Pay Input & Button */}
-                              <div className="flex items-center rounded border border-slate-300 bg-white p-0.5 transition-all focus-within:border-blue-400 focus-within:ring-1 focus-within:ring-blue-400">
+                              <div className="flex items-center rounded border border-slate-300 bg-[var(--bg-elevated)] p-0.5 dark:border-[#1e2638] transition-all focus-within:border-indigo-400 focus-within:ring-1 focus-within:ring-indigo-400">
                                 <span className="pl-1.5 pr-0.5 text-slate-400 text-[10px] font-medium">
                                   ₹
                                 </span>
@@ -332,13 +332,13 @@ function AgencyPayoutManager({
                                   onChange={(e) =>
                                     updateTripPayAmount(tripId, e.target.value)
                                   }
-                                  className="w-16 bg-transparent py-0.5 text-[11px] font-medium text-slate-800 outline-none placeholder:text-slate-300"
+                                  className="w-16 bg-transparent py-0.5 text-[11px] font-medium text-slate-800 dark:text-slate-100 outline-none placeholder:text-slate-300"
                                 />
                                 <button
                                   type="button"
                                   disabled={savingTripId === tripId}
                                   onClick={() => handleTripPayout(t)}
-                                  className="ml-0.5 rounded-sm bg-blue-500 px-1.5 py-0.5 text-[10px] font-medium text-white hover:bg-blue-600 disabled:opacity-50 transition-colors disabled:pointer-events-none"
+                                  className="ml-0.5 rounded-sm bg-indigo-50 dark:bg-indigo-500/100 px-1.5 py-0.5 text-[10px] font-medium text-white hover:bg-indigo-600 disabled:opacity-50 transition-colors disabled:pointer-events-none"
                                 >
                                   {savingTripId === tripId ? "..." : "Pay"}
                                 </button>
@@ -350,8 +350,8 @@ function AgencyPayoutManager({
                                 onClick={() => handleToggleTripHistory(t)}
                                 className={`flex items-center gap-1 rounded border px-1.5 py-0.5 text-[11px] font-medium transition-colors h-[22px] ${
                                   isExpanded
-                                    ? "border-blue-200 bg-blue-50 text-blue-700"
-                                    : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                                    ? "border-indigo-200 bg-indigo-50 text-indigo-700"
+                                    : "border-slate-200 bg-[var(--bg-elevated)] text-slate-600 hover:bg-slate-50 dark:border-[#1e2638] dark:text-slate-300 dark:hover:bg-white/5"
                                 }`}
                               >
                                 {isExpanded ? (
@@ -369,16 +369,16 @@ function AgencyPayoutManager({
                           <tr className="bg-slate-50/50 shadow-inner">
                             <td
                               colSpan={9}
-                              className="p-0 border-b border-slate-200"
+                              className="p-0 border-b border-slate-200 dark:border-[#1e2638]"
                             >
-                              <div className="m-3 mt-0 bg-white rounded-md shadow-sm border border-slate-200 p-3">
+                              <div className="m-3 mt-0 bg-[var(--bg-elevated)] rounded-md shadow-sm border border-slate-200 p-3 dark:border-[#1e2638]">
                                 <h5 className="font-semibold text-slate-700 flex items-center mb-3 text-xs">
                                   <History className="h-3.5 w-3.5 mr-1.5 text-slate-400" />{" "}
                                   Payment Timeline
                                 </h5>
 
                                 {loadingHistoryTripId === tripId ? (
-                                  <div className="flex items-center gap-2 text-xs text-blue-600">
+                                  <div className="flex items-center gap-2 text-xs text-indigo-600">
                                     <Loader2 className="h-3.5 w-3.5 animate-spin" />{" "}
                                     Loading timeline...
                                   </div>
@@ -391,11 +391,11 @@ function AgencyPayoutManager({
                                   <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                                     {/* Stats Mini Cards for the Trip */}
                                     <div className="md:col-span-1 space-y-1.5">
-                                      <div className="rounded bg-slate-50 px-2.5 py-1.5 border border-slate-100 flex justify-between items-center text-[11px]">
+                                      <div className="rounded bg-slate-50 dark:bg-white/[0.03] px-2.5 py-1.5 border border-slate-100 flex justify-between items-center text-[11px] dark:border-[#1e2638]">
                                         <span className="font-medium text-slate-500">
                                           Trip Total
                                         </span>
-                                        <span className="font-bold text-slate-800">
+                                        <span className="font-bold text-slate-800 dark:text-slate-100">
                                           {fmtCurrency(
                                             history.summary.totalAmount || 0,
                                           )}
@@ -429,7 +429,7 @@ function AgencyPayoutManager({
                                       {history.payments.map((p) => (
                                         <div
                                           key={p._id}
-                                          className="flex items-center justify-between rounded border border-slate-100 bg-white px-2.5 py-1.5 transition-shadow hover:shadow-sm"
+                                          className="flex items-center justify-between rounded border border-slate-100 bg-[var(--bg-elevated)] px-2.5 py-1.5 dark:border-[#1e2638] transition-shadow hover:shadow-sm"
                                         >
                                           <div className="flex items-center gap-2">
                                             <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-50 text-emerald-600">
@@ -520,12 +520,12 @@ export function HistoryPayoutPage() {
     <div className="flex h-full overflow-hidden relative">
       {/* LEFT: agency list panel */}
       <div
-        className={`flex w-full md:w-72 lg:w-80 shrink-0 flex-col border-r border-slate-200 bg-white transition-all ${
+        className={`flex w-full md:w-72 lg:w-80 shrink-0 flex-col border-r border-slate-200 bg-[var(--bg-card)] dark:border-[#1e2638] transition-all ${
           selectedAgencyId ? "hidden md:flex" : "flex"
         }`}
       >
-        <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3 shrink-0">
-          <h2 className="text-sm font-semibold text-slate-900">
+        <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3 shrink-0 dark:border-[#1e2638]">
+          <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
             Agency Payouts
           </h2>
           <button
@@ -539,14 +539,14 @@ export function HistoryPayoutPage() {
           </button>
         </div>
 
-        <div className="relative border-b border-slate-100 px-3 py-2 bg-slate-50/50 shrink-0">
+        <div className="relative border-b border-slate-100 px-3 py-2 bg-slate-50/50 shrink-0 dark:border-[#1e2638]">
           <Search className="absolute left-5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
           <input
             type="text"
             value={agencySearch}
             onChange={(e) => setAgencySearch(e.target.value)}
             placeholder="Search agencies..."
-            className="w-full rounded-md border border-slate-200 bg-white py-1.5 pl-8 pr-3 text-xs text-slate-800 shadow-sm outline-none transition-all focus:border-blue-400 focus:ring-1 focus:ring-blue-400"
+            className="w-full rounded-md border border-slate-200 bg-[var(--bg-elevated)] py-1.5 dark:border-[#1e2638] dark:text-slate-100 pl-8 pr-3 text-xs text-slate-800 shadow-sm outline-none transition-all focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400"
           />
         </div>
 
@@ -582,12 +582,12 @@ export function HistoryPayoutPage() {
                     onClick={() => setSelectedAgencyId(id)}
                     className={`block w-full rounded-lg border px-3 py-2.5 text-left transition-all ${
                       active
-                        ? "border-blue-300 bg-blue-50 shadow-sm"
-                        : "border-slate-200 bg-white hover:border-blue-200 hover:bg-slate-50 hover:shadow-sm"
+                        ? "border-indigo-300 bg-indigo-50 shadow-sm dark:border-indigo-500/40 dark:bg-indigo-500/15"
+                        : "border-slate-200 bg-[var(--bg-elevated)] hover:border-indigo-200 hover:bg-slate-50 dark:border-[#1e2638] dark:hover:border-indigo-500/40 dark:hover:bg-white/5 hover:shadow-sm"
                     }`}
                   >
                     <div
-                      className={`text-[13px] font-semibold ${active ? "text-blue-800" : "text-slate-700"} truncate`}
+                      className={`truncate text-[13px] font-semibold ${active ? "text-indigo-800 dark:text-indigo-200" : "text-slate-700 dark:text-slate-200"}`}
                     >
                       {formatAgencyLabel(a)}
                     </div>
@@ -619,9 +619,9 @@ export function HistoryPayoutPage() {
       >
         {selectedAgency ? (
           <div className="h-full overflow-hidden flex flex-col">
-            <div className="flex items-center justify-between gap-4 border-b border-slate-200 px-6 py-4 z-10 shrink-0">
+            <div className="flex items-center justify-between gap-4 border-b border-slate-200 px-6 py-4 z-10 shrink-0 dark:border-[#1e2638]">
               <div className="min-w-0">
-                <h3 className="text-lg font-semibold tracking-tight text-slate-800 truncate">
+                <h3 className="text-lg font-semibold tracking-tight text-slate-800 dark:text-slate-100 truncate">
                   {formatAgencyLabel(selectedAgency)}
                 </h3>
                 <p className="text-[11px] text-slate-500">
@@ -632,7 +632,7 @@ export function HistoryPayoutPage() {
                 <button
                   type="button"
                   onClick={() => setSelectedAgencyId("")}
-                  className="md:hidden flex items-center gap-1 rounded-md border border-slate-200 px-2.5 py-2 text-xs font-medium text-slate-600 hover:bg-slate-50 transition-colors"
+                  className="flex items-center gap-1 rounded-md border border-slate-200 px-2.5 py-2 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-50 md:hidden dark:border-[#1e2638] dark:hover:bg-white/5"
                 >
                   <ArrowLeft className="h-3.5 w-3.5" />
                   Back
@@ -640,7 +640,7 @@ export function HistoryPayoutPage() {
                 <button
                   type="button"
                   onClick={() => navigate("/history")}
-                  className="hidden md:flex items-center gap-1 rounded-md border border-slate-200 px-2.5 py-2 text-xs font-medium text-slate-600 hover:bg-slate-50 transition-colors"
+                  className="hidden items-center gap-1 rounded-md border border-slate-200 px-2.5 py-2 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-50 md:flex dark:border-[#1e2638] dark:hover:bg-white/5"
                 >
                   <ArrowLeft className="h-3.5 w-3.5" />
                   All History
@@ -658,10 +658,10 @@ export function HistoryPayoutPage() {
             </div>
           </div>
         ) : (
-          <div className="flex h-full flex-col items-center justify-center bg-slate-50 p-6">
-            <div className="flex max-w-sm flex-col items-center text-center p-6 border border-slate-200 bg-white rounded-lg shadow-sm">
+          <div className="flex h-full flex-col items-center justify-center bg-slate-50 dark:bg-white/[0.03] p-6">
+            <div className="flex max-w-sm flex-col items-center text-center p-6 border border-slate-200 bg-[var(--bg-card)] rounded-lg shadow-sm dark:border-[#1e2638]">
               <Building2 className="h-8 w-8 text-slate-300 mb-3" />
-              <h3 className="text-sm font-semibold text-slate-800">
+              <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-100">
                 Select an Agency
               </h3>
               <p className="mt-2 text-xs text-slate-500">
@@ -671,7 +671,7 @@ export function HistoryPayoutPage() {
               <button
                 type="button"
                 onClick={() => navigate("/history")}
-                className="mt-6 flex w-full items-center justify-center gap-1.5 rounded-md bg-white border border-slate-200 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-all"
+                className="mt-6 flex w-full items-center justify-center gap-1.5 rounded-md border border-slate-200 bg-[var(--bg-elevated)] px-3 py-2 text-xs font-medium text-slate-700 transition-all hover:bg-slate-50 dark:border-[#1e2638] dark:text-slate-200 dark:hover:bg-white/5"
               >
                 <ArrowLeft className="h-3.5 w-3.5" />
                 Go back to History

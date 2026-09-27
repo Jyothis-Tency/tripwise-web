@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { ChevronDown } from "lucide-react";
 import {
   QUARTER_MINUTES,
   hhmmTo12hParts,
@@ -18,6 +19,8 @@ export interface TimePicker12hProps {
   compact?: boolean;
   className?: string;
   id?: string;
+  /** Optional micro-label shown left of the control (e.g. Start / End) */
+  label?: string;
 }
 
 type Period = "AM" | "PM";
@@ -30,6 +33,50 @@ function defaultParts(): {
   return { hour12: 12, minute: 0, period: "AM" };
 }
 
+function SegmentSelect({
+  ariaLabel,
+  value,
+  disabled,
+  compact,
+  widthCls,
+  onChange,
+  children,
+}: {
+  ariaLabel: string;
+  value: string;
+  disabled?: boolean;
+  compact?: boolean;
+  widthCls: string;
+  onChange: (v: string) => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className={`relative shrink-0 ${widthCls}`}>
+      <select
+        aria-label={ariaLabel}
+        disabled={disabled}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className={`w-full appearance-none bg-transparent font-semibold tabular-nums text-slate-800 outline-none disabled:cursor-not-allowed disabled:opacity-45 dark:text-slate-100 ${
+          compact
+            ? "py-1.5 pl-1.5 pr-5 text-[11px] leading-tight"
+            : "py-2 pl-2.5 pr-7 text-sm leading-tight"
+        }`}
+      >
+        {children}
+      </select>
+      <ChevronDown
+        className={`pointer-events-none absolute top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500 ${
+          compact
+            ? "right-0.5 h-3 w-3"
+            : "right-1.5 h-3.5 w-3.5"
+        }`}
+        aria-hidden
+      />
+    </div>
+  );
+}
+
 export function TimePicker12h({
   value,
   onChange,
@@ -38,6 +85,7 @@ export function TimePicker12h({
   compact = false,
   className = "",
   id,
+  label,
 }: TimePicker12hProps) {
   const parsed = useMemo(() => (value ? hhmmTo12hParts(value) : null), [value]);
   const isEmpty = allowEmpty && !value;
@@ -79,81 +127,99 @@ export function TimePicker12h({
     onChange(parts12hToHHmm(hourNum, m, per));
   };
 
-  const selectCls = compact
-    ? "rounded border border-slate-200 bg-white px-0.5 py-1 text-[11px] leading-none outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-200 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400"
-    : "rounded-md border border-slate-200 bg-white px-1.5 py-1.5 text-sm outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-200 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400";
-
-  const hourCls = compact ? "w-9 min-w-9" : "w-[3.25rem]";
-  const minuteCls = compact ? "w-10 min-w-10" : "w-[3.5rem]";
-  const periodCls = compact ? "w-11 min-w-11" : "w-[3.75rem]";
+  const emptyDisabled = disabled || (allowEmpty && hour12 === "");
 
   return (
     <div
       id={id}
-      className={`inline-flex max-w-full items-center ${compact ? "flex-nowrap gap-0.5" : "flex-wrap gap-1"} ${className}`}
+      className={`inline-flex max-w-full items-center gap-1.5 ${className}`}
       role="group"
-      aria-label="Time"
+      aria-label={label ? `${label} time` : "Time"}
     >
-      <select
-        aria-label="Hour"
-        disabled={disabled}
-        value={hour12 === "" ? "" : String(hour12)}
-        onChange={(e) => {
-          const v = e.target.value;
-          if (v === "") {
-            setHour12("");
-            emit("", minute, period);
-            return;
-          }
-          const h = Number(v);
-          setHour12(h);
-          emit(h, minute, period);
-        }}
-        className={`${selectCls} ${hourCls} shrink-0`}
+      {label ? (
+        <span
+          className={`shrink-0 font-bold uppercase tracking-wide text-slate-400 dark:text-slate-500 ${
+            compact ? "w-7 text-[9px]" : "w-9 text-[10px]"
+          }`}
+        >
+          {label}
+        </span>
+      ) : null}
+
+      <div
+        className={`inline-flex items-stretch overflow-hidden rounded-lg border border-slate-200/90 bg-[var(--bg-elevated)] shadow-xs transition focus-within:border-indigo-400 focus-within:ring-2 focus-within:ring-indigo-500/15 dark:border-white/10 dark:focus-within:border-indigo-400 ${
+          disabled ? "opacity-50" : ""
+        }`}
       >
-        {allowEmpty && <option value="">—</option>}
-        {HOURS_12.map((h) => (
-          <option key={h} value={String(h)}>
-            {h}
-          </option>
-        ))}
-      </select>
-      <span
-        className={`shrink-0 text-slate-400 font-medium ${compact ? "text-[10px] px-px" : ""}`}
-      >
-        :
-      </span>
-      <select
-        aria-label="Minute"
-        disabled={disabled || (allowEmpty && hour12 === "")}
-        value={String(minute)}
-        onChange={(e) => {
-          const m = Number(e.target.value) as QuarterMinute;
-          setMinute(m);
-          emit(hour12 === "" ? "" : hour12, m, period);
-        }}
-        className={`${selectCls} ${minuteCls} shrink-0`}
-      >
-        {QUARTER_MINUTES.map((m) => (
-          <option key={m} value={String(m)}>
-            {String(m).padStart(2, "0")}
-          </option>
-        ))}
-      </select>
-      <select
-        aria-label="AM or PM"
-        disabled={disabled || (allowEmpty && hour12 === "")}
-        value={period}
-        onChange={(e) => {
-          const per = e.target.value as Period;
-          setPeriod(per);
-          emit(hour12 === "" ? "" : hour12, minute, per);
-        }}
-        className={`${selectCls} ${periodCls} shrink-0`}
-      >
-        <option value="AM">AM</option>
-        <option value="PM">PM</option>
-      </select>
+        <SegmentSelect
+          ariaLabel="Hour"
+          value={hour12 === "" ? "" : String(hour12)}
+          disabled={disabled}
+          compact={compact}
+          widthCls={compact ? "w-[2.75rem]" : "w-[3.35rem]"}
+          onChange={(v) => {
+            if (v === "") {
+              setHour12("");
+              emit("", minute, period);
+              return;
+            }
+            const h = Number(v);
+            setHour12(h);
+            emit(h, minute, period);
+          }}
+        >
+          {allowEmpty && <option value="">—</option>}
+          {HOURS_12.map((h) => (
+            <option key={h} value={String(h)}>
+              {h}
+            </option>
+          ))}
+        </SegmentSelect>
+
+        <span
+          className="flex items-center px-0.5 text-[11px] font-bold text-slate-300 dark:text-slate-600"
+          aria-hidden
+        >
+          :
+        </span>
+
+        <SegmentSelect
+          ariaLabel="Minute"
+          value={String(minute)}
+          disabled={emptyDisabled}
+          compact={compact}
+          widthCls={compact ? "w-[3.1rem]" : "w-[3.6rem]"}
+          onChange={(v) => {
+            const m = Number(v) as QuarterMinute;
+            setMinute(m);
+            emit(hour12 === "" ? "" : hour12, m, period);
+          }}
+        >
+          {QUARTER_MINUTES.map((m) => (
+            <option key={m} value={String(m)}>
+              {String(m).padStart(2, "0")}
+            </option>
+          ))}
+        </SegmentSelect>
+
+        <div className="w-px self-stretch bg-slate-200/80 dark:bg-white/10" />
+
+        <SegmentSelect
+          ariaLabel="AM or PM"
+          value={period}
+          disabled={emptyDisabled}
+          compact={compact}
+          widthCls={compact ? "w-[3.25rem]" : "w-[3.85rem]"}
+          onChange={(v) => {
+            const per = v as Period;
+            setPeriod(per);
+            emit(hour12 === "" ? "" : hour12, minute, per);
+          }}
+        >
+          <option value="AM">AM</option>
+          <option value="PM">PM</option>
+        </SegmentSelect>
+      </div>
     </div>
   );
 }

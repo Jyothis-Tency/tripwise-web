@@ -5,7 +5,7 @@ import { fetchDriverHistoryDetailed } from "../api";
 import type { HistoryTripItem } from "../../vehicles/api";
 
 const inputCls =
-  "w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500";
+  "w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20 dark:border-white/10 dark:bg-white/5 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-indigo-400 dark:focus:ring-indigo-500/30";
 
 function driverName(d: Driver): string {
   if (d.firstName && d.lastName) return `${d.firstName} ${d.lastName}`.trim();
@@ -28,16 +28,16 @@ function formatDate(d?: string) {
 function statusBadgeCls(status?: string) {
   switch ((status ?? "").toLowerCase()) {
     case "scheduled":
-      return "bg-blue-100 text-blue-700 border-blue-200";
+      return "bg-indigo-100 text-indigo-700 border-indigo-200 dark:bg-indigo-500/20 dark:text-indigo-300 dark:border-indigo-500/30";
     case "in_progress":
     case "in progress":
-      return "bg-blue-100 text-blue-700 border-blue-200";
+      return "bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-500/20 dark:text-amber-300 dark:border-amber-500/30";
     case "completed":
-      return "bg-green-100 text-green-700 border-green-200";
+      return "bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-500/20 dark:text-emerald-300 dark:border-emerald-500/30";
     case "cancelled":
-      return "bg-red-100 text-red-700 border-red-200";
+      return "bg-rose-100 text-rose-700 border-rose-200 dark:bg-rose-500/20 dark:text-rose-300 dark:border-rose-500/30";
     default:
-      return "bg-slate-100 text-slate-600 border-slate-200";
+      return "bg-slate-100 text-slate-600 border-slate-200 dark:bg-white/5 dark:text-slate-400 dark:border-white/10";
   }
 }
 
@@ -69,22 +69,24 @@ function ModalShell({
     <div
       ref={backdropRef}
       onClick={(e) => e.target === backdropRef.current && onClose()}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm dark:bg-black/60"
     >
       <div
-        className={`w-full ${maxWidth} rounded-2xl bg-white shadow-2xl flex flex-col max-h-[90vh]`}
+        className={`flex max-h-[90vh] w-full ${maxWidth} flex-col rounded-3xl border border-slate-200 bg-white shadow-2xl dark:border-[#1e2638] dark:bg-[#0e121d]`}
       >
-        <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4 shrink-0">
-          <h3 className="text-base font-semibold text-slate-900">{title}</h3>
+        <div className="flex shrink-0 items-center justify-between border-b border-slate-100 px-6 py-4 dark:border-white/10">
+          <h3 className="text-base font-semibold text-slate-900 dark:text-white">
+            {title}
+          </h3>
           <button
             type="button"
             onClick={onClose}
-            className="text-slate-400 hover:text-slate-600"
+            className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-white/5 dark:hover:text-slate-200"
           >
             <X className="h-5 w-5" />
           </button>
         </div>
-        <div className="overflow-y-auto flex-1">{children}</div>
+        <div className="flex-1 overflow-y-auto">{children}</div>
       </div>
     </div>
   );
@@ -191,11 +193,11 @@ export function DriverHistoryModal({
       onClose={onClose}
       maxWidth="max-w-2xl"
     >
-      <div className="p-4 space-y-4">
-        <div className="space-y-3">
+      <div className="space-y-4 p-4">
+        <div className="space-y-3 rounded-xl border border-slate-200 bg-slate-50/60 p-3 dark:border-white/10 dark:bg-white/[0.03]">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
             <div className="w-full sm:w-40">
-              <label className="text-xs font-medium text-slate-600">
+              <label className="text-xs font-medium text-slate-600 dark:text-slate-400">
                 Status
               </label>
               <select
@@ -216,7 +218,7 @@ export function DriverHistoryModal({
             </div>
 
             <div className="w-full sm:flex-1">
-              <label className="text-xs font-medium text-slate-600">
+              <label className="text-xs font-medium text-slate-600 dark:text-slate-400">
                 From Date
               </label>
               <input
@@ -234,7 +236,7 @@ export function DriverHistoryModal({
             </div>
 
             <div className="w-full sm:flex-1">
-              <label className="text-xs font-medium text-slate-600">
+              <label className="text-xs font-medium text-slate-600 dark:text-slate-400">
                 To Date
               </label>
               <input
@@ -253,46 +255,44 @@ export function DriverHistoryModal({
           </div>
 
           {tripStats?.completed != null && (
-            <p className="text-xs text-slate-500">
+            <p className="text-xs text-slate-500 dark:text-slate-400">
               {tripStats?.completed ?? 0} completed trips
             </p>
           )}
         </div>
 
         {financialStats && (
-          <section className="rounded-xl border border-slate-200 bg-blue-50 p-4">
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              <div className="rounded-lg border border-blue-200 bg-white p-3">
-                <div className="text-[11px] font-semibold uppercase tracking-wide text-blue-700">
-                  Total Revenue
-                </div>
-                <div className="text-sm font-bold text-slate-900 mt-1">
-                  {formatMoney0(financialStats.totalRevenue)}
-                </div>
+          <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="rounded-xl border border-indigo-200 bg-indigo-50/60 p-3 dark:border-indigo-500/30 dark:bg-indigo-500/10">
+              <div className="text-[11px] font-semibold uppercase tracking-wide text-indigo-700 dark:text-indigo-300">
+                Total Revenue
               </div>
-              <div className="rounded-lg border border-blue-200 bg-white p-3">
-                <div className="text-[11px] font-semibold uppercase tracking-wide text-blue-700">
-                  Driver Salary
-                </div>
-                <div className="text-sm font-bold text-slate-900 mt-1">
-                  {formatMoney0(financialStats.totalDriverSalary)}
-                </div>
+              <div className="mt-1 text-sm font-bold text-slate-900 dark:text-white">
+                {formatMoney0(financialStats.totalRevenue)}
               </div>
-              <div className="rounded-lg border border-blue-200 bg-white p-3">
-                <div className="text-[11px] font-semibold uppercase tracking-wide text-blue-700">
-                  Owner Revenue
-                </div>
-                <div className="text-sm font-bold text-slate-900 mt-1">
-                  {formatMoney0(financialStats.ownerRevenue)}
-                </div>
+            </div>
+            <div className="rounded-xl border border-emerald-200 bg-emerald-50/60 p-3 dark:border-emerald-500/30 dark:bg-emerald-500/10">
+              <div className="text-[11px] font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-300">
+                Driver Salary
               </div>
-              <div className="rounded-lg border border-blue-200 bg-white p-3 sm:col-span-2 lg:col-span-1">
-                <div className="text-[11px] font-semibold uppercase tracking-wide text-blue-700">
-                  Trip Expense
-                </div>
-                <div className="text-sm font-bold text-slate-900 mt-1">
-                  {formatMoney0(financialStats.totalExpenses)}
-                </div>
+              <div className="mt-1 text-sm font-bold text-slate-900 dark:text-white">
+                {formatMoney0(financialStats.totalDriverSalary)}
+              </div>
+            </div>
+            <div className="rounded-xl border border-indigo-200 bg-indigo-50/60 p-3 dark:border-indigo-500/30 dark:bg-indigo-500/10">
+              <div className="text-[11px] font-semibold uppercase tracking-wide text-indigo-700 dark:text-indigo-300">
+                Owner Revenue
+              </div>
+              <div className="mt-1 text-sm font-bold text-slate-900 dark:text-white">
+                {formatMoney0(financialStats.ownerRevenue)}
+              </div>
+            </div>
+            <div className="rounded-xl border border-amber-200 bg-amber-50/60 p-3 dark:border-amber-500/30 dark:bg-amber-500/10">
+              <div className="text-[11px] font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-300">
+                Trip Expense
+              </div>
+              <div className="mt-1 text-sm font-bold text-slate-900 dark:text-white">
+                {formatMoney0(financialStats.totalExpenses)}
               </div>
             </div>
           </section>
@@ -303,20 +303,24 @@ export function DriverHistoryModal({
             {Array.from({ length: 5 }).map((_, i) => (
               <div
                 key={i}
-                className="animate-pulse rounded-xl border border-slate-200 bg-white p-4"
+                className="animate-pulse rounded-xl border border-slate-200 bg-white p-4 dark:border-white/10 dark:bg-white/5"
               >
-                <div className="h-4 bg-slate-100 rounded w-1/2" />
-                <div className="h-3 bg-slate-100 rounded w-2/3 mt-3" />
-                <div className="h-3 bg-slate-100 rounded w-1/3 mt-3" />
+                <div className="h-4 w-1/2 rounded bg-slate-100 dark:bg-white/10" />
+                <div className="mt-3 h-3 w-2/3 rounded bg-slate-100 dark:bg-white/10" />
+                <div className="mt-3 h-3 w-1/3 rounded bg-slate-100 dark:bg-white/10" />
               </div>
             ))}
           </div>
         ) : error ? (
-          <p className="py-6 text-center text-xs text-red-500">{error}</p>
+          <p className="py-6 text-center text-xs text-red-500 dark:text-red-400">
+            {error}
+          </p>
         ) : trips.length === 0 ? (
           <div className="flex flex-col items-center py-10 text-center">
-            <History className="h-10 w-10 text-slate-300" />
-            <p className="mt-2 text-sm text-slate-400">No trip history found</p>
+            <History className="h-10 w-10 text-slate-300 dark:text-slate-600" />
+            <p className="mt-2 text-sm text-slate-400 dark:text-slate-500">
+              No trip history found
+            </p>
           </div>
         ) : (
           <div className="space-y-3">
@@ -327,19 +331,19 @@ export function DriverHistoryModal({
               return (
                 <section
                   key={t._id}
-                  className="rounded-xl border border-slate-200 bg-white p-4"
+                  className="rounded-xl border border-slate-200 bg-white p-4 dark:border-white/10 dark:bg-[#0e121d]/60"
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <div className="flex items-center gap-3">
-                        <div className="h-7 w-7 rounded-full bg-blue-50 border border-blue-200 flex items-center justify-center text-[11px] font-bold text-blue-700 shrink-0">
+                        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-indigo-200 bg-indigo-50 text-[11px] font-bold text-indigo-700 dark:border-indigo-500/30 dark:bg-indigo-500/15 dark:text-indigo-300">
                           {rowNumber}
                         </div>
                         <div className="min-w-0">
-                          <div className="text-sm font-semibold text-slate-900 truncate">
+                          <div className="truncate text-sm font-semibold text-slate-900 dark:text-white">
                             {t.tripNumber ?? "—"}
                           </div>
-                          <div className="mt-0.5 text-[12px] text-slate-500">
+                          <div className="mt-0.5 text-[12px] text-slate-500 dark:text-slate-400">
                             {t.from && t.to ? `${t.from} → ${t.to}` : "—"}
                           </div>
                         </div>
@@ -347,31 +351,31 @@ export function DriverHistoryModal({
                     </div>
 
                     <span
-                      className={`rounded-full border px-2 py-0.5 capitalize text-[11px] ${statusBadgeCls(status)}`}
+                      className={`rounded-full border px-2 py-0.5 text-[11px] capitalize ${statusBadgeCls(status)}`}
                     >
                       {status.replaceAll("_", " ")}
                     </span>
                   </div>
 
                   <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
-                    <div className="text-xs text-slate-600">
+                    <div className="text-xs text-slate-600 dark:text-slate-400">
                       <div>Distance: {t.distance ?? "—"}</div>
-                      <div className="text-blue-700 font-medium mt-1">
+                      <div className="mt-1 font-medium text-indigo-700 dark:text-indigo-300">
                         {kmTravelledText(t)}
                       </div>
                     </div>
-                    <div className="text-xs text-slate-600">
+                    <div className="text-xs text-slate-600 dark:text-slate-400">
                       <div>
                         Date: {formatDate(t.startDate ?? t.departureDate)}
                       </div>
                       <div className="mt-1 flex items-center gap-2">
-                        <Car className="h-4 w-4 text-slate-400 shrink-0" />
+                        <Car className="h-4 w-4 shrink-0 text-slate-400" />
                         <span className="truncate">
                           Vehicle: {resolveVehicleLabel(t)}
                         </span>
                       </div>
                       <div className="mt-1 flex items-center gap-2">
-                        <UserCheck className="h-4 w-4 text-slate-400 shrink-0" />
+                        <UserCheck className="h-4 w-4 shrink-0 text-slate-400" />
                         <span className="truncate">
                           Driver: {resolveDriverName(t)}
                         </span>
@@ -380,27 +384,27 @@ export function DriverHistoryModal({
                   </div>
 
                   <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3">
-                    <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-2">
-                      <div className="text-[11px] font-semibold text-emerald-800">
+                    <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-2 dark:border-emerald-500/30 dark:bg-emerald-500/10">
+                      <div className="text-[11px] font-semibold text-emerald-800 dark:text-emerald-300">
                         Driver Salary
                       </div>
-                      <div className="text-sm font-bold text-slate-900 mt-1">
+                      <div className="mt-1 text-sm font-bold text-slate-900 dark:text-white">
                         {formatMoney0(t.driver_salary)}
                       </div>
                     </div>
-                    <div className="rounded-lg border border-amber-200 bg-amber-50 p-2">
-                      <div className="text-[11px] font-semibold text-amber-800">
+                    <div className="rounded-lg border border-amber-200 bg-amber-50 p-2 dark:border-amber-500/30 dark:bg-amber-500/10">
+                      <div className="text-[11px] font-semibold text-amber-800 dark:text-amber-300">
                         Trip Expense
                       </div>
-                      <div className="text-sm font-bold text-slate-900 mt-1">
+                      <div className="mt-1 text-sm font-bold text-slate-900 dark:text-white">
                         {formatMoney0(t.totalExpenses)}
                       </div>
                     </div>
-                    <div className="rounded-lg border border-blue-200 bg-blue-50 p-2">
-                      <div className="text-[11px] font-semibold text-blue-800">
+                    <div className="rounded-lg border border-indigo-200 bg-indigo-50 p-2 dark:border-indigo-500/30 dark:bg-indigo-500/10">
+                      <div className="text-[11px] font-semibold text-indigo-800 dark:text-indigo-300">
                         Agency Profit
                       </div>
-                      <div className="text-sm font-bold text-slate-900 mt-1">
+                      <div className="mt-1 text-sm font-bold text-slate-900 dark:text-white">
                         {formatMoney0(t.agencyProfit || 0)}
                       </div>
                     </div>
@@ -417,18 +421,18 @@ export function DriverHistoryModal({
               type="button"
               onClick={() => canPrev && setPage((p) => Math.max(1, p - 1))}
               disabled={!canPrev}
-              className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+              className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50 dark:border-white/10 dark:bg-white/5 dark:text-slate-300 dark:hover:bg-white/10"
             >
               Prev
             </button>
-            <div className="text-xs text-slate-500">
+            <div className="text-xs text-slate-500 dark:text-slate-400">
               Page {pageNum} of {pagination.pages ?? 1}
             </div>
             <button
               type="button"
               onClick={() => canNext && setPage((p) => p + 1)}
               disabled={!canNext}
-              className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+              className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50 dark:border-white/10 dark:bg-white/5 dark:text-slate-300 dark:hover:bg-white/10"
             >
               Next
             </button>

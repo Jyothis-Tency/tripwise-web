@@ -46,26 +46,26 @@ function ModalShell({
 }) {
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end justify-center bg-slate-900/40 p-0 sm:items-center sm:p-4"
+      className="fixed inset-0 z-50 flex items-end justify-center bg-slate-900/40 p-0 sm:items-center sm:p-4 dark:bg-black/60"
       onClick={onClose}
       role="presentation"
     >
       <div
         role="dialog"
         aria-modal="true"
-        className={`max-h-[90vh] w-full overflow-y-auto rounded-t-2xl border border-slate-200 bg-white shadow-xl sm:rounded-2xl ${
+        className={`max-h-[90vh] w-full overflow-y-auto rounded-t-2xl border border-slate-200 bg-white shadow-xl sm:rounded-2xl dark:border-[#1e2638] dark:bg-[#0e121d] ${
           wide ? "sm:max-w-2xl" : "sm:max-w-md"
         }`}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3 sm:px-5">
-          <h3 className="text-sm font-bold text-slate-900 sm:text-base">
+        <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3 sm:px-5 dark:border-white/10">
+          <h3 className="text-sm font-bold text-slate-900 sm:text-base dark:text-white">
             {title}
           </h3>
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+            className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-white/5 dark:hover:text-slate-200"
             aria-label="Close"
           >
             <X className="h-4 w-4" />
@@ -76,6 +76,9 @@ function ModalShell({
     </div>
   );
 }
+
+const cardBase =
+  "rounded-2xl border bg-white p-5 shadow-subtle transition-all hover:shadow-float sm:p-6 dark:bg-[#0e121d]/80 dark:backdrop-blur-xl";
 
 export const RevenueBreakdown: React.FC<RevenueBreakdownProps> = ({
   revenue,
@@ -154,26 +157,29 @@ export const RevenueBreakdown: React.FC<RevenueBreakdownProps> = ({
     }
   };
 
+  const fieldCls =
+    "w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-400 dark:border-white/10 dark:bg-white/5 dark:text-slate-100";
+
   return (
     <div className="space-y-4 sm:space-y-6">
-      <div className="grid gap-4 sm:gap-6 md:grid-cols-2 lg:grid-cols-4">
-        {/* Total Revenue Card */}
-        <div className="relative flex flex-col justify-between overflow-hidden rounded-2xl border border-blue-100 bg-blue-600 p-5 shadow-md sm:p-6 md:col-span-2 lg:col-span-1">
+      <div className="grid gap-4 sm:gap-5 md:grid-cols-2 lg:grid-cols-4">
+        {/* Total Revenue */}
+        <div className="relative flex flex-col justify-between overflow-hidden rounded-2xl border border-indigo-500/20 bg-indigo-600 p-5 shadow-lg shadow-indigo-600/25 sm:p-6 md:col-span-2 lg:col-span-1 dark:bg-gradient-to-br dark:from-indigo-600 dark:to-indigo-700">
           <div className="absolute -right-6 -top-6 h-32 w-32 rounded-full bg-white/10 blur-2xl" />
-          <div className="absolute -bottom-6 -left-6 h-32 w-32 rounded-full bg-blue-500/50 blur-2xl" />
+          <div className="absolute -bottom-6 -left-6 h-32 w-32 rounded-full bg-indigo-500/40 blur-2xl" />
 
           <div className="relative z-10 flex items-start gap-4">
             <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-white/20 bg-white/20 text-white shadow-inner backdrop-blur-sm sm:h-14 sm:w-14">
               <Wallet className="h-6 w-6 sm:h-7 sm:w-7" />
             </div>
             <div>
-              <p className="text-xs font-medium text-blue-100 sm:text-sm">
+              <p className="text-xs font-medium text-indigo-100 sm:text-sm">
                 Total Revenue
               </p>
-              <h3 className="mt-0.5 text-2xl font-black tracking-tight text-white sm:text-3xl">
+              <h3 className="mt-0.5 font-mono text-2xl font-black tracking-tight text-white metric-tabular sm:text-3xl">
                 {fmtCurrency(revenue.total)}
               </h3>
-              <p className="mt-1 text-[11px] text-blue-200 sm:text-xs">
+              <p className="mt-1 text-[11px] text-indigo-200 sm:text-xs">
                 Combined revenue from all sources
               </p>
             </div>
@@ -185,19 +191,19 @@ export const RevenueBreakdown: React.FC<RevenueBreakdownProps> = ({
             </h4>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <p className="text-[10px] font-semibold uppercase tracking-wider text-blue-200 sm:text-[11px]">
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-indigo-200 sm:text-[11px]">
                   Driver Salary
                 </p>
-                <p className="mt-0.5 text-sm font-bold text-white sm:text-base">
+                <p className="mt-0.5 font-mono text-sm font-bold text-white metric-tabular sm:text-base">
                   {fmtCurrency(revenue.driverSalary || 0)}
                 </p>
               </div>
               {summary && (
                 <div>
-                  <p className="text-[10px] font-semibold uppercase tracking-wider text-blue-200 sm:text-[11px]">
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-indigo-200 sm:text-[11px]">
                     Avg / Trip
                   </p>
-                  <p className="mt-0.5 text-sm font-bold text-white sm:text-base">
+                  <p className="mt-0.5 font-mono text-sm font-bold text-white metric-tabular sm:text-base">
                     {fmtCurrency(summary.avgRevenuePerTrip || 0)}
                   </p>
                 </div>
@@ -207,16 +213,18 @@ export const RevenueBreakdown: React.FC<RevenueBreakdownProps> = ({
         </div>
 
         {/* Commission Profit */}
-        <div className="rounded-2xl border border-emerald-100 bg-white p-5 shadow-sm transition-all hover:shadow-md sm:p-6">
+        <div
+          className={`${cardBase} border-emerald-100 dark:border-emerald-500/20`}
+        >
           <div className="flex items-center gap-3 sm:gap-4">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600 sm:h-12 sm:w-12">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600 sm:h-12 sm:w-12 dark:bg-emerald-500/15 dark:text-emerald-400">
               <Briefcase className="h-5 w-5 sm:h-6 sm:w-6" />
             </div>
             <div>
-              <p className="text-xs font-medium text-slate-500 sm:text-sm">
+              <p className="text-xs font-medium text-slate-500 sm:text-sm dark:text-slate-400">
                 Commission Profit
               </p>
-              <h3 className="text-lg font-bold text-slate-900 sm:text-xl">
+              <h3 className="font-mono text-lg font-bold text-slate-900 metric-tabular sm:text-xl dark:text-white">
                 {fmtCurrency(commission)}
               </h3>
             </div>
@@ -230,35 +238,41 @@ export const RevenueBreakdown: React.FC<RevenueBreakdownProps> = ({
         </div>
 
         {/* Trip Revenue */}
-        <div className="rounded-2xl border border-blue-100 bg-white p-5 shadow-sm transition-all hover:shadow-md sm:p-6">
+        <div
+          className={`${cardBase} border-indigo-100 dark:border-indigo-500/20`}
+        >
           <div className="flex items-center gap-3 sm:gap-4">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-600 sm:h-12 sm:w-12">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600 sm:h-12 sm:w-12 dark:bg-indigo-500/15 dark:text-indigo-300">
               <Truck className="h-5 w-5 sm:h-6 sm:w-6" />
             </div>
             <div>
-              <p className="text-xs font-medium text-slate-500 sm:text-sm">
+              <p className="text-xs font-medium text-slate-500 sm:text-sm dark:text-slate-400">
                 Trip Revenue
               </p>
-              <h3 className="text-lg font-bold text-slate-900 sm:text-xl">
+              <h3 className="font-mono text-lg font-bold text-slate-900 metric-tabular sm:text-xl dark:text-white">
                 {fmtCurrency(tripRevenue)}
               </h3>
             </div>
           </div>
-          <p className="mt-4 text-xs text-slate-400">From owner&apos;s own trips</p>
+          <p className="mt-4 text-xs text-slate-400">
+            From owner&apos;s own trips
+          </p>
         </div>
 
         {/* Extra Commission */}
-        <div className="rounded-2xl border border-amber-100 bg-white p-5 shadow-sm transition-all hover:shadow-md sm:p-6">
+        <div
+          className={`${cardBase} border-amber-100 dark:border-amber-500/20`}
+        >
           <div className="flex items-start justify-between gap-2">
             <div className="flex min-w-0 items-center gap-3 sm:gap-4">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-50 text-amber-600 sm:h-12 sm:w-12">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-50 text-amber-600 sm:h-12 sm:w-12 dark:bg-amber-500/15 dark:text-amber-400">
                 <BadgePercent className="h-5 w-5 sm:h-6 sm:w-6" />
               </div>
               <div className="min-w-0">
-                <p className="text-xs font-medium text-slate-500 sm:text-sm">
+                <p className="text-xs font-medium text-slate-500 sm:text-sm dark:text-slate-400">
                   Extra Commission
                 </p>
-                <h3 className="text-lg font-bold text-slate-900 sm:text-xl">
+                <h3 className="font-mono text-lg font-bold text-slate-900 metric-tabular sm:text-xl dark:text-white">
                   {fmtCurrency(extraCommission)}
                 </h3>
               </div>
@@ -268,7 +282,7 @@ export const RevenueBreakdown: React.FC<RevenueBreakdownProps> = ({
                 type="button"
                 onClick={openAdd}
                 title="Add extra commission"
-                className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-amber-600 text-white hover:bg-amber-700"
+                className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-amber-600 text-white hover:bg-amber-700 dark:bg-amber-500 dark:hover:bg-amber-400"
               >
                 <Plus className="h-4 w-4" />
               </button>
@@ -276,7 +290,7 @@ export const RevenueBreakdown: React.FC<RevenueBreakdownProps> = ({
                 type="button"
                 onClick={() => setModal("history")}
                 title="Extra commission history"
-                className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-white/10 dark:bg-white/5 dark:text-slate-300 dark:hover:bg-white/10"
               >
                 <History className="h-4 w-4" />
               </button>
@@ -292,7 +306,7 @@ export const RevenueBreakdown: React.FC<RevenueBreakdownProps> = ({
         <ModalShell title="Add Extra Commission" onClose={() => setModal(null)}>
           <form onSubmit={handleSave} className="space-y-4">
             <div>
-              <label className="mb-1 block text-xs font-semibold text-slate-600">
+              <label className="mb-1 block text-xs font-semibold text-slate-600 dark:text-slate-400">
                 Amount (₹)
               </label>
               <input
@@ -302,42 +316,44 @@ export const RevenueBreakdown: React.FC<RevenueBreakdownProps> = ({
                 required
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
-                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-400"
+                className={fieldCls}
                 placeholder="0"
                 autoFocus
               />
             </div>
             <div>
-              <label className="mb-1 block text-xs font-semibold text-slate-600">
+              <label className="mb-1 block text-xs font-semibold text-slate-600 dark:text-slate-400">
                 Date
               </label>
               <input
                 type="date"
                 value={date}
                 onChange={(e) => setDate(e.target.value)}
-                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-400"
+                className={fieldCls}
               />
             </div>
             <div>
-              <label className="mb-1 block text-xs font-semibold text-slate-600">
+              <label className="mb-1 block text-xs font-semibold text-slate-600 dark:text-slate-400">
                 Notes (optional)
               </label>
               <textarea
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
                 rows={2}
-                className="w-full resize-none rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-400"
+                className={`${fieldCls} resize-none`}
                 placeholder="Reason for extra commission…"
               />
             </div>
             {saveError && (
-              <p className="text-xs font-medium text-rose-600">{saveError}</p>
+              <p className="text-xs font-medium text-rose-600 dark:text-rose-400">
+                {saveError}
+              </p>
             )}
             <div className="flex justify-end gap-2 pt-1">
               <button
                 type="button"
                 onClick={() => setModal(null)}
-                className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50"
+                className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 dark:border-white/10 dark:text-slate-300 dark:hover:bg-white/5"
               >
                 Cancel
               </button>
@@ -365,7 +381,7 @@ export const RevenueBreakdown: React.FC<RevenueBreakdownProps> = ({
               <Loader2 className="h-6 w-6 animate-spin text-amber-600" />
             </div>
           ) : historyError ? (
-            <p className="py-6 text-center text-sm text-rose-600">
+            <p className="py-6 text-center text-sm text-rose-600 dark:text-rose-400">
               {historyError}
             </p>
           ) : history.length === 0 ? (
@@ -373,25 +389,28 @@ export const RevenueBreakdown: React.FC<RevenueBreakdownProps> = ({
               No extra commission add-ins yet.
             </p>
           ) : (
-            <div className="overflow-x-auto rounded-xl border border-slate-200">
+            <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-white/10">
               <table className="min-w-full text-left text-sm">
-                <thead className="bg-slate-50 text-[11px] font-bold uppercase tracking-wide text-slate-500">
+                <thead className="bg-slate-50 text-[11px] font-bold uppercase tracking-wide text-slate-500 dark:bg-white/5 dark:text-slate-400">
                   <tr>
                     <th className="px-3 py-2.5">Date</th>
                     <th className="px-3 py-2.5">Notes</th>
                     <th className="px-3 py-2.5 text-right">Amount</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100">
+                <tbody className="divide-y divide-slate-100 dark:divide-white/10">
                   {history.map((row) => (
-                    <tr key={row._id} className="bg-white">
-                      <td className="whitespace-nowrap px-3 py-2.5 text-slate-700">
+                    <tr
+                      key={row._id}
+                      className="bg-white dark:bg-transparent"
+                    >
+                      <td className="whitespace-nowrap px-3 py-2.5 text-slate-700 dark:text-slate-300">
                         {formatDate(row.paymentDate)}
                       </td>
-                      <td className="max-w-[280px] truncate px-3 py-2.5 text-slate-500">
+                      <td className="max-w-[280px] truncate px-3 py-2.5 text-slate-500 dark:text-slate-400">
                         {row.notes || "—"}
                       </td>
-                      <td className="whitespace-nowrap px-3 py-2.5 text-right font-semibold tabular-nums text-slate-900">
+                      <td className="whitespace-nowrap px-3 py-2.5 text-right font-semibold tabular-nums text-slate-900 dark:text-white">
                         {fmtCurrency(row.amount)}
                       </td>
                     </tr>

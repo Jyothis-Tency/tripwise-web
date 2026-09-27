@@ -21,7 +21,7 @@ function ModeTabsBar({
 
   return (
     <div
-      className="grid h-10 w-[min(100%,17.5rem)] shrink-0 grid-cols-2 gap-1 rounded-xl border border-slate-200 bg-slate-50 p-1"
+      className="grid h-10 w-[min(100%,17.5rem)] shrink-0 grid-cols-2 gap-1 rounded-xl border border-slate-200 bg-slate-100 p-1 dark:border-white/10 dark:bg-white/5"
       role="tablist"
     >
       <button
@@ -30,8 +30,8 @@ function ModeTabsBar({
         aria-selected={mode === "vehicle"}
         className={`${tabBtn} ${
           mode === "vehicle"
-            ? "bg-blue-500 text-white shadow-sm"
-            : "bg-transparent text-slate-500 hover:text-slate-700"
+            ? "bg-indigo-500 text-white shadow-sm dark:bg-indigo-500"
+            : "bg-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
         }`}
         onClick={() => setMode("vehicle")}
       >
@@ -43,8 +43,8 @@ function ModeTabsBar({
         aria-selected={mode === "trip"}
         className={`${tabBtn} ${
           mode === "trip"
-            ? "bg-blue-500 text-white shadow-sm"
-            : "bg-transparent text-slate-500 hover:text-slate-700"
+            ? "bg-indigo-500 text-white shadow-sm dark:bg-indigo-500"
+            : "bg-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
         }`}
         onClick={() => setMode("trip")}
       >
@@ -125,25 +125,25 @@ const ExpensesPage: React.FC = () => {
       : null;
 
   return (
-    <div className="flex h-full min-h-0 flex-col bg-slate-50">
+    <div className="flex h-full min-h-0 flex-col bg-[var(--bg-main)]">
       {mode === "vehicle" ? (
         <div className="flex min-h-0 flex-1 overflow-hidden">
           <div
-            className={`flex w-full shrink-0 flex-col border-r border-slate-200 bg-white transition-all md:w-64 lg:w-72 xl:w-80 ${
+            className={`flex w-full shrink-0 flex-col border-r border-slate-200 bg-[var(--bg-card)] transition-all dark:border-[#1e2638] md:w-64 lg:w-72 xl:w-80 ${
               selectedVehicleId ? "hidden md:flex" : "flex"
             }`}
           >
-            <div className="flex justify-end border-b border-slate-200 bg-white px-3 py-2 md:hidden">
+            <div className="flex justify-end border-b border-slate-200 bg-[var(--bg-card)] px-3 py-2 dark:border-[#1e2638] md:hidden">
               <ModeTabsBar mode={mode} setMode={setMode} />
             </div>
-            <div className="relative border-b border-slate-100 px-3 py-2">
+            <div className="relative border-b border-slate-100 px-3 py-2 dark:border-white/10">
               <Search className="absolute left-5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
               <input
                 type="text"
                 value={vehicleSearch}
                 onChange={(e) => setVehicleSearch(e.target.value)}
                 placeholder="Search vehicles..."
-                className="w-full rounded-md border border-slate-200 bg-slate-50 py-1.5 pl-7 pr-3 text-xs text-slate-700 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400"
+                className="w-full rounded-md border border-slate-200 bg-slate-50 py-1.5 pl-7 pr-3 text-xs text-slate-700 outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400 dark:border-white/10 dark:bg-white/5 dark:text-slate-200 dark:placeholder:text-slate-500 dark:focus:border-indigo-400 dark:focus:ring-indigo-500/30"
               />
             </div>
             <div className="flex-1 space-y-1.5 overflow-y-auto p-3">
@@ -151,13 +151,13 @@ const ExpensesPage: React.FC = () => {
                 Array.from({ length: 6 }).map((_, i) => (
                   <div
                     key={i}
-                    className="h-24 animate-pulse rounded-xl bg-slate-100"
+                    className="h-24 animate-pulse rounded-xl bg-slate-100 dark:bg-white/5"
                   />
                 ))
               ) : vehicles.length === 0 ? (
                 <div className="flex flex-col items-center gap-2 py-12 text-center">
-                  <Car className="h-10 w-10 text-slate-300" />
-                  <p className="text-sm text-slate-400">No vehicles found</p>
+                  <Car className="h-10 w-10 text-slate-300 dark:text-slate-500" />
+                  <p className="text-sm text-slate-400 dark:text-slate-500">No vehicles found</p>
                 </div>
               ) : (
                 vehicles.map((v) => (
@@ -174,7 +174,7 @@ const ExpensesPage: React.FC = () => {
           </div>
 
           <div
-            className={`min-h-0 flex-1 overflow-y-auto bg-slate-50 p-4 ${
+            className={`min-h-0 flex-1 overflow-y-auto bg-[var(--bg-main)] p-4 ${
               selectedVehicleId ? "flex flex-col" : "hidden md:flex"
             }`}
           >
@@ -187,28 +187,28 @@ const ExpensesPage: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => setSelectedVehicleId(null)}
-                    className="rounded-lg border border-slate-200 bg-white p-2 text-slate-600 hover:bg-slate-50"
+                    className="rounded-lg border border-slate-200 bg-white p-2 text-slate-600 hover:bg-slate-50 dark:border-white/10 dark:bg-white/5 dark:text-slate-300 dark:hover:bg-white/10"
                     aria-label="Back to vehicle list"
                   >
                     <ChevronLeft className="h-5 w-5" />
                   </button>
                   <div>
-                    <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
+                    <p className="text-xs font-medium uppercase tracking-wide text-slate-400 dark:text-slate-500">
                       Vehicle
                     </p>
-                    <p className="text-lg font-bold text-slate-900">
+                    <p className="text-lg font-bold text-slate-900 dark:text-white">
                       {selectedVehicle.vehicleNumber}
                     </p>
                   </div>
                 </div>
-                <div className="hidden border-b border-slate-200 pb-3 md:block">
-                  <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
+                <div className="hidden border-b border-slate-200 pb-3 dark:border-[#1e2638] md:block">
+                  <p className="text-xs font-medium uppercase tracking-wide text-slate-400 dark:text-slate-500">
                     Vehicle expenses
                   </p>
-                  <p className="text-xl font-bold text-slate-900">
+                  <p className="text-xl font-bold text-slate-900 dark:text-white">
                     {selectedVehicle.vehicleNumber}
                   </p>
-                  <p className="text-sm text-slate-500">
+                  <p className="text-sm text-slate-500 dark:text-slate-400">
                     {[selectedVehicle.vehicleType, selectedVehicle.vehicleModel]
                       .filter(Boolean)
                       .join(" – ")}
@@ -221,11 +221,11 @@ const ExpensesPage: React.FC = () => {
             ) : (
               !vehicleLoading && (
                 <div className="flex min-h-0 flex-1 flex-col items-center justify-center text-center">
-                  <Car className="h-12 w-12 text-slate-300" />
-                  <p className="mt-3 text-sm font-medium text-slate-500">
+                  <Car className="h-12 w-12 text-slate-300 dark:text-slate-500" />
+                  <p className="mt-3 text-sm font-medium text-slate-500 dark:text-slate-400">
                     No vehicle selected
                   </p>
-                  <p className="mt-1 text-xs text-slate-400">
+                  <p className="mt-1 text-xs text-slate-400 dark:text-slate-500">
                     Select a vehicle from the list to manage its expenses
                   </p>
                 </div>
@@ -240,7 +240,7 @@ const ExpensesPage: React.FC = () => {
               placeholder="Search trips…"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-200 sm:max-w-md"
+              className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-200 dark:border-white/10 dark:bg-white/5 dark:text-slate-200 dark:placeholder:text-slate-500 dark:focus:border-indigo-400 dark:focus:ring-indigo-500/30 sm:max-w-md"
             />
             <div className="flex justify-end sm:shrink-0">
               <ModeTabsBar mode={mode} setMode={setMode} />
@@ -250,11 +250,11 @@ const ExpensesPage: React.FC = () => {
             Array.from({ length: 4 }).map((_, i) => (
               <div
                 key={i}
-                className="mb-2.5 h-16 animate-pulse rounded-xl bg-slate-200"
+                className="mb-2.5 h-16 animate-pulse rounded-xl bg-slate-200 dark:bg-white/5"
               />
             ))
           ) : trips.length === 0 ? (
-            <div className="py-16 text-center text-slate-400">
+            <div className="py-16 text-center text-slate-400 dark:text-slate-500">
               <div className="mb-2 text-5xl">📦</div>
               <p className="text-sm">
                 No trips found. Try another search or create a trip first.

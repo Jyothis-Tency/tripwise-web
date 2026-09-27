@@ -25,6 +25,8 @@ import {
   // Wallet, // used by disabled Payout UI
   FileDown,
   ListChecks,
+  Search,
+  FileText,
 } from "lucide-react";
 import jsPDF from "jspdf";
 import { useAuth } from "../../../hooks/useAuth";
@@ -190,6 +192,48 @@ function emptyNormalRow(): NormalEntryRow {
   };
 }
 
+const VEHICLE_TYPE_OPTIONS = [
+  "Sedan",
+  "SUV",
+  "Hatchback",
+  "Van",
+  "Truck / Van",
+  "Other",
+] as const;
+
+const plateInputCls =
+  "font-mono font-semibold uppercase tracking-wider !text-amber-700 dark:!text-amber-300";
+
+const actionBtnCls =
+  "flex h-7 w-7 items-center justify-center rounded-md border border-slate-200 bg-[var(--bg-elevated)] text-slate-400 transition hover:border-slate-300 dark:border-[#1e2638] dark:hover:border-white/15";
+
+function VehicleTypeSelect({
+  value,
+  onChange,
+  className = "",
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  className?: string;
+}) {
+  const known = (VEHICLE_TYPE_OPTIONS as readonly string[]).includes(value);
+  return (
+    <select
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      className={`w-full appearance-none rounded-md border border-slate-200 bg-[var(--bg-elevated)] px-2.5 py-2 text-sm text-slate-800 outline-none transition focus:border-indigo-400 focus:ring-1 focus:ring-indigo-200 dark:border-[#1e2638] dark:text-slate-100 ${className}`}
+    >
+      <option value="">Select</option>
+      {!known && value ? <option value={value}>{value}</option> : null}
+      {VEHICLE_TYPE_OPTIONS.map((t) => (
+        <option key={t} value={t}>
+          {t}
+        </option>
+      ))}
+    </select>
+  );
+}
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // AUTOSAVE ENGINE — Excel-like dual-layer persistence
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -327,17 +371,17 @@ function SyncBadge({ status }: { status: SyncStatus }) {
     saving: {
       icon: <Loader2 className="h-4 w-4 animate-spin" />,
       text: "Saving…",
-      cls: "text-amber-600 bg-amber-50 border-amber-200",
+      cls: "text-amber-600 bg-amber-50 border-amber-200 dark:text-amber-400 dark:bg-amber-500/10 dark:border-amber-500/20",
     },
     saved: {
       icon: <Cloud className="h-4 w-4" />,
       text: "Saved",
-      cls: "text-emerald-600 bg-emerald-50 border-emerald-200",
+      cls: "text-emerald-600 bg-emerald-50 border-emerald-200 dark:text-emerald-400 dark:bg-emerald-500/10 dark:border-emerald-500/20",
     },
     error: {
       icon: <CloudOff className="h-4 w-4" />,
       text: "Offline",
-      cls: "text-red-600 bg-red-50 border-red-200",
+      cls: "text-red-600 bg-red-50 border-red-200 dark:text-red-400 dark:bg-red-500/10 dark:border-red-500/20",
     },
   }[status];
   return (
@@ -369,17 +413,17 @@ function ModalShell({
     <div
       ref={ref}
       onClick={(e) => e.target === ref.current && onClose()}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 dark:bg-black/60"
     >
       <div
-        className={`w-full ${maxWidth} rounded-2xl bg-white shadow-2xl flex flex-col max-h-[90vh]`}
+        className={`w-full ${maxWidth} rounded-2xl border border-slate-200 bg-[var(--bg-card)] shadow-2xl flex flex-col max-h-[90vh] dark:border-[#1e2638]`}
       >
-        <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4 shrink-0">
-          <h3 className="text-base font-semibold text-slate-900">{title}</h3>
+        <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4 shrink-0 dark:border-[#1e2638]">
+          <h3 className="text-base font-semibold text-slate-900 dark:text-white">{title}</h3>
           <button
             type="button"
             onClick={onClose}
-            className="text-slate-400 hover:text-slate-600"
+            className="text-slate-400 hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-300"
           >
             <X className="h-5 w-5" />
           </button>
@@ -1013,7 +1057,7 @@ export function AgencyPayoutTab({
   if (loading)
     return (
       <div className="flex items-center justify-center py-16">
-        <Loader2 className="h-6 w-6 animate-spin text-blue-400" />
+        <Loader2 className="h-6 w-6 animate-spin text-indigo-400" />
       </div>
     );
 
@@ -1036,7 +1080,7 @@ export function AgencyPayoutTab({
         <select
           value={month}
           onChange={(e) => setMonth(e.target.value)}
-          className="min-h-[36px] rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-800 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 sm:text-sm"
+          className="min-h-[36px] rounded-lg border border-slate-200 bg-[var(--bg-elevated)] px-2.5 py-1.5 text-xs font-medium text-slate-800 outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400 sm:text-sm dark:border-[#1e2638] dark:text-slate-100"
         >
           {PAYOUT_MONTH_OPTIONS.map((o) => (
             <option key={o.value} value={o.value}>
@@ -1054,8 +1098,8 @@ export function AgencyPayoutTab({
             label: "Grand Total",
             hint: "Trip fare total",
             value: gt,
-            color: "text-slate-800",
-            bg: "bg-slate-50 border-slate-200",
+            color: "text-slate-800 dark:text-slate-100",
+            bg: "bg-slate-50 border-slate-200 dark:bg-white/5 dark:border-[#1e2638]",
             signed: false,
           },
           {
@@ -1063,8 +1107,8 @@ export function AgencyPayoutTab({
             label: "Advance",
             hint: "On trip rows",
             value: advance,
-            color: "text-sky-700",
-            bg: "bg-sky-50 border-sky-200",
+            color: "text-sky-700 dark:text-sky-400",
+            bg: "bg-sky-50 border-sky-200 dark:bg-sky-500/10 dark:border-sky-500/20",
             signed: false,
           },
           {
@@ -1072,8 +1116,8 @@ export function AgencyPayoutTab({
             label: "Payments",
             hint: "Cash receipts",
             value: received,
-            color: "text-emerald-700",
-            bg: "bg-emerald-50 border-emerald-200",
+            color: "text-emerald-700 dark:text-emerald-400",
+            bg: "bg-emerald-50 border-emerald-200 dark:bg-emerald-500/10 dark:border-emerald-500/20",
             signed: false,
           },
           {
@@ -1083,16 +1127,16 @@ export function AgencyPayoutTab({
             value: balanceVsPayments,
             color:
               balanceVsPayments > 0
-                ? "text-amber-700"
+                ? "text-amber-700 dark:text-amber-400"
                 : balanceVsPayments < 0
-                  ? "text-violet-700"
-                  : "text-slate-500",
+                  ? "text-violet-700 dark:text-violet-400"
+                  : "text-slate-500 dark:text-slate-400",
             bg:
               balanceVsPayments > 0
-                ? "bg-amber-50 border-amber-200"
+                ? "bg-amber-50 border-amber-200 dark:bg-amber-500/10 dark:border-amber-500/20"
                 : balanceVsPayments < 0
-                  ? "bg-violet-50 border-violet-200"
-                  : "bg-slate-50 border-slate-200",
+                  ? "bg-violet-50 border-violet-200 dark:bg-violet-500/10 dark:border-violet-500/20"
+                  : "bg-slate-50 border-slate-200 dark:bg-white/5 dark:border-[#1e2638]",
             signed: true,
           },
         ].map((c) => (
@@ -1144,7 +1188,7 @@ export function AgencyPayoutTab({
       )}
 
       {/* Add payment form */}
-      <div className="rounded-xl border border-blue-100 bg-blue-50/60 p-4 space-y-3">
+      <div className="rounded-xl border border-indigo-100 bg-indigo-50/60 p-4 space-y-3 dark:border-indigo-500/30 dark:bg-indigo-500/10">
         <h4 className="text-sm font-semibold text-slate-700">
           Record Payment Received
         </h4>
@@ -1165,7 +1209,7 @@ export function AgencyPayoutTab({
               placeholder="0"
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
-              className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-blue-400"
+              className="w-full rounded-lg border border-slate-200 bg-[var(--bg-elevated)] px-3 py-2 text-sm outline-none focus:border-indigo-400 dark:border-[#1e2638] dark:text-slate-100 dark:placeholder:text-slate-500"
             />
           </div>
           <div>
@@ -1176,7 +1220,7 @@ export function AgencyPayoutTab({
               type="date"
               value={paymentDate}
               onChange={(e) => setPaymentDate(e.target.value)}
-              className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-blue-400"
+              className="w-full rounded-lg border border-slate-200 bg-[var(--bg-elevated)] px-3 py-2 text-sm outline-none focus:border-indigo-400 dark:border-[#1e2638] dark:text-slate-100 dark:placeholder:text-slate-500"
             />
           </div>
           <div>
@@ -1186,7 +1230,7 @@ export function AgencyPayoutTab({
             <select
               value={paymentMethod}
               onChange={(e) => setPaymentMethod(e.target.value)}
-              className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-blue-400"
+              className="w-full rounded-lg border border-slate-200 bg-[var(--bg-elevated)] px-3 py-2 text-sm outline-none focus:border-indigo-400 dark:border-[#1e2638] dark:text-slate-100 dark:placeholder:text-slate-500"
             >
               <option value="cash">Cash</option>
               <option value="bank_transfer">Bank Transfer</option>
@@ -1203,14 +1247,14 @@ export function AgencyPayoutTab({
               placeholder="Optional"
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-blue-400"
+              className="w-full rounded-lg border border-slate-200 bg-[var(--bg-elevated)] px-3 py-2 text-sm outline-none focus:border-indigo-400 dark:border-[#1e2638] dark:text-slate-100 dark:placeholder:text-slate-500"
             />
           </div>
         </div>
         <button
           onClick={handleAdd}
           disabled={saving}
-          className="flex items-center gap-2 rounded-lg bg-blue-500 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-600 disabled:opacity-50"
+          className="flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-50 dark:bg-indigo-500 dark:hover:bg-indigo-400"
         >
           <Plus className="h-4 w-4" />
           {saving ? "Adding…" : "Add Payment"}
@@ -1231,7 +1275,7 @@ export function AgencyPayoutTab({
             {data.payments.map((p) => (
               <div
                 key={p._id}
-                className="flex items-center gap-3 rounded-xl border border-slate-100 bg-white px-4 py-3 shadow-sm"
+                className="flex items-center gap-3 rounded-xl border border-slate-100 bg-[var(--bg-card)] px-4 py-3 shadow-sm dark:border-[#1e2638]"
               >
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
@@ -1271,7 +1315,7 @@ export function AgencyPayoutTab({
           onClick={() =>
             generateAgencyPayoutPDF(user?.name || "Owner", agencyName, data)
           }
-          className="flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-4 py-2.5 text-sm font-semibold text-blue-700 hover:bg-blue-100 transition w-full justify-center"
+          className="flex items-center gap-2 rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-2.5 text-sm font-semibold text-indigo-700 hover:bg-indigo-100 transition w-full justify-center dark:border-indigo-500/30 dark:bg-indigo-500/15 dark:text-indigo-300 dark:hover:bg-indigo-500/25"
         >
           <FileDown className="h-4 w-4" /> Download Agency Report (PDF)
         </button>
@@ -1368,7 +1412,7 @@ export function DriverPayoutPanel({
   if (loading)
     return (
       <div className="flex items-center justify-center py-8">
-        <Loader2 className="h-5 w-5 animate-spin text-blue-400" />
+        <Loader2 className="h-5 w-5 animate-spin text-indigo-400" />
       </div>
     );
 
@@ -1386,7 +1430,7 @@ export function DriverPayoutPanel({
         <select
           value={month}
           onChange={(e) => setMonth(e.target.value)}
-          className="min-h-[30px] rounded-md border border-slate-200 bg-white px-2 py-1 text-[11px] font-medium text-slate-800 outline-none focus:border-blue-400"
+          className="min-h-[30px] rounded-md border border-slate-200 bg-[var(--bg-elevated)] px-2 py-1 text-[11px] font-medium text-slate-800 outline-none focus:border-indigo-400 dark:border-[#1e2638] dark:text-slate-100"
         >
           {PAYOUT_MONTH_OPTIONS.map((o) => (
             <option key={o.value} value={o.value}>
@@ -1409,7 +1453,7 @@ export function DriverPayoutPanel({
         ].map((c) => (
           <div
             key={c.label}
-            className="rounded-lg bg-slate-50 border border-slate-100 px-3 py-2"
+            className="rounded-lg bg-slate-50 border border-slate-100 px-3 py-2 dark:bg-white/5 dark:border-[#1e2638]"
           >
             <div className="text-[9px] font-bold uppercase tracking-wider text-slate-400">
               {c.label}
@@ -1431,18 +1475,18 @@ export function DriverPayoutPanel({
           placeholder="Amount"
           value={amount}
           onChange={(e) => setAmount(e.target.value)}
-          className="flex-1 min-w-[80px] rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs outline-none focus:border-blue-400"
+          className="flex-1 min-w-[80px] rounded-lg border border-slate-200 bg-[var(--bg-elevated)] px-2.5 py-1.5 text-xs outline-none focus:border-indigo-400 dark:border-[#1e2638] dark:text-slate-100"
         />
         <input
           type="date"
           value={paymentDate}
           onChange={(e) => setPaymentDate(e.target.value)}
-          className="rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs outline-none focus:border-blue-400"
+          className="rounded-lg border border-slate-200 bg-[var(--bg-elevated)] px-2.5 py-1.5 text-xs outline-none focus:border-indigo-400 dark:border-[#1e2638] dark:text-slate-100"
         />
         <select
           value={paymentMethod}
           onChange={(e) => setPaymentMethod(e.target.value)}
-          className="rounded-lg border border-slate-200 px-2 py-1.5 text-xs outline-none focus:border-blue-400"
+          className="rounded-lg border border-slate-200 bg-[var(--bg-elevated)] px-2 py-1.5 text-xs outline-none focus:border-indigo-400 dark:border-[#1e2638] dark:text-slate-100"
         >
           <option value="cash">Cash</option>
           <option value="bank_transfer">Bank Transfer</option>
@@ -1453,7 +1497,7 @@ export function DriverPayoutPanel({
           placeholder="Notes"
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
-          className="flex-1 min-w-[80px] rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs outline-none focus:border-blue-400"
+          className="flex-1 min-w-[80px] rounded-lg border border-slate-200 bg-[var(--bg-elevated)] px-2.5 py-1.5 text-xs outline-none focus:border-indigo-400 dark:border-[#1e2638] dark:text-slate-100"
         />
         <button
           onClick={handleAdd}
@@ -1471,7 +1515,7 @@ export function DriverPayoutPanel({
           {data!.payments.map((p) => (
             <div
               key={p._id}
-              className="flex items-center gap-2 rounded-lg border border-slate-100 bg-white px-3 py-2"
+              className="flex items-center gap-2 rounded-lg border border-slate-100 bg-[var(--bg-card)] px-3 py-2 dark:border-[#1e2638]"
             >
               <span className="font-semibold text-emerald-600 text-xs">
                 ₹{p.amount.toLocaleString("en-IN")}
@@ -1504,7 +1548,7 @@ export function DriverPayoutPanel({
               data,
             )
           }
-          className="flex items-center gap-1.5 rounded-lg border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-100 transition w-full justify-center"
+          className="flex items-center gap-1.5 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-1.5 text-xs font-semibold text-indigo-700 hover:bg-indigo-100 transition w-full justify-center dark:border-indigo-500/30 dark:bg-indigo-500/15 dark:text-indigo-300 dark:hover:bg-indigo-500/25"
         >
           <FileDown className="h-3.5 w-3.5" /> Download Report
         </button>
@@ -1546,6 +1590,7 @@ const CellInput = memo(function CellInput({
         value={timeVal}
         allowEmpty
         compact
+        label={title}
         disabled={disabled}
         onChange={(v) => {
           if (disabled) return;
@@ -1571,7 +1616,7 @@ const CellInput = memo(function CellInput({
       type={type}
       placeholder={placeholder}
       className={`w-full rounded-md border border-slate-200 px-2.5 py-2 text-sm outline-none
-        focus:border-blue-400 focus:ring-1 focus:ring-blue-200 bg-white transition disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400 ${
+        focus:border-indigo-400 focus:ring-1 focus:ring-indigo-200 bg-[var(--bg-elevated)] dark:border-[#1e2638] dark:text-slate-100 dark:placeholder:text-slate-500 transition disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400 dark:disabled:bg-white/5 dark:disabled:text-slate-500 ${
           type === "number"
             ? "[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
             : ""
@@ -1928,15 +1973,16 @@ function BulkEntryTable({
   );
 
   return (
-    <div className="space-y-4">
+    <div className="flex h-full min-h-0 flex-col">
+      <div className="min-h-0 flex-1 space-y-4 overflow-y-auto pb-2">
       {/* Top Actions */}
       {groups.length > 0 && groups.some((g) => g.rows.length > 0) && (
-        <div className="flex justify-end mb-2">
+        <div className="mb-2 flex justify-end">
           <button
             onClick={() => {
               void openBulkExportModal();
             }}
-            className="flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-100 transition shadow-sm"
+            className="flex items-center gap-2 rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-2 text-sm font-semibold text-indigo-700 shadow-sm transition hover:bg-indigo-100 dark:border-indigo-500/30 dark:bg-indigo-500/15 dark:text-indigo-300 dark:hover:bg-indigo-500/25"
           >
             <FileDown className="h-4 w-4" /> Download Bulk Trips Report (PDF)
           </button>
@@ -1953,9 +1999,9 @@ function BulkEntryTable({
           maxWidth="max-w-md"
         >
           <div className="p-5 sm:p-6 space-y-4">
-            <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-700">
+            <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-700 dark:border-[#1e2638] dark:bg-white/5 dark:text-slate-200">
               <span className="font-semibold">{agencyName || "Agency"}</span>
-              <span className="text-slate-500">
+              <span className="text-slate-500 dark:text-slate-400">
                 {" "}
                 • Filter:{" "}
                 <span className="font-semibold capitalize">{filterStatus}</span>
@@ -1964,31 +2010,31 @@ function BulkEntryTable({
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
-                <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1">
+                <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1 dark:text-slate-400">
                   Start Date (optional)
                 </label>
                 <input
                   type="date"
                   value={exportStartDate}
                   onChange={(e) => setExportStartDate(e.target.value)}
-                  className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-200 bg-white"
+                  className="w-full rounded-lg border border-slate-200 bg-[var(--bg-elevated)] px-3 py-2.5 text-sm outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-200 dark:border-[#1e2638] dark:text-slate-100 dark:placeholder:text-slate-500"
                 />
               </div>
               <div>
-                <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1">
+                <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1 dark:text-slate-400">
                   End Date (optional)
                 </label>
                 <input
                   type="date"
                   value={exportEndDate}
                   onChange={(e) => setExportEndDate(e.target.value)}
-                  className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-200 bg-white"
+                  className="w-full rounded-lg border border-slate-200 bg-[var(--bg-elevated)] px-3 py-2.5 text-sm outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-200 dark:border-[#1e2638] dark:text-slate-100 dark:placeholder:text-slate-500"
                 />
               </div>
             </div>
 
             <div>
-              <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1">
+              <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1 dark:text-slate-400">
                 From
               </label>
               <input
@@ -1996,20 +2042,20 @@ function BulkEntryTable({
                 value={exportFromName}
                 onChange={(e) => setExportFromName(e.target.value)}
                 placeholder="Company or owner name"
-                className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-200 bg-white"
+                className="w-full rounded-lg border border-slate-200 bg-[var(--bg-elevated)] px-3 py-2.5 text-sm outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-200 dark:border-[#1e2638] dark:text-slate-100 dark:placeholder:text-slate-500"
               />
               <label className="mt-2 flex items-center gap-2 text-sm text-slate-700 cursor-pointer select-none">
                 <input
                   type="checkbox"
                   checked={exportShowPhone}
                   onChange={(e) => setExportShowPhone(e.target.checked)}
-                  className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                  className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 dark:border-slate-600"
                 />
                 Show phone number after From name
               </label>
               {exportShowPhone && (
                 <div className="mt-2">
-                  <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1">
+                  <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1 dark:text-slate-400">
                     Phone Number
                   </label>
                   <input
@@ -2021,7 +2067,7 @@ function BulkEntryTable({
                         ? "Loading phone…"
                         : "Owner phone number"
                     }
-                    className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-200 bg-white"
+                    className="w-full rounded-lg border border-slate-200 bg-[var(--bg-elevated)] px-3 py-2.5 text-sm outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-200 dark:border-[#1e2638] dark:text-slate-100 dark:placeholder:text-slate-500"
                   />
                 </div>
               )}
@@ -2039,7 +2085,7 @@ function BulkEntryTable({
             </div>
 
             <div>
-              <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1">
+              <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1 dark:text-slate-400">
                 PDF File Name
               </label>
               <input
@@ -2047,7 +2093,7 @@ function BulkEntryTable({
                 value={exportFileName}
                 onChange={(e) => setExportFileName(e.target.value)}
                 placeholder="e.g. BulkTrips_Agency_all_2026-09-07.pdf"
-                className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-200 bg-white"
+                className="w-full rounded-lg border border-slate-200 bg-[var(--bg-elevated)] px-3 py-2.5 text-sm outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-200 dark:border-[#1e2638] dark:text-slate-100 dark:placeholder:text-slate-500"
               />
               <p className="mt-1 text-[11px] text-slate-500">
                 Change the download name if needed. `.pdf` is added
@@ -2073,14 +2119,14 @@ function BulkEntryTable({
                   setExportShowPhone(true);
                   setExportError(null);
                 }}
-                className="flex-1 rounded-xl border border-slate-200 bg-white py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                className="flex-1 rounded-xl border border-slate-200 bg-[var(--bg-elevated)] py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 dark:border-[#1e2638] dark:text-slate-200 dark:hover:bg-white/10"
               >
                 Clear
               </button>
               <button
                 type="button"
                 onClick={runBulkExport}
-                className="flex-1 rounded-xl bg-blue-600 py-2.5 text-sm font-bold text-white hover:bg-blue-700"
+                className="flex-1 rounded-xl bg-indigo-600 py-2.5 text-sm font-bold text-white hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-400"
               >
                 Export PDF
               </button>
@@ -2093,16 +2139,16 @@ function BulkEntryTable({
       {groups.map((g, gi) => (
         <div
           key={gi}
-          className={`rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden ${groups.length > 1 && g.rows.every((r) => isRowHidden(r.isCompleted)) ? "hidden" : ""}`}
+          className={`rounded-xl border border-slate-200 bg-[var(--bg-card)] shadow-sm overflow-hidden dark:border-[#1e2638] ${groups.length > 1 && g.rows.every((r) => isRowHidden(r.isCompleted)) ? "hidden" : ""}`}
         >
           {/* Group header */}
-          <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-2.5 sm:gap-3 border-b border-slate-100 bg-blue-50/50 px-4 sm:px-5 py-3 sm:py-3.5">
+          <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-2.5 sm:gap-3 border-b border-slate-100 bg-indigo-50/50 px-4 sm:px-5 py-3 sm:py-3.5 dark:border-[#1e2638] dark:bg-indigo-500/10">
             <div className="flex items-center gap-2.5 sm:gap-3">
-              <span className="flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-full bg-blue-100 text-xs sm:text-sm font-bold text-blue-600 shrink-0">
+              <span className="flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-full bg-indigo-100 text-xs sm:text-sm font-bold text-indigo-600 shrink-0 dark:bg-indigo-500/20 dark:text-indigo-300">
                 {gi + 1}
               </span>
               <div className="flex items-center gap-2 flex-1 min-w-0">
-                <span className="text-xs sm:text-sm font-semibold text-slate-600 shrink-0">
+                <span className="text-xs sm:text-sm font-semibold text-slate-600 shrink-0 dark:text-slate-300">
                   Driver:
                 </span>
                 <DriverNameCombobox
@@ -2149,7 +2195,7 @@ function BulkEntryTable({
             </div>
             <div className="flex items-center gap-2.5 sm:gap-3">
               <div className="flex items-center gap-2 flex-1 sm:flex-none">
-                <span className="text-xs sm:text-sm font-semibold text-slate-600 shrink-0">
+                <span className="text-xs sm:text-sm font-semibold text-slate-600 shrink-0 dark:text-slate-300">
                   Vehicle:
                 </span>
                 <CellInput
@@ -2172,24 +2218,24 @@ function BulkEntryTable({
           </div>
 
           {/* Trip rows — MOBILE CARD VIEW (below md) */}
-          <div className="md:hidden divide-y divide-slate-100">
+          <div className="md:hidden divide-y divide-slate-100 dark:divide-[#1e2638]">
             {g.rows.map((r, ri) => (
               <div
                 key={r.clientRowId}
                 className={`p-4 space-y-3 ${isRowHidden(r.isCompleted) ? "hidden" : ""}`}
               >
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-blue-500 uppercase">
+                  <span className="text-xs font-bold text-indigo-500 uppercase dark:text-indigo-300">
                     Trip {ri + 1}
                   </span>
                   <div className="flex items-center gap-2.5">
                     {r.distance > 0 && (
-                      <span className="text-xs bg-slate-100 px-2 py-0.5 rounded font-medium text-slate-600">
+                      <span className="text-xs bg-slate-100 px-2 py-0.5 rounded font-medium text-slate-600 dark:bg-white/10 dark:text-slate-300">
                         {r.distance} km
                       </span>
                     )}
                     {r.hours > 0 && (
-                      <span className="text-xs bg-slate-100 px-2 py-0.5 rounded font-medium text-slate-600">
+                      <span className="text-xs bg-slate-100 px-2 py-0.5 rounded font-medium text-slate-600 dark:bg-white/10 dark:text-slate-300">
                         {r.hours} hrs
                       </span>
                     )}
@@ -2226,7 +2272,7 @@ function BulkEntryTable({
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1">
-                    <label className="text-xs font-semibold text-slate-500 uppercase">
+                    <label className="text-xs font-semibold text-slate-500 uppercase dark:text-slate-400">
                       Start Date
                     </label>
                     <CellInput
@@ -2236,7 +2282,7 @@ function BulkEntryTable({
                     />
                   </div>
                   <div className="space-y-1">
-                    <label className="text-xs font-semibold text-slate-500 uppercase">
+                    <label className="text-xs font-semibold text-slate-500 uppercase dark:text-slate-400">
                       End Date
                     </label>
                     <CellInput
@@ -2246,7 +2292,7 @@ function BulkEntryTable({
                     />
                   </div>
                   <div className="space-y-1">
-                    <label className="text-xs font-semibold text-slate-500 uppercase">
+                    <label className="text-xs font-semibold text-slate-500 uppercase dark:text-slate-400">
                       Start KM
                     </label>
                     <CellInput
@@ -2256,7 +2302,7 @@ function BulkEntryTable({
                     />
                   </div>
                   <div className="space-y-1">
-                    <label className="text-xs font-semibold text-slate-500 uppercase">
+                    <label className="text-xs font-semibold text-slate-500 uppercase dark:text-slate-400">
                       End KM
                     </label>
                     <CellInput
@@ -2266,7 +2312,7 @@ function BulkEntryTable({
                     />
                   </div>
                   <div className="space-y-1">
-                    <label className="text-xs font-semibold text-slate-500 uppercase">
+                    <label className="text-xs font-semibold text-slate-500 uppercase dark:text-slate-400">
                       Start Time
                     </label>
                     <CellInput
@@ -2276,7 +2322,7 @@ function BulkEntryTable({
                     />
                   </div>
                   <div className="space-y-1">
-                    <label className="text-xs font-semibold text-slate-500 uppercase">
+                    <label className="text-xs font-semibold text-slate-500 uppercase dark:text-slate-400">
                       End Time
                     </label>
                     <CellInput
@@ -2286,7 +2332,7 @@ function BulkEntryTable({
                     />
                   </div>
                   <div className="space-y-1">
-                    <label className="text-xs font-semibold text-slate-500 uppercase">
+                    <label className="text-xs font-semibold text-slate-500 uppercase dark:text-slate-400">
                       Toll
                     </label>
                     <CellInput
@@ -2298,7 +2344,7 @@ function BulkEntryTable({
                     />
                   </div>
                   <div className="space-y-1">
-                    <label className="text-xs font-semibold text-slate-500 uppercase">
+                    <label className="text-xs font-semibold text-slate-500 uppercase dark:text-slate-400">
                       Advance
                     </label>
                     <CellInput
@@ -2312,7 +2358,7 @@ function BulkEntryTable({
                     />
                   </div>
                   <div className="space-y-1">
-                    <label className="text-xs font-semibold text-slate-500 uppercase">
+                    <label className="text-xs font-semibold text-slate-500 uppercase dark:text-slate-400">
                       Grand Total
                     </label>
                     <CellInput
@@ -2325,7 +2371,7 @@ function BulkEntryTable({
                   </div>
                 </div>
                 <div className="space-y-1">
-                  <label className="text-xs font-semibold text-slate-500 uppercase">
+                  <label className="text-xs font-semibold text-slate-500 uppercase dark:text-slate-400">
                     Notes
                   </label>
                   <textarea
@@ -2333,7 +2379,7 @@ function BulkEntryTable({
                     onChange={(e) => updateRow(gi, ri, "notes", e.target.value)}
                     placeholder="Add note…"
                     rows={2}
-                    className="w-full rounded-md border border-slate-200 px-2.5 py-2 text-sm outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-200 bg-white transition resize-y"
+                    className="w-full rounded-md border border-slate-200 bg-[var(--bg-elevated)] px-2.5 py-2 text-sm outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-200 transition resize-y dark:border-[#1e2638] dark:text-slate-100 dark:placeholder:text-slate-500"
                   />
                 </div>
               </div>
@@ -2344,7 +2390,7 @@ function BulkEntryTable({
           <div className="hidden md:block overflow-x-auto">
             <table className="w-full text-xs min-w-[700px]">
               <thead>
-                <tr className="bg-slate-50 text-left text-slate-500 font-semibold">
+                <tr className="bg-slate-50 text-left text-slate-500 font-semibold dark:bg-white/[0.03] dark:text-slate-400">
                   <th className="px-2 py-2 w-8">#</th>
                   <th className="px-2 py-2 w-8" title="Completed">
                     ✓
@@ -2353,7 +2399,7 @@ function BulkEntryTable({
                   <th className="px-2 py-2">Start KM</th>
                   <th className="px-2 py-2">End KM</th>
                   <th className="px-2 py-2">Dist.</th>
-                  <th className="px-2 py-2 min-w-[168px]">Time (Start/End)</th>
+                  <th className="px-2 py-2 min-w-[200px]">Time (Start/End)</th>
                   <th className="px-2 py-2">Hrs.</th>
                   <th className="px-2 py-2">Toll</th>
                   <th className="px-2 py-2">Advance</th>
@@ -2366,7 +2412,7 @@ function BulkEntryTable({
                 {g.rows.map((r, ri) => (
                   <tr
                     key={r.clientRowId}
-                    className={`border-t border-slate-50 hover:bg-slate-50/30 ${isRowHidden(r.isCompleted) ? "hidden" : ""}`}
+                    className={`border-t border-slate-50 hover:bg-slate-50/30 dark:border-[#1e2638] dark:hover:bg-white/[0.03] ${isRowHidden(r.isCompleted) ? "hidden" : ""}`}
                   >
                     <td className="px-2 py-1.5 text-slate-400 font-medium">
                       {ri + 1}
@@ -2416,17 +2462,19 @@ function BulkEntryTable({
                     <td className="px-2 py-1.5 font-medium text-slate-700">
                       {r.distance}
                     </td>
-                    <td className="px-2 py-1.5 min-w-[168px]">
+                    <td className="px-2 py-1.5 min-w-[200px]">
                       <div className="flex flex-col gap-1.5">
                         <CellInput
                           value={r.startTime}
                           onChange={(v) => updateRow(gi, ri, "startTime", v)}
                           type="time"
+                          title="Start"
                         />
                         <CellInput
                           value={r.endTime}
                           onChange={(v) => updateRow(gi, ri, "endTime", v)}
                           type="time"
+                          title="End"
                         />
                       </div>
                     </td>
@@ -2470,7 +2518,7 @@ function BulkEntryTable({
                         }
                         placeholder="Add note…"
                         rows={3}
-                        className="w-full min-w-[130px] rounded-md border border-slate-200 px-2 py-1.5 text-xs outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-200 bg-white transition resize-y"
+                        className="w-full min-w-[130px] rounded-md border border-slate-200 bg-[var(--bg-elevated)] px-2 py-1.5 text-xs outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-200 transition resize-y dark:border-[#1e2638] dark:text-slate-100 dark:placeholder:text-slate-500"
                       />
                     </td>
                     <td className="px-2 py-1.5">
@@ -2505,11 +2553,11 @@ function BulkEntryTable({
           </div>
 
           {/* Group footer */}
-          <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-center justify-between gap-2.5 sm:gap-3 border-t border-slate-100 px-4 sm:px-5 py-3 sm:py-3.5 bg-slate-50/50">
+          <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-center justify-between gap-2.5 sm:gap-3 border-t border-slate-100 px-4 sm:px-5 py-3 sm:py-3.5 bg-slate-50/50 dark:border-[#1e2638] dark:bg-white/[0.03]">
             <button
               type="button"
               onClick={() => addRow(gi)}
-              className="flex items-center gap-2 text-sm font-medium text-blue-600 hover:text-blue-700"
+              className="flex items-center gap-2 text-sm font-medium text-indigo-600 hover:text-indigo-700 dark:text-indigo-300 dark:hover:text-indigo-200"
             >
               <Plus className="h-4 w-4" /> Add Trip
             </button>
@@ -2534,19 +2582,19 @@ function BulkEntryTable({
                 );
                 return (
                   <>
-                    <span className="text-slate-500">
+                    <span className="text-slate-500 dark:text-slate-400">
                       Total:{" "}
-                      <strong className="text-slate-800">
+                      <strong className="text-slate-800 dark:text-slate-100">
                         ₹{totalGrand.toLocaleString("en-IN")}
                       </strong>
                     </span>
-                    <span className="text-slate-500">
+                    <span className="text-slate-500 dark:text-slate-400">
                       Advance:{" "}
-                      <strong className="text-slate-800">
+                      <strong className="text-slate-800 dark:text-slate-100">
                         ₹{advance.toLocaleString("en-IN")}
                       </strong>
                     </span>
-                    <span className="text-slate-500">
+                    <span className="text-slate-500 dark:text-slate-400">
                       Balance:{" "}
                       <strong className="text-emerald-600">
                         ₹{balance.toLocaleString("en-IN")}
@@ -2584,13 +2632,17 @@ function BulkEntryTable({
         </div>
       ))}
 
-      <button
-        type="button"
-        onClick={addGroup}
-        className="flex items-center gap-2 text-sm font-medium text-blue-600 hover:text-blue-700 border border-dashed border-blue-300 rounded-xl px-4 py-3.5 w-full justify-center hover:bg-blue-50/50 transition"
-      >
-        <Plus className="h-5 w-5" /> Add Driver / Vehicle
-      </button>
+      </div>
+
+      <div className="shrink-0 border-t border-slate-200 bg-[var(--bg-main)]/95 pt-3 backdrop-blur-sm dark:border-[#1e2638]">
+        <button
+          type="button"
+          onClick={addGroup}
+          className="flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-indigo-300 px-4 py-3.5 text-sm font-medium text-indigo-600 transition hover:bg-indigo-50/50 hover:text-indigo-700 dark:border-indigo-500/40 dark:text-indigo-300 dark:hover:bg-indigo-500/10"
+        >
+          <Plus className="h-5 w-5" /> Add Driver / Vehicle
+        </button>
+      </div>
     </div>
   );
 }
@@ -2684,10 +2736,22 @@ function NormalEntryTable({
   /** Copy one Normal row's driver into Bulk Entry (one click = one driver). */
   onSendDriverToBulk?: (entry: NormalEntryRow) => void;
 }) {
+  const [rowFilter, setRowFilter] = useState("");
+  const { user } = useAuth();
+
   const isRowHidden = (isCompleted?: boolean) => {
     if (filterStatus === "pending") return !!isCompleted;
     if (filterStatus === "completed") return !isCompleted;
     return false;
+  };
+
+  const matchesSearch = (e: NormalEntryRow) => {
+    const q = rowFilter.trim().toLowerCase();
+    if (!q) return true;
+    return [e.driverName, e.mobileNumber, e.vehicleNumber, e.vehicleType, e.notes]
+      .join(" ")
+      .toLowerCase()
+      .includes(q);
   };
 
   const toggleComplete = (i: number) => {
@@ -2697,7 +2761,7 @@ function NormalEntryTable({
       return next;
     });
   };
-  const { user } = useAuth();
+
   const update = useCallback(
     (idx: number, field: keyof NormalEntryRow, val: string) => {
       onChange((prev) => {
@@ -2737,206 +2801,168 @@ function NormalEntryTable({
     [onDeleteTrip, removeEntry],
   );
 
-  return (
-    <div className="space-y-4">
-      {/* All entries are editable — server trips are merged into entries[] */}
+  const filledCount = entries.filter(
+    (e) => e.driverName || e.vehicleNumber || e.mobileNumber,
+  ).length;
 
-      {/* Editable entries — MOBILE CARD VIEW (below md) */}
-      <div className="md:hidden space-y-3">
-        {entries.map((e, i) => (
-          <div
-            key={i}
-            className={`rounded-xl border border-slate-200 bg-white shadow-sm p-4 space-y-3 ${isRowHidden(e.isCompleted) ? "hidden" : ""}`}
-          >
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-blue-500 uppercase">
-                Entry {i + 1}
-              </span>
-              <div className="flex items-center gap-2.5">
-                {e.driverName?.trim() && (
-                  <button
-                    type="button"
-                    onClick={() => copySingleEntry(e)}
-                    title="Copy this entry"
-                    className="flex items-center gap-1 text-blue-600 hover:text-blue-800 text-xs font-semibold transition"
-                  >
-                    <Copy className="h-3.5 w-3.5" /> Copy
-                  </button>
-                )}
-                {e.driverName?.trim() && onSendDriverToBulk && (
-                  <button
-                    type="button"
-                    onClick={() => onSendDriverToBulk(e)}
-                    title="Add this driver to Bulk Entry"
-                    className="flex items-center gap-1 text-emerald-600 hover:text-emerald-800 text-xs font-semibold transition"
-                  >
-                    <ListChecks className="h-3.5 w-3.5" /> To Bulk
-                  </button>
-                )}
-                {(e as any)._id ? (
-                  <button
-                    type="button"
-                    onClick={() => deleteServerEntry(i, String((e as any)._id))}
-                    className="text-red-400 hover:text-red-600 p-1"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => removeEntry(i)}
-                    className="text-red-400 hover:text-red-600 p-1"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
-                )}
-                <button
-                  type="button"
-                  onClick={() => toggleComplete(i)}
-                  title={
-                    e.isCompleted ? "Mark as pending" : "Mark as completed"
-                  }
-                  className={`p-1 transition ${e.isCompleted ? "text-emerald-500 hover:text-emerald-600" : "text-slate-300 hover:text-slate-400"}`}
-                >
-                  <CheckCircle className="h-4.5 w-4.5" />
-                </button>
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <label className="text-xs font-semibold text-slate-500 uppercase">
-                  Date
-                </label>
-                <CellInput
-                  value={e.date}
-                  onChange={(v) => update(i, "date", v)}
-                  type="date"
-                />
-              </div>
-              <div className="space-y-1">
-                <label className="text-xs font-semibold text-slate-500 uppercase">
-                  Driver Name
-                </label>
-                <DriverNameCombobox
-                  value={e.driverName}
-                  selectedDriverId={e.driverId}
-                  onChange={(v) => {
-                    onChange((prev) => {
-                      const next = [...prev];
-                      next[i] = {
-                        ...next[i],
-                        driverName: v,
-                        driverId: undefined,
-                      };
-                      return next;
-                    });
-                  }}
-                  onDriverSelect={(d: Driver) => {
-                    const digits = String(d.phone ?? "").replace(/\D/g, "");
-                    onChange((prev) => {
-                      const next = [...prev];
-                      next[i] = {
-                        ...next[i],
-                        driverName: driverDisplayName(d),
-                        driverId: d._id ?? d.id,
-                        mobileNumber: digits || next[i].mobileNumber,
-                      };
-                      return next;
-                    });
-                  }}
-                  placeholder="Driver name"
-                />
-              </div>
-              <div className="space-y-1">
-                <label className="text-xs font-semibold text-slate-500 uppercase">
-                  Mobile
-                </label>
-                <CellInput
-                  value={e.mobileNumber}
-                  onChange={(v) => {
-                    onChange((prev) => {
-                      const next = [...prev];
-                      next[i] = {
-                        ...next[i],
-                        mobileNumber: v,
-                        driverId: undefined,
-                      };
-                      return next;
-                    });
-                  }}
-                  placeholder="9876543210"
-                />
-              </div>
-              <div className="space-y-1">
-                <label className="text-xs font-semibold text-slate-500 uppercase">
-                  Vehicle No.
-                </label>
-                <CellInput
-                  value={e.vehicleNumber}
-                  onChange={(v) => update(i, "vehicleNumber", v)}
-                  placeholder="KL07XX1234"
-                />
-              </div>
-              <div className="col-span-2 space-y-1">
-                <label className="text-xs font-semibold text-slate-500 uppercase">
-                  Vehicle Type
-                </label>
-                <CellInput
-                  value={e.vehicleType}
-                  onChange={(v) => update(i, "vehicleType", v)}
-                  placeholder="Sedan"
-                />
-              </div>
-            </div>
-            <div className="space-y-1">
-              <label className="text-xs font-semibold text-slate-500 uppercase">
-                Notes
-              </label>
-              <textarea
-                value={e.notes}
-                onChange={(ev) => update(i, "notes", ev.target.value)}
-                placeholder="Add note…"
-                rows={2}
-                className="w-full rounded-md border border-slate-200 px-2.5 py-2 text-sm outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-200 bg-white transition resize-y"
-              />
-            </div>
+  const visibleCount = entries.filter(
+    (e) => !isRowHidden(e.isCompleted) && matchesSearch(e),
+  ).length;
+
+  const rowActions = (e: NormalEntryRow, i: number, compact = false) => (
+    <div className={`flex items-center ${compact ? "gap-1" : "gap-1.5"}`}>
+      <button
+        type="button"
+        onClick={() => toggleComplete(i)}
+        title={e.isCompleted ? "Mark as pending" : "Mark as completed"}
+        className={`${actionBtnCls} ${
+          e.isCompleted
+            ? "border-emerald-500/40 bg-emerald-500/15 text-emerald-500 hover:bg-emerald-500/25"
+            : "hover:text-emerald-500"
+        }`}
+      >
+        <CheckCircle className="h-3.5 w-3.5" />
+      </button>
+      {e.driverName?.trim() ? (
+        <button
+          type="button"
+          onClick={() => copySingleEntry(e)}
+          title="Copy this entry"
+          className={`${actionBtnCls} hover:text-indigo-500 dark:hover:text-indigo-300`}
+        >
+          <Copy className="h-3.5 w-3.5" />
+        </button>
+      ) : null}
+      {e.driverName?.trim() && onSendDriverToBulk ? (
+        <button
+          type="button"
+          onClick={() => onSendDriverToBulk(e)}
+          title="Add this driver to Bulk Entry"
+          className={`${actionBtnCls} hover:text-amber-500 dark:hover:text-amber-300`}
+        >
+          <ListChecks className="h-3.5 w-3.5" />
+        </button>
+      ) : null}
+      {(e as any)._id ? (
+        <button
+          type="button"
+          onClick={() => deleteServerEntry(i, String((e as any)._id))}
+          title="Delete saved entry"
+          className={`${actionBtnCls} hover:border-rose-500/40 hover:bg-rose-500/10 hover:text-rose-500`}
+        >
+          <Trash2 className="h-3.5 w-3.5" />
+        </button>
+      ) : (
+        <button
+          type="button"
+          onClick={() => removeEntry(i)}
+          title={entries.length > 1 ? "Remove row" : "Clear row"}
+          className={`${actionBtnCls} hover:border-rose-500/40 hover:bg-rose-500/10 hover:text-rose-500`}
+        >
+          <Trash2 className="h-3.5 w-3.5" />
+        </button>
+      )}
+    </div>
+  );
+
+  return (
+    <div className="flex h-full min-h-0 flex-col">
+      <div className="min-h-0 flex-1 space-y-4 overflow-y-auto pb-2">
+      {/* Context bar */}
+      <div className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-[var(--bg-card)] p-3 shadow-sm dark:border-[#1e2638] sm:flex-row sm:items-center sm:justify-between sm:px-4">
+        <div className="flex min-w-0 items-center gap-2.5">
+          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-indigo-200 bg-indigo-50 text-indigo-600 dark:border-indigo-500/30 dark:bg-indigo-500/15 dark:text-indigo-300">
+            <FileText className="h-4 w-4" />
+          </span>
+          <div className="min-w-0">
+            <h2 className="truncate text-sm font-semibold text-slate-800 dark:text-slate-100">
+              Daily Fleet Dispatch Register
+            </h2>
+            <p className="text-[11px] text-slate-400 dark:text-slate-500">
+              {visibleCount} shown
+              {filledCount > 0 ? ` · ${filledCount} with data` : ""}
+              {agencyName ? ` · ${agencyName}` : ""}
+            </p>
           </div>
-        ))}
+        </div>
+        <div className="relative w-full sm:max-w-xs">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
+          <input
+            type="text"
+            value={rowFilter}
+            onChange={(ev) => setRowFilter(ev.target.value)}
+            placeholder="Filter driver, vehicle, or phone…"
+            className="w-full rounded-lg border border-slate-200 bg-[var(--bg-elevated)] py-2 pl-9 pr-3 text-xs text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-indigo-400 focus:ring-1 focus:ring-indigo-200 dark:border-[#1e2638] dark:text-slate-100 dark:placeholder:text-slate-500"
+          />
+        </div>
       </div>
 
-      {/* Editable entries — DESKTOP TABLE VIEW (md and above) */}
-      <div className="hidden md:block rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-xs min-w-[600px]">
-            <thead>
-              <tr className="bg-slate-50 text-left text-slate-500 font-semibold">
-                <th className="px-2 py-2 w-8">#</th>
-                <th className="px-2 py-2">Date</th>
-                <th className="px-2 py-2">Driver Name</th>
-                <th className="px-2 py-2">Mobile Number</th>
-                <th className="px-2 py-2">Vehicle Number</th>
-                <th className="px-2 py-2">Vehicle Type</th>
-                <th className="px-2 py-2 min-w-[130px]">Notes</th>
-                <th className="px-2 py-2 w-20"></th>
-              </tr>
-            </thead>
-            <tbody>
-              {entries.map((e, i) => (
-                <tr
-                  key={i}
-                  className={`border-t border-slate-50 hover:bg-slate-50/30 ${isRowHidden(e.isCompleted) ? "hidden" : ""}`}
-                >
-                  <td className="px-2 py-1.5 text-slate-400 font-medium">
+      {/* MOBILE CARD VIEW */}
+      <div className="space-y-3 md:hidden">
+        {entries.map((e, i) => {
+          if (isRowHidden(e.isCompleted) || !matchesSearch(e)) return null;
+          return (
+            <div
+              key={e.clientRowId ?? i}
+              className={`overflow-hidden rounded-2xl border bg-[var(--bg-card)] shadow-sm dark:border-[#1e2638] ${
+                e.isCompleted
+                  ? "border-emerald-300/60 dark:border-emerald-500/30"
+                  : "border-slate-200"
+              }`}
+            >
+              <div
+                className={`h-1 ${
+                  e.isCompleted
+                    ? "bg-gradient-to-r from-emerald-500 to-emerald-400"
+                    : "bg-gradient-to-r from-indigo-500 via-indigo-400 to-indigo-600"
+                }`}
+              />
+              <div className="flex items-center justify-between gap-2 border-b border-slate-100 px-3.5 py-2.5 dark:border-[#1e2638]">
+                <div className="flex min-w-0 items-center gap-2">
+                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-indigo-500/40 bg-indigo-500/15 font-mono text-[11px] font-bold text-indigo-600 dark:text-indigo-300">
                     {i + 1}
-                  </td>
-                  <td className="px-2 py-1.5">
+                  </span>
+                  <span className="truncate text-xs font-semibold uppercase tracking-wide text-slate-700 dark:text-slate-200">
+                    {e.driverName?.trim() || `Entry ${i + 1}`}
+                  </span>
+                  <span
+                    className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium ${
+                      e.isCompleted
+                        ? "border border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                        : "border border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-400"
+                    }`}
+                  >
+                    {e.isCompleted ? "Done" : "Pending"}
+                  </span>
+                </div>
+                {rowActions(e, i, true)}
+              </div>
+              <div className="space-y-3 p-3.5">
+                <div className="grid grid-cols-2 gap-2.5">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                      Date
+                    </label>
                     <CellInput
                       value={e.date}
                       onChange={(v) => update(i, "date", v)}
                       type="date"
+                      className="font-mono"
                     />
-                  </td>
-                  <td className="px-2 py-1.5">
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                      Vehicle Type
+                    </label>
+                    <VehicleTypeSelect
+                      value={e.vehicleType}
+                      onChange={(v) => update(i, "vehicleType", v)}
+                    />
+                  </div>
+                  <div className="col-span-2 space-y-1">
+                    <label className="text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                      Driver Name
+                    </label>
                     <DriverNameCombobox
                       value={e.driverName}
                       selectedDriverId={e.driverId}
@@ -2966,8 +2992,11 @@ function NormalEntryTable({
                       }}
                       placeholder="Driver name"
                     />
-                  </td>
-                  <td className="px-2 py-1.5">
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                      Mobile
+                    </label>
                     <CellInput
                       value={e.mobileNumber}
                       onChange={(v) => {
@@ -2982,145 +3011,235 @@ function NormalEntryTable({
                         });
                       }}
                       placeholder="9876543210"
+                      className="font-mono"
                     />
-                  </td>
-                  <td className="px-2 py-1.5">
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                      Vehicle No.
+                    </label>
                     <CellInput
                       value={e.vehicleNumber}
                       onChange={(v) => update(i, "vehicleNumber", v)}
                       placeholder="KL07XX1234"
+                      className={plateInputCls}
                     />
-                  </td>
-                  <td className="px-2 py-1.5">
-                    <CellInput
-                      value={e.vehicleType}
-                      onChange={(v) => update(i, "vehicleType", v)}
-                      placeholder="Sedan"
-                    />
-                  </td>
-                  <td className="px-2 py-1.5">
-                    <textarea
-                      value={e.notes}
-                      onChange={(ev) => update(i, "notes", ev.target.value)}
-                      placeholder="Add note…"
-                      rows={3}
-                      className="w-full min-w-[130px] rounded-md border border-slate-200 px-2 py-1.5 text-xs outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-200 bg-white transition resize-y"
-                    />
-                  </td>
-                  <td className="px-2 py-1.5">
-                    <div className="flex flex-col gap-1 items-center">
-                      {e.driverName?.trim() && (
-                        <button
-                          type="button"
-                          onClick={() => copySingleEntry(e)}
-                          title="Copy this entry"
-                          className="flex items-center gap-1 text-blue-600 hover:text-blue-800 text-[10px] font-semibold transition"
-                        >
-                          <Copy className="h-3 w-3" /> Copy
-                        </button>
-                      )}
-                      {e.driverName?.trim() && onSendDriverToBulk && (
-                        <button
-                          type="button"
-                          onClick={() => onSendDriverToBulk(e)}
-                          title="Add this driver to Bulk Entry"
-                          className="flex items-center gap-1 text-emerald-600 hover:text-emerald-800 text-[10px] font-semibold transition"
-                        >
-                          <ListChecks className="h-3 w-3" /> To Bulk
-                        </button>
-                      )}
-                      <button
-                        type="button"
-                        onClick={() => toggleComplete(i)}
-                        title={
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                    Notes
+                  </label>
+                  <input
+                    value={e.notes}
+                    onChange={(ev) => update(i, "notes", ev.target.value)}
+                    placeholder="Add note…"
+                    className="w-full rounded-md border border-slate-200 bg-[var(--bg-elevated)] px-2.5 py-2 text-sm outline-none transition focus:border-indigo-400 focus:ring-1 focus:ring-indigo-200 dark:border-[#1e2638] dark:text-slate-100 dark:placeholder:text-slate-500"
+                  />
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* DESKTOP TABLE */}
+      <div className="hidden overflow-hidden rounded-xl border border-slate-200 bg-[var(--bg-card)] shadow-sm dark:border-[#1e2638] md:block">
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[720px] text-xs">
+            <thead>
+              <tr className="border-b border-slate-100 bg-slate-50/90 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:border-[#1e2638] dark:bg-white/[0.03] dark:text-slate-400">
+                <th className="w-10 px-3 py-2.5 text-center font-mono">#</th>
+                <th className="px-2 py-2.5">Date</th>
+                <th className="px-2 py-2.5">Driver Name</th>
+                <th className="px-2 py-2.5">Mobile</th>
+                <th className="px-2 py-2.5">Vehicle Number</th>
+                <th className="px-2 py-2.5">Type</th>
+                <th className="min-w-[120px] px-2 py-2.5">Notes</th>
+                <th className="w-28 px-2 py-2.5 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100 dark:divide-[#1e2638]">
+              {entries.map((e, i) => {
+                if (isRowHidden(e.isCompleted) || !matchesSearch(e)) return null;
+                const isDraft =
+                  !e.driverName?.trim() &&
+                  !e.vehicleNumber?.trim() &&
+                  !e.mobileNumber?.trim();
+                return (
+                  <tr
+                    key={e.clientRowId ?? i}
+                    className={`group transition hover:bg-slate-50/50 dark:hover:bg-white/[0.03] ${
+                      e.isCompleted
+                        ? "bg-emerald-50/40 dark:bg-emerald-500/[0.04]"
+                        : isDraft
+                          ? "opacity-90"
+                          : ""
+                    }`}
+                  >
+                    <td className="px-3 py-2 text-center">
+                      <span
+                        className={`inline-flex h-5 w-5 items-center justify-center rounded font-mono text-[11px] font-medium ${
                           e.isCompleted
-                            ? "Mark as pending"
-                            : "Mark as completed"
-                        }
-                        className={`p-1 transition ${e.isCompleted ? "text-emerald-500 hover:text-emerald-600" : "text-slate-300 hover:text-slate-400"}`}
+                            ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400"
+                            : "bg-slate-100 text-slate-500 dark:bg-white/10 dark:text-slate-400"
+                        }`}
                       >
-                        <CheckCircle className="h-4 w-4" />
-                      </button>
-                      {(e as any)._id ? (
-                        <button
-                          type="button"
-                          onClick={() =>
-                            deleteServerEntry(i, String((e as any)._id))
-                          }
-                          title="Delete saved entry"
-                          className="text-red-400 hover:text-red-600"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </button>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => removeEntry(i)}
-                          title={
-                            entries.length > 1 ? "Remove row" : "Clear row"
-                          }
-                          className="text-red-400 hover:text-red-600"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </button>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
+                        {i + 1}
+                      </span>
+                    </td>
+                    <td className="px-2 py-1.5">
+                      <CellInput
+                        value={e.date}
+                        onChange={(v) => update(i, "date", v)}
+                        type="date"
+                        className="font-mono"
+                      />
+                    </td>
+                    <td className="px-2 py-1.5">
+                      <DriverNameCombobox
+                        value={e.driverName}
+                        selectedDriverId={e.driverId}
+                        onChange={(v) => {
+                          onChange((prev) => {
+                            const next = [...prev];
+                            next[i] = {
+                              ...next[i],
+                              driverName: v,
+                              driverId: undefined,
+                            };
+                            return next;
+                          });
+                        }}
+                        onDriverSelect={(d: Driver) => {
+                          const digits = String(d.phone ?? "").replace(
+                            /\D/g,
+                            "",
+                          );
+                          onChange((prev) => {
+                            const next = [...prev];
+                            next[i] = {
+                              ...next[i],
+                              driverName: driverDisplayName(d),
+                              driverId: d._id ?? d.id,
+                              mobileNumber: digits || next[i].mobileNumber,
+                            };
+                            return next;
+                          });
+                        }}
+                        placeholder="Driver name"
+                      />
+                    </td>
+                    <td className="px-2 py-1.5">
+                      <CellInput
+                        value={e.mobileNumber}
+                        onChange={(v) => {
+                          onChange((prev) => {
+                            const next = [...prev];
+                            next[i] = {
+                              ...next[i],
+                              mobileNumber: v,
+                              driverId: undefined,
+                            };
+                            return next;
+                          });
+                        }}
+                        placeholder="9876543210"
+                        className="font-mono"
+                      />
+                    </td>
+                    <td className="px-2 py-1.5">
+                      <CellInput
+                        value={e.vehicleNumber}
+                        onChange={(v) => update(i, "vehicleNumber", v)}
+                        placeholder="KL07XX1234"
+                        className={plateInputCls}
+                      />
+                    </td>
+                    <td className="px-2 py-1.5">
+                      <VehicleTypeSelect
+                        value={e.vehicleType}
+                        onChange={(v) => update(i, "vehicleType", v)}
+                        className="py-1.5 text-xs"
+                      />
+                    </td>
+                    <td className="px-2 py-1.5">
+                      <input
+                        value={e.notes}
+                        onChange={(ev) => update(i, "notes", ev.target.value)}
+                        placeholder="Add note…"
+                        className="w-full min-w-[120px] rounded-md border border-slate-200 bg-[var(--bg-elevated)] px-2 py-1.5 text-xs outline-none transition focus:border-indigo-400 focus:ring-1 focus:ring-indigo-200 dark:border-[#1e2638] dark:text-slate-100 dark:placeholder:text-slate-500"
+                      />
+                    </td>
+                    <td className="px-2 py-1.5">
+                      <div className="flex justify-end">{rowActions(e, i, true)}</div>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
       </div>
 
-      <div className="flex flex-wrap items-center gap-3">
+      {visibleCount === 0 && (
+        <p className="py-6 text-center text-sm text-slate-400 dark:text-slate-500">
+          {rowFilter.trim()
+            ? "No entries match this filter"
+            : "No entries for this status"}
+        </p>
+      )}
+      </div>
+
+      <div className="shrink-0 border-t border-slate-200 bg-[var(--bg-main)]/95 pt-3 backdrop-blur-sm dark:border-[#1e2638]">
+      <div className="flex flex-wrap items-center gap-2.5">
         <button
           type="button"
           onClick={addEntry}
-          className="flex items-center gap-2 text-sm font-medium text-blue-600 hover:text-blue-700 border border-dashed border-blue-300 rounded-xl px-4 py-3.5 flex-1 justify-center hover:bg-blue-50/50 transition"
+          className="flex flex-1 items-center justify-center gap-2 rounded-xl border border-dashed border-slate-300 px-4 py-3 text-sm font-medium text-indigo-600 transition hover:border-indigo-500 hover:bg-indigo-50/50 dark:border-[#334155] dark:text-indigo-300 dark:hover:border-indigo-500/50 dark:hover:bg-indigo-500/10"
         >
-          <Plus className="h-5 w-5" /> Add Entry
+          <Plus className="h-4 w-4" /> Add Entry
         </button>
-        {entries.length > 0 &&
-          entries.some(
-            (e) => e.driverName || e.vehicleNumber || e.mobileNumber,
-          ) && (
-            <button
-              type="button"
-              onClick={() => {
-                const defaultName = `NormalTrips_${(agencyName || "Agency").replace(/\s+/g, "_")}_${new Date().toISOString().split("T")[0]}.pdf`;
-                const fileName = window.prompt(
-                  "Enter file name for Report:",
-                  defaultName,
-                );
-                if (fileName) {
-                  const reportEntries = entries
-                    .filter(
-                      (e) => e.driverName || e.vehicleNumber || e.mobileNumber,
-                    )
-                    .filter((e) => !isRowHidden(e.isCompleted));
-                  generateNormalTripsPDF(
-                    user?.name || "Owner",
-                    agencyName || "Agency",
-                    fileName.endsWith(".pdf") ? fileName : `${fileName}.pdf`,
-                    reportEntries,
+        {filledCount > 0 && (
+          <button
+            type="button"
+            onClick={() => {
+              const defaultName = `NormalTrips_${(agencyName || "Agency").replace(/\s+/g, "_")}_${new Date().toISOString().split("T")[0]}.pdf`;
+              const fileName = window.prompt(
+                "Enter file name for Report:",
+                defaultName,
+              );
+              if (fileName) {
+                const reportEntries = entries
+                  .filter(
+                    (e) => e.driverName || e.vehicleNumber || e.mobileNumber,
+                  )
+                  .filter(
+                    (e) => !isRowHidden(e.isCompleted) && matchesSearch(e),
                   );
-                }
-              }}
-              title="Download Normal Trips Report"
-              className="flex items-center gap-2 text-sm font-semibold text-blue-700 bg-blue-50 border border-blue-300 hover:bg-blue-100 rounded-xl px-4 py-3.5 transition"
-            >
-              <FileDown className="h-5 w-5" /> Download Report
-            </button>
-          )}
+                generateNormalTripsPDF(
+                  user?.name || "Owner",
+                  agencyName || "Agency",
+                  fileName.endsWith(".pdf") ? fileName : `${fileName}.pdf`,
+                  reportEntries,
+                );
+              }
+            }}
+            title="Download Normal Trips Report"
+            className="flex items-center gap-2 rounded-xl border border-slate-200 bg-[var(--bg-elevated)] px-4 py-3 text-sm font-semibold text-slate-700 transition hover:border-indigo-300 hover:text-indigo-700 dark:border-[#1e2638] dark:text-slate-200 dark:hover:border-indigo-500/40 dark:hover:text-indigo-300"
+          >
+            <FileDown className="h-4 w-4 text-rose-400" /> Report (PDF)
+          </button>
+        )}
         <button
           type="button"
           onClick={() => copyAllEntries(entries, agencyName)}
           title="Copy all entries"
-          className="flex items-center gap-2 text-sm font-semibold text-blue-700 bg-blue-50 border border-blue-300 hover:bg-blue-100 rounded-xl px-4 py-3.5 transition"
+          className="flex items-center gap-2 rounded-xl border border-slate-200 bg-[var(--bg-elevated)] px-4 py-3 text-sm font-semibold text-slate-700 transition hover:border-indigo-300 hover:text-indigo-700 dark:border-[#1e2638] dark:text-slate-200 dark:hover:border-indigo-500/40 dark:hover:text-indigo-300"
         >
-          <Copy className="h-5 w-5" /> Copy All
+          <Copy className="h-4 w-4 text-indigo-400" /> Copy All
         </button>
+      </div>
       </div>
     </div>
   );
@@ -3781,12 +3900,12 @@ export function BulkEntryPage() {
   // ══════════════════════════════════════════════════════════════════════════════
 
   return (
-    <div className="flex h-full flex-col bg-slate-50 overflow-hidden">
+    <div className="flex h-full flex-col bg-[var(--bg-main)] overflow-hidden">
       {/* ─── HEADER BAR ─── */}
-      <div className="sticky top-0 z-20 flex flex-col sm:flex-row sm:flex-wrap sm:items-center justify-between gap-2.5 sm:gap-3 border-b border-slate-200 bg-white/90 backdrop-blur-md px-4 sm:px-6 py-3 sm:py-3.5 shadow-sm shrink-0">
+      <div className="sticky top-0 z-20 flex flex-col sm:flex-row sm:flex-wrap sm:items-center justify-between gap-2.5 sm:gap-3 border-b border-slate-200 bg-[var(--bg-card)]/90 backdrop-blur-md px-4 sm:px-6 py-3 sm:py-3.5 shadow-sm shrink-0 dark:border-[#1e2638]">
         <div className="flex items-center gap-2.5 sm:gap-3 flex-wrap">
-          <FileSpreadsheet className="h-6 w-6 text-blue-500 shrink-0 hidden sm:block" />
-          <h1 className="text-sm sm:text-base font-bold text-slate-800 uppercase tracking-wider hidden md:block">
+          <FileSpreadsheet className="h-6 w-6 text-indigo-500 shrink-0 hidden sm:block" />
+          <h1 className="text-sm sm:text-base font-bold text-slate-800 uppercase tracking-wider hidden md:block dark:text-white">
             {isBulkMode ? "Bulk Entry" : "Normal Entry"}
           </h1>
 
@@ -3798,10 +3917,10 @@ export function BulkEntryPage() {
                 e.stopPropagation();
                 setShowDropdown(!showDropdown);
               }}
-              className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm hover:border-blue-300 transition w-full sm:min-w-[180px]"
+              className="flex items-center gap-2 rounded-lg border border-slate-200 bg-[var(--bg-elevated)] px-3 py-2.5 text-sm hover:border-indigo-300 transition w-full sm:min-w-[180px] dark:border-[#1e2638] dark:hover:border-indigo-400"
             >
               <Building2 className="h-4.5 w-4.5 text-slate-400 shrink-0" />
-              <span className="truncate text-slate-700 font-medium">
+              <span className="truncate text-slate-700 font-medium dark:text-slate-200">
                 {selectedAgency
                   ? formatAgencyLabel(selectedAgency)
                   : "Select Agency"}
@@ -3811,7 +3930,7 @@ export function BulkEntryPage() {
 
             {showDropdown && (
               <div
-                className="absolute left-0 top-full mt-1 w-full sm:w-72 rounded-xl border border-slate-200 bg-white shadow-lg z-30 py-1 max-h-60 overflow-y-auto"
+                className="absolute left-0 top-full mt-1 w-full sm:w-72 rounded-xl border border-slate-200 bg-[var(--bg-card)] shadow-lg z-30 py-1 max-h-60 overflow-y-auto dark:border-[#1e2638]"
                 onClick={(e) => e.stopPropagation()}
               >
                 {agencyLoading ? (
@@ -3828,10 +3947,10 @@ export function BulkEntryPage() {
                       key={a._id ?? a.id}
                       type="button"
                       onClick={() => selectAgency(a._id ?? a.id ?? "")}
-                      className={`w-full text-left px-4 py-3 text-sm hover:bg-blue-50 transition ${
+                      className={`w-full text-left px-4 py-3 text-sm hover:bg-indigo-50 dark:hover:bg-indigo-500/10 transition ${
                         (a._id ?? a.id) === selectedId
-                          ? "bg-blue-50 text-blue-700 font-semibold"
-                          : "text-slate-700"
+                          ? "bg-indigo-50 text-indigo-700 font-semibold dark:bg-indigo-500/15 dark:text-indigo-300"
+                          : "text-slate-700 dark:text-slate-200"
                       }`}
                     >
                       <span className="block font-medium truncate">
@@ -3847,7 +3966,7 @@ export function BulkEntryPage() {
           <button
             type="button"
             onClick={() => setShowCreateModal(true)}
-            className="flex items-center gap-1.5 rounded-lg bg-blue-500 px-3 py-2.5 text-xs sm:text-sm font-semibold text-white hover:bg-blue-600 transition shadow-sm shrink-0"
+            className="flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-2.5 text-xs sm:text-sm font-semibold text-white hover:bg-indigo-700 transition shadow-sm shrink-0 dark:bg-indigo-500 dark:hover:bg-indigo-400"
           >
             <Plus className="h-4 w-4" />{" "}
             <span className="hidden sm:inline">Agency</span>
@@ -3868,8 +3987,8 @@ export function BulkEntryPage() {
               onClick={() => toggleMode("payout")}
               className={`flex items-center gap-1.5 rounded-lg px-3 py-2.5 text-xs sm:text-sm font-semibold transition shadow-sm shrink-0 border ${
                 activeTab === "payout"
-                  ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-                  : "bg-white text-emerald-600 border-emerald-100 hover:bg-emerald-50"
+                  ? "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-500/20"
+                  : "bg-[var(--bg-elevated)] text-emerald-600 border-emerald-100 hover:bg-emerald-50 dark:text-emerald-400 dark:border-emerald-500/20 dark:hover:bg-emerald-500/10"
               }`}
             >
               <Wallet className="h-4 w-4" />{" "}
@@ -3880,7 +3999,7 @@ export function BulkEntryPage() {
 
           {/* Agency Total Balance Display */}
           {selectedAgency && isBulkMode && (
-            <div className="hidden sm:flex items-center gap-2 rounded-lg bg-emerald-50 px-3 py-2.5 border border-emerald-100 shadow-sm transition-all hover:shadow hover:bg-emerald-100/60 sm:ml-auto">
+            <div className="hidden sm:flex items-center gap-2 rounded-lg bg-emerald-50 px-3 py-2.5 border border-emerald-100 shadow-sm transition-all hover:shadow hover:bg-emerald-100/60 sm:ml-auto dark:bg-emerald-500/10 dark:border-emerald-500/20">
               <span className="text-xs sm:text-sm font-bold text-emerald-600 uppercase tracking-wider">
                 Balance:
               </span>
@@ -3896,7 +4015,7 @@ export function BulkEntryPage() {
         <div className="flex items-center gap-2 sm:gap-2.5">
           {/* Mobile total balance */}
           {selectedAgency && isBulkMode && (
-            <div className="sm:hidden flex items-center gap-2 rounded-lg bg-emerald-50 px-2.5 py-1.5 border border-emerald-100">
+            <div className="sm:hidden flex items-center gap-2 rounded-lg bg-emerald-50 px-2.5 py-1.5 border border-emerald-100 dark:bg-emerald-500/10 dark:border-emerald-500/20">
               <span className="text-xs font-bold text-emerald-600 uppercase">
                 Bal:
               </span>
@@ -3913,14 +4032,14 @@ export function BulkEntryPage() {
 
           {/* Filter Status toggle */}
           {activeTab !== "payout" && (
-            <div className="hidden sm:flex items-center rounded-lg border border-slate-200 bg-slate-50 p-0.5">
+            <div className="hidden sm:flex items-center rounded-lg border border-slate-200 bg-slate-50 p-0.5 dark:border-[#1e2638] dark:bg-white/5">
               <button
                 type="button"
                 onClick={() => setFilterStatus("all")}
                 className={`rounded-md px-2 sm:px-3 py-1.5 sm:py-2 text-xs font-semibold transition ${
                   filterStatus === "all"
-                    ? "bg-white text-slate-700 shadow-sm"
-                    : "text-slate-400 hover:text-slate-600"
+                    ? "bg-white text-slate-700 shadow-sm dark:bg-[#0e121d] dark:text-slate-200"
+                    : "text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
                 }`}
               >
                 All
@@ -3930,8 +4049,8 @@ export function BulkEntryPage() {
                 onClick={() => setFilterStatus("pending")}
                 className={`rounded-md px-2 sm:px-3 py-1.5 sm:py-2 text-xs font-semibold transition ${
                   filterStatus === "pending"
-                    ? "bg-white text-orange-600 shadow-sm"
-                    : "text-slate-400 hover:text-slate-600"
+                    ? "bg-white text-amber-600 shadow-sm dark:bg-[#0e121d] dark:text-amber-400"
+                    : "text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
                 }`}
               >
                 Pending
@@ -3941,8 +4060,8 @@ export function BulkEntryPage() {
                 onClick={() => setFilterStatus("completed")}
                 className={`rounded-md px-2 sm:px-3 py-1.5 sm:py-2 text-xs font-semibold transition ${
                   filterStatus === "completed"
-                    ? "bg-white text-emerald-600 shadow-sm"
-                    : "text-slate-400 hover:text-slate-600"
+                    ? "bg-white text-emerald-600 shadow-sm dark:bg-[#0e121d] dark:text-emerald-400"
+                    : "text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
                 }`}
               >
                 Done
@@ -3951,14 +4070,14 @@ export function BulkEntryPage() {
           )}
 
           {/* Mode toggle */}
-          <div className="flex items-center rounded-lg border border-slate-200 bg-slate-50 p-0.5">
+          <div className="flex items-center rounded-lg border border-slate-200 bg-slate-50 p-0.5 dark:border-[#1e2638] dark:bg-white/5">
             <button
               type="button"
               onClick={() => toggleMode("bulk")}
               className={`rounded-md px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-semibold transition ${
                 activeTab === "bulk"
-                  ? "bg-white text-blue-600 shadow-sm"
-                  : "text-slate-500 hover:text-slate-700"
+                  ? "bg-indigo-600 text-white shadow-sm dark:bg-indigo-500"
+                  : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
               }`}
             >
               Bulk
@@ -3968,8 +4087,8 @@ export function BulkEntryPage() {
               onClick={() => toggleMode("normal")}
               className={`rounded-md px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-semibold transition ${
                 activeTab === "normal"
-                  ? "bg-white text-blue-600 shadow-sm"
-                  : "text-slate-500 hover:text-slate-700"
+                  ? "bg-indigo-600 text-white shadow-sm dark:bg-indigo-500"
+                  : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
               }`}
             >
               Normal
@@ -3979,7 +4098,7 @@ export function BulkEntryPage() {
           <button
             type="button"
             onClick={loadTrips}
-            className="flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center text-slate-500 hover:bg-slate-100 rounded-full transition active:rotate-180 shrink-0"
+            className="flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center text-slate-500 hover:bg-slate-100 rounded-full transition active:rotate-180 shrink-0 dark:text-slate-400 dark:hover:bg-white/10"
             title="Refresh"
           >
             <RefreshCw className="h-4 w-4 sm:h-5 sm:w-5" />
@@ -3992,11 +4111,11 @@ export function BulkEntryPage() {
       {/* No submit feedback bar (autosync only) */}
 
       {/* ─── CONTENT ─── */}
-      <div className="flex-1 overflow-y-auto p-4 sm:p-5 lg:p-6">
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden p-4 sm:p-5 lg:p-6">
         {!selectedAgency ? (
           <div className="flex flex-col items-center justify-center h-full gap-4 text-center py-20">
             <Building2 className="h-16 w-16 text-slate-200" />
-            <p className="text-base font-medium text-slate-500">
+            <p className="text-base font-medium text-slate-500 dark:text-slate-400">
               Select an agency to get started
             </p>
             <p className="text-sm text-slate-400">
@@ -4009,7 +4128,7 @@ export function BulkEntryPage() {
               <button
                 type="button"
                 onClick={() => toggleMode("bulk")}
-                className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs sm:text-sm font-medium text-slate-600 hover:bg-slate-50 transition"
+                className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-[var(--bg-elevated)] px-3 py-1.5 text-xs sm:text-sm font-medium text-slate-600 hover:bg-slate-50 transition dark:border-[#1e2638] dark:text-slate-300 dark:hover:bg-white/10"
               >
                 <ArrowLeft className="h-4 w-4" />
                 Back
@@ -4066,13 +4185,13 @@ export function BulkEntryPage() {
           maxWidth="max-w-sm"
         >
           <div className="p-6 space-y-4">
-            <p className="text-sm text-slate-700">{pendingDelete.message}</p>
+            <p className="text-sm text-slate-700 dark:text-slate-200">{pendingDelete.message}</p>
             <div className="flex justify-end gap-2 pt-2">
               <button
                 type="button"
                 onClick={cancelDelete}
                 disabled={deleteInFlight}
-                className="rounded-lg border border-slate-200 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                className="rounded-lg border border-slate-200 bg-[var(--bg-elevated)] px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-50 dark:border-[#1e2638] dark:text-slate-200 dark:hover:bg-white/5"
               >
                 Cancel
               </button>

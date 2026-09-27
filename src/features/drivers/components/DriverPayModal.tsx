@@ -244,20 +244,20 @@ export function DriverPayModal({
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-0 backdrop-blur-sm sm:items-center sm:p-4">
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-0 backdrop-blur-sm dark:bg-black/60 sm:items-center sm:p-4">
       <div
-        className="flex max-h-[min(92dvh,100%)] w-full max-w-md flex-col overflow-hidden rounded-t-2xl bg-white shadow-2xl sm:max-h-[90vh] sm:rounded-2xl"
+        className="flex max-h-[min(92dvh,100%)] w-full max-w-md flex-col overflow-hidden rounded-t-2xl border border-slate-200 bg-white shadow-2xl dark:border-[#1e2638] dark:bg-[#0e121d] sm:max-h-[90vh] sm:rounded-2xl"
         role="dialog"
         aria-modal="true"
       >
-        <div className="flex shrink-0 items-center justify-between border-b border-slate-100 px-4 py-3">
-          <h3 className="pr-2 text-sm font-semibold leading-snug text-slate-900 sm:text-base">
+        <div className="flex shrink-0 items-center justify-between border-b border-slate-100 px-4 py-3 dark:border-white/10">
+          <h3 className="pr-2 text-sm font-semibold leading-snug text-slate-900 dark:text-white sm:text-base">
             Pay
           </h3>
           <button
             type="button"
             onClick={onClose}
-            className="shrink-0 rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+            className="shrink-0 rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-white/5 dark:hover:text-slate-200"
             aria-label="Close"
           >
             <X className="h-5 w-5 sm:h-4 sm:w-4" />
@@ -266,11 +266,11 @@ export function DriverPayModal({
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain p-4 sm:p-5">
           {loadingDetail && !detail ? (
             <div className="flex justify-center py-8">
-              <Loader2 className="h-7 w-7 animate-spin text-slate-400" />
+              <Loader2 className="h-7 w-7 animate-spin text-indigo-500" />
             </div>
           ) : (
             <>
-              <p className="mb-3 text-xs text-slate-500">
+              <p className="mb-3 text-xs text-slate-500 dark:text-slate-400">
                 {paymentKind === "advance"
                   ? "Advance paid to driver. Reduces trip bata pending for this period."
                   : "Payment to driver: applied to bata (salary) first, then bulk advance payout."}
@@ -280,31 +280,33 @@ export function DriverPayModal({
                     {paymentKind === "advance" ? (
                       <>
                         Bata remaining:{" "}
-                        <strong>
+                        <strong className="text-slate-800 dark:text-slate-200">
                           {fmtCurrency(detail.summary.vehicleBata.remaining)}
                         </strong>
                       </>
                     ) : (
                       <>
                         Remaining to pay:{" "}
-                        <strong>{fmtCurrency(remainingToPay)}</strong>
+                        <strong className="text-slate-800 dark:text-slate-200">
+                          {fmtCurrency(remainingToPay)}
+                        </strong>
                       </>
                     )}
                   </>
                 )}
               </p>
               <fieldset className="block">
-                <legend className="text-xs font-medium text-slate-600">
+                <legend className="text-xs font-medium text-slate-600 dark:text-slate-400">
                   Type
                 </legend>
-                <div className="mt-1.5 grid grid-cols-2 gap-1 rounded-xl border border-slate-200 bg-slate-50 p-1">
+                <div className="mt-1.5 grid grid-cols-2 gap-1 rounded-xl border border-slate-200 bg-slate-50 p-1 dark:border-white/10 dark:bg-white/5">
                   <button
                     type="button"
                     onClick={() => setPaymentKind("pay")}
                     className={`min-h-[40px] rounded-lg px-2 py-2 text-xs font-semibold sm:text-sm ${
                       paymentKind === "pay"
-                        ? "bg-blue-600 text-white shadow-sm"
-                        : "text-slate-600 hover:bg-white"
+                        ? "bg-indigo-600 text-white shadow-sm dark:bg-indigo-500"
+                        : "text-slate-600 hover:bg-white dark:text-slate-300 dark:hover:bg-white/10"
                     }`}
                   >
                     Pay
@@ -314,38 +316,38 @@ export function DriverPayModal({
                     onClick={() => setPaymentKind("advance")}
                     className={`min-h-[40px] rounded-lg px-2 py-2 text-xs font-semibold sm:text-sm ${
                       paymentKind === "advance"
-                        ? "bg-blue-600 text-white shadow-sm"
-                        : "text-slate-600 hover:bg-white"
+                        ? "bg-indigo-600 text-white shadow-sm dark:bg-indigo-500"
+                        : "text-slate-600 hover:bg-white dark:text-slate-300 dark:hover:bg-white/10"
                     }`}
                   >
                     Advance
                   </button>
                 </div>
               </fieldset>
-              <label className="mt-3 block text-xs font-medium text-slate-600">
+              <label className="mt-3 block text-xs font-medium text-slate-600 dark:text-slate-400">
                 Amount (₹)
                 <input
                   type="number"
-                  className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                  className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20 dark:border-white/10 dark:bg-white/5 dark:text-slate-100 dark:focus:border-indigo-400"
                   value={payAmount}
                   onChange={(e) => setPayAmount(e.target.value)}
                   min={0}
                 />
               </label>
-              <label className="mt-3 block text-xs font-medium text-slate-600">
+              <label className="mt-3 block text-xs font-medium text-slate-600 dark:text-slate-400">
                 Date
                 <input
                   type="date"
-                  className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                  className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20 dark:border-white/10 dark:bg-white/5 dark:text-slate-100 dark:focus:border-indigo-400"
                   value={payDate}
                   onChange={(e) => setPayDate(e.target.value)}
                 />
               </label>
               {paymentKind === "pay" && (
-                <label className="mt-3 block text-xs font-medium text-slate-600">
+                <label className="mt-3 block text-xs font-medium text-slate-600 dark:text-slate-400">
                   Method
                   <select
-                    className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                    className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20 dark:border-white/10 dark:bg-white/5 dark:text-slate-100 dark:focus:border-indigo-400"
                     value={payMethod}
                     onChange={(e) => setPayMethod(e.target.value)}
                   >
@@ -357,10 +359,10 @@ export function DriverPayModal({
                   </select>
                 </label>
               )}
-              <label className="mt-3 block text-xs font-medium text-slate-600">
+              <label className="mt-3 block text-xs font-medium text-slate-600 dark:text-slate-400">
                 Notes
                 <input
-                  className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                  className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20 dark:border-white/10 dark:bg-white/5 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-indigo-400"
                   value={payNotes}
                   onChange={(e) => setPayNotes(e.target.value)}
                   placeholder={
@@ -371,13 +373,15 @@ export function DriverPayModal({
                 />
               </label>
               {payMessage && (
-                <p className="mt-2 text-xs text-red-600">{payMessage}</p>
+                <p className="mt-2 text-xs text-red-600 dark:text-red-400">
+                  {payMessage}
+                </p>
               )}
               <div className="mt-4 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
                 <button
                   type="button"
                   onClick={onClose}
-                  className="min-h-[44px] w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm font-medium sm:min-h-0 sm:w-auto sm:py-2"
+                  className="min-h-[44px] w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm font-medium text-slate-700 dark:border-white/10 dark:text-slate-300 dark:hover:bg-white/5 sm:min-h-0 sm:w-auto sm:py-2"
                 >
                   Cancel
                 </button>
@@ -385,7 +389,7 @@ export function DriverPayModal({
                   type="button"
                   disabled={paySaving || loadingDetail}
                   onClick={handleSubmit}
-                  className="inline-flex min-h-[44px] w-full items-center justify-center rounded-lg bg-blue-600 px-3 py-2.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50 sm:min-h-0 sm:w-auto sm:py-2"
+                  className="inline-flex min-h-[44px] w-full items-center justify-center rounded-lg bg-indigo-600 px-3 py-2.5 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50 dark:bg-indigo-500 dark:hover:bg-indigo-400 sm:min-h-0 sm:w-auto sm:py-2"
                 >
                   {paySaving ? (
                     <Loader2 className="h-4 w-4 animate-spin" />

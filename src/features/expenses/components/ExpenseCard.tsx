@@ -24,11 +24,11 @@ const ExpenseCard: React.FC<Props> = ({ expense, onRefresh, onEdit }) => {
   };
 
   return (
-    <div className="flex items-center gap-3 bg-white rounded-xl px-3.5 py-2.5 sm:px-4 sm:py-3 mb-2 border border-slate-100 shadow-sm transition-shadow hover:shadow-md group">
-      <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-lg bg-slate-100 flex items-center justify-center text-lg shrink-0">{icon}</div>
+    <div className="group mb-2 flex items-center gap-3 rounded-xl border border-slate-100 bg-[var(--bg-card)] px-3.5 py-2.5 shadow-sm transition-shadow hover:shadow-md sm:px-4 sm:py-3 dark:border-white/10 dark:hover:bg-white/[0.04]">
+      <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-lg bg-slate-100 flex items-center justify-center text-lg shrink-0 dark:bg-white/5">{icon}</div>
       <div className="flex-1 min-w-0">
-        <div className="font-semibold text-[13px] sm:text-sm text-slate-800 truncate">{expense.title || expense.description || 'Expense'}</div>
-        <div className="text-[11px] sm:text-xs text-slate-400 flex gap-2 mt-0.5">
+        <div className="font-semibold text-[13px] sm:text-sm text-slate-800 truncate dark:text-white">{expense.title || expense.description || 'Expense'}</div>
+        <div className="text-[11px] sm:text-xs text-slate-400 flex gap-2 mt-0.5 dark:text-slate-500">
           <span className="capitalize">{expense.category}</span>
           <span>{fmtDate(expense.date)}</span>
           {expense.notes && <span className="truncate max-w-[120px] italic">{expense.notes}</span>}
@@ -38,7 +38,7 @@ const ExpenseCard: React.FC<Props> = ({ expense, onRefresh, onEdit }) => {
       {/* Edit button */}
       <button
         onClick={() => onEdit(expense)}
-        className="bg-amber-50 hover:bg-amber-100 text-amber-500 border-0 rounded-lg px-2 py-1 sm:px-2.5 sm:py-1.5 text-[11px] cursor-pointer shrink-0 ml-1 transition-colors"
+        className="bg-amber-50 hover:bg-amber-100 text-amber-500 border-0 rounded-lg px-2 py-1 sm:px-2.5 sm:py-1.5 text-[11px] cursor-pointer shrink-0 ml-1 transition-colors dark:bg-amber-500/10 dark:hover:bg-amber-500/20 dark:text-amber-400"
         title="Edit Expense"
       >
         ✏️
@@ -46,7 +46,7 @@ const ExpenseCard: React.FC<Props> = ({ expense, onRefresh, onEdit }) => {
       {/* Delete button */}
       <button
         onClick={handleDelete}
-        className="bg-red-50 hover:bg-red-100 text-red-500 border-0 rounded-lg px-2 py-1 sm:px-2.5 sm:py-1.5 text-[11px] cursor-pointer shrink-0 transition-colors"
+        className="bg-red-50 hover:bg-red-100 text-red-500 border-0 rounded-lg px-2 py-1 sm:px-2.5 sm:py-1.5 text-[11px] cursor-pointer shrink-0 transition-colors dark:bg-red-500/10 dark:hover:bg-red-500/20"
         title="Delete Expense"
       >
         ✕

@@ -1,6 +1,7 @@
-import type { ReactNode } from 'react';
-import { Navigate } from 'react-router-dom';
-import { useAuth } from '../hooks/useAuth';
+import type { ReactNode } from "react";
+import { Navigate } from "react-router-dom";
+import { useAuth } from "../hooks/useAuth";
+import { TripwiseLogo } from "./brand/TripwiseLogo";
 
 interface ProtectedRouteProps {
   children: ReactNode;
@@ -11,8 +12,9 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
 
   if (loading) {
     return (
-      <div className="flex h-screen items-center justify-center">
-        <div className="h-12 w-12 animate-spin rounded-full border-b-2 border-blue-500" />
+      <div className="flex h-screen flex-col items-center justify-center gap-4 bg-[var(--bg-main)]">
+        <TripwiseLogo className="h-16 w-16 drop-shadow-md" />
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-indigo-500 border-t-transparent" />
       </div>
     );
   }
@@ -23,5 +25,3 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
 
   return <>{children}</>;
 }
-
-

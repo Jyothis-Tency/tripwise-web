@@ -166,37 +166,37 @@ export function GuestInvitesPanel({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 p-0 sm:p-4"
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 p-0 sm:p-4 dark:bg-black/60"
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
-      <div className="w-full sm:max-w-lg max-h-[90vh] flex flex-col rounded-t-2xl sm:rounded-2xl bg-white shadow-2xl">
-        <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4 shrink-0">
+      <div className="w-full sm:max-w-lg max-h-[90vh] flex flex-col rounded-t-2xl sm:rounded-2xl border border-slate-200 bg-[var(--bg-card)] shadow-2xl dark:border-[#1e2638]">
+        <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4 shrink-0 dark:border-[#1e2638]">
           <div>
-            <h3 className="text-base font-semibold text-slate-900">
+            <h3 className="text-base font-semibold text-slate-900 dark:text-white">
               Driver guest links
             </h3>
-            <p className="text-xs text-slate-400 mt-0.5">
+            <p className="text-xs text-slate-400 mt-0.5 dark:text-slate-500">
               Share with driver · autosaves · open same link to Approve
             </p>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="text-slate-400 hover:text-slate-600"
+            className="text-slate-400 hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-300"
             aria-label="Close"
           >
             <X className="h-5 w-5" />
           </button>
         </div>
 
-        <div className="flex border-b border-slate-100 px-5 shrink-0">
+        <div className="flex border-b border-slate-100 px-5 shrink-0 dark:border-[#1e2638]">
           <button
             type="button"
             onClick={() => setTab("invites")}
             className={`px-3 py-2.5 text-sm font-semibold border-b-2 -mb-px transition ${
               tab === "invites"
-                ? "border-blue-500 text-blue-600"
-                : "border-transparent text-slate-400"
+                ? "border-indigo-500 text-indigo-600 dark:border-indigo-400 dark:text-indigo-300"
+                : "border-transparent text-slate-400 dark:text-slate-500"
             }`}
           >
             Links
@@ -206,8 +206,8 @@ export function GuestInvitesPanel({
             onClick={() => setTab("all")}
             className={`px-3 py-2.5 text-sm font-semibold border-b-2 -mb-px transition ${
               tab === "all"
-                ? "border-blue-500 text-blue-600"
-                : "border-transparent text-slate-400"
+                ? "border-indigo-500 text-indigo-600 dark:border-indigo-400 dark:text-indigo-300"
+                : "border-transparent text-slate-400 dark:text-slate-500"
             }`}
           >
             Approved history
@@ -216,24 +216,24 @@ export function GuestInvitesPanel({
 
         <div className="flex-1 overflow-y-auto p-5 space-y-4">
           {error && (
-            <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+            <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-300">
               {error}
             </div>
           )}
 
           {loading && (
             <div className="flex justify-center py-8">
-              <Loader2 className="h-6 w-6 animate-spin text-blue-500" />
+              <Loader2 className="h-6 w-6 animate-spin text-indigo-500" />
             </div>
           )}
 
           {!loading && tab === "invites" && (
             <>
-              <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 space-y-3">
-                <p className="text-xs font-bold uppercase tracking-wider text-slate-500">
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 space-y-3 dark:border-[#1e2638] dark:bg-white/[0.03]">
+                <p className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                   New driver link
                 </p>
-                <p className="text-xs text-slate-500">
+                <p className="text-xs text-slate-500 dark:text-slate-400">
                   Optional name/phone now, or leave blank for the driver to
                   fill. Multi-agency · autosave · you Approve on the same page.
                 </p>
@@ -241,20 +241,20 @@ export function GuestInvitesPanel({
                   value={driverName}
                   onChange={(e) => setDriverName(e.target.value)}
                   placeholder="Driver name (optional)"
-                  className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
+                  className="w-full rounded-lg border border-slate-200 bg-[var(--bg-elevated)] px-3 py-2 text-sm outline-none focus:border-indigo-400 dark:border-[#1e2638] dark:text-slate-100 dark:placeholder:text-slate-500"
                 />
                 <input
                   value={driverPhone}
                   onChange={(e) => setDriverPhone(e.target.value)}
                   placeholder="Phone (optional)"
-                  className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
+                  className="w-full rounded-lg border border-slate-200 bg-[var(--bg-elevated)] px-3 py-2 text-sm outline-none focus:border-indigo-400 dark:border-[#1e2638] dark:text-slate-100 dark:placeholder:text-slate-500"
                 />
-                <label className="text-sm text-slate-600 flex items-center gap-2">
+                <label className="text-sm text-slate-600 flex items-center gap-2 dark:text-slate-300">
                   Expires
                   <select
                     value={expiresInDays}
                     onChange={(e) => setExpiresInDays(Number(e.target.value))}
-                    className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm"
+                    className="rounded-lg border border-slate-200 bg-[var(--bg-elevated)] px-2 py-1.5 text-sm dark:border-[#1e2638] dark:text-slate-100"
                   >
                     <option value={1}>1 day</option>
                     <option value={3}>3 days</option>
@@ -266,14 +266,14 @@ export function GuestInvitesPanel({
                   type="button"
                   disabled={creating}
                   onClick={onCreate}
-                  className="w-full rounded-lg bg-blue-600 py-2.5 text-sm font-bold text-white hover:bg-blue-700 disabled:opacity-60"
+                  className="w-full rounded-lg bg-indigo-600 py-2.5 text-sm font-bold text-white hover:bg-indigo-700 disabled:opacity-60 dark:bg-indigo-500 dark:hover:bg-indigo-400"
                 >
                   {creating ? "Creating…" : "Create & open in new tab"}
                 </button>
               </div>
 
               {invites.length === 0 ? (
-                <p className="text-center text-sm text-slate-400 py-4">
+                <p className="text-center text-sm text-slate-400 py-4 dark:text-slate-500">
                   No links yet
                 </p>
               ) : (
@@ -287,14 +287,14 @@ export function GuestInvitesPanel({
                     return (
                       <li
                         key={inv.id}
-                        className="rounded-xl border border-slate-200 bg-white p-3 space-y-2"
+                        className="rounded-xl border border-slate-200 bg-[var(--bg-card)] p-3 space-y-2 dark:border-[#1e2638]"
                       >
                         <div className="flex items-start justify-between gap-2">
                           <div className="min-w-0">
-                            <p className="text-sm font-semibold text-slate-800 truncate">
+                            <p className="text-sm font-semibold text-slate-800 truncate dark:text-slate-100">
                               {inv.driverName || inv.label}
                             </p>
-                            <p className="text-xs text-slate-400 mt-0.5">
+                            <p className="text-xs text-slate-400 mt-0.5 dark:text-slate-500">
                               {inv.driverPhone
                                 ? `${inv.driverPhone} · `
                                 : ""}
@@ -313,7 +313,7 @@ export function GuestInvitesPanel({
                               type="button"
                               title="Open in new tab (owner always)"
                               onClick={() => openLink(inv)}
-                              className="rounded-lg p-2 text-emerald-600 hover:bg-emerald-50"
+                              className="rounded-lg p-2 text-emerald-600 hover:bg-emerald-50 dark:text-emerald-400 dark:hover:bg-emerald-500/10"
                             >
                               <ExternalLink className="h-4 w-4" />
                             </button>
@@ -321,7 +321,7 @@ export function GuestInvitesPanel({
                               type="button"
                               title="Copy link for driver"
                               onClick={() => copyLink(inv)}
-                              className="rounded-lg p-2 text-blue-600 hover:bg-blue-50"
+                              className="rounded-lg p-2 text-indigo-600 hover:bg-indigo-50 dark:text-indigo-300 dark:hover:bg-indigo-500/15"
                             >
                               {copiedId === inv.id ? (
                                 <Check className="h-4 w-4" />
@@ -335,7 +335,7 @@ export function GuestInvitesPanel({
                                 title="Unrevoke — allow drivers again"
                                 disabled={actionId === inv.id}
                                 onClick={() => onUnrevoke(inv.id)}
-                                className="rounded-lg p-2 text-emerald-600 hover:bg-emerald-50"
+                                className="rounded-lg p-2 text-emerald-600 hover:bg-emerald-50 dark:text-emerald-400 dark:hover:bg-emerald-500/10"
                               >
                                 <RotateCcw className="h-4 w-4" />
                               </button>
@@ -345,14 +345,14 @@ export function GuestInvitesPanel({
                                 title="Revoke — block drivers"
                                 disabled={actionId === inv.id}
                                 onClick={() => onRevoke(inv.id)}
-                                className="rounded-lg p-2 text-slate-400 hover:bg-red-50 hover:text-red-500"
+                                className="rounded-lg p-2 text-slate-400 hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-500/10"
                               >
                                 <Ban className="h-4 w-4" />
                               </button>
                             )}
                           </div>
                         </div>
-                        <label className="flex items-center gap-2 text-xs text-slate-500">
+                        <label className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
                           <span className="shrink-0">Expires</span>
                           <input
                             type="datetime-local"
@@ -366,7 +366,7 @@ export function GuestInvitesPanel({
                                 void onExpiryChange(inv.id, next);
                               }
                             }}
-                            className="flex-1 min-w-0 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-700"
+                            className="flex-1 min-w-0 rounded-lg border border-slate-200 bg-[var(--bg-elevated)] px-2 py-1.5 text-xs text-slate-700 dark:border-[#1e2638] dark:text-slate-100"
                           />
                         </label>
                       </li>
@@ -380,7 +380,7 @@ export function GuestInvitesPanel({
           {!loading && tab === "all" && (
             <>
               {subs.length === 0 ? (
-                <p className="text-center text-sm text-slate-400 py-8">
+                <p className="text-center text-sm text-slate-400 py-8 dark:text-slate-500">
                   No approved entries yet
                 </p>
               ) : (
@@ -388,18 +388,18 @@ export function GuestInvitesPanel({
                   {subs.map((s) => (
                     <li
                       key={s.id}
-                      className="rounded-xl border border-slate-200 bg-white p-4"
+                      className="rounded-xl border border-slate-200 bg-[var(--bg-card)] p-4 dark:border-[#1e2638]"
                     >
-                      <p className="text-sm font-semibold text-slate-800">
+                      <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">
                         {s.guestName || "Driver"}
                         {s.guestPhone ? (
-                          <span className="font-normal text-slate-500">
+                          <span className="font-normal text-slate-500 dark:text-slate-400">
                             {" "}
                             · {s.guestPhone}
                           </span>
                         ) : null}
                       </p>
-                      <p className="text-xs text-slate-400 mt-0.5">
+                      <p className="text-xs text-slate-400 mt-0.5 dark:text-slate-500">
                         {s.agencyName || "Agency"} · {s.rowCount} row
                         {s.rowCount === 1 ? "" : "s"}
                         {s.acceptedAt
@@ -430,7 +430,7 @@ export function GuestLinkButton({
       type="button"
       onClick={onClick}
       title="Driver guest links"
-      className="relative flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-xs sm:text-sm font-semibold text-slate-600 hover:border-blue-300 hover:text-blue-600 transition shadow-sm shrink-0"
+      className="relative flex items-center gap-1.5 rounded-lg border border-slate-200 bg-[var(--bg-elevated)] px-3 py-2.5 text-xs sm:text-sm font-semibold text-slate-600 hover:border-indigo-300 hover:text-indigo-600 transition shadow-sm shrink-0 dark:border-[#1e2638] dark:text-slate-300 dark:hover:border-indigo-400 dark:hover:text-indigo-300"
     >
       <Link2 className="h-4 w-4" />
       <span className="hidden sm:inline">Guest link</span>

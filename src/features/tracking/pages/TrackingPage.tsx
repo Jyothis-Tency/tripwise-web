@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Car,
   ChevronRight,
@@ -11,68 +11,115 @@ import {
   Info,
   Navigation,
   RefreshCw,
-} from 'lucide-react';
-import { fetchTrackingVehicles, completeTrip, type TrackingVehicle } from '../api';
-import { fetchAgencies, type Agency } from '../../bulk-entry/api';
-import { resolveAgencyLabelFromName } from '../../../lib/agencyDisplay';
-import { resolveTripAgencyProfitDisplay } from '../../history/tripExpenseBreakdown';
+  Fuel,
+  Landmark,
+  FileText,
+  ParkingCircle,
+  Package,
+} from "lucide-react";
+import {
+  fetchTrackingVehicles,
+  completeTrip,
+  type TrackingVehicle,
+} from "../api";
+import { fetchAgencies, type Agency } from "../../bulk-entry/api";
+import { resolveAgencyLabelFromName } from "../../../lib/agencyDisplay";
+import { resolveTripAgencyProfitDisplay } from "../../history/tripExpenseBreakdown";
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // UTILITIES
 // ═══════════════════════════════════════════════════════════════════════════════
 
 function statusBadgeCls(status?: string) {
-  switch ((status ?? '').toLowerCase()) {
-    case 'in_progress': return 'border-green-200 bg-green-50 text-green-700';
-    case 'scheduled': return 'border-blue-200 bg-blue-50 text-blue-700';
-    case 'completed': return 'border-slate-200 bg-slate-50 text-slate-600';
-    default: return 'border-slate-200 bg-slate-50 text-slate-600';
+  switch ((status ?? "").toLowerCase()) {
+    case "in_progress":
+      return "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/15 dark:text-emerald-400";
+    case "scheduled":
+      return "border-indigo-200 bg-indigo-50 text-indigo-700 dark:border-indigo-500/30 dark:bg-indigo-500/15 dark:text-indigo-300";
+    case "completed":
+      return "border-slate-200 bg-slate-50 text-slate-600 dark:border-white/10 dark:bg-white/5 dark:text-slate-400";
+    default:
+      return "border-slate-200 bg-slate-50 text-slate-600 dark:border-white/10 dark:bg-white/5 dark:text-slate-400";
   }
 }
 
 function statusLabel(status?: string) {
-  switch ((status ?? '').toLowerCase()) {
-    case 'in_progress': return 'In Progress';
-    case 'scheduled': return 'Scheduled';
-    case 'completed': return 'Completed';
-    default: return status ?? 'Unknown';
+  switch ((status ?? "").toLowerCase()) {
+    case "in_progress":
+      return "In Progress";
+    case "scheduled":
+      return "Scheduled";
+    case "completed":
+      return "Completed";
+    default:
+      return status ?? "Unknown";
   }
 }
 
 function formatDate(d?: string) {
-  if (!d) return '—';
+  if (!d) return "—";
   try {
     const date = new Date(d);
     if (isNaN(date.getTime())) return d;
-    return date.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
-  } catch { return d; }
+    return date.toLocaleDateString("en-IN", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    });
+  } catch {
+    return d;
+  }
 }
 
-function driverName(driver: TrackingVehicle['driver']): string {
-  if (!driver) return 'No Driver';
+function driverName(driver: TrackingVehicle["driver"]): string {
+  if (!driver) return "No Driver";
   if (driver.fullName) return driver.fullName;
-  if (driver.firstName && driver.lastName) return `${driver.firstName} ${driver.lastName}`;
-  return 'No Driver';
+  if (driver.firstName && driver.lastName)
+    return `${driver.firstName} ${driver.lastName}`;
+  return "No Driver";
 }
 
+const inputCls =
+  "w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition-colors placeholder:text-slate-400 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 dark:border-white/10 dark:bg-white/5 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-indigo-400 dark:focus:ring-indigo-500/30";
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // MODAL SHELL
 // ═══════════════════════════════════════════════════════════════════════════════
 
-function ModalShell({ title, onClose, children, maxWidth = 'max-w-md' }: {
-  title: string; onClose: () => void; children: React.ReactNode; maxWidth?: string;
+function ModalShell({
+  title,
+  onClose,
+  children,
+  maxWidth = "max-w-md",
+}: {
+  title: string;
+  onClose: () => void;
+  children: React.ReactNode;
+  maxWidth?: string;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   return (
-    <div ref={ref} onClick={e => e.target === ref.current && onClose()}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-      <div className={`w-full ${maxWidth} rounded-2xl bg-white shadow-2xl flex flex-col max-h-[90vh]`}>
-        <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4 shrink-0">
-          <h3 className="text-base font-semibold text-slate-900">{title}</h3>
-          <button type="button" onClick={onClose} className="text-slate-400 hover:text-slate-600"><X className="h-5 w-5" /></button>
+    <div
+      ref={ref}
+      onClick={(e) => e.target === ref.current && onClose()}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm dark:bg-black/60"
+    >
+      <div
+        className={`flex w-full ${maxWidth} max-h-[90vh] flex-col rounded-2xl border border-slate-200 bg-white shadow-2xl dark:border-[#1e2638] dark:bg-[#0e121d]`}
+      >
+        <div className="flex shrink-0 items-center justify-between border-b border-slate-100 px-6 py-4 dark:border-white/10">
+          <h3 className="text-base font-semibold text-slate-900 dark:text-white">
+            {title}
+          </h3>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-white/5 dark:hover:text-slate-200"
+          >
+            <X className="h-5 w-5" />
+          </button>
         </div>
-        <div className="overflow-y-auto flex-1">{children}</div>
+        <div className="flex-1 overflow-y-auto">{children}</div>
       </div>
     </div>
   );
@@ -82,20 +129,42 @@ function ModalShell({ title, onClose, children, maxWidth = 'max-w-md' }: {
 // INFO DISPLAY HELPERS
 // ═══════════════════════════════════════════════════════════════════════════════
 
-function InfoCard({ title, children }: { title: string; children: React.ReactNode }) {
+function InfoCard({
+  title,
+  children,
+}: {
+  title: string;
+  children: React.ReactNode;
+}) {
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-5 sm:p-6">
-      <h4 className="text-base font-semibold text-slate-800 mb-3">{title}</h4>
-      <div className="space-y-2">{children}</div>
+    <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-subtle sm:p-6 dark:border-[#1e2638] dark:bg-[#0e121d]/80 dark:backdrop-blur-xl">
+      <h4 className="mb-3 text-sm font-semibold text-slate-800 sm:text-base dark:text-white">
+        {title}
+      </h4>
+      <div className="space-y-0.5">{children}</div>
     </div>
   );
 }
 
-function InfoRow({ label, value, valueColor }: { label: string; value?: string | number | null; valueColor?: string }) {
+function InfoRow({
+  label,
+  value,
+  valueColor,
+}: {
+  label: string;
+  value?: string | number | null;
+  valueColor?: string;
+}) {
   return (
-    <div className="flex items-start justify-between py-2 border-b border-slate-50 last:border-0">
-      <span className="text-sm text-slate-500 shrink-0 mr-4">{label}</span>
-      <span className={`text-sm font-medium text-right ${valueColor ?? 'text-slate-800'}`}>{value ?? '—'}</span>
+    <div className="flex items-start justify-between border-b border-slate-50 py-2 last:border-0 dark:border-white/5">
+      <span className="mr-4 shrink-0 text-sm text-slate-500 dark:text-slate-400">
+        {label}
+      </span>
+      <span
+        className={`text-right text-sm font-medium ${valueColor ?? "text-slate-800 dark:text-slate-200"}`}
+      >
+        {value ?? "—"}
+      </span>
     </div>
   );
 }
@@ -106,63 +175,89 @@ function InfoRow({ label, value, valueColor }: { label: string; value?: string |
 
 function TrackingCardSkeleton() {
   return (
-    <div className="w-full rounded-xl border border-slate-100 p-4 animate-pulse bg-white">
+    <div className="w-full animate-pulse rounded-xl border border-slate-100 bg-white p-4 dark:border-[#1e2638] dark:bg-[#0e121d]/80">
       <div className="flex items-center gap-3">
-        <div className="h-12 w-12 shrink-0 rounded-lg bg-slate-50" />
+        <div className="h-10 w-10 shrink-0 rounded-lg bg-slate-100 dark:bg-white/5" />
         <div className="flex-1 space-y-2">
-          <div className="h-5 w-28 rounded bg-slate-50" />
-          <div className="h-4 w-20 rounded bg-slate-50" />
+          <div className="h-4 w-28 rounded bg-slate-100 dark:bg-white/5" />
+          <div className="h-3 w-20 rounded bg-slate-100 dark:bg-white/5" />
         </div>
       </div>
-      <div className="h-4 w-2/3 mt-3 rounded bg-slate-50" />
-      <div className="h-4 w-1/2 mt-1.5 rounded bg-slate-50" />
+      <div className="mt-3 h-3 w-2/3 rounded bg-slate-100 dark:bg-white/5" />
+      <div className="mt-1.5 h-3 w-1/2 rounded bg-slate-100 dark:bg-white/5" />
     </div>
   );
 }
 
-function TrackingCard({ item, isSelected, onSelect }: {
-  item: TrackingVehicle; isSelected: boolean; onSelect: () => void;
+function TrackingCard({
+  item,
+  isSelected,
+  onSelect,
+}: {
+  item: TrackingVehicle;
+  isSelected: boolean;
+  onSelect: () => void;
 }) {
   const v = item.vehicle;
   const trip = item.activeTrip;
   const drv = item.driver;
-  const tripStatus = (trip?.status ?? 'scheduled').toLowerCase();
+  const tripStatus = (trip?.status ?? "scheduled").toLowerCase();
+  const inProgress = tripStatus === "in_progress";
 
   return (
-    <button type="button" onClick={onSelect}
-      className={`w-full text-left rounded-xl border p-4 transition-all ${
+    <button
+      type="button"
+      onClick={onSelect}
+      className={`w-full rounded-xl p-3.5 text-left transition-all ${
         isSelected
-          ? 'border-blue-400 bg-blue-50 ring-1 ring-blue-200 shadow-sm'
-          : 'border-slate-200 bg-white hover:border-slate-300 hover:shadow-sm'
-      }`}>
-
-      {/* Top row: icon + vehicle number + status */}
+          ? "border-2 border-indigo-500 bg-indigo-50/40 shadow-xs dark:border-indigo-400 dark:bg-indigo-500/10"
+          : "border border-slate-200 bg-white hover:border-slate-300 hover:shadow-xs dark:border-white/10 dark:bg-[#0e121d]/80 dark:hover:border-white/20 dark:hover:bg-white/[0.04]"
+      }`}
+    >
       <div className="flex items-center gap-3">
-        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-blue-50">
-          <Car className="h-6 w-6 text-blue-500" />
+        <div
+          className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${
+            isSelected
+              ? "bg-indigo-100 text-indigo-600 dark:bg-indigo-500/20 dark:text-indigo-300"
+              : "bg-slate-100 text-slate-500 dark:bg-white/5 dark:text-slate-400"
+          }`}
+        >
+          <Car className="h-5 w-5" strokeWidth={1.8} />
         </div>
-        <div className="flex-1 min-w-0">
-          <p className="text-base font-semibold text-slate-800 truncate">{v.vehicleNumber ?? 'N/A'}</p>
-          <div className="flex items-center gap-1.5 mt-0.5">
-            <span className={`h-2.5 w-2.5 rounded-full ${tripStatus === 'in_progress' ? 'bg-green-500' : 'bg-blue-400'}`} />
-            <span className={`text-sm font-medium ${tripStatus === 'in_progress' ? 'text-green-600' : 'text-blue-500'}`}>
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-bold tracking-tight text-slate-900 dark:text-white">
+            {v.vehicleNumber ?? "N/A"}
+          </p>
+          <div className="mt-1 flex items-center gap-1.5">
+            <span
+              className={`h-2 w-2 rounded-full ${
+                inProgress ? "bg-emerald-500" : "bg-indigo-500"
+              }`}
+            />
+            <span
+              className={`text-xs font-medium ${
+                inProgress
+                  ? "text-emerald-700 dark:text-emerald-400"
+                  : "text-indigo-700 dark:text-indigo-300"
+              }`}
+            >
               {statusLabel(trip?.status)}
             </span>
           </div>
         </div>
       </div>
 
-      {/* Driver */}
-      <div className="flex items-center gap-2 mt-3 text-slate-600">
-        <User className="h-4 w-4 shrink-0 text-slate-400" />
-        <span className="text-sm truncate font-medium">{driverName(drv)}</span>
+      <div className="mt-3 flex items-center gap-2 text-slate-600 dark:text-slate-300">
+        <User className="h-3.5 w-3.5 shrink-0 text-slate-400" />
+        <span className="truncate text-xs font-medium">{driverName(drv)}</span>
       </div>
 
-      {/* Route */}
       {trip?.from && trip?.to && (
-        <div className="flex items-center gap-2 mt-1.5 text-slate-500">
-          <MapPin className="h-4 w-4 shrink-0 text-slate-400" />
-          <span className="text-sm truncate">{trip.from} → {trip.to}</span>
+        <div className="mt-1.5 flex items-center gap-2 text-indigo-600 dark:text-indigo-300">
+          <MapPin className="h-3.5 w-3.5 shrink-0 text-indigo-400 dark:text-indigo-400/80" />
+          <span className="truncate text-xs font-medium">
+            {trip.from} → {trip.to}
+          </span>
         </div>
       )}
     </button>
@@ -173,32 +268,51 @@ function TrackingCard({ item, isSelected, onSelect }: {
 // DETAIL TABS
 // ═══════════════════════════════════════════════════════════════════════════════
 
-function TripInfoTab({ item, onComplete }: { item: TrackingVehicle; onComplete: () => void }) {
+function TripInfoTab({
+  item,
+  onComplete,
+}: {
+  item: TrackingVehicle;
+  onComplete: () => void;
+}) {
   const trip = item.activeTrip;
-  if (!trip) return <p className="py-8 text-center text-sm text-slate-400">No active trip data</p>;
+  if (!trip)
+    return (
+      <div className="flex flex-col items-center rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50/40 py-12 text-center dark:border-white/10 dark:bg-white/5">
+        <p className="text-sm font-semibold text-slate-900 dark:text-white">
+          No active trip data
+        </p>
+      </div>
+    );
 
-  const tripId = trip._id ?? trip.id ?? '';
-  const isInProgress = (trip.status ?? '').toLowerCase() === 'in_progress';
+  const tripId = trip._id ?? trip.id ?? "";
+  const isInProgress = (trip.status ?? "").toLowerCase() === "in_progress";
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
       <div className="md:col-span-2">
         <InfoCard title="Trip Overview">
           <InfoRow label="Trip Number" value={trip.tripNumber} />
           <InfoRow label="Status" value={statusLabel(trip.status)} />
-          <InfoRow label="Priority" value={trip.priority ?? 'Normal'} />
+          <InfoRow label="Priority" value={trip.priority ?? "Normal"} />
         </InfoCard>
       </div>
 
       <InfoCard title="Route Information">
         <InfoRow label="From" value={trip.from} />
         <InfoRow label="To" value={trip.to} />
-        <InfoRow label="Distance" value={trip.distance != null ? `${trip.distance}` : undefined} />
+        <InfoRow
+          label="Distance"
+          value={trip.distance != null ? `${trip.distance}` : undefined}
+        />
       </InfoCard>
 
       <InfoCard title="Schedule">
         <InfoRow label="Start Date" value={formatDate(trip.startDate)} />
-        <InfoRow label="Expected End" value={formatDate(trip.expectedEndDate)} />
+        <InfoRow
+          label="Expected End"
+          value={formatDate(trip.expectedEndDate)}
+        />
       </InfoCard>
 
       <div className="md:col-span-2">
@@ -212,14 +326,20 @@ function TripInfoTab({ item, onComplete }: { item: TrackingVehicle; onComplete: 
       {isInProgress && tripId && (
         <div className="md:col-span-2">
           <InfoCard title="Trip Actions">
-            <button type="button" onClick={onComplete}
-              className="w-full flex items-center justify-center gap-2 rounded-lg bg-emerald-500 px-4 py-3.5 text-base font-semibold text-white hover:bg-emerald-600 transition shadow-sm hover:shadow-md">
+            <button
+              type="button"
+              onClick={onComplete}
+              className="flex w-full items-center justify-center gap-2 rounded-lg bg-emerald-600 px-4 py-3.5 text-base font-semibold text-white shadow-sm transition hover:bg-emerald-700 hover:shadow-md dark:bg-emerald-500 dark:hover:bg-emerald-400"
+            >
               <CheckCircle2 className="h-5 w-5" />
               Complete Trip
             </button>
-            <div className="flex items-start gap-2 mt-3 px-4 py-3 rounded-lg bg-blue-50 text-xs text-slate-600">
-              <Info className="h-4 w-4 shrink-0 text-blue-400 mt-0.5" />
-              <span>This will mark the trip as completed. The vehicle will be available for new trips.</span>
+            <div className="mt-3 flex items-start gap-2 rounded-lg border border-indigo-100 bg-indigo-50 px-4 py-3 text-xs text-slate-600 dark:border-indigo-500/30 dark:bg-indigo-500/10 dark:text-slate-300">
+              <Info className="mt-0.5 h-4 w-4 shrink-0 text-indigo-500 dark:text-indigo-300" />
+              <span>
+                This will mark the trip as completed. The vehicle will be
+                available for new trips.
+              </span>
             </div>
           </InfoCard>
         </div>
@@ -233,7 +353,7 @@ function DriverInfoTab({ item }: { item: TrackingVehicle }) {
   const v = item.vehicle;
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
       <InfoCard title="Driver Profile">
         <InfoRow label="Name" value={driverName(drv)} />
         <InfoRow label="Phone" value={drv?.phone} />
@@ -245,7 +365,10 @@ function DriverInfoTab({ item }: { item: TrackingVehicle }) {
         <InfoRow label="Vehicle Number" value={v.vehicleNumber} />
         <InfoRow label="Vehicle Type" value={v.vehicleType} />
         <InfoRow label="Vehicle Model" value={v.vehicleModel} />
-        <InfoRow label="Vehicle Year" value={v.vehicleYear != null ? String(v.vehicleYear) : undefined} />
+        <InfoRow
+          label="Vehicle Year"
+          value={v.vehicleYear != null ? String(v.vehicleYear) : undefined}
+        />
       </InfoCard>
     </div>
   );
@@ -259,7 +382,12 @@ function ExpenseInfoTab({
   resolveAgencyLabel: (agencyName?: string) => string;
 }) {
   const trip = item.activeTrip;
-  if (!trip) return <p className ="py-8 text-center text-sm text-slate-400">No trip data</p>;
+  if (!trip)
+    return (
+      <div className="flex flex-col items-center rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50/40 py-12 text-center dark:border-white/10 dark:bg-white/5">
+        <p className="text-sm text-slate-500 dark:text-slate-400">No trip data</p>
+      </div>
+    );
 
   const agencyCost = trip.agencyCost != null ? Number(trip.agencyCost) : 0;
   const cabCost = trip.cabCost != null ? Number(trip.cabCost) : 0;
@@ -270,16 +398,29 @@ function ExpenseInfoTab({
     expenses,
   });
 
-  // Categorise expenses
-  let fuel = 0, toll = 0, taxPermit = 0, parking = 0, other = 0;
-  expenses.forEach(e => {
+  let fuel = 0,
+    toll = 0,
+    taxPermit = 0,
+    parking = 0,
+    other = 0;
+  expenses.forEach((e) => {
     const amt = Number(e.amount ?? 0);
-    switch ((e.type ?? '').toLowerCase()) {
-      case 'fuel': fuel += amt; break;
-      case 'toll': toll += amt; break;
-      case 'tax': case 'permit': taxPermit += amt; break;
-      case 'parking': parking += amt; break;
-      default: other += amt;
+    switch ((e.type ?? "").toLowerCase()) {
+      case "fuel":
+        fuel += amt;
+        break;
+      case "toll":
+        toll += amt;
+        break;
+      case "tax":
+      case "permit":
+        taxPermit += amt;
+        break;
+      case "parking":
+        parking += amt;
+        break;
+      default:
+        other += amt;
     }
   });
   const totalExpenses = toll + taxPermit + parking + other;
@@ -287,33 +428,67 @@ function ExpenseInfoTab({
   return (
     <div className="space-y-4">
       <InfoCard title="Cost Summary">
-        <InfoRow label="Agency Name" value={resolveAgencyLabel(trip.agencyName)} />
-        <InfoRow label="Agency Cost" value={`₹${agencyCost.toLocaleString('en-IN')}`} />
-        <InfoRow label="Cab Cost" value={`₹${cabCost.toLocaleString('en-IN')}`} />
-        <div className="border-t border-slate-100 my-1" />
-        <InfoRow label="Agency Profit" value={`₹${agencyProfitAmt.toLocaleString('en-IN')}`} valueColor="text-emerald-600 font-bold" />
-        <InfoRow label="Advance" value={`₹${(trip.advance != null ? Number(trip.advance) : 0).toLocaleString('en-IN')}`} />
+        <InfoRow
+          label="Agency Name"
+          value={resolveAgencyLabel(trip.agencyName)}
+        />
+        <InfoRow
+          label="Agency Cost"
+          value={`₹${agencyCost.toLocaleString("en-IN")}`}
+        />
+        <InfoRow
+          label="Cab Cost"
+          value={`₹${cabCost.toLocaleString("en-IN")}`}
+        />
+        <div className="my-1 border-t border-slate-100 dark:border-white/10" />
+        <InfoRow
+          label="Agency Profit"
+          value={`₹${agencyProfitAmt.toLocaleString("en-IN")}`}
+          valueColor="font-bold text-emerald-600 dark:text-emerald-400"
+        />
+        <InfoRow
+          label="Advance"
+          value={`₹${(trip.advance != null ? Number(trip.advance) : 0).toLocaleString("en-IN")}`}
+        />
       </InfoCard>
 
       <InfoCard title="Cab Expenses Breakdown">
-        <ExpenseRow icon="⛽" label="Petrol / Diesel" amount={fuel} />
-        <ExpenseRow icon="🛣️" label="Toll Charges" amount={toll} />
-        <ExpenseRow icon="📋" label="Tax & Permit" amount={taxPermit} />
-        <ExpenseRow icon="🅿️" label="Parking" amount={parking} />
-        <ExpenseRow icon="📦" label="Other" amount={other} />
-        <div className="border-t border-slate-100 my-1" />
-        <InfoRow label="Total Cab Expenses" value={`₹${totalExpenses.toLocaleString('en-IN')}`} valueColor="text-orange-600 font-bold" />
+        <ExpenseRow icon={Fuel} label="Petrol / Diesel" amount={fuel} />
+        <ExpenseRow icon={Landmark} label="Toll Charges" amount={toll} />
+        <ExpenseRow icon={FileText} label="Tax & Permit" amount={taxPermit} />
+        <ExpenseRow icon={ParkingCircle} label="Parking" amount={parking} />
+        <ExpenseRow icon={Package} label="Other" amount={other} />
+        <div className="my-1 border-t border-slate-100 dark:border-white/10" />
+        <InfoRow
+          label="Total Cab Expenses"
+          value={`₹${totalExpenses.toLocaleString("en-IN")}`}
+          valueColor="font-bold text-amber-600 dark:text-amber-400"
+        />
       </InfoCard>
     </div>
   );
 }
 
-function ExpenseRow({ icon, label, amount }: { icon: string; label: string; amount: number }) {
+function ExpenseRow({
+  icon: Icon,
+  label,
+  amount,
+}: {
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
+  amount: number;
+}) {
   return (
-    <div className="flex items-center gap-3 py-2 border-b border-slate-50 last:border-0">
-      <span className="flex h-8 w-8 items-center justify-center rounded-md bg-blue-50 text-base">{icon}</span>
-      <span className="flex-1 text-sm text-slate-500">{label}</span>
-      <span className="text-sm font-semibold text-slate-800">₹{amount.toLocaleString('en-IN')}</span>
+    <div className="flex items-center gap-3 border-b border-slate-50 py-2 last:border-0 dark:border-white/5">
+      <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600 dark:bg-indigo-500/15 dark:text-indigo-300">
+        <Icon className="h-4 w-4" />
+      </span>
+      <span className="flex-1 text-sm text-slate-500 dark:text-slate-400">
+        {label}
+      </span>
+      <span className="text-sm font-semibold tabular-nums text-slate-800 dark:text-slate-200">
+        ₹{amount.toLocaleString("en-IN")}
+      </span>
     </div>
   );
 }
@@ -322,26 +497,46 @@ function ExpenseRow({ icon, label, amount }: { icon: string; label: string; amou
 // COMPLETE TRIP MODAL
 // ═══════════════════════════════════════════════════════════════════════════════
 
-function CompleteTripModal({ tripId, startKm, onClose, onCompleted }: {
-  tripId: string; startKm?: number; onClose: () => void; onCompleted: () => void;
+function CompleteTripModal({
+  tripId,
+  startKm,
+  onClose,
+  onCompleted,
+}: {
+  tripId: string;
+  startKm?: number;
+  onClose: () => void;
+  onCompleted: () => void;
 }) {
-  const [endKm, setEndKm] = useState('');
+  const [endKm, setEndKm] = useState("");
   const [err, setErr] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   const handleSubmit = async () => {
     const parsed = parseFloat(endKm.trim());
-    if (!endKm.trim()) { setErr('Ending KM is required'); return; }
-    if (isNaN(parsed)) { setErr('Please enter a valid number'); return; }
-    if (parsed < 0) { setErr('KM cannot be negative'); return; }
-    if (startKm != null && parsed < startKm) { setErr('Ending KM must be ≥ starting KM'); return; }
+    if (!endKm.trim()) {
+      setErr("Ending KM is required");
+      return;
+    }
+    if (isNaN(parsed)) {
+      setErr("Please enter a valid number");
+      return;
+    }
+    if (parsed < 0) {
+      setErr("KM cannot be negative");
+      return;
+    }
+    if (startKm != null && parsed < startKm) {
+      setErr("Ending KM must be ≥ starting KM");
+      return;
+    }
 
     setSubmitting(true);
     try {
       await completeTrip(tripId, parsed);
       onCompleted();
     } catch (e: any) {
-      setErr(e?.response?.data?.message ?? 'Failed to complete trip');
+      setErr(e?.response?.data?.message ?? "Failed to complete trip");
     } finally {
       setSubmitting(false);
     }
@@ -349,32 +544,58 @@ function CompleteTripModal({ tripId, startKm, onClose, onCompleted }: {
 
   return (
     <ModalShell title="Complete Trip" onClose={onClose} maxWidth="max-w-sm">
-      <div className="p-6 space-y-4">
+      <div className="space-y-4 p-6">
         {startKm != null && (
-          <div className="flex items-center gap-2 rounded-lg bg-blue-50 px-3 py-2 text-xs text-slate-700">
-            <Info className="h-4 w-4 text-blue-400 shrink-0" />
-            <span>Starting KM: <strong>{startKm}</strong></span>
+          <div className="flex items-center gap-2 rounded-lg border border-indigo-100 bg-indigo-50 px-3 py-2 text-xs text-slate-700 dark:border-indigo-500/30 dark:bg-indigo-500/10 dark:text-slate-300">
+            <Info className="h-4 w-4 shrink-0 text-indigo-500 dark:text-indigo-300" />
+            <span>
+              Starting KM: <strong>{startKm}</strong>
+            </span>
           </div>
         )}
 
         <div className="space-y-1.5">
-          <label htmlFor="endKm" className="text-xs font-medium text-slate-600">Ending KM <span className="text-red-500">*</span></label>
-          <input id="endKm" type="number" value={endKm} onChange={e => { setEndKm(e.target.value); setErr(null); }}
+          <label
+            htmlFor="endKm"
+            className="text-xs font-medium text-slate-600 dark:text-slate-400"
+          >
+            Ending KM <span className="text-red-500">*</span>
+          </label>
+          <input
+            id="endKm"
+            type="number"
+            value={endKm}
+            onChange={(e) => {
+              setEndKm(e.target.value);
+              setErr(null);
+            }}
             placeholder="Enter ending odometer reading"
-            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500" />
-          {err && <p className="text-xs text-red-600">{err}</p>}
+            className={inputCls}
+          />
+          {err && (
+            <p className="text-xs text-red-600 dark:text-red-400">{err}</p>
+          )}
         </div>
 
-        <p className="text-xs text-slate-400">
+        <p className="text-xs text-slate-400 dark:text-slate-500">
           Please enter the ending odometer reading to complete the trip.
         </p>
 
         <div className="flex justify-end gap-2 pt-2">
-          <button type="button" onClick={onClose}
-            className="rounded-lg border border-slate-200 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50">Cancel</button>
-          <button type="button" onClick={handleSubmit} disabled={submitting}
-            className="rounded-lg bg-emerald-500 px-5 py-2 text-sm font-semibold text-white hover:bg-emerald-600 disabled:opacity-50">
-            {submitting ? 'Completing…' : 'Complete Trip'}
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-lg border border-slate-200 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 dark:border-white/10 dark:text-slate-300 dark:hover:bg-white/5"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={handleSubmit}
+            disabled={submitting}
+            className="rounded-lg bg-emerald-600 px-5 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50 dark:bg-emerald-500 dark:hover:bg-emerald-400"
+          >
+            {submitting ? "Completing…" : "Complete Trip"}
           </button>
         </div>
       </div>
@@ -397,79 +618,98 @@ function DetailPanel({
   onRefresh: () => void;
   resolveAgencyLabel: (agencyName?: string) => string;
 }) {
-  const [tab, setTab] = useState<'trip' | 'driver' | 'expense'>('trip');
+  const [tab, setTab] = useState<"trip" | "driver" | "expense">("trip");
   const [showComplete, setShowComplete] = useState(false);
 
   const v = item.vehicle;
   const trip = item.activeTrip;
-  const tripStatus = trip?.status ?? 'scheduled';
+  const tripStatus = trip?.status ?? "scheduled";
 
   const tabs: { key: typeof tab; label: string }[] = [
-    { key: 'trip', label: 'TRIP INFO' },
-    { key: 'driver', label: 'DRIVER INFO' },
-    { key: 'expense', label: 'EXPENSE INFO' },
+    { key: "trip", label: "Trip Info" },
+    { key: "driver", label: "Driver Info" },
+    { key: "expense", label: "Expense Info" },
   ];
 
   return (
-    <div className="flex h-full flex-col bg-slate-50">
-      {/* Header */}
-      <div className="sticky top-0 z-20 flex items-center justify-between border-b border-slate-200 bg-white/90 backdrop-blur-md px-4 lg:px-6 py-4 shrink-0 shadow-sm">
+    <div className="flex h-full flex-col bg-slate-50 dark:bg-[#0e121d]">
+      <div className="sticky top-0 z-20 flex shrink-0 items-center justify-between border-b border-slate-200 bg-white/90 px-4 py-4 shadow-sm backdrop-blur-md lg:px-6 dark:border-[#1e2638] dark:bg-[#0e121d]/90">
         <div className="flex items-center gap-3">
-          <button type="button" onClick={onBack} 
-            className="lg:hidden flex h-10 w-10 items-center justify-center -ml-2 text-slate-500 hover:bg-slate-100 rounded-full transition-colors active:scale-95">
+          <button
+            type="button"
+            onClick={onBack}
+            className="-ml-2 flex h-10 w-10 items-center justify-center rounded-full text-slate-500 transition-colors hover:bg-slate-100 active:scale-95 lg:hidden dark:text-slate-400 dark:hover:bg-white/5"
+          >
             <ArrowLeft className="h-5 w-5" />
           </button>
           <div>
-            <h3 className="text-2xl font-bold text-slate-900 leading-tight">{v.vehicleNumber}</h3>
+            <h3 className="text-xl font-bold leading-tight text-slate-900 sm:text-2xl dark:text-white">
+              {v.vehicleNumber}
+            </h3>
             {trip?.from && trip?.to && (
-              <p className="text-sm text-slate-500 flex items-center gap-1.5 mt-0.5">
-                {trip.from} <ChevronRight className="h-3.5 w-3.5" /> {trip.to}
+              <p className="mt-0.5 flex items-center gap-1.5 text-sm text-slate-500 dark:text-slate-400">
+                {trip.from}{" "}
+                <ChevronRight className="h-3.5 w-3.5 shrink-0" /> {trip.to}
               </p>
             )}
           </div>
         </div>
-        <div className="flex items-center gap-3">
-          <span className={`rounded-full border px-3.5 py-1.5 text-xs uppercase tracking-wider font-bold ${statusBadgeCls(tripStatus)}`}>
+        <div className="flex items-center gap-2 sm:gap-3">
+          <span
+            className={`rounded-full border px-3 py-1 text-[11px] font-bold uppercase tracking-wider sm:px-3.5 sm:py-1.5 sm:text-xs ${statusBadgeCls(tripStatus)}`}
+          >
             {statusLabel(tripStatus)}
           </span>
-          <button type="button" onClick={onRefresh} 
-            className="flex h-10 w-10 items-center justify-center text-slate-500 hover:bg-slate-100 rounded-full transition-colors active:rotate-180">
+          <button
+            type="button"
+            onClick={onRefresh}
+            className="flex h-10 w-10 items-center justify-center rounded-full text-slate-500 transition-colors hover:bg-slate-100 active:rotate-180 dark:text-slate-400 dark:hover:bg-white/5"
+            title="Refresh"
+          >
             <RefreshCw className="h-5 w-5" />
           </button>
         </div>
       </div>
 
-      {/* Tab bar */}
-      <div className="sticky top-[73px] z-10 flex border-b border-slate-200 bg-white/90 backdrop-blur-md shrink-0 overflow-x-auto no-scrollbar">
-        {tabs.map(t => (
-          <button key={t.key} type="button" onClick={() => setTab(t.key)}
-            className={`whitespace-nowrap px-6 py-4 text-xs font-bold tracking-widest transition-all border-b-2 relative ${
+      <div className="no-scrollbar sticky top-[73px] z-10 flex shrink-0 overflow-x-auto border-b border-slate-200 bg-white/90 backdrop-blur-md dark:border-[#1e2638] dark:bg-[#0e121d]/90">
+        {tabs.map((t) => (
+          <button
+            key={t.key}
+            type="button"
+            onClick={() => setTab(t.key)}
+            className={`relative whitespace-nowrap border-b-2 px-4 py-3.5 text-xs font-semibold transition-all sm:px-6 sm:text-sm ${
               tab === t.key
-                ? 'border-blue-500 text-blue-600'
-                : 'border-transparent text-slate-400 hover:text-slate-600'
-            }`}>
+                ? "border-indigo-500 text-indigo-600 dark:border-indigo-400 dark:text-indigo-300"
+                : "border-transparent text-slate-400 hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-300"
+            }`}
+          >
             {t.label}
-            {tab === t.key && <div className="absolute inset-x-0 bottom-0 h-0.5 bg-blue-500 rounded-t-full shadow-[0_-1px_4px_rgba(99,102,241,0.3)]" />}
           </button>
         ))}
       </div>
 
-      {/* Tab content */}
       <div className="flex-1 overflow-y-auto p-4 sm:p-5">
-        {tab === 'trip' && <TripInfoTab item={item} onComplete={() => setShowComplete(true)} />}
-        {tab === 'driver' && <DriverInfoTab item={item} />}
-        {tab === 'expense' && (
-          <ExpenseInfoTab item={item} resolveAgencyLabel={resolveAgencyLabel} />
+        {tab === "trip" && (
+          <TripInfoTab item={item} onComplete={() => setShowComplete(true)} />
+        )}
+        {tab === "driver" && <DriverInfoTab item={item} />}
+        {tab === "expense" && (
+          <ExpenseInfoTab
+            item={item}
+            resolveAgencyLabel={resolveAgencyLabel}
+          />
         )}
       </div>
 
-      {/* Complete trip modal */}
       {showComplete && trip && (
         <CompleteTripModal
-          tripId={trip._id ?? trip.id ?? ''}
+          tripId={trip._id ?? trip.id ?? ""}
           startKm={trip.startKilometers}
           onClose={() => setShowComplete(false)}
-          onCompleted={() => { setShowComplete(false); onRefresh(); }}
+          onCompleted={() => {
+            setShowComplete(false);
+            onRefresh();
+          }}
         />
       )}
     </div>
@@ -493,20 +733,26 @@ export function TrackingPage() {
     [ownerAgencies],
   );
 
-  const selected = selectedIdx !== null ? vehicles[selectedIdx] ?? null : null;
+  const selected =
+    selectedIdx !== null ? (vehicles[selectedIdx] ?? null) : null;
 
   const load = useCallback(async () => {
-    setLoading(true); setError(null);
+    setLoading(true);
+    setError(null);
     try {
       const data = await fetchTrackingVehicles();
       setVehicles(data);
       setSelectedIdx(null);
     } catch (e: any) {
-      setError(e?.response?.data?.message ?? 'Failed to load tracking data');
-    } finally { setLoading(false); }
+      setError(e?.response?.data?.message ?? "Failed to load tracking data");
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    load();
+  }, [load]);
 
   useEffect(() => {
     fetchAgencies(1, 500)
@@ -515,59 +761,82 @@ export function TrackingPage() {
   }, []);
 
   return (
-    <div className="flex h-full overflow-hidden relative">
+    <div className="relative flex h-full overflow-hidden dark:bg-[#0e121d]">
       {/* LEFT: list panel */}
-      <div className={`flex w-full md:w-72 lg:w-80 xl:w-96 shrink-0 flex-col border-r border-slate-200 bg-white transition-all ${
-        selectedIdx !== null ? 'hidden md:flex' : 'flex'
-      }`}>
-        {/* Header */}
-        <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4 shrink-0">
+      <div
+        className={`flex w-full shrink-0 flex-col border-r border-slate-200 bg-white transition-all md:w-72 lg:w-80 xl:w-96 dark:border-[#1e2638] dark:bg-[#0e121d]/80 ${
+          selectedIdx !== null ? "hidden md:flex" : "flex"
+        }`}
+      >
+        <div className="flex shrink-0 items-center justify-between border-b border-slate-200 px-4 py-3.5 dark:border-[#1e2638]">
+          <h2 className="text-sm font-bold tracking-tight text-slate-900 dark:text-white">
+            Active Trips
+          </h2>
           <div className="flex items-center gap-2">
-            <h2 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Active Trips</h2>
-          </div>
-          <div className="flex items-center gap-2.5">
-            <button type="button" onClick={load} 
-              className="flex h-9 w-9 items-center justify-center text-blue-500 hover:bg-blue-50 rounded-full transition-all active:scale-95 active:rotate-180"
-              title="Refresh tracking data">
-              <RefreshCw className="h-5 w-5" />
+            <button
+              type="button"
+              onClick={load}
+              className="flex h-8 w-8 items-center justify-center rounded-lg text-indigo-600 transition-all hover:bg-indigo-50 active:scale-95 dark:text-indigo-300 dark:hover:bg-indigo-500/15"
+              title="Refresh tracking data"
+            >
+              <RefreshCw className="h-4 w-4" />
             </button>
-            <span className="rounded-full bg-blue-50 px-3 py-1 text-sm font-bold text-blue-600">
+            <span className="rounded-full border border-indigo-200 bg-indigo-50 px-2.5 py-0.5 text-xs font-bold text-indigo-600 dark:border-indigo-500/30 dark:bg-indigo-500/15 dark:text-indigo-300">
               {vehicles.length}
             </span>
           </div>
         </div>
 
-        {/* List */}
-        <div className="flex-1 space-y-2.5 overflow-y-auto p-4">
+        <div className="flex-1 space-y-2.5 overflow-y-auto p-3">
           {loading ? (
             Array.from({ length: 6 }).map((_, i) => (
               <TrackingCardSkeleton key={i} />
             ))
           ) : error ? (
             <div className="flex flex-col items-center gap-3 py-12">
-              <AlertTriangle className="h-12 w-12 text-red-300" />
-              <p className="text-base text-red-500">{error}</p>
-              <button type="button" onClick={load} className="text-sm text-blue-500 underline">Retry</button>
+              <AlertTriangle className="h-10 w-10 text-rose-300 dark:text-rose-400/70" />
+              <p className="text-sm text-rose-500 dark:text-rose-400">
+                {error}
+              </p>
+              <button
+                type="button"
+                onClick={load}
+                className="text-xs font-semibold text-indigo-600 underline dark:text-indigo-300"
+              >
+                Retry
+              </button>
             </div>
           ) : vehicles.length === 0 ? (
-            <div className="flex flex-col items-center gap-4 py-16 text-center">
-              <Navigation className="h-14 w-14 text-slate-300" />
-              <p className="text-base font-medium text-slate-500">No active trips</p>
-              <p className="text-sm text-slate-400">Vehicles with in-progress or scheduled trips will appear here</p>
+            <div className="flex flex-col items-center gap-3 rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50/40 py-14 text-center dark:border-white/10 dark:bg-white/5">
+              <Navigation className="h-10 w-10 text-slate-300 dark:text-slate-600" />
+              <p className="text-sm font-medium text-slate-500 dark:text-slate-400">
+                No active trips
+              </p>
+              <p className="max-w-[14rem] text-xs text-slate-400 dark:text-slate-500">
+                Vehicles with in-progress or scheduled trips will appear here
+              </p>
             </div>
           ) : (
             vehicles.map((v, i) => (
-              <TrackingCard key={v.vehicle.id ?? v.vehicle._id ?? i} item={v} isSelected={i === selectedIdx}
-                onSelect={() => setSelectedIdx(i)} />
+              <TrackingCard
+                key={v.vehicle.id ?? v.vehicle._id ?? i}
+                item={v}
+                isSelected={i === selectedIdx}
+                onSelect={() => setSelectedIdx(i)}
+              />
             ))
           )}
         </div>
       </div>
 
       {/* RIGHT: detail panel */}
-      <div className={`flex-1 overflow-hidden transition-all ${
-        selectedIdx !== null ? 'flex flex-col' : 'hidden md:flex flex-col'
-      }`}>
+      <div
+        className={`flex-1 overflow-hidden transition-all ${
+          selectedIdx !== null
+            ? "flex flex-col"
+            : "hidden flex-col md:flex"
+        }`}
+      >
         {selected ? (
           <DetailPanel
             item={selected}
@@ -576,11 +845,15 @@ export function TrackingPage() {
             resolveAgencyLabel={resolveAgencyLabel}
           />
         ) : !loading ? (
-          <div className="flex h-full items-center justify-center">
+          <div className="flex h-full items-center justify-center bg-slate-50 dark:bg-[#0e121d]">
             <div className="text-center">
-              <Navigation className="mx-auto h-16 w-16 text-slate-300" />
-              <p className="mt-4 text-base font-medium text-slate-500">No vehicle selected</p>
-              <p className="mt-1.5 text-sm text-slate-400">Select a vehicle from the list to view tracking details</p>
+              <Navigation className="mx-auto h-12 w-12 text-slate-300 dark:text-slate-600" />
+              <p className="mt-3 text-sm font-medium text-slate-500 dark:text-slate-400">
+                No vehicle selected
+              </p>
+              <p className="mt-1 text-xs text-slate-400 dark:text-slate-500">
+                Select a vehicle from the list to view tracking details
+              </p>
             </div>
           </div>
         ) : null}

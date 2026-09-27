@@ -6,6 +6,8 @@ import {
   ChevronLeft,
   ChevronRight,
   AlertCircle,
+  FileText,
+  SlidersHorizontal,
 } from "lucide-react";
 import {
   fetchTripHistory,
@@ -49,6 +51,12 @@ const STATUS_OPTIONS = [
 const PREVIEW_LIMIT = 20;
 const PDF_LIMIT = 10000;
 
+const fieldCls =
+  "w-full rounded-lg border border-slate-200 bg-[var(--bg-elevated)] px-3 py-2.5 text-sm font-medium text-slate-700 outline-none transition focus:border-indigo-400 focus:ring-1 focus:ring-indigo-200 dark:border-[#1e2638] dark:text-slate-100 dark:focus:border-indigo-400";
+
+const labelCls =
+  "mb-1.5 block text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400";
+
 function getCurrentMonthValue(): string {
   const now = new Date();
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
@@ -78,7 +86,7 @@ function PaginationBar({
   if (p.pages <= 1) return null;
   return (
     <div className="flex items-center justify-between pt-2">
-      <span className="text-xs text-slate-500">
+      <span className="text-xs text-slate-500 dark:text-slate-400">
         Page {p.page}/{p.pages} · {p.total} trips
       </span>
       <div className="flex gap-2">
@@ -86,7 +94,7 @@ function PaginationBar({
           type="button"
           disabled={!p.hasPrev}
           onClick={() => onChange(p.page - 1)}
-          className="flex items-center gap-1 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-40"
+          className="flex items-center gap-1 rounded-lg border border-slate-200 bg-[var(--bg-elevated)] px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-40 dark:border-[#1e2638] dark:text-slate-300 dark:hover:bg-white/5"
         >
           <ChevronLeft className="h-4 w-4" /> Prev
         </button>
@@ -94,7 +102,7 @@ function PaginationBar({
           type="button"
           disabled={!p.hasNext}
           onClick={() => onChange(p.page + 1)}
-          className="flex items-center gap-1 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-40"
+          className="flex items-center gap-1 rounded-lg border border-slate-200 bg-[var(--bg-elevated)] px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-40 dark:border-[#1e2638] dark:text-slate-300 dark:hover:bg-white/5"
         >
           Next <ChevronRight className="h-4 w-4" />
         </button>
@@ -142,7 +150,8 @@ export function ReportsPage() {
     hasNext: false,
     hasPrev: false,
   });
-  const [previewPaymentSummary, setPreviewPaymentSummary] = useState<HistoryPaymentSummary | null>(null);
+  const [previewPaymentSummary, setPreviewPaymentSummary] =
+    useState<HistoryPaymentSummary | null>(null);
   const [previewLoaded, setPreviewLoaded] = useState(false);
   const [loadingPreview, setLoadingPreview] = useState(false);
   const [previewError, setPreviewError] = useState<string | null>(null);
@@ -171,7 +180,6 @@ export function ReportsPage() {
     [agencies],
   );
 
-  // Trip number suggestions for search dropdown
   useEffect(() => {
     const q = tripSearchQuery.trim();
     if (!q || entityFilter) {
@@ -303,22 +311,52 @@ export function ReportsPage() {
 
   const filterSummary = reportFilterSubtitle(entityFilter, dateFilter);
 
+  const visibleFields = REPORT_FIELD_DEFS.filter((f) => {
+    const bulkOnlyFields = [
+      "advance",
+      "balance",
+      "toll",
+      "notes",
+      "vehicleType",
+      "mobileNumber",
+    ];
+    const vehicleOnlyFields = [
+      "from",
+      "to",
+      "customer",
+      "startKilometers",
+      "startTime",
+      "totalKm",
+      "totalTime",
+    ];
+    if (tripSource === "bulk" && vehicleOnlyFields.includes(f.id)) return false;
+    if (tripSource === "vehicle" && bulkOnlyFields.includes(f.id)) return false;
+    return true;
+  });
+
   return (
-    <div className="flex h-full flex-col overflow-hidden bg-slate-50">
-      <div className="shrink-0 border-b border-slate-200 bg-white px-4 py-4 sm:px-6">
+    <div className="flex h-full flex-col overflow-hidden bg-[var(--bg-main)]">
+      <div className="shrink-0 border-b border-slate-200 bg-[var(--bg-card)] px-4 py-4 dark:border-[#1e2638] sm:px-6">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h1 className="text-xl font-bold text-slate-800">Trip Reports</h1>
-            <p className="mt-0.5 text-sm text-slate-500">
-              Filter trips, preview the PDF layout, then export
-            </p>
+          <div className="flex items-start gap-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-indigo-200 bg-indigo-50 text-indigo-600 dark:border-indigo-500/30 dark:bg-indigo-500/15 dark:text-indigo-300">
+              <FileText className="h-5 w-5" />
+            </div>
+            <div>
+              <h1 className="text-xl font-bold tracking-tight text-slate-800 dark:text-white">
+                Trip Reports
+              </h1>
+              <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">
+                Filter trips, preview the PDF layout, then export
+              </p>
+            </div>
           </div>
           <div className="flex flex-wrap gap-2">
             <button
               type="button"
               onClick={handlePreview}
               disabled={loadingPreview}
-              className="inline-flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-100 disabled:opacity-60"
+              className="inline-flex items-center gap-2 rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-2 text-sm font-semibold text-indigo-700 transition hover:bg-indigo-100 disabled:opacity-60 dark:border-indigo-500/40 dark:bg-indigo-500/15 dark:text-indigo-300 dark:hover:bg-indigo-500/25"
             >
               {loadingPreview ? (
                 <RefreshCw className="h-4 w-4 animate-spin" />
@@ -336,7 +374,7 @@ export function ReportsPage() {
                   ? "Download PDF for all matching trips"
                   : "Load preview first"
               }
-              className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
+              className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700 disabled:opacity-50 dark:bg-indigo-500 dark:hover:bg-indigo-400"
             >
               {generatingPdf ? (
                 <RefreshCw className="h-4 w-4 animate-spin" />
@@ -349,13 +387,20 @@ export function ReportsPage() {
         </div>
       </div>
 
-      <div className="flex flex-1 min-h-0 flex-col lg:flex-row">
-        {/* Filters — left */}
-        <aside className="w-full shrink-0 border-b border-slate-200 bg-white lg:w-[320px] xl:w-[360px] lg:border-b-0 lg:border-r overflow-y-auto">
+      <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
+        <aside className="w-full shrink-0 overflow-y-auto border-b border-slate-200 bg-[var(--bg-card)] dark:border-[#1e2638] lg:w-[320px] lg:border-b-0 lg:border-r xl:w-[360px]">
           <div className="space-y-4 p-4 sm:p-5">
-            <h2 className="text-sm font-bold uppercase tracking-wide text-slate-500">
-              Report filters
-            </h2>
+            <div className="flex items-center justify-between gap-2 border-b border-slate-100 pb-3 dark:border-[#1e2638]">
+              <div className="flex items-center gap-2">
+                <SlidersHorizontal className="h-4 w-4 text-indigo-500 dark:text-indigo-400" />
+                <h2 className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                  Report filters
+                </h2>
+              </div>
+              <span className="rounded border border-slate-200 bg-[var(--bg-elevated)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-400 dark:border-[#1e2638] dark:text-slate-500">
+                Config
+              </span>
+            </div>
 
             <ReportEntitySearch
               value={entityFilter}
@@ -373,10 +418,8 @@ export function ReportsPage() {
 
             <div className="space-y-3">
               <div>
-                <label className="mb-1 block text-xs font-medium text-slate-600">
-                  Trip Source
-                </label>
-                <div className="flex rounded-lg border border-slate-200 bg-slate-50/50 p-1">
+                <label className={labelCls}>Trip Source</label>
+                <div className="grid grid-cols-2 gap-1 rounded-lg border border-slate-200 bg-slate-100 p-1 dark:border-[#1e2638] dark:bg-[#060e20]">
                   <button
                     type="button"
                     onClick={() => {
@@ -384,10 +427,10 @@ export function ReportsPage() {
                       setFieldSelection(defaultReportFieldSelection("vehicle"));
                       setPreviewLoaded(false);
                     }}
-                    className={`flex-1 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+                    className={`rounded-md px-3 py-1.5 text-xs font-semibold transition ${
                       tripSource === "vehicle"
-                        ? "bg-white text-blue-700 shadow-sm ring-1 ring-slate-200/50"
-                        : "text-slate-600 hover:text-slate-900"
+                        ? "border border-indigo-500/40 bg-[var(--bg-card)] text-indigo-600 shadow-xs dark:bg-[#131b2e] dark:text-indigo-300"
+                        : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
                     }`}
                   >
                     Vehicle Trips
@@ -399,10 +442,10 @@ export function ReportsPage() {
                       setFieldSelection(defaultReportFieldSelection("bulk"));
                       setPreviewLoaded(false);
                     }}
-                    className={`flex-1 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+                    className={`rounded-md px-3 py-1.5 text-xs font-semibold transition ${
                       tripSource === "bulk"
-                        ? "bg-white text-blue-700 shadow-sm ring-1 ring-slate-200/50"
-                        : "text-slate-600 hover:text-slate-900"
+                        ? "border border-indigo-500/40 bg-[var(--bg-card)] text-indigo-600 shadow-xs dark:bg-[#131b2e] dark:text-indigo-300"
+                        : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
                     }`}
                   >
                     Bulk Entry
@@ -411,16 +454,14 @@ export function ReportsPage() {
               </div>
 
               <div>
-                <label className="mb-1 block text-xs font-medium text-slate-600">
-                  Status
-                </label>
+                <label className={labelCls}>Status</label>
                 <select
                   value={status}
                   onChange={(e) => {
                     setStatus(e.target.value);
                     setPreviewLoaded(false);
                   }}
-                  className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm font-medium text-slate-700 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-200"
+                  className={fieldCls}
                 >
                   {STATUS_OPTIONS.map((o) => (
                     <option key={o.value} value={o.value}>
@@ -431,9 +472,7 @@ export function ReportsPage() {
               </div>
 
               <div>
-                <label className="mb-1 block text-xs font-medium text-slate-600">
-                  Month
-                </label>
+                <label className={labelCls}>Month</label>
                 <select
                   value={filterMode === "month" ? month : ""}
                   onChange={(e) => {
@@ -443,7 +482,7 @@ export function ReportsPage() {
                     setEndDate("");
                     setPreviewLoaded(false);
                   }}
-                  className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm font-medium text-slate-700 outline-none focus:border-blue-400"
+                  className={fieldCls}
                 >
                   {monthOptions().map((o) => (
                     <option key={o.value} value={o.value}>
@@ -455,9 +494,7 @@ export function ReportsPage() {
 
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="mb-1 block text-xs font-medium text-slate-600">
-                    Start date
-                  </label>
+                  <label className={labelCls}>Start date</label>
                   <input
                     type="date"
                     value={startDate}
@@ -467,13 +504,11 @@ export function ReportsPage() {
                       setMonth("");
                       setPreviewLoaded(false);
                     }}
-                    className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-slate-700 outline-none focus:border-blue-400"
+                    className={`${fieldCls} font-mono text-xs`}
                   />
                 </div>
                 <div>
-                  <label className="mb-1 block text-xs font-medium text-slate-600">
-                    End date
-                  </label>
+                  <label className={labelCls}>End date</label>
                   <input
                     type="date"
                     value={endDate}
@@ -483,20 +518,20 @@ export function ReportsPage() {
                       setMonth("");
                       setPreviewLoaded(false);
                     }}
-                    className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-slate-700 outline-none focus:border-blue-400"
+                    className={`${fieldCls} font-mono text-xs`}
                   />
                 </div>
               </div>
             </div>
 
-            <p className="text-xs text-slate-500">
+            <p className="text-xs leading-relaxed text-slate-500 dark:text-slate-500">
               Select a driver, vehicle, agency, or trip number from search to
               narrow the report. Leave empty for all trips in the date range.
             </p>
 
-            <div className="border-t border-slate-100 pt-4">
-              <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
-                <h3 className="text-sm font-bold text-slate-700">
+            <div className="border-t border-slate-100 pt-4 dark:border-[#1e2638]">
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                <h3 className="text-sm font-bold text-slate-700 dark:text-slate-200">
                   Report fields
                 </h3>
                 <div className="flex gap-2">
@@ -506,7 +541,7 @@ export function ReportsPage() {
                       setFieldSelection(defaultReportFieldSelection());
                       setPreviewLoaded(false);
                     }}
-                    className="text-xs font-medium text-slate-600 hover:text-blue-600"
+                    className="text-xs font-medium text-slate-500 hover:text-indigo-600 dark:text-slate-400 dark:hover:text-indigo-300"
                   >
                     Reset defaults
                   </button>
@@ -514,45 +549,62 @@ export function ReportsPage() {
                     type="button"
                     onClick={() => {
                       const all = {} as ReportFieldSelection;
-                      const bulkOnlyFields = ["advance", "balance", "toll", "notes", "vehicleType", "mobileNumber"];
-                      const vehicleOnlyFields = ["from", "to", "customer", "startKilometers", "startTime", "totalKm", "totalTime"];
+                      const bulkOnlyFields = [
+                        "advance",
+                        "balance",
+                        "toll",
+                        "notes",
+                        "vehicleType",
+                        "mobileNumber",
+                      ];
+                      const vehicleOnlyFields = [
+                        "from",
+                        "to",
+                        "customer",
+                        "startKilometers",
+                        "startTime",
+                        "totalKm",
+                        "totalTime",
+                      ];
                       for (const f of REPORT_FIELD_DEFS) {
-                        if (tripSource === "bulk" && vehicleOnlyFields.includes(f.id)) continue;
-                        if (tripSource === "vehicle" && bulkOnlyFields.includes(f.id)) continue;
+                        if (
+                          tripSource === "bulk" &&
+                          vehicleOnlyFields.includes(f.id)
+                        )
+                          continue;
+                        if (
+                          tripSource === "vehicle" &&
+                          bulkOnlyFields.includes(f.id)
+                        )
+                          continue;
                         all[f.id] = true;
                       }
                       setFieldSelection(all);
                       setPreviewLoaded(false);
                     }}
-                    className="text-xs font-medium text-slate-600 hover:text-blue-600"
+                    className="text-xs font-medium text-indigo-600 hover:underline dark:text-indigo-400"
                   >
                     Select all
                   </button>
                 </div>
               </div>
               <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                {REPORT_FIELD_DEFS.filter(f => {
-                  const bulkOnlyFields = ["advance", "balance", "toll", "notes", "vehicleType", "mobileNumber"];
-                  const vehicleOnlyFields = ["from", "to", "customer", "startKilometers", "startTime", "totalKm", "totalTime"];
-                  if (tripSource === "bulk" && vehicleOnlyFields.includes(f.id)) return false;
-                  if (tripSource === "vehicle" && bulkOnlyFields.includes(f.id)) return false;
-                  return true;
-                }).map((f) => (
+                {visibleFields.map((f) => (
                   <label
                     key={f.id}
-                    className="flex items-center gap-2 rounded-lg border border-slate-100 bg-slate-50/80 px-2.5 py-2 text-sm text-slate-700 cursor-pointer hover:border-blue-200 hover:bg-blue-50/50 has-checked:border-blue-300 has-checked:bg-blue-50"
+                    className="flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 bg-[var(--bg-elevated)] px-2.5 py-2 text-sm text-slate-700 transition hover:border-indigo-300 has-checked:border-indigo-400 has-checked:bg-indigo-50 dark:border-[#1e2638] dark:text-slate-200 dark:hover:border-indigo-500/40 dark:has-checked:border-indigo-500/50 dark:has-checked:bg-indigo-500/15"
                   >
                     <input
                       type="checkbox"
                       checked={fieldSelection[f.id]}
                       onChange={() => toggleReportField(f.id)}
-                      className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-200"
+                      className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-200 dark:border-white/20 dark:bg-transparent"
                     />
                     <span className="truncate">{f.label}</span>
                   </label>
                 ))}
               </div>
-              <p className="mt-2 text-xs text-slate-500">
+              <p className="mt-2 text-xs text-slate-500 dark:text-slate-500">
                 Checked fields appear in the preview and PDF. Trip number is
                 always shown on each card.
               </p>
@@ -561,39 +613,55 @@ export function ReportsPage() {
             <button
               type="button"
               onClick={resetFilters}
-              className="w-full rounded-lg border border-slate-200 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50"
+              className="w-full rounded-lg border border-slate-200 bg-[var(--bg-elevated)] py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-50 dark:border-[#1e2638] dark:text-slate-300 dark:hover:bg-white/5"
             >
               Clear all filters
             </button>
           </div>
         </aside>
 
-        {/* Preview — right */}
-        <main className="flex min-w-0 flex-1 flex-col overflow-y-auto bg-slate-100/80">
+        <main className="flex min-w-0 flex-1 flex-col overflow-y-auto bg-[var(--bg-main)]">
           <div className="space-y-3 p-4 sm:p-6">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <h2 className="text-sm font-bold uppercase tracking-wide text-slate-500">
-                Report preview
-              </h2>
-              {previewLoaded && (
-                <div className="flex flex-col items-end gap-1">
-                  <span className="text-xs text-slate-500 tabular-nums">
-                    {previewPagination.total} trip
-                    {previewPagination.total === 1 ? "" : "s"}
-                    {filterSummary ? ` · ${filterSummary}` : ""}
-                  </span>
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-[var(--bg-card)] px-4 py-3 dark:border-[#1e2638]">
+              <div className="flex items-center gap-2.5">
+                <span
+                  className={`h-2.5 w-2.5 rounded-full ${
+                    previewLoaded
+                      ? "bg-emerald-400 shadow-sm shadow-emerald-400/40"
+                      : "bg-slate-300 dark:bg-slate-600"
+                  }`}
+                />
+                <div>
+                  <h2 className="text-sm font-semibold tracking-wide text-slate-800 dark:text-slate-100">
+                    Report preview
+                  </h2>
+                  {previewLoaded ? (
+                    <p className="text-[11px] text-slate-400 dark:text-slate-500">
+                      {previewPagination.total} trip
+                      {previewPagination.total === 1 ? "" : "s"}
+                      {filterSummary ? ` · ${filterSummary}` : ""}
+                    </p>
+                  ) : (
+                    <p className="text-[11px] text-slate-400 dark:text-slate-500">
+                      Configure filters, then preview before PDF export
+                    </p>
+                  )}
                 </div>
+              </div>
+              {previewLoaded && (
+                <span className="rounded-md border border-slate-200 bg-[var(--bg-elevated)] px-2.5 py-1 font-mono text-[11px] font-semibold tabular-nums text-slate-600 dark:border-[#1e2638] dark:text-slate-300">
+                  {previewPagination.total} trips
+                </span>
               )}
             </div>
 
-
             {!previewLoaded && !loadingPreview && (
-              <div className="rounded-xl border border-dashed border-slate-200 bg-white px-6 py-14 text-center">
-                <Eye className="mx-auto h-10 w-10 text-slate-300" />
-                <p className="mt-3 text-sm font-medium text-slate-600">
+              <div className="rounded-xl border border-dashed border-slate-200 bg-[var(--bg-card)] px-6 py-14 text-center dark:border-[#1e2638]">
+                <Eye className="mx-auto h-10 w-10 text-slate-300 dark:text-slate-600" />
+                <p className="mt-3 text-sm font-medium text-slate-600 dark:text-slate-300">
                   No preview yet
                 </p>
-                <p className="mt-1 text-xs text-slate-500">
+                <p className="mt-1 text-xs text-slate-500 dark:text-slate-500">
                   Set filters and click &quot;Preview report&quot; to see trips
                   here before exporting PDF.
                 </p>
@@ -602,24 +670,26 @@ export function ReportsPage() {
 
             {loadingPreview && (
               <div className="flex justify-center py-16">
-                <RefreshCw className="h-8 w-8 animate-spin text-blue-500" />
+                <RefreshCw className="h-8 w-8 animate-spin text-indigo-500" />
               </div>
             )}
 
             {previewError && (
-              <div className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+              <div className="flex items-center gap-2 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-300">
                 <AlertCircle className="h-4 w-4 shrink-0" />
                 {previewError}
               </div>
             )}
 
             {previewLoaded && !loadingPreview && previewTrips.length === 0 && (
-              <div className="rounded-xl border border-slate-200 bg-white px-6 py-12 text-center">
-                <p className="text-sm text-slate-600">No trips match these filters.</p>
+              <div className="rounded-xl border border-slate-200 bg-[var(--bg-card)] px-6 py-12 text-center dark:border-[#1e2638]">
+                <p className="text-sm text-slate-600 dark:text-slate-300">
+                  No trips match these filters.
+                </p>
                 <button
                   type="button"
                   onClick={resetFilters}
-                  className="mt-3 text-sm font-medium text-blue-600 hover:underline"
+                  className="mt-3 text-sm font-medium text-indigo-600 hover:underline dark:text-indigo-400"
                 >
                   Clear filters
                 </button>
@@ -636,7 +706,9 @@ export function ReportsPage() {
                   title="Trip History Report"
                   subtitle={filterSummary || undefined}
                   resolveAgencyLabel={resolveAgencyLabel}
-                  paymentSummary={tripSource === "bulk" ? previewPaymentSummary : undefined}
+                  paymentSummary={
+                    tripSource === "bulk" ? previewPaymentSummary : undefined
+                  }
                   pageNote={
                     previewPagination.pages > 1
                       ? `Showing page ${previewPagination.page} of ${previewPagination.pages} (${previewTrips.length} trips on this page). PDF export includes all ${previewPagination.total} trips.`

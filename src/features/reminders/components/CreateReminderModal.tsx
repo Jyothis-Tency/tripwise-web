@@ -35,20 +35,20 @@ const CreateReminderModal: React.FC<Props> = ({ open, onClose, onCreated }) => {
     finally { setSaving(false); }
   };
 
-  const inputCls = "w-full px-3 py-2.5 rounded-lg border border-slate-200 text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 transition-colors";
-  const labelCls = "text-xs font-semibold text-slate-500 mb-1 block";
+  const inputCls = "w-full px-3 py-2.5 rounded-lg border border-slate-200 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20 transition-colors dark:border-white/10 dark:bg-white/5 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-indigo-400 dark:focus:ring-indigo-500/30";
+  const labelCls = "text-xs font-semibold text-slate-500 mb-1 block dark:text-slate-400";
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm p-4">
-      <div className="bg-white rounded-2xl w-full max-w-md max-h-[90vh] overflow-y-auto shadow-xl animate-scale-in">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 shrink-0">
-          <h3 className="text-base font-bold text-slate-800">Create Trip Reminder</h3>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 transition-colors">
+      <div className="w-full max-w-md max-h-[90vh] overflow-y-auto rounded-2xl border border-slate-200 bg-[var(--bg-card)] shadow-xl animate-scale-in dark:border-[#1e2638]">
+        <div className="flex shrink-0 items-center justify-between border-b border-slate-100 px-5 py-4 dark:border-white/10">
+          <h3 className="text-base font-bold text-slate-800 dark:text-white">Create Trip Reminder</h3>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 transition-colors dark:hover:text-slate-200">
             <X className="h-5 w-5" />
           </button>
         </div>
 
-        {error && <div className="mx-5 mt-4 bg-red-50 text-red-600 px-3 py-2 rounded-lg text-xs font-medium border border-red-100">{error}</div>}
+        {error && <div className="mx-5 mt-4 bg-red-50 text-red-600 px-3 py-2 rounded-lg text-xs font-medium border border-red-100 dark:bg-red-500/10 dark:text-red-400 dark:border-red-500/30">{error}</div>}
 
         <form onSubmit={handleSubmit} className="p-5">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -66,8 +66,8 @@ const CreateReminderModal: React.FC<Props> = ({ open, onClose, onCreated }) => {
             <textarea className={`${inputCls} min-h-[60px] resize-y`} value={form.message} onChange={e => set('message', e.target.value)} />
           </div>
           <div className="flex justify-end gap-2 mt-5">
-            <button type="button" onClick={onClose} className="px-4 py-2.5 rounded-lg border border-slate-200 bg-white text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors">Cancel</button>
-            <button type="submit" disabled={saving} className="px-5 py-2.5 rounded-lg bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 transition-colors disabled:opacity-50">
+            <button type="button" onClick={onClose} className="px-4 py-2.5 rounded-lg border border-slate-200 bg-white text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors dark:border-white/10 dark:bg-white/5 dark:text-slate-300 dark:hover:bg-white/10">Cancel</button>
+            <button type="submit" disabled={saving} className="px-5 py-2.5 rounded-lg bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700 transition-colors disabled:opacity-50 dark:bg-indigo-500 dark:hover:bg-indigo-400">
               {saving ? 'Creating…' : 'Create Reminder'}
             </button>
           </div>

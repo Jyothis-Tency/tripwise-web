@@ -7,11 +7,11 @@ import {
 import type { ReactNode } from "react";
 
 export const filterControlCls =
-  "h-10 w-full rounded-xl border border-slate-200 bg-white px-3.5 text-sm text-slate-800 shadow-sm outline-none transition placeholder:text-slate-400 hover:border-slate-300 focus:border-blue-400 focus:ring-2 focus:ring-blue-100";
+  "h-10 w-full rounded-lg border border-slate-200 bg-[var(--bg-elevated)] px-3.5 text-sm text-slate-800 shadow-xs outline-none transition placeholder:text-slate-400 hover:border-slate-300 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-500/15 dark:border-[#1e2638] dark:text-slate-100 dark:placeholder:text-slate-500 dark:hover:border-white/15 dark:focus:border-indigo-400";
 
 export function FilterLabel({ children }: { children: ReactNode }) {
   return (
-    <span className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+    <span className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
       {children}
     </span>
   );
@@ -38,12 +38,12 @@ export function SearchInput({
 
   return (
     <div
-      className={`group relative flex w-full items-center rounded-xl border border-slate-200 bg-white shadow-sm transition focus-within:border-blue-400 focus-within:ring-2 focus-within:ring-blue-100 hover:border-slate-300 ${
+      className={`group relative flex w-full items-center rounded-lg border border-slate-200 bg-[var(--bg-elevated)] shadow-xs transition focus-within:border-indigo-400 focus-within:ring-2 focus-within:ring-indigo-500/15 hover:border-slate-300 dark:border-[#1e2638] dark:hover:border-white/15 ${
         isSm ? "h-9" : "h-11"
       }`}
     >
       <span
-        className={`pointer-events-none flex shrink-0 items-center justify-center text-slate-400 group-focus-within:text-blue-500 ${
+        className={`pointer-events-none flex shrink-0 items-center justify-center text-slate-400 group-focus-within:text-indigo-500 dark:text-slate-500 dark:group-focus-within:text-indigo-400 ${
           isSm ? "w-9" : "w-11"
         }`}
       >
@@ -56,14 +56,14 @@ export function SearchInput({
         autoFocus={autoFocus}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className={`min-w-0 flex-1 border-0 bg-transparent py-0 text-slate-800 outline-none placeholder:text-slate-400 ${
+        className={`min-w-0 flex-1 border-0 bg-transparent py-0 text-slate-800 outline-none placeholder:text-slate-400 dark:text-slate-100 dark:placeholder:text-slate-500 ${
           isSm ? "text-xs" : "text-sm"
         }`}
       />
 
       <span className="flex shrink-0 items-center gap-1 pr-2">
         {showCount && (
-          <span className="rounded-lg bg-blue-50 px-1.5 py-0.5 text-[10px] font-bold tabular-nums text-blue-600">
+          <span className="rounded-md bg-indigo-50 px-1.5 py-0.5 text-[10px] font-bold tabular-nums text-indigo-600 dark:bg-indigo-500/15 dark:text-indigo-300">
             {resultCount}
           </span>
         )}
@@ -71,7 +71,7 @@ export function SearchInput({
           <button
             type="button"
             onClick={() => onChange("")}
-            className="flex h-7 w-7 items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
+            className="flex h-7 w-7 items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-white/10 dark:hover:text-slate-200"
             aria-label="Clear search"
           >
             <X className="h-3.5 w-3.5" />
@@ -93,21 +93,21 @@ export function SortToggle({
 }) {
   return (
     <div className="flex h-11 shrink-0 items-center gap-2">
-      <span className="hidden text-[11px] font-semibold uppercase tracking-wide text-slate-400 sm:inline">
+      <span className="hidden text-[11px] font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500 sm:inline">
         Sort
       </span>
       <div
-        className="inline-flex h-11 items-stretch rounded-xl border border-slate-200 bg-slate-100 p-1 shadow-sm"
+        className="inline-flex h-11 items-stretch rounded-lg border border-slate-200 bg-slate-100 p-1 shadow-xs dark:border-[#1e2638] dark:bg-white/5"
         role="group"
         aria-label="Sort order"
       >
         <button
           type="button"
           onClick={() => onChange("desc")}
-          className={`inline-flex items-center justify-center gap-1.5 rounded-lg px-3.5 text-xs font-semibold transition sm:min-w-[6.5rem] ${
+          className={`inline-flex items-center justify-center gap-1.5 rounded-md px-3.5 text-xs font-semibold transition sm:min-w-[6.5rem] ${
             value === "desc"
-              ? "bg-white text-blue-600 shadow-sm"
-              : "text-slate-500 hover:text-slate-700"
+              ? "bg-[var(--bg-card)] text-indigo-600 shadow-xs dark:bg-[#0e121d] dark:text-indigo-300"
+              : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
           }`}
         >
           <ArrowDownWideNarrow className="h-3.5 w-3.5 shrink-0" strokeWidth={2.25} />
@@ -116,10 +116,10 @@ export function SortToggle({
         <button
           type="button"
           onClick={() => onChange("asc")}
-          className={`inline-flex items-center justify-center gap-1.5 rounded-lg px-3.5 text-xs font-semibold transition sm:min-w-[6.5rem] ${
+          className={`inline-flex items-center justify-center gap-1.5 rounded-md px-3.5 text-xs font-semibold transition sm:min-w-[6.5rem] ${
             value === "asc"
-              ? "bg-white text-blue-600 shadow-sm"
-              : "text-slate-500 hover:text-slate-700"
+              ? "bg-[var(--bg-card)] text-indigo-600 shadow-xs dark:bg-[#0e121d] dark:text-indigo-300"
+              : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
           }`}
         >
           <ArrowUpWideNarrow className="h-3.5 w-3.5 shrink-0" strokeWidth={2.25} />
@@ -174,10 +174,10 @@ export function FilterChip({
 }) {
   const activeCls =
     tone === "in"
-      ? "border-emerald-400 bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100"
+      ? "border-emerald-400/60 bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100 dark:border-emerald-500/40 dark:bg-emerald-500/15 dark:text-emerald-300 dark:ring-emerald-500/20"
       : tone === "out"
-        ? "border-amber-400 bg-amber-50 text-amber-700 ring-1 ring-amber-100"
-        : "border-blue-400 bg-blue-50 text-blue-700 ring-1 ring-blue-100";
+        ? "border-rose-400/60 bg-rose-50 text-rose-700 ring-1 ring-rose-100 dark:border-rose-500/40 dark:bg-rose-500/15 dark:text-rose-300 dark:ring-rose-500/20"
+        : "border-indigo-400/60 bg-indigo-50 text-indigo-700 ring-1 ring-indigo-100 dark:border-indigo-500/40 dark:bg-indigo-500/15 dark:text-indigo-300 dark:ring-indigo-500/20";
 
   return (
     <button
@@ -186,7 +186,7 @@ export function FilterChip({
       className={`inline-flex h-8 items-center rounded-full border px-3 text-xs font-semibold transition ${
         active
           ? activeCls
-          : "border-slate-200 bg-white text-slate-500 hover:border-slate-300 hover:text-slate-700"
+          : "border-slate-200 bg-[var(--bg-elevated)] text-slate-500 hover:border-slate-300 hover:text-slate-700 dark:border-[#1e2638] dark:text-slate-400 dark:hover:border-white/15 dark:hover:text-slate-200"
       }`}
     >
       {children}
@@ -202,12 +202,12 @@ export function ActiveFilterPill({
   onClear: () => void;
 }) {
   return (
-    <span className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white py-0.5 pl-2.5 pr-1 text-[11px] font-medium text-slate-600">
+    <span className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-[var(--bg-elevated)] py-0.5 pl-2.5 pr-1 text-[11px] font-medium text-slate-600 dark:border-[#1e2638] dark:text-slate-300">
       {label}
       <button
         type="button"
         onClick={onClear}
-        className="flex h-5 w-5 items-center justify-center rounded-full text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+        className="flex h-5 w-5 items-center justify-center rounded-full text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-white/10 dark:hover:text-slate-200"
         aria-label={`Clear ${label}`}
       >
         <X className="h-3 w-3" />

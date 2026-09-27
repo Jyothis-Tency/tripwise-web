@@ -1,8 +1,9 @@
 import { Outlet, useLocation, Link } from "react-router-dom";
 import { Sidebar } from "./Sidebar";
-import { Menu, ChevronRight } from "lucide-react";
+import { Menu, ChevronRight, Moon, Sun } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useAuth } from "../hooks/useAuth";
+import { useTheme } from "../hooks/useTheme";
 
 const routeTitle: Record<string, string> = {
   "/": "Dashboard",
@@ -46,6 +47,8 @@ const fullHeightPaths = [
   "/tracking",
   "/create-trip",
   "/expenses",
+  "/reminders",
+  "/bulk-entry",
   "/cash-in-cash-out",
   "/transaction",
   "/transaction-history",
@@ -57,6 +60,7 @@ export function DashboardLayout() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const { user } = useAuth();
+  const { theme, toggleTheme } = useTheme();
 
   // Close mobile menu on route change
   useEffect(() => {
@@ -78,18 +82,18 @@ export function DashboardLayout() {
     .toUpperCase();
 
   return (
-    <div className="flex h-screen bg-slate-50 overflow-hidden relative">
+    <div className="relative flex h-screen overflow-hidden bg-slate-50 dark:bg-[#07090e]">
       {/* Mobile overlay */}
       {isMobileMenuOpen && (
         <div
-          className="fixed inset-0 z-40 bg-slate-900/30 backdrop-blur-sm lg:hidden animate-fade-in"
+          className="fixed inset-0 z-40 bg-slate-900/30 backdrop-blur-sm animate-fade-in lg:hidden dark:bg-black/60"
           onClick={closeMobileMenu}
         />
       )}
 
       {/* Sidebar — mobile: fixed drawer, desktop: static with collapse */}
       <div
-        className={`fixed inset-y-0 left-0 z-50 transform bg-white transition-transform duration-200 ease-out lg:static lg:translate-x-0 ${
+        className={`fixed inset-y-0 left-0 z-50 transform bg-[var(--bg-card)] transition-transform duration-200 ease-out dark:bg-[#0b1120] lg:static lg:translate-x-0 ${
           isMobileMenuOpen ? "translate-x-0 shadow-xl" : "-translate-x-full"
         }`}
       >
@@ -100,13 +104,13 @@ export function DashboardLayout() {
         />
       </div>
 
-      <div className="flex flex-1 flex-col overflow-hidden min-w-0">
+      <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         {/* Top header */}
-        <header className="flex h-14 shrink-0 items-center justify-between border-b border-slate-200 bg-white px-4 lg:px-6">
-          <div className="flex items-center gap-3 min-w-0">
+        <header className="flex h-14 shrink-0 items-center justify-between border-b border-slate-200 bg-white px-4 lg:px-6 dark:border-white/10 dark:bg-[#0c0e15]">
+          <div className="flex min-w-0 items-center gap-3">
             <button
               onClick={() => setIsMobileMenuOpen(true)}
-              className="lg:hidden flex items-center justify-center h-9 w-9 -ml-1 text-slate-500 hover:bg-slate-100 rounded-lg transition-colors active:scale-95"
+              className="-ml-1 flex h-9 w-9 items-center justify-center rounded-lg text-slate-500 transition-colors hover:bg-slate-100 active:scale-95 lg:hidden dark:text-slate-400 dark:hover:bg-white/5"
               aria-label="Open menu"
             >
               <Menu className="h-5 w-5" />
@@ -118,17 +122,17 @@ export function DashboardLayout() {
                   {breadcrumbs.map((crumb, i) => (
                     <span key={i} className="flex items-center gap-1">
                       {i > 0 && (
-                        <ChevronRight className="h-3.5 w-3.5 text-slate-300 shrink-0" />
+                        <ChevronRight className="h-3.5 w-3.5 shrink-0 text-slate-300 dark:text-slate-600" />
                       )}
                       {crumb.to ? (
                         <Link
                           to={crumb.to}
-                          className="text-slate-400 hover:text-blue-600 font-medium transition-colors"
+                          className="font-medium text-slate-400 transition-colors hover:text-indigo-600 dark:hover:text-indigo-400"
                         >
                           {crumb.label}
                         </Link>
                       ) : (
-                        <span className="text-slate-800 font-semibold">
+                        <span className="font-semibold text-slate-800 dark:text-slate-100">
                           {crumb.label}
                         </span>
                       )}
@@ -136,20 +140,32 @@ export function DashboardLayout() {
                   ))}
                 </nav>
               ) : (
-                <h1 className="text-sm font-semibold text-slate-800 truncate">
+                <h1 className="truncate text-sm font-semibold text-slate-800 dark:text-slate-100">
                   {title}
                 </h1>
               )}
             </div>
           </div>
 
-          {/* Right side: User */}
           <div className="flex items-center gap-2">
-            <div className="hidden sm:flex items-center gap-2 rounded-lg bg-slate-50 border border-slate-100 px-2.5 py-1.5">
-              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-blue-50 text-blue-600 text-[11px] font-bold">
+            <button
+              type="button"
+              onClick={toggleTheme}
+              className="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 text-slate-500 transition-colors hover:bg-slate-50 hover:text-slate-800 dark:border-white/10 dark:text-slate-400 dark:hover:bg-white/5 dark:hover:text-slate-200"
+              title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+              aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+            >
+              {theme === "dark" ? (
+                <Sun className="h-4 w-4" />
+              ) : (
+                <Moon className="h-4 w-4" />
+              )}
+            </button>
+            <div className="hidden items-center gap-2 rounded-lg border border-slate-100 bg-slate-50 px-2.5 py-1.5 sm:flex dark:border-white/10 dark:bg-white/5">
+              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-indigo-50 text-[11px] font-bold text-indigo-600 dark:bg-indigo-500/15 dark:text-indigo-300">
                 {initials}
               </span>
-              <span className="text-sm font-medium text-slate-600 max-w-[120px] truncate">
+              <span className="max-w-[120px] truncate text-sm font-medium text-slate-600 dark:text-slate-300">
                 {userName}
               </span>
             </div>
@@ -158,7 +174,7 @@ export function DashboardLayout() {
 
         {/* Content area */}
         <main
-          className={`flex-1 overflow-hidden ${isFull ? "" : "overflow-y-auto p-4 sm:p-6"}`}
+          className={`flex-1 overflow-hidden bg-[var(--bg-main)] ${isFull ? "" : "overflow-y-auto p-4 sm:p-6"}`}
         >
           <Outlet />
         </main>

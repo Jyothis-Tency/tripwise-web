@@ -61,12 +61,12 @@ function ReadOnlyRow({
   highlight?: boolean;
 }) {
   return (
-    <div className="flex items-baseline gap-2 py-1.5 border-b border-slate-100/80 last:border-0">
+    <div className="flex items-baseline gap-2 py-1.5 border-b border-slate-100/80 last:border-0 dark:border-[#1e2638]">
       <span className="w-[130px] sm:w-[150px] shrink-0 text-sm text-slate-600">
         {label}
       </span>
       <span
-        className={`text-sm sm:text-[15px] font-semibold tabular-nums ${highlight ? "text-blue-700" : "text-slate-800"}`}
+        className={`text-sm sm:text-[15px] font-semibold tabular-nums ${highlight ? "text-indigo-700 dark:text-indigo-300" : "text-slate-800 dark:text-slate-100"}`}
       >
         {value}
       </span>
@@ -75,10 +75,10 @@ function ReadOnlyRow({
 }
 
 const inputCls =
-  "w-full border border-slate-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-200";
+  "w-full rounded-lg border border-slate-200 bg-[var(--bg-elevated)] px-3 py-2 text-sm text-slate-800 outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-200 dark:border-[#1e2638] dark:text-slate-100";
 
 const currencyWrapCls =
-  "flex border border-slate-200 rounded-lg overflow-hidden focus-within:border-blue-400 focus-within:ring-1";
+  "flex overflow-hidden rounded-lg border border-slate-200 focus-within:border-indigo-400 focus-within:ring-1 dark:border-[#1e2638]";
 
 function buildInitialFields(trip: HistoryTrip) {
   return {
@@ -268,10 +268,10 @@ export function EditTripModal({
 
   return (
     <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl max-h-[92vh] flex flex-col">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 shrink-0">
+      <div className="bg-[var(--bg-card)] rounded-2xl shadow-2xl border border-slate-200 dark:border-[#1e2638] w-full max-w-5xl max-h-[92vh] flex flex-col">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 shrink-0 dark:border-[#1e2638]">
           <div>
-            <h3 className="font-semibold text-slate-800 text-lg">
+            <h3 className="font-semibold text-slate-800 dark:text-slate-100 text-lg">
               Edit Trip Details
             </h3>
             <p className="text-xs text-slate-500 mt-0.5">
@@ -281,7 +281,7 @@ export function EditTripModal({
           <button
             type="button"
             onClick={onClose}
-            className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition"
+            className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition dark:hover:bg-white/5"
           >
             <X className="h-5 w-5" />
           </button>
@@ -296,11 +296,11 @@ export function EditTripModal({
 
           <div className="grid min-w-0 grid-cols-1 gap-5 xl:grid-cols-3">
             <section className="xl:col-span-2">
-              <h4 className="text-sm font-bold text-blue-500 uppercase tracking-wider mb-2 flex items-center gap-2">
-                <span className="w-1 h-4 bg-blue-400 rounded-full" />
+              <h4 className="text-sm font-bold text-indigo-500 uppercase tracking-wider mb-2 flex items-center gap-2">
+                <span className="w-1 h-4 bg-indigo-400 rounded-full" />
                 Trip Details
               </h4>
-              <div className="rounded-lg bg-slate-50/50 border border-slate-100 px-4 sm:px-5 py-3 sm:py-4 space-y-3">
+              <div className="space-y-3 rounded-lg border border-slate-100 bg-slate-50/50 px-4 py-3 dark:border-[#1e2638] dark:bg-white/[0.03] sm:px-5 sm:py-4">
                 <ReadOnlyRow
                   label="Trip Number"
                   value={trip.tripNumber ?? trip._id}
@@ -523,7 +523,7 @@ export function EditTripModal({
                       Agency Cost
                     </label>
                     <div className={currencyWrapCls}>
-                      <span className="px-3 bg-slate-50 border-r border-slate-200 py-2 text-sm text-slate-500">
+                      <span className="px-3 bg-slate-50 dark:bg-white/[0.03] border-r border-slate-200 py-2 text-sm text-slate-500 dark:border-[#1e2638]">
                         ₹
                       </span>
                       <input
@@ -541,7 +541,7 @@ export function EditTripModal({
                       Cab Cost
                     </label>
                     <div className={currencyWrapCls}>
-                      <span className="px-3 bg-slate-50 border-r border-slate-200 py-2 text-sm text-slate-500">
+                      <span className="px-3 bg-slate-50 dark:bg-white/[0.03] border-r border-slate-200 py-2 text-sm text-slate-500 dark:border-[#1e2638]">
                         ₹
                       </span>
                       <input
@@ -555,7 +555,7 @@ export function EditTripModal({
                     </div>
                   </div>
                 </div>
-                <div className="rounded-lg bg-emerald-50/30 border border-emerald-100 px-4 py-3 my-3">
+                <div className="my-3 rounded-lg border border-emerald-100 bg-emerald-50/30 px-4 py-3 dark:border-emerald-500/20 dark:bg-emerald-500/10">
                   <ReadOnlyRow
                     label="Fuel expense"
                     value={fmtCurrency(expenseBreakdown.fuelExpense)}
@@ -576,7 +576,7 @@ export function EditTripModal({
                       Driver Salary
                     </label>
                     <div className={currencyWrapCls}>
-                      <span className="px-3 bg-slate-50 border-r border-slate-200 py-2 text-sm text-slate-500">
+                      <span className="px-3 bg-slate-50 dark:bg-white/[0.03] border-r border-slate-200 py-2 text-sm text-slate-500 dark:border-[#1e2638]">
                         ₹
                       </span>
                       <input
@@ -594,7 +594,7 @@ export function EditTripModal({
                       Advance
                     </label>
                     <div className={currencyWrapCls}>
-                      <span className="px-3 bg-slate-50 border-r border-slate-200 py-2 text-sm text-slate-500">
+                      <span className="px-3 bg-slate-50 dark:bg-white/[0.03] border-r border-slate-200 py-2 text-sm text-slate-500 dark:border-[#1e2638]">
                         ₹
                       </span>
                       <input
@@ -625,7 +625,7 @@ export function EditTripModal({
                     Loading payment…
                   </p>
                 ) : (
-                  <div className="rounded-lg bg-amber-50/30 border border-amber-100 px-4 py-3">
+                  <div className="rounded-lg border border-amber-100 bg-amber-50/30 px-4 py-3 dark:border-amber-500/20 dark:bg-amber-500/10">
                     <div className="flex items-center gap-2 mb-2">
                       <span
                         className={`rounded-full border px-2 py-0.5 text-xs font-bold capitalize ${paymentBadgeCls}`}
@@ -669,12 +669,12 @@ export function EditTripModal({
           </div>
         </div>
 
-        <div className="px-5 py-4 border-t border-slate-100 flex gap-3 shrink-0 bg-slate-50">
+        <div className="px-5 py-4 border-t border-slate-100 flex gap-3 shrink-0 bg-slate-50 dark:bg-white/[0.03] dark:border-[#1e2638]">
           <button
             type="button"
             onClick={onClose}
             disabled={saving}
-            className="flex-1 px-4 py-2 border border-slate-200 rounded-xl text-sm font-medium text-slate-600 hover:bg-white transition disabled:opacity-50"
+            className="flex-1 px-4 py-2 border border-slate-200 rounded-xl text-sm font-medium text-slate-600 hover:bg-[var(--bg-elevated)] transition disabled:opacity-50 dark:hover:bg-white/5 dark:border-[#1e2638]"
           >
             Cancel
           </button>
@@ -682,7 +682,7 @@ export function EditTripModal({
             type="button"
             onClick={handleSubmit}
             disabled={saving}
-            className="flex-[2] flex justify-center items-center gap-2 bg-blue-600 text-white rounded-xl py-2 px-4 text-sm font-semibold hover:bg-blue-700 transition disabled:opacity-70"
+            className="flex-[2] flex justify-center items-center gap-2 bg-indigo-600 text-white rounded-xl py-2 px-4 text-sm font-semibold hover:bg-indigo-700 transition disabled:opacity-70"
           >
             {saving ? (
               <div className="h-4 w-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />

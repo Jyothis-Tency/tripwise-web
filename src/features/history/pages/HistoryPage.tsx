@@ -36,7 +36,7 @@ function getCurrentMonthValue(): string {
 }
 
 function monthOptions(): { value: string; label: string }[] {
-  const opts: { value: string; label: string }[] = [{ value: 'all_time', label: '📅 All Time' }];
+  const opts: { value: string; label: string }[] = [{ value: 'all_time', label: 'All Time' }];
   const now = new Date();
   for (let i = 0; i < 24; i++) {
     const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
@@ -51,20 +51,44 @@ function monthOptions(): { value: string; label: string }[] {
 
 function PaymentBanner({ summary }: { summary: HistoryPaymentSummary }) {
   const cards = [
-    { label: 'Total Amount', value: summary.totalAmount, gradient: 'from-slate-50 to-slate-100/80', border: 'border-slate-200', color: 'text-slate-800', icon: '💰' },
-    { label: 'Total Paid',   value: summary.totalPaid,   gradient: 'from-emerald-50 to-emerald-100/80', border: 'border-emerald-200', color: 'text-emerald-700', icon: '✅' },
-    { label: 'Outstanding',  value: summary.totalOutstanding, gradient: 'from-red-50 to-red-100/80', border: 'border-red-200', color: 'text-red-700', icon: '⏳' },
+    {
+      label: "Total Amount",
+      value: summary.totalAmount,
+      wrap: "border-slate-200 bg-[var(--bg-card)] dark:border-[#1e2638]",
+      color: "text-slate-800 dark:text-slate-100",
+      labelCls: "text-slate-500 dark:text-slate-400",
+    },
+    {
+      label: "Total Paid",
+      value: summary.totalPaid,
+      wrap: "border-emerald-200 bg-emerald-50/70 dark:border-emerald-500/30 dark:bg-emerald-500/10",
+      color: "text-emerald-700 dark:text-emerald-400",
+      labelCls: "text-emerald-600/80 dark:text-emerald-400/80",
+    },
+    {
+      label: "Outstanding",
+      value: summary.totalOutstanding,
+      wrap: "border-rose-200 bg-rose-50/70 dark:border-rose-500/30 dark:bg-rose-500/10",
+      color: "text-rose-700 dark:text-rose-400",
+      labelCls: "text-rose-600/80 dark:text-rose-400/80",
+    },
   ];
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
-      {cards.map(item => (
-        <div key={item.label} className={`rounded-xl bg-gradient-to-br ${item.gradient} border ${item.border} px-5 py-4 sm:py-5 shadow-sm`}>
-          <div className="flex items-center justify-between sm:block">
-            <div className="flex items-center gap-2">
-              <span className="text-xl sm:hidden">{item.icon}</span>
-              <span className="text-sm sm:text-base font-bold text-slate-600 uppercase tracking-wide">{item.label}</span>
-            </div>
-            <div className={`text-2xl sm:text-3xl font-extrabold ${item.color} sm:mt-2 tabular-nums tracking-tight`}>{fmtCurrency(item.value)}</div>
+    <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-4">
+      {cards.map((item) => (
+        <div
+          key={item.label}
+          className={`rounded-xl border px-5 py-4 shadow-sm sm:py-5 ${item.wrap}`}
+        >
+          <span
+            className={`text-[11px] font-bold uppercase tracking-wider ${item.labelCls}`}
+          >
+            {item.label}
+          </span>
+          <div
+            className={`mt-2 font-mono text-2xl font-extrabold tabular-nums tracking-tight sm:text-3xl ${item.color}`}
+          >
+            {fmtCurrency(item.value)}
           </div>
         </div>
       ))}
@@ -76,31 +100,54 @@ function PaymentBanner({ summary }: { summary: HistoryPaymentSummary }) {
 
 function EmptyState({ onReset }: { onReset: () => void }) {
   return (
-    <div className="flex flex-col items-center justify-center py-16 sm:py-20 text-center">
-      <div className="rounded-full bg-gradient-to-br from-slate-100 to-slate-200 p-4 sm:p-5 mb-4 shadow-inner">
-        <Search className="h-7 w-7 sm:h-8 sm:w-8 text-slate-400" />
+    <div className="flex flex-col items-center justify-center py-16 text-center sm:py-20">
+      <div className="mb-4 rounded-full border border-slate-200 bg-[var(--bg-elevated)] p-4 shadow-inner dark:border-[#1e2638] sm:p-5">
+        <Search className="h-7 w-7 text-slate-400 dark:text-slate-500 sm:h-8 sm:w-8" />
       </div>
-      <h3 className="text-base sm:text-lg font-semibold text-slate-700 mb-1">No trips found</h3>
-      <p className="text-sm sm:text-sm text-slate-500 mb-4 px-4">Try adjusting your filters or search query.</p>
-      <button onClick={onReset} className="text-sm sm:text-sm font-medium text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 px-4 py-2 rounded-lg transition">Clear all filters</button>
+      <h3 className="mb-1 text-base font-semibold text-slate-700 dark:text-slate-200 sm:text-lg">
+        No trips found
+      </h3>
+      <p className="mb-4 px-4 text-sm text-slate-500 dark:text-slate-400">
+        Try adjusting your filters or search query.
+      </p>
+      <button
+        onClick={onReset}
+        className="rounded-lg bg-indigo-50 px-4 py-2 text-sm font-medium text-indigo-600 transition hover:bg-indigo-100 dark:bg-indigo-500/15 dark:text-indigo-300 dark:hover:bg-indigo-500/25"
+      >
+        Clear all filters
+      </button>
     </div>
   );
 }
 
 // ─── Pagination ───────────────────────────────────────────────────────────────
 
-function Pagination({ p, onChange }: { p: HistoryPagination; onChange: (page: number) => void }) {
+function Pagination({
+  p,
+  onChange,
+}: {
+  p: HistoryPagination;
+  onChange: (page: number) => void;
+}) {
   if (p.pages <= 1) return null;
   return (
-    <div className="flex items-center justify-between pt-4 pb-2">
-      <span className="text-xs sm:text-sm text-slate-500">Page {p.page}/{p.pages} · {p.total} trips</span>
+    <div className="flex items-center justify-between pb-2 pt-4">
+      <span className="text-xs text-slate-500 dark:text-slate-400 sm:text-sm">
+        Page {p.page}/{p.pages} · {p.total} trips
+      </span>
       <div className="flex items-center gap-1.5 sm:gap-2">
-        <button disabled={!p.hasPrev} onClick={() => onChange(p.page - 1)}
-          className="flex items-center gap-1 rounded-lg border border-slate-200 px-3 sm:px-3 py-1.5 text-xs sm:text-sm font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition">
+        <button
+          disabled={!p.hasPrev}
+          onClick={() => onChange(p.page - 1)}
+          className="flex items-center gap-1 rounded-lg border border-slate-200 bg-[var(--bg-elevated)] px-3 py-1.5 text-xs font-medium text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-[#1e2638] dark:text-slate-300 dark:hover:bg-white/5 sm:text-sm"
+        >
           <ChevronLeft className="h-3.5 w-3.5 sm:h-4 sm:w-4" /> Prev
         </button>
-        <button disabled={!p.hasNext} onClick={() => onChange(p.page + 1)}
-          className="flex items-center gap-1 rounded-lg border border-slate-200 px-3 sm:px-3 py-1.5 text-xs sm:text-sm font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition">
+        <button
+          disabled={!p.hasNext}
+          onClick={() => onChange(p.page + 1)}
+          className="flex items-center gap-1 rounded-lg border border-slate-200 bg-[var(--bg-elevated)] px-3 py-1.5 text-xs font-medium text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-[#1e2638] dark:text-slate-300 dark:hover:bg-white/5 sm:text-sm"
+        >
           Next <ChevronRight className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
         </button>
       </div>
@@ -535,29 +582,38 @@ export function HistoryPage() {
   };
 
   return (
-    <div className="flex flex-col gap-5 sm:gap-6 px-4 sm:px-6 py-5 sm:py-6">
+    <div className="flex flex-col gap-5 bg-[var(--bg-main)] px-4 py-5 sm:gap-6 sm:px-6 sm:py-6">
 
       {/* Page Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+      <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
         <div>
-          <h1 className="text-xl sm:text-2xl font-bold text-slate-800 tracking-tight">Trip History</h1>
-          <p className="text-sm text-slate-500 mt-0.5">View, filter and manage your trips</p>
+          <h1 className="text-xl font-bold tracking-tight text-slate-800 dark:text-white sm:text-2xl">
+            Trip History
+          </h1>
+          <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">
+            View, filter, and audit fleet trips &amp; settlement status
+          </p>
         </div>
-        <div className="flex gap-2 flex-wrap">
+        <div className="flex flex-wrap gap-2">
           <button
             onClick={() => navigate('/history/payout')}
-            className="flex items-center gap-1.5 rounded-lg border border-blue-100 bg-blue-50 text-blue-600 px-3 py-2 text-sm font-semibold hover:bg-blue-100 transition shrink-0 active:scale-[0.98]"
+            className="flex shrink-0 items-center gap-1.5 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 text-sm font-semibold text-indigo-600 transition hover:bg-indigo-100 active:scale-[0.98] dark:border-indigo-500/40 dark:bg-indigo-500/15 dark:text-indigo-300 dark:hover:bg-indigo-500/25"
           >
             <Wallet className="h-4 w-4" />
             Payout
           </button>
-          <button onClick={handleExportPdf}
-            className="flex items-center gap-1.5 rounded-lg bg-blue-50 border border-blue-100 text-blue-600 px-3 py-2 text-sm font-semibold hover:bg-blue-100 transition shrink-0 active:scale-[0.98]">
+          <button
+            onClick={handleExportPdf}
+            className="flex shrink-0 items-center gap-1.5 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 text-sm font-semibold text-indigo-600 transition hover:bg-indigo-100 active:scale-[0.98] dark:border-indigo-500/40 dark:bg-indigo-500/15 dark:text-indigo-300 dark:hover:bg-indigo-500/25"
+          >
             <FileDown className="h-4 w-4" />
             Export
           </button>
-          <button onClick={load} disabled={loading}
-            className="flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 transition disabled:opacity-50 shrink-0 active:scale-[0.98]">
+          <button
+            onClick={load}
+            disabled={loading}
+            className="flex shrink-0 items-center gap-1.5 rounded-lg border border-slate-200 bg-[var(--bg-elevated)] px-3 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-50 disabled:opacity-50 active:scale-[0.98] dark:border-[#1e2638] dark:text-slate-300 dark:hover:bg-white/5"
+          >
             <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
             Refresh
           </button>
@@ -568,60 +624,89 @@ export function HistoryPage() {
       <PaymentBanner summary={paymentSummary} />
 
       {/* Filters */}
-      <div className="rounded-xl border border-slate-200 bg-white shadow-sm p-4 sm:p-5 space-y-3 sm:space-y-4">
-        {/* Search */}
+      <div className="space-y-3 rounded-xl border border-slate-200 bg-[var(--bg-card)] p-4 shadow-sm dark:border-[#1e2638] sm:space-y-4 sm:p-5">
         <div className="relative">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400" />
+          <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 dark:text-slate-500" />
           <input
             type="text"
             value={search}
-            onChange={e => handleSearchChange(e.target.value)}
+            onChange={(e) => handleSearchChange(e.target.value)}
             placeholder="Search by Trip ID, driver, vehicle or location…"
-            className="w-full pl-11 pr-10 py-3 rounded-lg border border-slate-200 text-base outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-200 transition bg-slate-50 focus:bg-white"
+            className="w-full rounded-lg border border-slate-200 bg-[var(--bg-elevated)] py-2.5 pl-10 pr-10 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-indigo-400 focus:ring-1 focus:ring-indigo-200 dark:border-[#1e2638] dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-indigo-400"
           />
           {search && (
-            <button onClick={() => handleSearchChange('')}
-              className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
-              <X className="h-5 w-5" />
+            <button
+              onClick={() => handleSearchChange('')}
+              className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+            >
+              <X className="h-4 w-4" />
             </button>
           )}
         </div>
 
-        {/* Filter row */}
-        <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-3">
-          {/* Status */}
-          <select value={status} onChange={e => { setStatus(e.target.value); setPage(1); }}
-            className="rounded-lg border border-slate-200 px-4 py-3 text-sm font-medium text-slate-700 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-200 bg-white">
-            {STATUS_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+        <div className="grid grid-cols-2 gap-3 sm:flex sm:flex-wrap">
+          <select
+            value={status}
+            onChange={(e) => {
+              setStatus(e.target.value);
+              setPage(1);
+            }}
+            className="rounded-lg border border-slate-200 bg-[var(--bg-elevated)] px-4 py-2.5 text-sm font-medium text-slate-700 outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-200 dark:border-[#1e2638] dark:text-slate-100"
+          >
+            {STATUS_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
           </select>
 
-          {/* Month */}
-          <select value={filterMode === 'month' ? month : ''}
-            onChange={e => handleMonthChange(e.target.value)}
-            className={`rounded-lg border px-4 py-3 text-sm font-medium outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-200 bg-white ${
-              filterMode === 'month' ? 'border-blue-300 text-blue-700 ring-1 ring-blue-100' : 'border-slate-200 text-slate-700'
-            }`}>
-            {monthOptions().map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+          <select
+            value={filterMode === 'month' ? month : ''}
+            onChange={(e) => handleMonthChange(e.target.value)}
+            className={`rounded-lg border bg-[var(--bg-elevated)] px-4 py-2.5 text-sm font-medium outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-200 dark:border-[#1e2638] dark:text-slate-100 ${
+              filterMode === 'month'
+                ? 'border-indigo-300 text-indigo-700 ring-1 ring-indigo-100 dark:border-indigo-500/40 dark:text-indigo-300 dark:ring-indigo-500/20'
+                : 'border-slate-200 text-slate-700'
+            }`}
+          >
+            {monthOptions().map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
           </select>
 
-          {/* Date range — OR separator */}
-          <span className="hidden sm:flex items-center text-xs font-semibold text-slate-400 uppercase">or</span>
+          <span className="hidden items-center text-xs font-semibold uppercase text-slate-400 dark:text-slate-500 sm:flex">
+            or
+          </span>
 
-          {/* Date range */}
-          <div className={`col-span-2 flex items-center gap-2 rounded-lg border p-1 ${
-            filterMode === 'daterange' ? 'border-blue-300 ring-1 ring-blue-100' : 'border-transparent'
-          }`}>
-            <input type="date" value={startDate} onChange={e => handleStartDateChange(e.target.value)}
-              className="flex-1 rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-slate-700 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-200" />
-            <span className="text-slate-400 text-sm shrink-0">to</span>
-            <input type="date" value={endDate} onChange={e => handleEndDateChange(e.target.value)}
-              className="flex-1 rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-slate-700 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-200" />
+          <div
+            className={`col-span-2 flex items-center gap-2 rounded-lg border p-1 ${
+              filterMode === 'daterange'
+                ? 'border-indigo-300 ring-1 ring-indigo-100 dark:border-indigo-500/40 dark:ring-indigo-500/20'
+                : 'border-transparent'
+            }`}
+          >
+            <input
+              type="date"
+              value={startDate}
+              onChange={(e) => handleStartDateChange(e.target.value)}
+              className="flex-1 rounded-lg border border-slate-200 bg-[var(--bg-elevated)] px-3 py-2.5 font-mono text-sm text-slate-700 outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-200 dark:border-[#1e2638] dark:text-slate-100"
+            />
+            <span className="shrink-0 text-sm text-slate-400">to</span>
+            <input
+              type="date"
+              value={endDate}
+              onChange={(e) => handleEndDateChange(e.target.value)}
+              className="flex-1 rounded-lg border border-slate-200 bg-[var(--bg-elevated)] px-3 py-2.5 font-mono text-sm text-slate-700 outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-200 dark:border-[#1e2638] dark:text-slate-100"
+            />
           </div>
 
-          {/* Clear */}
           {hasActiveFilters && (
-            <button onClick={resetFilters}
-              className="col-span-2 sm:col-span-1 flex items-center justify-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-600 hover:bg-red-100 transition">
+            <button
+              onClick={resetFilters}
+              className="col-span-2 flex items-center justify-center gap-1.5 rounded-lg border border-rose-200 bg-rose-50 px-4 py-2.5 text-sm font-medium text-rose-600 transition hover:bg-rose-100 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-300 dark:hover:bg-rose-500/20 sm:col-span-1"
+            >
               <X className="h-4 w-4" /> Reset to This Month
             </button>
           )}
@@ -632,14 +717,19 @@ export function HistoryPage() {
       <div className="space-y-3">
         {loading && (
           <div className="flex justify-center py-16">
-            <RefreshCw className="h-6 w-6 animate-spin text-blue-500" />
+            <RefreshCw className="h-6 w-6 animate-spin text-indigo-500" />
           </div>
         )}
 
         {!loading && error && (
-          <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 flex items-center justify-between">
+          <div className="flex items-center justify-between rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-300">
             {error}
-            <button onClick={load} className="text-red-600 underline text-xs hover:no-underline">Retry</button>
+            <button
+              onClick={load}
+              className="text-xs text-rose-600 underline hover:no-underline dark:text-rose-300"
+            >
+              Retry
+            </button>
           </div>
         )}
 
@@ -647,19 +737,20 @@ export function HistoryPage() {
           <EmptyState onReset={resetFilters} />
         )}
 
-        {!loading && !error && trips.map(trip => (
-          <TripCard
-            key={trip._id}
-            trip={trip}
-            onDeleted={load}
-            onPaymentRecorded={handlePaymentRecorded}
-            onTripUpdated={handleTripUpdated}
-            resolveAgencyLabel={resolveAgencyLabel}
-          />
-        ))}
+        {!loading &&
+          !error &&
+          trips.map((trip) => (
+            <TripCard
+              key={trip._id}
+              trip={trip}
+              onDeleted={load}
+              onPaymentRecorded={handlePaymentRecorded}
+              onTripUpdated={handleTripUpdated}
+              resolveAgencyLabel={resolveAgencyLabel}
+            />
+          ))}
       </div>
 
-      {/* Pagination */}
       {!loading && <Pagination p={pagination} onChange={setPage} />}
     </div>
   );

@@ -6,6 +6,7 @@ import './index.css';
 import App from './App.tsx';
 import { store } from './store';
 import { useAuth } from './hooks/useAuth';
+import { ThemeProvider } from './hooks/useTheme';
 
 function AppWithAuthInit() {
   const { init } = useAuth();
@@ -20,9 +21,11 @@ function AppWithAuthInit() {
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <Provider store={store}>
-      <BrowserRouter>
-        <AppWithAuthInit />
-      </BrowserRouter>
+      <ThemeProvider>
+        <BrowserRouter>
+          <AppWithAuthInit />
+        </BrowserRouter>
+      </ThemeProvider>
     </Provider>
   </StrictMode>,
 );

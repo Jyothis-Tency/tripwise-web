@@ -1,76 +1,94 @@
-import React from 'react';
-import { 
-  Milestone, 
-  CheckCircle2, 
-  XCircle, 
-  BarChart3 
-} from 'lucide-react';
-import type { PLTrips } from '../api';
+import React from "react";
+import { Milestone, CheckCircle2, XCircle, Percent } from "lucide-react";
+import type { PLTrips } from "../api";
 
 interface TripStatisticsProps {
   trips: PLTrips;
 }
 
+const stats = [
+  {
+    key: "total",
+    label: "Total Trips",
+    icon: Milestone,
+    wrap: "border-indigo-50 bg-indigo-50/30 dark:border-indigo-500/15 dark:bg-indigo-500/10",
+    iconWrap: "bg-indigo-100 text-indigo-600 dark:bg-indigo-500/20 dark:text-indigo-300",
+    value: "text-indigo-700 dark:text-indigo-300",
+  },
+  {
+    key: "completed",
+    label: "Completed",
+    icon: CheckCircle2,
+    wrap: "border-emerald-50 bg-emerald-50/30 dark:border-emerald-500/15 dark:bg-emerald-500/10",
+    iconWrap:
+      "bg-emerald-100 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400",
+    value: "text-emerald-700 dark:text-emerald-400",
+  },
+  {
+    key: "cancelled",
+    label: "Cancelled",
+    icon: XCircle,
+    wrap: "border-rose-50 bg-rose-50/30 dark:border-rose-500/15 dark:bg-rose-500/10",
+    iconWrap: "bg-rose-100 text-rose-600 dark:bg-rose-500/20 dark:text-rose-400",
+    value: "text-rose-700 dark:text-rose-400",
+  },
+  {
+    key: "rate",
+    label: "Completion Rate",
+    icon: Percent,
+    wrap: "border-amber-50 bg-amber-50/30 dark:border-amber-500/15 dark:bg-amber-500/10",
+    iconWrap: "bg-amber-100 text-amber-600 dark:bg-amber-500/20 dark:text-amber-400",
+    value: "text-amber-700 dark:text-amber-400",
+  },
+] as const;
+
 export const TripStatistics: React.FC<TripStatisticsProps> = ({ trips }) => {
+  const values: Record<string, string | number> = {
+    total: trips.total,
+    completed: trips.completed,
+    cancelled: trips.cancelled,
+    rate: `${(trips.completionRate ?? 0).toFixed(1)}%`,
+  };
+
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-6 shadow-sm">
-      <div className="mb-4 sm:mb-6 flex items-center gap-2">
-        <BarChart3 className="h-5 w-5 text-blue-500" />
-        <h2 className="text-base sm:text-lg font-semibold text-slate-900">Trip Statistics</h2>
+    <div className="rounded-2xl border border-slate-200/90 bg-white p-4 shadow-subtle sm:p-6 dark:border-[#1e2638] dark:bg-[#0e121d]/90 dark:backdrop-blur-xl">
+      <div className="mb-4 flex items-center gap-2 sm:mb-6">
+        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600 dark:bg-indigo-500/15 dark:text-indigo-300">
+          <Milestone className="h-4 w-4" />
+        </div>
+        <h2 className="text-base font-semibold text-slate-900 sm:text-lg dark:text-white">
+          Trip Statistics
+        </h2>
       </div>
 
-      <div className="grid gap-3 sm:gap-4 grid-cols-2 lg:grid-cols-4">
-        {/* Total Trips */}
-        <div className="rounded-xl border border-blue-50 bg-blue-50/30 p-3 sm:p-4">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-3">
-            <div className="flex h-8 w-8 sm:h-10 sm:w-10 shrink-0 items-center justify-center rounded-lg bg-blue-100 text-blue-600">
-              <Milestone className="h-4 w-4 sm:h-5 sm:w-5" />
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
+        {stats.map((s) => {
+          const Icon = s.icon;
+          return (
+            <div
+              key={s.key}
+              className={`rounded-xl border p-3 sm:p-4 ${s.wrap}`}
+            >
+              <div className="flex flex-col items-start gap-2 sm:flex-row sm:items-center sm:gap-3">
+                <div
+                  className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg sm:h-10 sm:w-10 ${s.iconWrap}`}
+                >
+                  <Icon className="h-4 w-4 sm:h-5 sm:w-5" />
+                </div>
+                <div>
+                  <p className="text-[10px] font-medium text-slate-500 sm:text-xs dark:text-slate-400">
+                    {s.label}
+                  </p>
+                  <h4
+                    className={`font-mono text-base font-bold leading-tight metric-tabular sm:text-lg ${s.value}`}
+                  >
+                    {values[s.key]}
+                  </h4>
+                </div>
+              </div>
             </div>
-            <div>
-              <p className="text-[10px] sm:text-xs font-medium text-slate-500">Total Trips</p>
-              <h4 className="text-base sm:text-lg font-bold text-blue-700 leading-tight border-red-500">{trips.total}</h4>
-            </div>
-          </div>
-        </div>
-
-        {/* Completed Trips */}
-        <div className="rounded-xl border border-emerald-50 bg-emerald-50/30 p-3 sm:p-4">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-3">
-            <div className="flex h-8 w-8 sm:h-10 sm:w-10 shrink-0 items-center justify-center rounded-lg bg-emerald-100 text-emerald-600">
-              <CheckCircle2 className="h-4 w-4 sm:h-5 sm:w-5" />
-            </div>
-            <div>
-              <p className="text-[10px] sm:text-xs font-medium text-slate-500">Completed</p>
-              <h4 className="text-base sm:text-lg font-bold text-emerald-700 leading-tight">{trips.completed}</h4>
-            </div>
-          </div>
-        </div>
-
-        {/* Cancelled Trips */}
-        <div className="rounded-xl border border-red-50 bg-red-50/30 p-3 sm:p-4">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-3">
-            <div className="flex h-8 w-8 sm:h-10 sm:w-10 shrink-0 items-center justify-center rounded-lg bg-red-100 text-red-600">
-              <XCircle className="h-4 w-4 sm:h-5 sm:w-5" />
-            </div>
-            <div>
-              <p className="text-[10px] sm:text-xs font-medium text-slate-500">Cancelled</p>
-              <h4 className="text-base sm:text-lg font-bold text-red-700 leading-tight">{trips.cancelled}</h4>
-            </div>
-          </div>
-        </div>
-
-        {/* Completion Rate */}
-        <div className="rounded-xl border border-amber-50 bg-amber-50/30 p-3 sm:p-4">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-3">
-            <div className="flex h-8 w-8 sm:h-10 sm:w-10 shrink-0 items-center justify-center rounded-lg bg-amber-100 text-amber-600">
-              <BarChart3 className="h-4 w-4 sm:h-5 sm:w-5" />
-            </div>
-            <div>
-              <p className="text-[10px] sm:text-xs font-medium text-slate-500">Win Rate</p>
-              <h4 className="text-base sm:text-lg font-bold text-amber-700 leading-tight">{trips.completionRate.toFixed(1)}%</h4>
-            </div>
-          </div>
-        </div>
+          );
+        })}
       </div>
     </div>
   );

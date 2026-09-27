@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { Link } from "react-router-dom";
 import {
   ArrowDownLeft,
   ArrowUpRight,
   Building2,
   CheckCircle2,
+  History,
   Loader2,
   User,
   Wallet,
@@ -35,8 +37,40 @@ const PAYMENT_METHODS = [
   { value: "other", label: "Other" },
 ] as const;
 
+const QUICK_AMOUNTS = [500, 1000, 2000, 5000, 10000] as const;
+
+const LS_RECENT_AGENCIES = "tripwise_tx_recent_agencies";
+const LS_RECENT_DRIVERS = "tripwise_tx_recent_drivers";
+const RECENT_PARTY_LIMIT = 3;
+
+function loadRecentIds(key: string): string[] {
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter((id): id is string => typeof id === "string" && !!id);
+  } catch {
+    return [];
+  }
+}
+
+function pushRecentId(key: string, id: string): string[] {
+  if (!id) return loadRecentIds(key);
+  const next = [id, ...loadRecentIds(key).filter((x) => x !== id)].slice(
+    0,
+    RECENT_PARTY_LIMIT,
+  );
+  try {
+    localStorage.setItem(key, JSON.stringify(next));
+  } catch {
+    /* ignore quota */
+  }
+  return next;
+}
+
 const fieldCls =
-  "w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100";
+  "w-full rounded-lg border border-slate-200 bg-[var(--bg-elevated)] px-3 py-2.5 text-sm text-slate-800 outline-none transition focus:border-indigo-400 focus:ring-2 focus:ring-indigo-500/15 dark:border-[#1e2638] dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-indigo-400";
 
 function driverDisplayName(d: Driver) {
   const full = (d as { fullName?: string }).fullName?.trim();
@@ -84,13 +118,13 @@ function BalanceStat({
   const valueCls =
     tone === "remaining"
       ? positive
-        ? "text-emerald-600"
-        : "text-amber-600"
-      : "text-slate-800";
+        ? "text-emerald-600 dark:text-emerald-400"
+        : "text-amber-600 dark:text-amber-400"
+      : "text-slate-800 dark:text-slate-100";
 
   return (
     <div className="text-right">
-      <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+      <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
         {label}
       </p>
       {loading || value == null ? (
@@ -98,12 +132,20 @@ function BalanceStat({
           <Loader2 className="h-3.5 w-3.5 animate-spin text-slate-400" />
         </div>
       ) : (
-        <p className={`mt-0.5 text-sm font-bold tabular-nums leading-none ${valueCls}`}>
+        <p
+          className={`mt-0.5 text-sm font-bold tabular-nums leading-none ${valueCls}`}
+        >
           {tone === "remaining" ? fmtSignedCurrency(value) : fmtCurrency(value)}
         </p>
       )}
     </div>
   );
+}
+
+function isoDateOffset(days: number) {
+  const d = new Date();
+  d.setDate(d.getDate() + days);
+  return d.toISOString().slice(0, 10);
 }
 
 export function TransactionPage() {
@@ -124,6 +166,28 @@ export function TransactionPage() {
   const [grandTotal, setGrandTotal] = useState<number | null>(null);
   const [remaining, setRemaining] = useState<number | null>(null);
   const [balanceLoading, setBalanceLoading] = useState(false);
+  const [recentAgencyIds, setRecentAgencyIds] = useState<string[]>(() =>
+    loadRecentIds(LS_RECENT_AGENCIES),
+  );
+  const [recentDriverIds, setRecentDriverIds] = useState<string[]>(() =>
+    loadRecentIds(LS_RECENT_DRIVERS),
+  );
+
+  const recentIds =
+    entityType === "agency" ? recentAgencyIds : recentDriverIds;
+
+  const selectParty = useCallback(
+    (id: string) => {
+      if (!id) return;
+      setSelectedId(id);
+      if (entityType === "agency") {
+        setRecentAgencyIds(pushRecentId(LS_RECENT_AGENCIES, id));
+      } else {
+        setRecentDriverIds(pushRecentId(LS_RECENT_DRIVERS, id));
+      }
+    },
+    [entityType],
+  );
 
   const loadLists = useCallback(async () => {
     setLoadingLists(true);
@@ -169,7 +233,6 @@ export function TransactionPage() {
           const bulk = Number(detail.summary.cashInBulk.fromTrips) || 0;
           const vehicle =
             Number(detail.summary.cashOutAgencyProfit.fromTrips) || 0;
-          // Same as History: Grand Total = bulk (+) − vehicle (−)
           setGrandTotal(bulk - vehicle);
           setRemaining(
             detail.summary.cashInBulk.remaining -
@@ -207,31 +270,63 @@ export function TransactionPage() {
 
   const nameOptions = useMemo(() => {
     const q = nameQuery.trim().toLowerCase();
-    if (entityType === "agency") {
-      return agencies
-        .map((a) => ({
-          id: a._id ?? a.id ?? "",
-          label: a.name,
-          sub: a.phone || "Agency",
-        }))
-        .filter((o) => o.id && (!q || o.label.toLowerCase().includes(q)));
-    }
-    return drivers
-      .map((d) => ({
-        id: d._id,
-        label: driverDisplayName(d),
-        sub: d.phone || "Driver",
-      }))
-      .filter(
-        (o) =>
-          o.id &&
-          (!q ||
-            o.label.toLowerCase().includes(q) ||
-            o.sub.toLowerCase().includes(q)),
-      );
-  }, [entityType, agencies, drivers, nameQuery]);
+    const base =
+      entityType === "agency"
+        ? agencies
+            .map((a) => ({
+              id: a._id ?? a.id ?? "",
+              label: a.name,
+              sub: a.phone || "Agency",
+            }))
+            .filter((o) => o.id && (!q || o.label.toLowerCase().includes(q)))
+        : drivers
+            .map((d) => ({
+              id: d._id,
+              label: driverDisplayName(d),
+              sub: d.phone || "Driver",
+            }))
+            .filter(
+              (o) =>
+                o.id &&
+                (!q ||
+                  o.label.toLowerCase().includes(q) ||
+                  o.sub.toLowerCase().includes(q)),
+            );
 
-  const selected = nameOptions.find((o) => o.id === selectedId);
+    // Empty search: pin up to 3 recently selected parties at the top.
+    if (q || recentIds.length === 0) {
+      return base.map((o) => ({ ...o, recent: false }));
+    }
+
+    const byId = new Map(base.map((o) => [o.id, o]));
+    const recentOpts = recentIds
+      .map((id) => byId.get(id))
+      .filter((o): o is (typeof base)[number] => !!o)
+      .map((o) => ({ ...o, recent: true }));
+    const recentSet = new Set(recentOpts.map((o) => o.id));
+    const rest = base
+      .filter((o) => !recentSet.has(o.id))
+      .map((o) => ({ ...o, recent: false }));
+    return [...recentOpts, ...rest];
+  }, [entityType, agencies, drivers, nameQuery, recentIds]);
+
+  const selected = useMemo(() => {
+    if (!selectedId) return undefined;
+    if (entityType === "agency") {
+      const a = agencies.find((x) => (x._id ?? x.id) === selectedId);
+      return a
+        ? { id: selectedId, label: a.name, sub: a.phone || "Agency" }
+        : nameOptions.find((o) => o.id === selectedId);
+    }
+    const d = drivers.find((x) => x._id === selectedId);
+    return d
+      ? {
+          id: selectedId,
+          label: driverDisplayName(d),
+          sub: d.phone || "Driver",
+        }
+      : nameOptions.find((o) => o.id === selectedId);
+  }, [selectedId, entityType, agencies, drivers, nameOptions]);
 
   const directionHint =
     entityType === "agency"
@@ -241,6 +336,17 @@ export function TransactionPage() {
       : cashKind === "cash_in"
         ? "Advance given to driver"
         : "Salary / bata payment to driver";
+
+  const addQuickAmount = (n: number) => {
+    const cur = Number(amount) || 0;
+    setAmount(String(cur + n));
+  };
+
+  const setFullDue = () => {
+    if (remaining == null) return;
+    const due = Math.abs(remaining);
+    if (due > 0) setAmount(String(due));
+  };
 
   const submit = async () => {
     setMessage(null);
@@ -295,7 +401,6 @@ export function TransactionPage() {
           );
         }
 
-        // Waterfall: vehicle bata first, then bulk advance payout (matches CICO).
         if (left > 0 && bataRemaining > 0) {
           const pay = Math.min(left, bataRemaining);
           await createSalaryTransaction(selectedId, {
@@ -344,52 +449,81 @@ export function TransactionPage() {
   };
 
   return (
-    <div className="flex h-full flex-col overflow-hidden bg-slate-50">
+    <div className="flex h-full flex-col overflow-hidden bg-[var(--bg-main)]">
       <div className="mx-auto flex h-full w-full max-w-6xl flex-col px-4 py-4 sm:px-6 sm:py-5">
-        <div className="mb-4 flex shrink-0 items-start gap-3">
-          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue-600 text-white shadow-sm">
-            <Wallet className="h-5 w-5" />
+        <div className="mb-4 flex shrink-0 items-start justify-between gap-3">
+          <div className="flex items-start gap-3">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-indigo-200 bg-indigo-50 text-indigo-600 dark:border-indigo-500/30 dark:bg-indigo-500/15 dark:text-indigo-300">
+              <Wallet className="h-5 w-5" />
+            </div>
+            <div>
+              <h1 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white">
+                Transaction
+              </h1>
+              <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">
+                Record cash in or cash out for an agency or driver.
+              </p>
+            </div>
           </div>
-          <div>
-            <h1 className="text-xl font-bold text-slate-900">Transaction</h1>
-            <p className="mt-0.5 text-sm text-slate-500">
-              Record cash in or cash out for an agency or driver.
-            </p>
-          </div>
+          <Link
+            to="/transaction-history"
+            className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-lg border border-slate-200 bg-[var(--bg-elevated)] px-3 text-xs font-semibold text-slate-600 transition hover:bg-slate-50 dark:border-[#1e2638] dark:text-slate-300 dark:hover:bg-white/5 sm:text-sm"
+          >
+            <History className="h-3.5 w-3.5" />
+            <span className="hidden sm:inline">History</span>
+          </Link>
         </div>
 
         {loadingLists ? (
-          <div className="flex flex-1 items-center justify-center rounded-2xl border border-slate-200 bg-white">
-            <Loader2 className="h-7 w-7 animate-spin text-blue-500" />
+          <div className="flex flex-1 items-center justify-center rounded-2xl border border-slate-200 bg-[var(--bg-card)] dark:border-[#1e2638]">
+            <Loader2 className="h-7 w-7 animate-spin text-indigo-500" />
           </div>
         ) : (
-          <section className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-            <div className="shrink-0 border-b border-slate-100 px-4 py-3 sm:px-5">
-              <h2 className="text-sm font-semibold text-slate-800">
-                Record transaction
-              </h2>
-              <p className="text-xs text-slate-400">
-                {selected
-                  ? `Party: ${selected.label}`
-                  : "Choose a party, then enter payment details"}
-              </p>
+          <section className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-[var(--bg-card)] shadow-sm dark:border-[#1e2638]">
+            <div className="flex shrink-0 items-center justify-between gap-3 border-b border-slate-100 px-4 py-3 dark:border-[#1e2638] sm:px-5">
+              <div className="min-w-0">
+                <h2 className="text-sm font-semibold text-slate-800 dark:text-slate-100">
+                  Payment &amp; settlement
+                </h2>
+                <p className="truncate text-xs text-slate-400 dark:text-slate-500">
+                  {selected
+                    ? `Party: ${selected.label}`
+                    : "Choose a party, then enter payment details"}
+                </p>
+              </div>
+              {selectedId && remaining != null && !balanceLoading && (
+                <div className="hidden shrink-0 items-center gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-1.5 sm:flex">
+                  <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+                    Remaining
+                  </span>
+                  <span
+                    className={`font-mono text-sm font-bold tabular-nums ${
+                      remaining >= 0
+                        ? "text-emerald-600 dark:text-emerald-400"
+                        : "text-rose-500 dark:text-rose-400"
+                    }`}
+                  >
+                    {fmtSignedCurrency(remaining)}
+                  </span>
+                </div>
+              )}
             </div>
 
             <div className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-5">
-              <div className="mx-auto grid max-w-5xl gap-6 md:grid-cols-2 md:gap-8">
+              <div className="mx-auto grid max-w-5xl gap-6 lg:grid-cols-12 lg:gap-5">
                 {/* Party */}
-                <div className="flex min-h-0 flex-col gap-4">
+                <div className="flex min-h-0 flex-col gap-4 lg:col-span-5">
                   <div>
-                    <h3 className="text-xs font-bold uppercase tracking-wide text-slate-500">
-                      Party
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                      1. Select party
                     </h3>
-                    <p className="mt-0.5 text-xs text-slate-400">
-                      Choose agency or driver
+                    <p className="mt-0.5 text-xs text-slate-400 dark:text-slate-500">
+                      Filter agency or driver account
                     </p>
                   </div>
 
                   <div
-                    className="grid shrink-0 grid-cols-2 rounded-full border border-slate-200 bg-slate-100 p-1"
+                    className="grid shrink-0 grid-cols-2 rounded-xl border border-slate-200 bg-slate-100 p-1 dark:border-[#1e2638] dark:bg-[#060e20]"
                     role="tablist"
                   >
                     {(
@@ -404,10 +538,10 @@ export function TransactionPage() {
                         role="tab"
                         aria-selected={entityType === id}
                         onClick={() => setEntityType(id)}
-                        className={`flex h-9 items-center justify-center gap-2 rounded-full text-sm font-semibold transition ${
+                        className={`flex h-9 items-center justify-center gap-2 rounded-lg text-sm font-semibold transition ${
                           entityType === id
-                            ? "bg-white text-blue-600 shadow-sm"
-                            : "bg-transparent text-slate-500 hover:text-slate-700"
+                            ? "border border-indigo-500/40 bg-[var(--bg-card)] text-indigo-600 shadow-xs dark:bg-[#131b2e] dark:text-indigo-300"
+                            : "bg-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
                         }`}
                       >
                         <Icon className="h-4 w-4" />
@@ -428,50 +562,79 @@ export function TransactionPage() {
                     />
                   </div>
 
-                  <div className="max-h-64 space-y-1.5 overflow-y-auto rounded-xl border border-slate-100 bg-slate-50/70 p-1.5 md:max-h-none md:min-h-[16rem] md:flex-1">
+                  <div className="max-h-64 space-y-1.5 overflow-y-auto rounded-xl border border-slate-100 bg-slate-50/70 p-1.5 dark:border-[#1e2638] dark:bg-white/[0.03] md:max-h-none md:min-h-[16rem] md:flex-1">
                     {nameOptions.length === 0 ? (
-                      <p className="px-3 py-8 text-center text-xs text-slate-400">
+                      <p className="px-3 py-8 text-center text-xs text-slate-400 dark:text-slate-500">
                         No matches
                       </p>
                     ) : (
-                      nameOptions.map((o) => {
+                      nameOptions.map((o, idx) => {
                         const sel = o.id === selectedId;
+                        const showRecentHeader =
+                          !nameQuery.trim() &&
+                          o.recent &&
+                          (idx === 0 || !nameOptions[idx - 1]?.recent);
+                        const showRestHeader =
+                          !nameQuery.trim() &&
+                          !o.recent &&
+                          idx > 0 &&
+                          nameOptions[idx - 1]?.recent;
                         return (
-                          <button
-                            key={o.id}
-                            type="button"
-                            onClick={() => setSelectedId(o.id)}
-                            className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition ${
-                              sel
-                                ? "border border-blue-300 bg-blue-50 shadow-sm"
-                                : "border border-transparent bg-white hover:border-slate-200"
-                            }`}
-                          >
-                            <div
-                              className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${
-                                entityType === "agency"
-                                  ? "bg-blue-100 text-blue-600"
-                                  : "bg-violet-100 text-violet-600"
+                          <div key={o.id}>
+                            {showRecentHeader && (
+                              <p className="px-2 pb-1 pt-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+                                Recent
+                              </p>
+                            )}
+                            {showRestHeader && (
+                              <p className="px-2 pb-1 pt-2 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+                                All {entityType === "agency" ? "agencies" : "drivers"}
+                              </p>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => selectParty(o.id)}
+                              className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition ${
+                                sel
+                                  ? "border-2 border-indigo-500/80 bg-indigo-50 shadow-sm dark:bg-indigo-500/10 dark:border-indigo-500/70"
+                                  : "border border-transparent bg-[var(--bg-card)] hover:border-slate-200 dark:hover:border-white/10 dark:hover:bg-white/[0.04]"
                               }`}
                             >
-                              {entityType === "agency" ? (
-                                <Building2 className="h-4 w-4" />
-                              ) : (
-                                <User className="h-4 w-4" />
+                              <div
+                                className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${
+                                  sel
+                                    ? "border border-indigo-500/40 bg-indigo-500/15 text-indigo-600 dark:text-indigo-300"
+                                    : entityType === "agency"
+                                      ? "bg-indigo-100 text-indigo-600 dark:bg-indigo-500/10 dark:text-indigo-400"
+                                      : "bg-violet-100 text-violet-600 dark:bg-violet-500/10 dark:text-violet-300"
+                                }`}
+                              >
+                                {entityType === "agency" ? (
+                                  <Building2 className="h-4 w-4" />
+                                ) : (
+                                  <User className="h-4 w-4" />
+                                )}
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <div className="flex min-w-0 items-center gap-1.5">
+                                  <p className="truncate text-sm font-semibold text-slate-900 dark:text-slate-100">
+                                    {o.label}
+                                  </p>
+                                  {o.recent && !nameQuery.trim() && (
+                                    <span className="shrink-0 rounded bg-indigo-50 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-indigo-600 dark:bg-indigo-500/15 dark:text-indigo-300">
+                                      Recent
+                                    </span>
+                                  )}
+                                </div>
+                                <p className="truncate font-mono text-xs text-slate-400 dark:text-slate-500">
+                                  {o.sub}
+                                </p>
+                              </div>
+                              {sel && (
+                                <CheckCircle2 className="h-4 w-4 shrink-0 text-indigo-500 dark:text-indigo-400" />
                               )}
-                            </div>
-                            <div className="min-w-0 flex-1">
-                              <p className="truncate text-sm font-semibold text-slate-900">
-                                {o.label}
-                              </p>
-                              <p className="truncate text-xs text-slate-400">
-                                {o.sub}
-                              </p>
-                            </div>
-                            {sel && (
-                              <CheckCircle2 className="h-4 w-4 shrink-0 text-blue-500" />
-                            )}
-                          </button>
+                            </button>
+                          </div>
                         );
                       })
                     )}
@@ -479,13 +642,13 @@ export function TransactionPage() {
                 </div>
 
                 {/* Payment */}
-                <div className="flex flex-col gap-4 border-t border-slate-100 pt-6 md:border-l md:border-t-0 md:pl-8 md:pt-0">
+                <div className="flex flex-col gap-4 border-t border-slate-100 pt-6 dark:border-[#1e2638] lg:col-span-7 lg:border-l lg:border-t-0 lg:pl-6 lg:pt-0">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <h3 className="text-xs font-bold uppercase tracking-wide text-slate-500">
-                        Payment
+                      <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                        2. Transaction details
                       </h3>
-                      <p className="mt-0.5 truncate text-xs text-slate-400">
+                      <p className="mt-0.5 truncate text-xs text-slate-400 dark:text-slate-500">
                         {selected
                           ? `For ${selected.label}`
                           : "Select a party first"}
@@ -499,7 +662,7 @@ export function TransactionPage() {
                           loading={balanceLoading}
                         />
                         <div
-                          className="h-8 w-px bg-slate-200"
+                          className="h-8 w-px bg-slate-200 dark:bg-white/10"
                           aria-hidden
                         />
                         <BalanceStat
@@ -513,7 +676,7 @@ export function TransactionPage() {
                   </div>
 
                   <div>
-                    <FieldLabel>Direction</FieldLabel>
+                    <FieldLabel>Cash flow direction</FieldLabel>
                     <div className="grid grid-cols-2 gap-2">
                       {entityType === "agency" ? (
                         <>
@@ -522,8 +685,8 @@ export function TransactionPage() {
                             onClick={() => setCashKind("cash_in")}
                             className={`flex items-center justify-center gap-2 rounded-xl border px-3 py-3 text-sm font-semibold transition ${
                               cashKind === "cash_in"
-                                ? "border-emerald-400 bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200"
-                                : "border-slate-200 bg-white text-slate-500 hover:bg-slate-50"
+                                ? "border-emerald-500/80 bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400"
+                                : "border-slate-200 bg-[var(--bg-elevated)] text-slate-500 hover:border-emerald-500/40 hover:text-emerald-600 dark:border-[#1e2638] dark:text-slate-400 dark:hover:bg-emerald-950/10"
                             }`}
                           >
                             <ArrowDownLeft className="h-4 w-4" />
@@ -534,8 +697,8 @@ export function TransactionPage() {
                             onClick={() => setCashKind("cash_out")}
                             className={`flex items-center justify-center gap-2 rounded-xl border px-3 py-3 text-sm font-semibold transition ${
                               cashKind === "cash_out"
-                                ? "border-amber-400 bg-amber-50 text-amber-700 ring-1 ring-amber-200"
-                                : "border-slate-200 bg-white text-slate-500 hover:bg-slate-50"
+                                ? "border-rose-500/80 bg-rose-50 text-rose-700 dark:bg-rose-950/30 dark:text-rose-400"
+                                : "border-slate-200 bg-[var(--bg-elevated)] text-slate-500 hover:border-rose-500/40 hover:text-rose-500 dark:border-[#1e2638] dark:text-slate-400 dark:hover:bg-rose-950/10"
                             }`}
                           >
                             <ArrowUpRight className="h-4 w-4" />
@@ -549,8 +712,8 @@ export function TransactionPage() {
                             onClick={() => setCashKind("cash_out")}
                             className={`flex items-center justify-center gap-2 rounded-xl border px-3 py-3 text-sm font-semibold transition ${
                               cashKind === "cash_out"
-                                ? "border-amber-400 bg-amber-50 text-amber-700 ring-1 ring-amber-200"
-                                : "border-slate-200 bg-white text-slate-500 hover:bg-slate-50"
+                                ? "border-rose-500/80 bg-rose-50 text-rose-700 dark:bg-rose-950/30 dark:text-rose-400"
+                                : "border-slate-200 bg-[var(--bg-elevated)] text-slate-500 hover:border-rose-500/40 hover:text-rose-500 dark:border-[#1e2638] dark:text-slate-400 dark:hover:bg-rose-950/10"
                             }`}
                           >
                             <ArrowUpRight className="h-4 w-4" />
@@ -561,8 +724,8 @@ export function TransactionPage() {
                             onClick={() => setCashKind("cash_in")}
                             className={`flex items-center justify-center gap-2 rounded-xl border px-3 py-3 text-sm font-semibold transition ${
                               cashKind === "cash_in"
-                                ? "border-sky-400 bg-sky-50 text-sky-700 ring-1 ring-sky-200"
-                                : "border-slate-200 bg-white text-slate-500 hover:bg-slate-50"
+                                ? "border-sky-500/80 bg-sky-50 text-sky-700 dark:bg-sky-950/30 dark:text-sky-400"
+                                : "border-slate-200 bg-[var(--bg-elevated)] text-slate-500 hover:border-sky-500/40 hover:text-sky-600 dark:border-[#1e2638] dark:text-slate-400 dark:hover:bg-sky-950/10"
                             }`}
                           >
                             <Wallet className="h-4 w-4" />
@@ -571,46 +734,109 @@ export function TransactionPage() {
                         </>
                       )}
                     </div>
-                    <p className="mt-2 text-xs text-slate-400">{directionHint}</p>
+                    <p className="mt-2 text-xs text-slate-400 dark:text-slate-500">
+                      {directionHint}
+                    </p>
                   </div>
 
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                    <div>
-                      <FieldLabel>Amount (₹)</FieldLabel>
+                  <div>
+                    <div className="mb-1.5 flex items-center justify-between gap-2">
+                      <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                        Amount (₹)
+                      </span>
+                      {remaining != null && !balanceLoading && (
+                        <span className="text-[11px] text-slate-400 dark:text-slate-500">
+                          Outstanding:{" "}
+                          <strong className="text-slate-700 dark:text-slate-200">
+                            {fmtSignedCurrency(remaining)}
+                          </strong>
+                        </span>
+                      )}
+                    </div>
+                    <div className="relative">
+                      <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 text-lg font-bold text-emerald-600 dark:text-emerald-400">
+                        ₹
+                      </span>
                       <input
                         type="number"
                         min="0"
                         step="0.01"
                         value={amount}
                         onChange={(e) => setAmount(e.target.value)}
-                        placeholder="0"
-                        className={fieldCls}
+                        placeholder="0.00"
+                        className={`${fieldCls} py-3 pl-9 font-mono text-xl font-bold tracking-wide`}
                       />
                     </div>
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      {QUICK_AMOUNTS.map((n) => (
+                        <button
+                          key={n}
+                          type="button"
+                          onClick={() => addQuickAmount(n)}
+                          className="rounded-md border border-slate-200 bg-[var(--bg-elevated)] px-2.5 py-1 font-mono text-xs text-slate-600 transition hover:border-indigo-400 hover:text-indigo-600 dark:border-[#1e2638] dark:text-slate-300 dark:hover:border-indigo-500/40 dark:hover:text-indigo-300"
+                        >
+                          +₹{n.toLocaleString("en-IN")}
+                        </button>
+                      ))}
+                      {remaining != null && Math.abs(remaining) > 0 && (
+                        <button
+                          type="button"
+                          onClick={setFullDue}
+                          className="ml-auto rounded-md border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1 font-mono text-xs font-medium text-emerald-600 transition hover:bg-emerald-500/20 dark:text-emerald-400"
+                        >
+                          Clear full due
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     <div>
-                      <FieldLabel>Date</FieldLabel>
+                      <div className="mb-1.5 flex items-center justify-between gap-2">
+                        <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                          Posting date
+                        </span>
+                        <div className="flex items-center gap-1.5 text-[10px] font-medium">
+                          <button
+                            type="button"
+                            onClick={() => setDate(isoDateOffset(0))}
+                            className="text-indigo-600 hover:underline dark:text-indigo-400"
+                          >
+                            Today
+                          </button>
+                          <span className="text-slate-300 dark:text-slate-600">
+                            ·
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => setDate(isoDateOffset(-1))}
+                            className="text-slate-500 hover:underline dark:text-slate-400"
+                          >
+                            Yesterday
+                          </button>
+                        </div>
+                      </div>
                       <input
                         type="date"
                         value={date}
                         onChange={(e) => setDate(e.target.value)}
-                        className={fieldCls}
+                        className={`${fieldCls} font-mono`}
                       />
                     </div>
-                  </div>
-
-                  <div>
-                    <FieldLabel>Method</FieldLabel>
-                    <select
-                      value={method}
-                      onChange={(e) => setMethod(e.target.value)}
-                      className={fieldCls}
-                    >
-                      {PAYMENT_METHODS.map((m) => (
-                        <option key={m.value} value={m.value}>
-                          {m.label}
-                        </option>
-                      ))}
-                    </select>
+                    <div>
+                      <FieldLabel>Payment method</FieldLabel>
+                      <select
+                        value={method}
+                        onChange={(e) => setMethod(e.target.value)}
+                        className={fieldCls}
+                      >
+                        {PAYMENT_METHODS.map((m) => (
+                          <option key={m.value} value={m.value}>
+                            {m.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
                   </div>
 
                   <div>
@@ -628,8 +854,8 @@ export function TransactionPage() {
                     <div
                       className={`flex items-start gap-2 rounded-xl px-3 py-2.5 text-sm ${
                         success
-                          ? "border border-emerald-200 bg-emerald-50 text-emerald-800"
-                          : "border border-rose-200 bg-rose-50 text-rose-700"
+                          ? "border border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300"
+                          : "border border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-300"
                       }`}
                     >
                       {success && (
@@ -644,7 +870,7 @@ export function TransactionPage() {
                       type="button"
                       disabled={saving || !selectedId}
                       onClick={submit}
-                      className="flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+                      className="flex w-full items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-indigo-500 dark:hover:bg-indigo-400"
                     >
                       {saving ? (
                         <>

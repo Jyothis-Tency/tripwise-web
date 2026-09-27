@@ -1,18 +1,29 @@
-import { User } from 'lucide-react';
-import type { Driver } from '../api';
+import { Pencil, User } from "lucide-react";
+import type { Driver } from "../api";
 
 function getStatusColor(driver: Driver): string {
-  if (driver.isBlocked) return 'bg-rose-500';
-  const statusVal = driver.status || (driver.isActive !== false ? 'Active' : 'Inactive');
+  if (driver.isBlocked) return "bg-rose-500";
+  const statusVal =
+    driver.status || (driver.isActive !== false ? "Active" : "Inactive");
   const s = String(statusVal).toLowerCase();
-  if (s === 'active') return 'bg-emerald-500';
-  if (s === 'on leave') return 'bg-amber-500';
-  return 'bg-slate-400';
+  if (s === "active") return "bg-emerald-500";
+  if (s === "on leave") return "bg-amber-500";
+  return "bg-slate-400";
 }
 
 function getStatusLabel(driver: Driver): string {
-  if (driver.isBlocked) return 'Blocked';
-  return driver.status || (driver.isActive !== false ? 'Active' : 'Inactive');
+  if (driver.isBlocked) return "Blocked";
+  return driver.status || (driver.isActive !== false ? "Active" : "Inactive");
+}
+
+function getStatusTextCls(driver: Driver): string {
+  if (driver.isBlocked) return "text-rose-700 dark:text-rose-400";
+  const s = String(
+    driver.status || (driver.isActive !== false ? "Active" : "Inactive"),
+  ).toLowerCase();
+  if (s === "active") return "text-emerald-700 dark:text-emerald-400";
+  if (s === "on leave") return "text-amber-700 dark:text-amber-400";
+  return "text-slate-500 dark:text-slate-400";
 }
 
 interface DriverCardProps {
@@ -22,10 +33,16 @@ interface DriverCardProps {
   onEdit: () => void;
 }
 
-export function DriverCard({ driver, isSelected, onSelect, onEdit }: DriverCardProps) {
-  const name = driver.firstName && driver.lastName
-    ? `${driver.firstName} ${driver.lastName}`.trim()
-    : (driver as any).name ?? '—';
+export function DriverCard({
+  driver,
+  isSelected,
+  onSelect,
+  onEdit,
+}: DriverCardProps) {
+  const name =
+    driver.firstName && driver.lastName
+      ? `${driver.firstName} ${driver.lastName}`.trim()
+      : ((driver as any).name ?? "—");
   const statusLabel = getStatusLabel(driver);
   const statusDot = getStatusColor(driver);
   const subtitle = driver.place
@@ -34,45 +51,79 @@ export function DriverCard({ driver, isSelected, onSelect, onEdit }: DriverCardP
 
   return (
     <div
+      role="button"
+      tabIndex={0}
       onClick={onSelect}
-      className={`flex items-center gap-3 px-3 py-2.5 rounded-xl border cursor-pointer transition-all
-        ${isSelected
-          ? 'bg-blue-50 border-blue-400 shadow-sm'
-          : 'bg-white border-slate-200 hover:border-slate-300 hover:bg-slate-50/50'}`}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") onSelect();
+      }}
+      className={`group flex cursor-pointer items-center gap-3 rounded-xl border p-3 transition-all ${
+        isSelected
+          ? "border-indigo-500 bg-indigo-50/40 shadow-xs dark:border-indigo-400 dark:bg-indigo-500/10"
+          : "border-slate-200/70 bg-white hover:border-slate-300 hover:bg-slate-50/70 dark:border-white/10 dark:bg-[#0e121d]/80 dark:hover:border-white/20 dark:hover:bg-white/[0.04]"
+      }`}
     >
-      {/* Avatar */}
       {driver.profileImg ? (
         <img
           src={driver.profileImg}
           alt={name}
-          className="h-10 w-10 rounded-full object-cover shrink-0"
-          onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
+          className="h-10 w-10 shrink-0 rounded-full object-cover"
+          onError={(e) => {
+            (e.target as HTMLImageElement).style.display = "none";
+          }}
         />
       ) : (
-        <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center shrink-0">
-          <User className="h-5 w-5 text-blue-500" />
+        <div
+          className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${
+            isSelected
+              ? "bg-indigo-600 text-white shadow-xs dark:bg-indigo-500"
+              : "border border-slate-200 bg-slate-100 text-slate-600 dark:border-white/10 dark:bg-white/5 dark:text-slate-400"
+          }`}
+        >
+          <User className="h-5 w-5" />
         </div>
       )}
 
-      {/* Info */}
-      <div className="flex-1 min-w-0">
-        <p className="text-sm font-semibold text-slate-800 truncate">{name}</p>
-        <div className="flex items-center gap-1.5 mt-0.5">
-          <span className={`h-1.5 w-1.5 rounded-full ${statusDot}`} />
-          <span className="text-[11px] text-slate-500">{statusLabel}</span>
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-1.5">
+          <p className="truncate text-xs font-bold tracking-tight text-slate-900 dark:text-white">
+            {name}
+          </p>
+          {!driver.isBlocked &&
+            String(statusLabel).toLowerCase() === "active" && (
+              <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500" />
+            )}
         </div>
-        <p className="text-[11px] text-slate-400 truncate mt-0.5">{subtitle}</p>
+        <div className="mt-0.5 flex items-center gap-1.5">
+          {(driver.isBlocked ||
+            String(statusLabel).toLowerCase() !== "active") && (
+            <span className={`h-1.5 w-1.5 rounded-full ${statusDot}`} />
+          )}
+          <span
+            className={`text-[11px] font-medium ${getStatusTextCls(driver)}`}
+          >
+            {statusLabel}
+          </span>
+        </div>
+        <p className="mt-0.5 truncate text-[11px] text-slate-400 dark:text-slate-500">
+          {subtitle}
+        </p>
       </div>
 
-      {/* Edit */}
       <button
-        onClick={e => { e.stopPropagation(); onEdit(); }}
-        className="shrink-0 p-1.5 rounded-md bg-blue-50 text-blue-500 hover:bg-blue-100 transition"
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          onEdit();
+        }}
+        className={`shrink-0 rounded-md p-1.5 transition ${
+          isSelected
+            ? "text-indigo-600 hover:bg-indigo-100/70 dark:text-indigo-300 dark:hover:bg-indigo-500/20"
+            : "text-slate-400 opacity-80 hover:bg-slate-100 hover:text-slate-600 group-hover:opacity-100 dark:hover:bg-white/10 dark:hover:text-slate-200"
+        }`}
         title="Edit driver"
       >
-        <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-        </svg>
+        <Pencil className="h-3.5 w-3.5" />
       </button>
     </div>
   );

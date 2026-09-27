@@ -1,4 +1,8 @@
 import jsPDF from "jspdf";
+import {
+  TRIP_CONFIRMATION_SEED,
+  type TripConfirmationSeed,
+} from "./seed";
 
 export type TemplateField = {
   id: string;
@@ -85,63 +89,58 @@ export function newPageBreak(): TemplateBlock {
   return { id: nid("pb"), type: "pageBreak" };
 }
 
-/** Default layout — labels/structure only; values filled on Trip Confirmation. */
-export const DEFAULT_TRIP_CONFIRMATION: TripConfirmationTemplate = {
-  blocks: [
-    newHeading("INWAY CABS", "company"),
-    newHeading("PREMIUM CRYSTA – TOUR QUOTATION", "title"),
-    newFields([
-      ["Trip", ""],
-      ["Duration", ""],
-      ["Vehicle", ""],
-      ["Package", ""],
-      ["KM Calculation", ""],
-    ]),
-    newText(""),
-    newHeading("PACKAGE PRICE", "section"),
-    newText("", { bold: true, underline: true }),
-    newList("Package Includes:", [
-      "Fuel",
-      "Toll Charges",
-      "Parking Charges",
-      "Driver Allowance",
-      "Professional Driver",
-      "Up to 700 km",
-    ]),
-    newFields([["Extra KM", ""]]),
-    newHeading("TRIP DETAILS", "section"),
-    newFields([
-      ["Arrival", ""],
-      ["Departure", ""],
-      ["Pickup", ""],
-      ["Drop", ""],
-      ["Pickup Time", ""],
-    ]),
-    newHeading("BOOKING CONFIRMATION", "section"),
-    newFields([["Advance", ""]]),
-    newText(""),
-    newText("", { bold: true }),
-    newHeading("PAYMENT DETAILS", "section"),
-    newFields([
-      ["UPI ID", ""],
-      ["G Pay / PhonePe", ""],
-    ]),
-    newPageBreak(),
-    newHeading("INWAY CABS", "company"),
-    newText("", { bold: true }),
-    newText("", { bold: true }),
-    newText("", { bold: true }),
-    newText("", { bold: true }),
-    newText(""),
-    newText("★ INWAY CABS", { bold: true }),
-    newText(
-      "Professional Service • Clean Vehicles • Experienced Drivers • Customer Satisfaction",
-      { bold: true },
-    ),
-  ],
-};
+/** Build full template blocks from seed (preloads + empty per-trip slots). */
+export function buildTemplateFromSeed(
+  seed: TripConfirmationSeed = TRIP_CONFIRMATION_SEED,
+): TripConfirmationTemplate {
+  const bank = [...seed.bankLines];
+  while (bank.length < 4) bank.push("");
 
-const LS_KEY = "tripwise.tripConfirmation.template.v2";
+  return {
+    blocks: [
+      newHeading(seed.companyName, "company"),
+      newHeading(seed.documentTitle, "title"),
+      newFields(seed.tripFieldNames.map((l) => [l, ""] as [string, string])),
+      newText(""),
+      newHeading(seed.packagePriceHeading, "section"),
+      newText("", { bold: true, underline: true }),
+      newList(seed.packageIncludesTitle, [...seed.packageIncludesItems]),
+      newFields([[seed.extraKmLabel, ""]]),
+      newHeading(seed.tripDetailsHeading, "section"),
+      newFields(
+        seed.tripDetailFieldNames.map((l) => [l, ""] as [string, string]),
+      ),
+      newHeading(seed.bookingHeading, "section"),
+      newFields([[seed.advanceLabel, ""]]),
+      newText(seed.bookingConfirmSentence),
+      newText(seed.balanceSentence, { bold: true }),
+      newHeading(seed.paymentHeading, "section"),
+      newFields(
+        seed.paymentFields.map(
+          (f) => [f.label, f.value] as [string, string],
+        ),
+      ),
+      newPageBreak(),
+      newHeading(seed.companyName, "company"),
+      newText(bank[0] ?? "", { bold: true }),
+      newText(bank[1] ?? "", { bold: true }),
+      newText(bank[2] ?? "", { bold: true }),
+      newText(bank[3] ?? "", { bold: true }),
+      newText(""),
+      newText(seed.vehicleAvailableSentence, { bold: true }),
+      newText(""),
+      newText(seed.footerBrand, { bold: true }),
+      newText(seed.footerTagline, { bold: true }),
+    ],
+  };
+}
+
+/** Default layout from seed script. */
+export const DEFAULT_TRIP_CONFIRMATION: TripConfirmationTemplate =
+  buildTemplateFromSeed();
+
+const LS_KEY = "tripwise.tripConfirmation.template.v3";
+const LS_KEY_V2 = "tripwise.tripConfirmation.template.v2";
 const LS_KEY_LEGACY = "tripwise.tripConfirmation.defaults";
 
 function isTemplate(v: unknown): v is TripConfirmationTemplate {
@@ -152,124 +151,51 @@ function isTemplate(v: unknown): v is TripConfirmationTemplate {
   );
 }
 
-/** Migrate old fixed-field saves into the flexible template. */
-function migrateLegacy(raw: Record<string, string>): TripConfirmationTemplate {
-  const t = structuredClone(DEFAULT_TRIP_CONFIRMATION);
-  const setField = (label: string, value?: string) => {
-    if (value == null) return;
-    for (const b of t.blocks) {
-      if (b.type !== "fields") continue;
-      const f = b.fields.find(
-        (x) => x.label.toLowerCase() === label.toLowerCase(),
-      );
-      if (f) f.value = value;
-    }
-  };
-  if (raw.companyName) {
-    for (const b of t.blocks) {
-      if (b.type === "heading" && b.style === "company") b.text = raw.companyName;
-    }
-  }
-  if (raw.documentTitle) {
-    for (const b of t.blocks) {
-      if (b.type === "heading" && b.style === "title") b.text = raw.documentTitle;
-    }
-  }
-  setField("Trip", raw.trip);
-  setField("Duration", raw.duration);
-  setField("Vehicle", raw.vehicle);
-  setField("Package", raw.packageKm);
-  setField("KM Calculation", raw.kmCalculation);
-  setField("Arrival", raw.arrival);
-  setField("Departure", raw.departure);
-  setField("Pickup", raw.pickup);
-  setField("Drop", raw.drop);
-  setField("Pickup Time", raw.pickupTime);
-  setField("Advance", raw.advanceAmount);
-  setField("Extra KM", raw.extraKmRate);
-  setField("UPI ID", raw.upiId);
-  setField("G Pay / PhonePe", raw.gpayPhone);
-
-  // Update first free-text route / notes / bank lines if present
-  const texts = t.blocks.filter((b) => b.type === "text");
-  if (raw.route && texts[0]?.type === "text") texts[0].text = raw.route;
-  if (raw.packagePrice) {
-    const price = t.blocks.find(
-      (b) => b.type === "text" && b.underline,
-    );
-    if (price?.type === "text") price.text = raw.packagePrice;
-  }
-  if (raw.packageIncludes) {
-    const list = t.blocks.find((b) => b.type === "list");
-    if (list?.type === "list") {
-      list.items = raw.packageIncludes.split("\n").filter(Boolean);
-    }
+/** Write seed into localStorage (used by seed script / Reset to seed). */
+export function applyTripConfirmationSeed(): TripConfirmationTemplate {
+  const t = buildTemplateFromSeed();
+  saveTripConfirmationDefaults(t);
+  try {
+    localStorage.removeItem(LS_KEY_V2);
+    localStorage.removeItem(LS_KEY_LEGACY);
+  } catch {
+    /* ignore */
   }
   return t;
 }
 
 export function loadTripConfirmationDefaults(): TripConfirmationTemplate {
   try {
-    const v2 = localStorage.getItem(LS_KEY);
-    if (v2) {
-      const parsed = JSON.parse(v2);
-      if (isTemplate(parsed)) {
-        const raw: TripConfirmationTemplate = {
-          blocks: parsed.blocks.length
-            ? parsed.blocks
-            : structuredClone(DEFAULT_TRIP_CONFIRMATION.blocks),
-        };
-        return stripTemplateValues(raw);
+    const v3 = localStorage.getItem(LS_KEY);
+    if (v3) {
+      const parsed = JSON.parse(v3);
+      if (isTemplate(parsed) && parsed.blocks.length) {
+        return { blocks: parsed.blocks };
       }
     }
-    const legacy = localStorage.getItem(LS_KEY_LEGACY);
-    if (legacy) {
-      const parsed = JSON.parse(legacy) as Record<string, string>;
-      return stripTemplateValues(migrateLegacy(parsed));
-    }
+    // First visit / after seed bump: apply seed
+    return applyTripConfirmationSeed();
   } catch {
     /* ignore */
   }
-  return stripTemplateValues(structuredClone(DEFAULT_TRIP_CONFIRMATION));
+  return buildTemplateFromSeed();
 }
 
 export function saveTripConfirmationDefaults(data: TripConfirmationTemplate) {
   try {
-    localStorage.setItem(LS_KEY, JSON.stringify(stripTemplateValues(data)));
+    localStorage.setItem(LS_KEY, JSON.stringify(data));
   } catch {
     /* ignore */
   }
 }
 
-/** Keep structure/labels; clear field & text values (for blank client forms). */
-export function stripTemplateValues(
-  data: TripConfirmationTemplate,
-): TripConfirmationTemplate {
-  return {
-    blocks: data.blocks.map((b) => {
-      if (b.type === "fields") {
-        return {
-          ...b,
-          fields: b.fields.map((f) => ({ ...f, value: "" })),
-        };
-      }
-      if (b.type === "text") {
-        // Keep static branding lines that look like fixed template copy
-        const t = (b.text || "").trim();
-        if (
-          t.startsWith("★") ||
-          /Professional Service/i.test(t)
-        ) {
-          return { ...b };
-        }
-        return { ...b, text: "" };
-      }
-      return { ...b };
-    }),
-  };
-}
+/** Field name (key) + value. */
+export type SimpleField = {
+  label: string;
+  value: string;
+};
 
-/** Flat form model for the simple template editor. */
+/** Flat form for template editor (preloads + field names). */
 export type SimpleTripTemplate = {
   companyName: string;
   documentTitle: string;
@@ -277,55 +203,35 @@ export type SimpleTripTemplate = {
   tripDetailsHeading: string;
   bookingHeading: string;
   paymentHeading: string;
-  tripFields: string[];
+  tripFields: SimpleField[];
+  routeText: string;
   packageIncludesTitle: string;
   packageIncludesItems: string[];
-  extraKmLabel: string;
-  tripDetailFields: string[];
-  advanceLabel: string;
-  paymentFields: string[];
+  packagePrice: string;
+  extraKm: SimpleField;
+  tripDetailFields: SimpleField[];
+  advance: SimpleField;
+  bookingNote: string;
+  bookingSubNote: string;
+  paymentFields: SimpleField[];
+  bankLines: string[];
+  vehicleAvailableSentence: string;
   footerBrand: string;
   footerTagline: string;
 };
 
+function sf(label: string, value = ""): SimpleField {
+  return { label, value };
+}
+
 export function defaultSimpleTripTemplate(): SimpleTripTemplate {
-  return {
-    companyName: "INWAY CABS",
-    documentTitle: "PREMIUM CRYSTA – TOUR QUOTATION",
-    packagePriceHeading: "PACKAGE PRICE",
-    tripDetailsHeading: "TRIP DETAILS",
-    bookingHeading: "BOOKING CONFIRMATION",
-    paymentHeading: "PAYMENT DETAILS",
-    tripFields: ["Trip", "Duration", "Vehicle", "Package", "KM Calculation"],
-    packageIncludesTitle: "Package Includes:",
-    packageIncludesItems: [
-      "Fuel",
-      "Toll Charges",
-      "Parking Charges",
-      "Driver Allowance",
-      "Professional Driver",
-      "Up to 700 km",
-    ],
-    extraKmLabel: "Extra KM",
-    tripDetailFields: [
-      "Arrival",
-      "Departure",
-      "Pickup",
-      "Drop",
-      "Pickup Time",
-    ],
-    advanceLabel: "Advance",
-    paymentFields: ["UPI ID", "G Pay / PhonePe"],
-    footerBrand: "★ INWAY CABS",
-    footerTagline:
-      "Professional Service • Clean Vehicles • Experienced Drivers • Customer Satisfaction",
-  };
+  return templateToSimple(buildTemplateFromSeed());
 }
 
 export function templateToSimple(
   data: TripConfirmationTemplate,
 ): SimpleTripTemplate {
-  const fallback = defaultSimpleTripTemplate();
+  const fallback = templateToSimpleFromSeed(TRIP_CONFIRMATION_SEED);
   const headings = data.blocks.filter(
     (b): b is Extract<TemplateBlock, { type: "heading" }> =>
       b.type === "heading",
@@ -342,8 +248,7 @@ export function templateToSimple(
 
   const company =
     headings.find((h) => h.style === "company")?.text ?? fallback.companyName;
-  const title =
-    headings.find((h) => h.style === "title")?.text ?? fallback.documentTitle;
+  const title = headings.find((h) => h.style === "title")?.text ?? "";
   const sections = headings.filter((h) => h.style === "section");
 
   const footerBrand =
@@ -352,6 +257,47 @@ export function templateToSimple(
   const footerTagline =
     texts.find((t) => /Professional Service/i.test(t.text))?.text ??
     fallback.footerTagline;
+  const vehicleLine =
+    texts.find((t) => /pre-booking/i.test(t.text))?.text ??
+    fallback.vehicleAvailableSentence;
+
+  const toFields = (
+    group: Extract<TemplateBlock, { type: "fields" }> | undefined,
+    fb: SimpleField[],
+  ): SimpleField[] =>
+    group?.fields?.length
+      ? group.fields.map((f) => ({ label: f.label, value: f.value ?? "" }))
+      : fb.map((f) => ({ ...f }));
+
+  const contentTexts = texts.filter(
+    (t) =>
+      !t.text.trim().startsWith("★") &&
+      !/Professional Service/i.test(t.text) &&
+      !/pre-booking/i.test(t.text),
+  );
+  const priceText =
+    texts.find((t) => t.underline)?.text ?? contentTexts[1]?.text ?? "";
+
+  const pageBreakIdx = data.blocks.findIndex((b) => b.type === "pageBreak");
+  const page2Texts = data.blocks
+    .slice(pageBreakIdx + 1)
+    .filter(
+      (b): b is Extract<TemplateBlock, { type: "text" }> =>
+        b.type === "text" &&
+        !b.text.trim().startsWith("★") &&
+        !/Professional Service/i.test(b.text) &&
+        !/pre-booking/i.test(b.text),
+    );
+
+  // booking sentences: after advance field group — contentTexts[2], [3] typically
+  const bookingNote =
+    contentTexts.find((t) => /confirmed upon receipt/i.test(t.text))?.text ??
+    contentTexts[2]?.text ??
+    fallback.bookingNote;
+  const bookingSubNote =
+    contentTexts.find((t) => /Balance:/i.test(t.text))?.text ??
+    contentTexts[3]?.text ??
+    fallback.bookingSubNote;
 
   return {
     companyName: company,
@@ -360,93 +306,136 @@ export function templateToSimple(
     tripDetailsHeading: sections[1]?.text ?? fallback.tripDetailsHeading,
     bookingHeading: sections[2]?.text ?? fallback.bookingHeading,
     paymentHeading: sections[3]?.text ?? fallback.paymentHeading,
-    tripFields: fieldGroups[0]?.fields.map((f) => f.label).filter(Boolean)
-      .length
-      ? fieldGroups[0]!.fields.map((f) => f.label)
-      : fallback.tripFields,
+    tripFields: toFields(fieldGroups[0], fallback.tripFields),
+    routeText: contentTexts[0]?.text ?? "",
     packageIncludesTitle: lists[0]?.title ?? fallback.packageIncludesTitle,
-    packageIncludesItems: lists[0]?.items?.length
-      ? [...lists[0].items]
-      : fallback.packageIncludesItems,
-    extraKmLabel: fieldGroups[1]?.fields[0]?.label ?? fallback.extraKmLabel,
-    tripDetailFields: fieldGroups[2]?.fields.map((f) => f.label).filter(Boolean)
-      .length
-      ? fieldGroups[2]!.fields.map((f) => f.label)
-      : fallback.tripDetailFields,
-    advanceLabel: fieldGroups[3]?.fields[0]?.label ?? fallback.advanceLabel,
-    paymentFields: fieldGroups[4]?.fields.map((f) => f.label).filter(Boolean)
-      .length
-      ? fieldGroups[4]!.fields.map((f) => f.label)
-      : fallback.paymentFields,
+    packageIncludesItems: lists[0]?.items ? [...lists[0].items] : [],
+    packagePrice: priceText,
+    extraKm: fieldGroups[1]?.fields[0]
+      ? {
+          label: fieldGroups[1].fields[0].label,
+          value: fieldGroups[1].fields[0].value ?? "",
+        }
+      : { ...fallback.extraKm },
+    tripDetailFields: toFields(fieldGroups[2], fallback.tripDetailFields),
+    advance: fieldGroups[3]?.fields[0]
+      ? {
+          label: fieldGroups[3].fields[0].label,
+          value: fieldGroups[3].fields[0].value ?? "",
+        }
+      : { ...fallback.advance },
+    bookingNote,
+    bookingSubNote,
+    paymentFields: toFields(fieldGroups[4], fallback.paymentFields),
+    bankLines: [
+      page2Texts[0]?.text ?? "",
+      page2Texts[1]?.text ?? "",
+      page2Texts[2]?.text ?? "",
+      page2Texts[3]?.text ?? "",
+    ],
+    vehicleAvailableSentence: vehicleLine,
     footerBrand,
     footerTagline,
+  };
+}
+
+function templateToSimpleFromSeed(
+  seed: TripConfirmationSeed,
+): SimpleTripTemplate {
+  return {
+    companyName: seed.companyName,
+    documentTitle: seed.documentTitle,
+    packagePriceHeading: seed.packagePriceHeading,
+    tripDetailsHeading: seed.tripDetailsHeading,
+    bookingHeading: seed.bookingHeading,
+    paymentHeading: seed.paymentHeading,
+    tripFields: seed.tripFieldNames.map((l) => sf(l)),
+    routeText: "",
+    packageIncludesTitle: seed.packageIncludesTitle,
+    packageIncludesItems: [...seed.packageIncludesItems],
+    packagePrice: "",
+    extraKm: sf(seed.extraKmLabel),
+    tripDetailFields: seed.tripDetailFieldNames.map((l) => sf(l)),
+    advance: sf(seed.advanceLabel),
+    bookingNote: seed.bookingConfirmSentence,
+    bookingSubNote: seed.balanceSentence,
+    paymentFields: seed.paymentFields.map((f) => ({ ...f })),
+    bankLines: [...seed.bankLines],
+    vehicleAvailableSentence: seed.vehicleAvailableSentence,
+    footerBrand: seed.footerBrand,
+    footerTagline: seed.footerTagline,
   };
 }
 
 export function simpleToTemplate(
   s: SimpleTripTemplate,
 ): TripConfirmationTemplate {
-  const labels = (arr: string[]) =>
-    arr.map((label) => [label.trim() || "Field", ""] as [string, string]);
+  const pairs = (arr: SimpleField[]) =>
+    arr.map(
+      (f) =>
+        [f.label.trim() || "Field", f.value ?? ""] as [string, string],
+    );
 
-  return stripTemplateValues({
+  const trip =
+    s.tripFields.length > 0
+      ? s.tripFields
+      : [sf("Trip"), sf("Duration"), sf("Vehicle")];
+  const details =
+    s.tripDetailFields.length > 0
+      ? s.tripDetailFields
+      : [
+          sf("Arrival"),
+          sf("Departure"),
+          sf("Pickup"),
+          sf("Drop"),
+          sf("Pickup Time"),
+        ];
+  const payment =
+    s.paymentFields.length > 0
+      ? s.paymentFields
+      : [sf("UPI ID"), sf("G Pay / PhonePe")];
+
+  const bank = [...(s.bankLines ?? [])];
+  while (bank.length < 4) bank.push("");
+
+  return {
     blocks: [
-      newHeading(s.companyName.trim() || "INWAY CABS", "company"),
-      newHeading(
-        s.documentTitle.trim() || "PREMIUM CRYSTA – TOUR QUOTATION",
-        "title",
-      ),
-      newFields(
-        labels(
-          s.tripFields.length ? s.tripFields : ["Trip", "Duration", "Vehicle"],
-        ),
-      ),
-      newText(""),
-      newHeading(s.packagePriceHeading.trim() || "PACKAGE PRICE", "section"),
-      newText("", { bold: true, underline: true }),
+      newHeading(s.companyName.trim(), "company"),
+      newHeading(s.documentTitle.trim(), "title"),
+      newFields(pairs(trip)),
+      newText(s.routeText ?? ""),
+      newHeading(s.packagePriceHeading.trim(), "section"),
+      newText(s.packagePrice ?? "", { bold: true, underline: true }),
       newList(
-        s.packageIncludesTitle.trim() || "Package Includes:",
-        (s.packageIncludesItems.length
-          ? s.packageIncludesItems
-          : ["Fuel"]
-        ).map((x) => x.trim()).filter(Boolean),
+        s.packageIncludesTitle.trim(),
+        (s.packageIncludesItems ?? []).map((x) => x.trim()).filter(Boolean),
       ),
-      newFields([[s.extraKmLabel.trim() || "Extra KM", ""]]),
-      newHeading(s.tripDetailsHeading.trim() || "TRIP DETAILS", "section"),
-      newFields(
-        labels(
-          s.tripDetailFields.length
-            ? s.tripDetailFields
-            : ["Arrival", "Departure", "Pickup", "Drop", "Pickup Time"],
-        ),
-      ),
-      newHeading(s.bookingHeading.trim() || "BOOKING CONFIRMATION", "section"),
-      newFields([[s.advanceLabel.trim() || "Advance", ""]]),
-      newText(""),
-      newText("", { bold: true }),
-      newHeading(s.paymentHeading.trim() || "PAYMENT DETAILS", "section"),
-      newFields(
-        labels(
-          s.paymentFields.length
-            ? s.paymentFields
-            : ["UPI ID", "G Pay / PhonePe"],
-        ),
-      ),
+      newFields([
+        [s.extraKm.label.trim() || "Extra KM", s.extraKm.value ?? ""],
+      ]),
+      newHeading(s.tripDetailsHeading.trim(), "section"),
+      newFields(pairs(details)),
+      newHeading(s.bookingHeading.trim(), "section"),
+      newFields([
+        [s.advance.label.trim() || "Advance", s.advance.value ?? ""],
+      ]),
+      newText(s.bookingNote ?? ""),
+      newText(s.bookingSubNote ?? "", { bold: true }),
+      newHeading(s.paymentHeading.trim(), "section"),
+      newFields(pairs(payment)),
       newPageBreak(),
-      newHeading(s.companyName.trim() || "INWAY CABS", "company"),
-      newText("", { bold: true }),
-      newText("", { bold: true }),
-      newText("", { bold: true }),
-      newText("", { bold: true }),
+      newHeading(s.companyName.trim(), "company"),
+      newText(bank[0] ?? "", { bold: true }),
+      newText(bank[1] ?? "", { bold: true }),
+      newText(bank[2] ?? "", { bold: true }),
+      newText(bank[3] ?? "", { bold: true }),
       newText(""),
-      newText(s.footerBrand.trim() || "★ INWAY CABS", { bold: true }),
-      newText(
-        s.footerTagline.trim() ||
-          "Professional Service • Clean Vehicles • Experienced Drivers • Customer Satisfaction",
-        { bold: true },
-      ),
+      newText(s.vehicleAvailableSentence ?? "", { bold: true }),
+      newText(""),
+      newText(s.footerBrand.trim(), { bold: true }),
+      newText(s.footerTagline.trim(), { bold: true }),
     ],
-  });
+  };
 }
 
 

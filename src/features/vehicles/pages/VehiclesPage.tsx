@@ -9,12 +9,14 @@ import {
   Pencil,
   Plus,
   Search,
+  User,
   UserCheck,
   UserPlus,
   AlertTriangle,
   Calculator,
   ArrowLeft,
   ArrowRightLeft,
+  Calendar,
   X,
   Check,
   Loader2,
@@ -64,26 +66,26 @@ const VEHICLE_STATUSES = ["Available", "On Trip", "Maintenance", "Inactive"];
 function statusBadgeCls(status?: string) {
   switch ((status ?? "").toLowerCase()) {
     case "available":
-      return "bg-green-100 text-green-700 border-green-200";
+      return "bg-green-100 text-green-700 border-green-200 dark:bg-emerald-500/15 dark:text-emerald-300 dark:border-emerald-500/30";
     case "on trip":
     case "on_trip":
-      return "bg-blue-100 text-blue-700 border-blue-200";
+      return "bg-indigo-100 text-indigo-700 border-indigo-200 dark:bg-indigo-500/20 dark:text-indigo-300 dark:border-indigo-500/30";
     case "maintenance":
     case "under maintenance":
-      return "bg-orange-100 text-orange-700 border-orange-200";
+      return "bg-orange-100 text-orange-700 border-orange-200 dark:bg-amber-500/15 dark:text-amber-300 dark:border-amber-500/30";
     case "inactive":
-      return "bg-slate-100 text-slate-600 border-slate-200";
+      return "bg-slate-100 text-slate-600 border-slate-200 dark:bg-white/5 dark:text-slate-400 dark:border-white/10";
     case "scheduled":
-      return "bg-blue-100 text-blue-700 border-blue-200";
+      return "bg-indigo-100 text-indigo-700 border-indigo-200 dark:bg-indigo-500/20 dark:text-indigo-300 dark:border-indigo-500/30";
     case "in_progress":
     case "in progress":
-      return "bg-blue-100 text-blue-700 border-blue-200";
+      return "bg-indigo-100 text-indigo-700 border-indigo-200 dark:bg-indigo-500/20 dark:text-indigo-300 dark:border-indigo-500/30";
     case "completed":
-      return "bg-green-100 text-green-700 border-green-200";
+      return "bg-green-100 text-green-700 border-green-200 dark:bg-emerald-500/15 dark:text-emerald-300 dark:border-emerald-500/30";
     case "cancelled":
-      return "bg-red-100 text-red-700 border-red-200";
+      return "bg-red-100 text-red-700 border-red-200 dark:bg-red-500/15 dark:text-red-300 dark:border-red-500/30";
     default:
-      return "bg-slate-100 text-slate-600 border-slate-200";
+      return "bg-slate-100 text-slate-600 border-slate-200 dark:bg-white/5 dark:text-slate-400 dark:border-white/10";
   }
 }
 
@@ -146,7 +148,7 @@ function tripDriverName(t: TripItem) {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 const inputCls =
-  "w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500";
+  "w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition-colors placeholder:text-slate-400 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 dark:border-white/10 dark:bg-white/5 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-indigo-400 dark:focus:ring-indigo-500/30";
 
 function Field({
   label,
@@ -161,7 +163,10 @@ function Field({
 }) {
   return (
     <div className="space-y-1">
-      <label htmlFor={id} className="text-xs font-medium text-slate-600">
+      <label
+        htmlFor={id}
+        className="text-xs font-medium text-slate-600 dark:text-slate-400"
+      >
         {label}
         {required && <span className="ml-0.5 text-red-500">*</span>}
       </label>
@@ -187,22 +192,24 @@ function ModalShell({
     <div
       ref={backdropRef}
       onClick={(e) => e.target === backdropRef.current && onClose()}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 dark:bg-black/60"
     >
       <div
-        className={`w-full ${maxWidth} rounded-2xl bg-white shadow-2xl flex flex-col max-h-[90vh]`}
+        className={`w-full ${maxWidth} flex max-h-[90vh] flex-col rounded-2xl border border-slate-200 bg-white shadow-2xl dark:border-[#1e2638] dark:bg-[#0e121d]`}
       >
-        <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4 shrink-0">
-          <h3 className="text-base font-semibold text-slate-900">{title}</h3>
+        <div className="flex shrink-0 items-center justify-between border-b border-slate-100 px-6 py-4 dark:border-white/10">
+          <h3 className="text-base font-semibold text-slate-900 dark:text-white">
+            {title}
+          </h3>
           <button
             type="button"
             onClick={onClose}
-            className="text-slate-400 hover:text-slate-600"
+            className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-white/5 dark:hover:text-slate-200"
           >
             <X className="h-5 w-5" />
           </button>
         </div>
-        <div className="overflow-y-auto flex-1">{children}</div>
+        <div className="flex-1 overflow-y-auto">{children}</div>
       </div>
     </div>
   );
@@ -298,10 +305,10 @@ function EditableGridField({
   if (editing) {
   return (
       <div className="col-span-1">
-        <span className="text-slate-400 block mb-0.5 uppercase tracking-wide text-[10px] sm:text-[11px]">
+        <span className="mb-0.5 block text-[10px] uppercase tracking-wide text-slate-400 sm:text-[11px] dark:text-slate-500">
           {label}
         </span>
-        <div className="flex items-center gap-1 mt-0.5 flex-wrap">
+        <div className="mt-0.5 flex flex-wrap items-center gap-1">
           {isTimeField ? (
             <TimePicker12h
               value={editValue}
@@ -320,7 +327,7 @@ function EditableGridField({
               if (e.key === "Enter") handleSave();
               if (e.key === "Escape") cancel();
             }}
-            className="w-full min-w-[70px] border border-blue-300 rounded px-1.5 py-0.5 text-xs outline-none focus:ring-1 focus:ring-blue-200 bg-white"
+            className="w-full min-w-[70px] rounded border border-indigo-300 bg-white px-1.5 py-0.5 text-xs outline-none focus:ring-1 focus:ring-indigo-200 dark:border-indigo-500/40 dark:bg-white/5 dark:text-slate-100 dark:focus:ring-indigo-500/30"
             disabled={saving}
           />
           )}
@@ -345,10 +352,10 @@ function EditableGridField({
   }
   return (
     <div className="group col-span-1">
-      <span className="text-slate-400 block mb-0.5">{label}</span>
+      <span className="mb-0.5 block text-slate-400 dark:text-slate-500">{label}</span>
       <div className="flex items-center gap-1">
         <span
-          className={`${highlight ? "font-bold text-blue-700" : "font-medium text-slate-700"} truncate`}
+          className={`${highlight ? "font-bold text-indigo-700 dark:text-indigo-300" : "font-medium text-slate-700 dark:text-slate-200"} truncate`}
         >
           {isCurrency && displayValue !== "—" && !isNaN(Number(displayValue))
             ? `₹${Number(displayValue).toLocaleString("en-IN")}`
@@ -367,7 +374,7 @@ function EditableGridField({
             setEditValue(seed);
             setEditing(true);
           }}
-          className="opacity-100 lg:opacity-0 lg:group-hover:opacity-100 text-slate-400 hover:text-blue-500 transition-opacity p-0.5"
+          className="p-0.5 text-slate-400 opacity-100 transition-opacity hover:text-indigo-500 lg:opacity-0 lg:group-hover:opacity-100 dark:hover:text-indigo-300"
           title="Edit inline"
         >
           <Pencil className="h-3 w-3" />
@@ -561,14 +568,14 @@ function VehicleModal({
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg border border-slate-200 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"
+            className="rounded-lg border border-slate-200 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 dark:border-white/10 dark:text-slate-300 dark:hover:bg-white/5"
           >
             Cancel
           </button>
           <button
             type="submit"
             disabled={saving}
-            className="rounded-lg bg-blue-500 px-5 py-2 text-sm font-semibold text-white hover:bg-blue-600 disabled:opacity-50"
+            className="rounded-lg bg-indigo-600 px-5 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-50 dark:bg-indigo-500 dark:hover:bg-indigo-400"
           >
             {saving ? "Saving…" : "Save"}
           </button>
@@ -615,7 +622,7 @@ function UpdateTripWrapper({
     return (
       <ModalShell title="Loading..." onClose={onClose} maxWidth="max-w-md">
         <div className="p-8 flex justify-center">
-          <Loader2 className="h-6 w-6 animate-spin text-blue-500" />
+          <Loader2 className="h-6 w-6 animate-spin text-indigo-500" />
         </div>
       </ModalShell>
     );
@@ -852,7 +859,7 @@ export function TripFormModal({
             </Field>
           </div>
 
-          <div className="flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 p-3 text-blue-700">
+          <div className="flex items-center gap-2 rounded-lg border border-indigo-200 bg-indigo-50 p-3 text-indigo-700 dark:border-indigo-500/30 dark:bg-indigo-500/10 dark:text-indigo-300">
             <Calculator className="h-5 w-5 shrink-0" />
             <span className="text-sm font-semibold">
               Agency profit: ₹{profitPreview.toLocaleString("en-IN", {
@@ -874,18 +881,18 @@ export function TripFormModal({
           </Field>
         </div>
 
-        <div className="flex justify-end gap-2 border-t border-slate-100 p-4 shrink-0 bg-slate-50 rounded-b-xl">
+        <div className="flex shrink-0 justify-end gap-2 rounded-b-xl border-t border-slate-100 bg-slate-50 p-4 dark:border-white/10 dark:bg-white/5">
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm text-slate-700 hover:bg-slate-100"
+            className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm text-slate-700 hover:bg-slate-100 dark:border-white/10 dark:bg-white/5 dark:text-slate-300 dark:hover:bg-white/10"
           >
             Cancel
           </button>
           <button
             type="submit"
             disabled={saving || !form.agencyName.trim()}
-            className="rounded-lg bg-blue-500 px-6 py-2 text-sm font-semibold text-white hover:bg-blue-600 disabled:opacity-50"
+            className="rounded-lg bg-indigo-600 px-6 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-50 dark:bg-indigo-500 dark:hover:bg-indigo-400"
           >
             {saving ? "Saving…" : isUpdate ? "Update Trip" : "Start Trip"}
           </button>
@@ -930,14 +937,16 @@ function CancelTripModal({
         <div className="flex items-start gap-3">
           <AlertTriangle className="h-6 w-6 text-red-500 shrink-0 mt-0.5" />
           <div>
-            <p className="text-sm font-medium text-slate-900">Are you sure?</p>
-            <p className="text-xs text-slate-500 mt-1">
+            <p className="text-sm font-medium text-slate-900 dark:text-white">
+              Are you sure?
+            </p>
+            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
               This will cancel the trip. This action cannot be undone.
             </p>
           </div>
         </div>
         {error && (
-          <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-600">
+          <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-600 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-300">
             {error}
           </p>
         )}
@@ -945,7 +954,7 @@ function CancelTripModal({
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg border border-slate-200 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"
+            className="rounded-lg border border-slate-200 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 dark:border-white/10 dark:text-slate-300 dark:hover:bg-white/5"
           >
             Keep Trip
           </button>
@@ -1029,7 +1038,7 @@ function SwitchVehicleModal({
     <ModalShell title="Switch Vehicle" onClose={onClose} maxWidth="max-w-md">
       <form onSubmit={submit} className="flex flex-col" style={{ maxHeight: "65vh" }}>
         <div className="px-4 pt-4 pb-2 shrink-0">
-          <p className="mb-3 text-xs text-slate-500">
+          <p className="mb-3 text-xs text-slate-500 dark:text-slate-400">
             Move this trip to another vehicle in your fleet. Only scheduled and
             in-progress trips can be switched.
           </p>
@@ -1052,7 +1061,7 @@ function SwitchVehicleModal({
         </div>
 
         <div
-          className="mx-4 mb-2 min-h-48 max-h-60 overflow-y-auto rounded-lg border border-slate-200 bg-slate-50/50"
+          className="mx-4 mb-2 max-h-60 min-h-48 overflow-y-auto rounded-lg border border-slate-200 bg-slate-50/50 dark:border-white/10 dark:bg-white/5"
           role="listbox"
           aria-label="Fleet vehicles"
         >
@@ -1082,8 +1091,8 @@ function SwitchVehicleModal({
                       onClick={() => setSelectedId(v._id)}
                       className={`flex w-full items-center justify-between gap-2 rounded-md px-3 py-2.5 text-left text-sm transition ${
                         isSelected
-                          ? "bg-blue-100 text-blue-900 ring-1 ring-blue-300"
-                          : "text-slate-800 hover:bg-white"
+                          ? "bg-indigo-100 text-indigo-900 ring-1 ring-indigo-300 dark:bg-indigo-500/20 dark:text-indigo-200 dark:ring-indigo-500/40"
+                          : "text-slate-800 hover:bg-white dark:text-slate-200 dark:hover:bg-white/5"
                       }`}
                     >
                       <span className="font-medium">{vehicleLabel(v)}</span>
@@ -1102,18 +1111,18 @@ function SwitchVehicleModal({
           )}
         </div>
 
-        <div className="flex justify-end gap-2 px-4 py-4 border-t border-slate-100 shrink-0">
+        <div className="flex shrink-0 justify-end gap-2 border-t border-slate-100 px-4 py-4 dark:border-white/10">
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg border border-slate-200 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"
+            className="rounded-lg border border-slate-200 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 dark:border-white/10 dark:text-slate-300 dark:hover:bg-white/5"
           >
             Cancel
           </button>
           <button
             type="submit"
             disabled={saving || !selectedId || loading}
-            className="rounded-lg bg-blue-500 px-5 py-2 text-sm font-semibold text-white hover:bg-blue-600 disabled:opacity-50"
+            className="rounded-lg bg-indigo-600 px-5 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-50 dark:bg-indigo-500 dark:hover:bg-indigo-400"
           >
             {saving ? "Switching…" : "Switch Vehicle"}
           </button>
@@ -1189,7 +1198,7 @@ function DriverAssignModal({
       <div className="flex flex-col" style={{ maxHeight: "60vh" }}>
         <div className="px-4 pt-4 pb-2">
           {hasDriver && (
-            <div className="mb-3 flex items-center gap-2 rounded-lg bg-blue-50 border border-blue-100 px-3 py-2 text-xs text-blue-700">
+            <div className="mb-3 flex items-center gap-2 rounded-lg border border-indigo-100 bg-indigo-50 px-3 py-2 text-xs text-indigo-700 dark:border-indigo-500/30 dark:bg-indigo-500/10 dark:text-indigo-300">
               <UserCheck className="h-4 w-4 shrink-0" />
               <span>
                 Current driver: <strong>{currentDriverName}</strong>
@@ -1230,21 +1239,25 @@ function DriverAssignModal({
                   type="button"
                   onClick={() => assign(driver)}
                   disabled={!!assigning}
-                  className={`flex w-full items-center justify-between rounded-lg border px-3 py-2.5 text-left transition hover:bg-slate-50 disabled:opacity-60 ${
+                  className={`flex w-full items-center justify-between rounded-lg border px-3 py-2.5 text-left transition hover:bg-slate-50 disabled:opacity-60 dark:hover:bg-white/5 ${
                     isCurrent
-                      ? "border-blue-300 bg-blue-50"
-                      : "border-slate-200"
+                      ? "border-indigo-300 bg-indigo-50 dark:border-indigo-500/40 dark:bg-indigo-500/15"
+                      : "border-slate-200 dark:border-white/10"
                   }`}
                 >
                   <div>
-                    <p className="text-sm font-medium text-slate-800">{name}</p>
+                    <p className="text-sm font-medium text-slate-800 dark:text-slate-100">
+                      {name}
+                    </p>
                     {driver.phone && (
                       <p className="text-xs text-slate-400">{driver.phone}</p>
                     )}
                   </div>
                   <div className="flex items-center gap-2">
                     {isCurrent && (
-                      <span className="text-xs text-blue-500">Current</span>
+                      <span className="text-xs text-indigo-500 dark:text-indigo-300">
+                        Current
+                      </span>
                     )}
                     {assigning === driver._id ? (
                       <span className="text-xs text-slate-400">Assigning…</span>
@@ -1408,12 +1421,12 @@ function VehicleHistoryTab({
         />
       )}
 
-      {/* Filters: sticky within tab scroll so list/stats scroll underneath */}
-      <div className="sticky top-0 z-10 -mx-4 border-b border-slate-200 bg-slate-50 px-4 pb-3 pt-0">
+      {/* Filters card */}
+      <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-[#1e2638] dark:bg-[#0e121d]/80">
         <div className="space-y-3">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
             <div className="w-full sm:w-40">
-              <label className="text-xs font-medium text-slate-600">
+              <label className="text-xs font-medium text-slate-600 dark:text-slate-400">
                 Status
               </label>
               <select
@@ -1434,7 +1447,7 @@ function VehicleHistoryTab({
             </div>
 
             <div className="w-full sm:flex-1">
-              <label className="text-xs font-medium text-slate-600">
+              <label className="text-xs font-medium text-slate-600 dark:text-slate-400">
                 From Date
               </label>
               <input
@@ -1452,7 +1465,7 @@ function VehicleHistoryTab({
             </div>
 
             <div className="w-full sm:flex-1">
-              <label className="text-xs font-medium text-slate-600">
+              <label className="text-xs font-medium text-slate-600 dark:text-slate-400">
                 To Date
               </label>
               <input
@@ -1471,66 +1484,66 @@ function VehicleHistoryTab({
           </div>
 
           {tripStats?.completed != null && (
-            <p className="text-xs text-slate-500">
+            <p className="text-xs text-slate-500 dark:text-slate-400">
               {tripStats?.completed ?? 0} completed trips
             </p>
           )}
         </div>
       </div>
 
-      {/* Statistics banner */}
+      {/* Statistics banner — Stitch-style white cards + indigo labels */}
       {financialStats && (
-        <section className="rounded-xl border border-slate-200 bg-blue-50 p-4">
+        <section className="space-y-3">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            <div className="rounded-lg border border-blue-200 bg-white p-3">
-              <div className="text-[11px] font-semibold uppercase tracking-wide text-blue-700">
+            <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-[#1e2638] dark:bg-[#0e121d]/80">
+              <div className="text-[10px] font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">
                 Total agency cost
               </div>
-              <div className="text-sm font-bold text-slate-900 mt-1">
+              <div className="mt-1 text-sm font-bold text-slate-900 dark:text-white">
                 {formatMoney0(
                   financialStats.billedRevenue ?? financialStats.totalRevenue,
                 )}
               </div>
             </div>
-            <div className="rounded-lg border border-blue-200 bg-white p-3">
-              <div className="text-[11px] font-semibold uppercase tracking-wide text-blue-700">
+            <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-[#1e2638] dark:bg-[#0e121d]/80">
+              <div className="text-[10px] font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">
                 Total cab cost
               </div>
-              <div className="text-sm font-bold text-slate-900 mt-1">
+              <div className="mt-1 text-sm font-bold text-slate-900 dark:text-white">
                 {formatMoney0(
                   financialStats.cabFare ?? financialStats.totalRevenue,
                 )}
               </div>
             </div>
-            <div className="rounded-lg border border-blue-200 bg-white p-3">
-              <div className="text-[11px] font-semibold uppercase tracking-wide text-blue-700">
+            <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-[#1e2638] dark:bg-[#0e121d]/80">
+              <div className="text-[10px] font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">
                 Driver Salary
               </div>
-              <div className="text-sm font-bold text-slate-900 mt-1">
+              <div className="mt-1 text-sm font-bold text-slate-900 dark:text-white">
                 {formatMoney0(financialStats.totalDriverSalary)}
               </div>
             </div>
-            <div className="rounded-lg border border-blue-200 bg-white p-3">
-              <div className="text-[11px] font-semibold uppercase tracking-wide text-blue-700">
+            <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-[#1e2638] dark:bg-[#0e121d]/80">
+              <div className="text-[10px] font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">
                 Owner Revenue
               </div>
-              <div className="text-sm font-bold text-slate-900 mt-1">
+              <div className="mt-1 text-sm font-bold text-slate-900 dark:text-white">
                 {formatMoney0(financialStats.ownerRevenue)}
               </div>
             </div>
-            <div className="rounded-lg border border-blue-200 bg-white p-3 sm:col-span-2 lg:col-span-1">
-              <div className="text-[11px] font-semibold uppercase tracking-wide text-blue-700">
+            <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-[#1e2638] dark:bg-[#0e121d]/80 sm:col-span-2 lg:col-span-1">
+              <div className="text-[10px] font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">
                 Trip Expense
               </div>
-              <div className="text-sm font-bold text-slate-900 mt-1">
+              <div className="mt-1 text-sm font-bold text-slate-900 dark:text-white">
                 {formatMoney0(financialStats.totalExpenses)}
               </div>
             </div>
-            <div className="rounded-lg border border-blue-200 bg-white p-3 sm:col-span-2 lg:col-span-2">
-              <div className="text-[11px] font-semibold uppercase tracking-wide text-blue-700">
+            <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-[#1e2638] dark:bg-[#0e121d]/80 sm:col-span-2 lg:col-span-2">
+              <div className="text-[10px] font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">
                 Vehicle Expenses
               </div>
-              <div className="text-sm font-bold text-slate-900 mt-1">
+              <div className="mt-1 text-sm font-bold text-slate-900 dark:text-white">
                 {formatMoney0(financialStats.vehicleExpenses ?? 0)}
               </div>
             </div>
@@ -1544,20 +1557,22 @@ function VehicleHistoryTab({
           {Array.from({ length: 5 }).map((_, i) => (
             <div
               key={i}
-              className="animate-pulse rounded-xl border border-slate-200 bg-white p-4"
+              className="animate-pulse rounded-xl border border-slate-200 bg-white p-4 dark:border-[#1e2638] dark:bg-[#0e121d]/80"
             >
-              <div className="h-4 bg-slate-100 rounded w-1/2" />
-              <div className="h-3 bg-slate-100 rounded w-2/3 mt-3" />
-              <div className="h-3 bg-slate-100 rounded w-1/3 mt-3" />
+              <div className="h-4 w-1/2 rounded bg-slate-100 dark:bg-white/10" />
+              <div className="mt-3 h-3 w-2/3 rounded bg-slate-100 dark:bg-white/10" />
+              <div className="mt-3 h-3 w-1/3 rounded bg-slate-100 dark:bg-white/10" />
             </div>
           ))}
         </div>
         ) : error ? (
           <p className="py-6 text-center text-xs text-red-500">{error}</p>
       ) : trips.length === 0 ? (
-          <div className="flex flex-col items-center py-10 text-center">
-            <History className="h-10 w-10 text-slate-300" />
-            <p className="mt-2 text-sm text-slate-400">No trip history found</p>
+          <div className="flex flex-col items-center rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50/40 py-12 text-center dark:border-white/10 dark:bg-white/5">
+            <History className="h-10 w-10 text-slate-300 dark:text-slate-600" />
+            <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
+              No trip history found
+            </p>
           </div>
         ) : (
         <div className="space-y-3">
@@ -1569,19 +1584,19 @@ function VehicleHistoryTab({
             return (
               <section
                 key={t._id}
-                className="rounded-xl border border-slate-200 bg-white p-4"
+                className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-[#1e2638] dark:bg-[#0e121d]/80"
               >
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <div className="flex items-center gap-3">
-                      <div className="h-7 w-7 rounded-full bg-blue-50 border border-blue-200 flex items-center justify-center text-[11px] font-bold text-blue-700 shrink-0">
+                      <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-indigo-200 bg-indigo-50 text-[11px] font-bold text-indigo-700 dark:border-indigo-500/30 dark:bg-indigo-500/15 dark:text-indigo-300">
                         {rowNumber}
-          </div>
+                      </div>
                       <div className="min-w-0">
-                        <div className="text-sm font-semibold text-slate-900 truncate">
+                        <div className="truncate text-sm font-semibold text-slate-900 dark:text-white">
                           {t.tripNumber ?? "—"}
-      </div>
-                        <div className="mt-0.5 text-[12px] text-slate-500">
+                        </div>
+                        <div className="mt-0.5 text-[12px] text-slate-500 dark:text-slate-400">
                           {t.from && t.to ? `${t.from} → ${t.to}` : "—"}
                         </div>
                       </div>
@@ -1593,7 +1608,7 @@ function VehicleHistoryTab({
                       type="button"
                       onClick={() => openEditTrip(t)}
                       disabled={editTripLoadingId === t._id}
-                      className="flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-600 hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700 transition disabled:opacity-60"
+                      className="flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-600 transition hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-700 disabled:opacity-60 dark:border-white/10 dark:bg-white/5 dark:text-slate-300 dark:hover:border-indigo-500/40 dark:hover:bg-indigo-500/10 dark:hover:text-indigo-300"
                       title="Edit trip details"
                     >
                       {editTripLoadingId === t._id ? (
@@ -1608,17 +1623,17 @@ function VehicleHistoryTab({
                     >
                       {status.replaceAll("_", " ")}
                     </span>
-      </div>
+                  </div>
                 </div>
 
                 <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
-                  <div className="text-xs text-slate-600">
+                  <div className="text-xs text-slate-600 dark:text-slate-400">
                     <div>Distance: {t.distance ?? "—"}</div>
-                    <div className="text-blue-700 font-medium mt-1">
+                    <div className="mt-1 font-medium text-indigo-700 dark:text-indigo-300">
                       {kmTravelledText(t)}
                     </div>
                   </div>
-                  <div className="text-xs text-slate-600">
+                  <div className="text-xs text-slate-600 dark:text-slate-400">
                     <div>
                       Date: {formatDate(t.startDate ?? t.departureDate)}
                     </div>
@@ -1632,32 +1647,32 @@ function VehicleHistoryTab({
                 </div>
 
                 <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3">
-                  <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-2">
-                    <div className="text-[11px] font-semibold text-emerald-800">
+                  <div className="rounded-lg border border-emerald-200 bg-emerald-50/60 p-2 dark:border-emerald-500/30 dark:bg-emerald-500/10">
+                    <div className="text-[11px] font-semibold text-emerald-800 dark:text-emerald-300">
                       Driver Salary
                     </div>
-                    <div className="text-sm font-bold text-slate-900 mt-1">
+                    <div className="mt-1 text-sm font-bold text-slate-900 dark:text-white">
                       {formatMoney0(t.driver_salary)}
                     </div>
                   </div>
-                  <div className="rounded-lg border border-amber-200 bg-amber-50 p-2">
-                    <div className="text-[11px] font-semibold text-amber-800">
+                  <div className="rounded-lg border border-amber-200 bg-amber-50/60 p-2 dark:border-amber-500/30 dark:bg-amber-500/10">
+                    <div className="text-[11px] font-semibold text-amber-800 dark:text-amber-300">
                       Trip Expense
                     </div>
-                    <div className="text-sm font-bold text-slate-900 mt-1">
+                    <div className="mt-1 text-sm font-bold text-slate-900 dark:text-white">
                       {formatMoney0(t.totalExpenses)}
                     </div>
                   </div>
-                  <div className="rounded-lg border border-blue-200 bg-blue-50 p-2">
-                    <div className="text-[11px] font-semibold text-blue-800">
+                  <div className="rounded-lg border border-indigo-200 bg-indigo-50/60 p-2 dark:border-indigo-500/30 dark:bg-indigo-500/10">
+                    <div className="text-[11px] font-semibold text-indigo-800 dark:text-indigo-300">
                       Agency profit
                     </div>
-                    <div className="text-sm font-bold text-slate-900 mt-1">
+                    <div className="mt-1 text-sm font-bold text-slate-900 dark:text-white">
                       {formatMoney0(t.agencyProfit)}
                     </div>
                   </div>
                 </div>
-      </section>
+              </section>
             );
           })}
         </div>
@@ -1670,18 +1685,18 @@ function VehicleHistoryTab({
             type="button"
             onClick={() => canPrev && setPage((p) => Math.max(1, p - 1))}
             disabled={!canPrev}
-            className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+            className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50 dark:border-white/10 dark:bg-white/5 dark:text-slate-300 dark:hover:bg-white/10"
           >
             Prev
           </button>
-          <div className="text-xs text-slate-500">
+          <div className="text-xs text-slate-500 dark:text-slate-400">
             Page {pagination.current ?? page} of {pagination.pages ?? 1}
           </div>
           <button
             type="button"
             onClick={() => canNext && setPage((p) => p + 1)}
             disabled={!canNext}
-            className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+            className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50 dark:border-white/10 dark:bg-white/5 dark:text-slate-300 dark:hover:bg-white/10"
           >
             Next
           </button>
@@ -1778,15 +1793,15 @@ function TripDriverTab({
         {uErr && <p className="text-xs text-red-500">{uErr}</p>}
         {hasActiveTrip ? (
           <section
-            className={`rounded-xl border overflow-hidden ${expandedTripId === activeTrip._id ? "border-blue-300 shadow-sm" : "border-blue-100"} bg-blue-50`}
+            className={`overflow-hidden rounded-xl border ${expandedTripId === activeTrip._id ? "border-indigo-300 shadow-sm dark:border-indigo-500/50" : "border-indigo-100 dark:border-indigo-500/25"} bg-indigo-50 dark:bg-indigo-500/10`}
           >
             <div
-              className="p-4 cursor-pointer hover:bg-blue-100/50 transition-colors"
+              className="cursor-pointer p-4 transition-colors hover:bg-indigo-100/50 dark:hover:bg-indigo-500/15"
               onClick={() => toggleExpand(activeTrip._id)}
             >
-              <div className="flex items-start justify-between mb-2">
+              <div className="mb-2 flex items-start justify-between">
               <div>
-                  <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-blue-400">
+                  <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-indigo-400 dark:text-indigo-300">
                     {expandedTripId === activeTrip._id ? (
                       <ChevronUp className="h-3.5 w-3.5" />
                     ) : (
@@ -1795,35 +1810,41 @@ function TripDriverTab({
                     Live trip
                   </p>
                   {activeTrip.tripNumber && (
-                    <p className="text-sm font-bold text-slate-800 mt-0.5">
+                    <p className="mt-0.5 text-sm font-bold text-slate-800 dark:text-white">
                       Trip #{activeTrip.tripNumber}
                     </p>
                   )}
             </div>
                 <span
-                  className={`text-xs rounded-full border px-2 py-0.5 capitalize ${statusBadgeCls(activeTrip.status)}`}
+                  className={`rounded-full border px-2 py-0.5 text-xs capitalize ${statusBadgeCls(activeTrip.status)}`}
                 >
                   {activeTrip.status ?? "—"}
             </span>
           </div>
-          <div className="space-y-1 text-xs text-slate-600">
+          <div className="space-y-1 text-xs text-slate-600 dark:text-slate-300">
             {activeTrip.from && activeTrip.to && (
               <p className="flex items-center gap-1 font-medium">
                 <span>{activeTrip.from}</span>
-                    <ChevronRight className="h-3.5 w-3.5 text-blue-400" />
+                    <ChevronRight className="h-3.5 w-3.5 text-indigo-400" />
                 <span>{activeTrip.to}</span>
               </p>
             )}
                 {activeTrip.departureDate && (
-                  <p>📅 {formatDate(activeTrip.departureDate)}</p>
+                  <p className="flex items-center gap-1.5">
+                    <Calendar className="h-3.5 w-3.5 text-slate-400" />
+                    {formatDate(activeTrip.departureDate)}
+                  </p>
                 )}
-                <p>👤 Driver: {activeTripDriver ?? "Unassigned"}</p>
+                <p className="flex items-center gap-1.5">
+                  <User className="h-3.5 w-3.5 text-slate-400" />
+                  Driver: {activeTripDriver ?? "Unassigned"}
+                </p>
           </div>
             </div>
 
             {expandedTripId === activeTrip._id && (
-              <div className="px-4 pb-4 pt-1 border-t border-blue-100/50">
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-y-3 gap-x-4 mb-3 text-xs text-slate-600 pt-3">
+              <div className="border-t border-indigo-100/50 px-4 pb-4 pt-1 dark:border-indigo-500/20">
+                <div className="mb-3 grid grid-cols-2 gap-x-4 gap-y-3 pt-3 text-xs text-slate-600 sm:grid-cols-3 dark:text-slate-300">
                   <EditableGridField
                     tripId={activeTrip._id}
                     fieldKey="customer"
@@ -1952,7 +1973,7 @@ function TripDriverTab({
                       </p>
                     </div>
                   )}
-                  <div className="col-span-2 sm:col-span-3 grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-2 mt-2 border-t border-blue-100/30 pt-3 text-[11px]">
+                  <div className="col-span-2 mt-2 grid grid-cols-2 gap-2 border-t border-indigo-100/30 pt-3 text-[11px] sm:col-span-3 md:grid-cols-4 lg:grid-cols-7 dark:border-indigo-500/20">
                     <EditableGridField
                       tripId={activeTrip._id}
                       fieldKey="agencyCost"
@@ -2009,10 +2030,10 @@ function TripDriverTab({
                       isCurrency
                     />
                     <div>
-                      <span className="block mb-0.5 uppercase text-blue-500">
+                      <span className="mb-0.5 block uppercase text-indigo-500 dark:text-indigo-400">
                         Agency profit
                       </span>
-                      <span className="font-bold text-blue-700">
+                      <span className="font-bold text-indigo-700 dark:text-indigo-300">
                         ₹
                         {Number(activeTrip.agencyProfit || 0).toLocaleString(
                           "en-IN",
@@ -2021,7 +2042,7 @@ function TripDriverTab({
                     </div>
                   </div>
                 </div>
-                <div className="flex flex-wrap gap-2 pt-2 border-t border-blue-100/50">
+                <div className="flex flex-wrap gap-2 border-t border-indigo-100/50 pt-2 dark:border-indigo-500/20">
                   <button
                     type="button"
                     onClick={() =>
@@ -2029,7 +2050,7 @@ function TripDriverTab({
                         activeTrip._id ?? activeTrip.id ?? activeTrip.tripId,
                       )
                     }
-                    className="flex-1 rounded-lg border border-blue-300 bg-white px-3 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-50"
+                    className="flex-1 rounded-lg border border-indigo-300 bg-white px-3 py-1.5 text-xs font-medium text-indigo-700 hover:bg-indigo-50 dark:border-indigo-500/40 dark:bg-white/5 dark:text-indigo-300 dark:hover:bg-indigo-500/15"
                   >
               Update
             </button>
@@ -2040,7 +2061,7 @@ function TripDriverTab({
                         activeTrip._id ?? activeTrip.id ?? activeTrip.tripId,
                       )
                     }
-                    className="flex-1 rounded-lg border border-red-200 bg-white px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50"
+                    className="flex-1 rounded-lg border border-red-200 bg-white px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 dark:border-red-500/30 dark:bg-white/5 dark:text-red-300 dark:hover:bg-red-500/10"
                   >
               Cancel Trip
             </button>
@@ -2052,7 +2073,7 @@ function TripDriverTab({
                           activeTrip._id ?? activeTrip.id ?? activeTrip.tripId,
                         )
                       }
-                      className="flex items-center justify-center gap-1 rounded-lg border border-amber-200 bg-white px-3 py-1.5 text-xs font-medium text-amber-800 hover:bg-amber-50"
+                      className="flex items-center justify-center gap-1 rounded-lg border border-amber-200 bg-white px-3 py-1.5 text-xs font-medium text-amber-800 hover:bg-amber-50 dark:border-amber-500/30 dark:bg-white/5 dark:text-amber-300 dark:hover:bg-amber-500/10"
                     >
                       <ArrowRightLeft className="h-3.5 w-3.5" />
                       Switch Vehicle
@@ -2067,7 +2088,7 @@ function TripDriverTab({
                         )
                       }
                       disabled={unassigning}
-                      className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50"
+                      className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50 dark:border-white/10 dark:bg-white/5 dark:text-slate-300 dark:hover:bg-white/10"
                     >
                       Unassign Driver
                     </button>
@@ -2079,7 +2100,7 @@ function TripDriverTab({
                           activeTrip._id ?? activeTrip.id ?? activeTrip.tripId,
                         )
                       }
-                      className="rounded-lg border border-blue-200 bg-white px-3 py-1.5 text-xs font-medium text-blue-600 hover:bg-blue-50"
+                      className="rounded-lg border border-indigo-200 bg-white px-3 py-1.5 text-xs font-medium text-indigo-600 hover:bg-indigo-50 dark:border-indigo-500/30 dark:bg-white/5 dark:text-indigo-300 dark:hover:bg-indigo-500/15"
                     >
                       Assign Driver
                     </button>
@@ -2089,11 +2110,11 @@ function TripDriverTab({
             )}
         </section>
         ) : (
-          <div className="flex flex-col items-center rounded-xl border border-dashed border-slate-200 bg-white py-12 text-center">
-            <p className="text-sm text-slate-500">
+          <div className="flex flex-col items-center rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50/40 py-12 text-center dark:border-white/10 dark:bg-white/5">
+            <p className="text-sm font-semibold text-slate-900 dark:text-white">
               No live trip on this vehicle
             </p>
-            <p className="mt-1 text-xs text-slate-400">
+            <p className="mt-1 text-xs text-slate-400 dark:text-slate-500">
               When a trip is in progress, it will show here.
             </p>
           </div>
@@ -2106,21 +2127,23 @@ function TripDriverTab({
     <div className="space-y-4">
       {uErr && <p className="text-xs text-red-500">{uErr}</p>}
       <div className="flex items-center justify-between pt-2">
-        <h4 className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+        <h4 className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
           Upcoming trips
         </h4>
         <Link
           to="/create-trip"
-          className="flex items-center gap-1.5 rounded-lg bg-blue-50 px-2.5 py-1.5 text-xs font-semibold text-blue-600 hover:bg-blue-100"
+          className="flex items-center gap-1.5 rounded-lg border border-indigo-200 bg-indigo-50 px-2.5 py-1.5 text-xs font-semibold text-indigo-600 hover:bg-indigo-100 dark:border-indigo-500/30 dark:bg-indigo-500/10 dark:text-indigo-300 dark:hover:bg-indigo-500/20"
         >
           <Plus className="h-3.5 w-3.5" /> Create New Trip
         </Link>
       </div>
 
       {upcomingTrips.length === 0 ? (
-        <p className="py-4 text-center text-xs text-slate-400">
-          No scheduled trips
-        </p>
+        <div className="flex flex-col items-center rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50/40 py-10 text-center dark:border-white/10 dark:bg-white/5">
+          <p className="text-sm text-slate-500 dark:text-slate-400">
+            No scheduled trips
+          </p>
+        </div>
       ) : (
         <div className="space-y-3">
           {upcomingTrips.map((trip) => {
@@ -2128,27 +2151,27 @@ function TripDriverTab({
             return (
               <section
                 key={trip._id}
-                className={`rounded-xl border overflow-hidden transition-all ${expandedTripId === trip._id ? "border-slate-300 shadow-sm" : "border-slate-200"} bg-white`}
+                className={`overflow-hidden rounded-xl border transition-all ${expandedTripId === trip._id ? "border-slate-300 shadow-sm dark:border-white/20" : "border-slate-200 dark:border-[#1e2638]"} bg-white dark:bg-[#0e121d]/80`}
               >
                 <div
-                  className="p-4 cursor-pointer hover:bg-slate-50 transition-colors"
+                  className="cursor-pointer p-4 transition-colors hover:bg-slate-50 dark:hover:bg-white/5"
                   onClick={() => toggleExpand(trip._id)}
                 >
-                <div className="flex items-start justify-between mb-2">
+                <div className="mb-2 flex items-start justify-between">
                     <div className="flex items-start gap-2">
                       {expandedTripId === trip._id ? (
-                        <ChevronUp className="h-4 w-4 text-slate-400 mt-0.5 shrink-0" />
+                        <ChevronUp className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />
                       ) : (
-                        <ChevronDown className="h-4 w-4 text-slate-400 mt-0.5 shrink-0" />
+                        <ChevronDown className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />
                       )}
                   <div>
                         {trip.tripNumber && (
-                          <p className="text-sm font-bold text-slate-800">
+                          <p className="text-sm font-bold text-slate-800 dark:text-white">
                             Trip #{trip.tripNumber}
                           </p>
                         )}
                     {trip.from && trip.to && (
-                      <p className="flex items-center gap-1 text-xs text-slate-600 mt-0.5">
+                      <p className="mt-0.5 flex items-center gap-1 text-xs text-slate-600 dark:text-slate-300">
                         <span>{trip.from}</span>
                         <ChevronRight className="h-3 w-3 text-slate-400" />
                         <span>{trip.to}</span>
@@ -2157,22 +2180,28 @@ function TripDriverTab({
                   </div>
                     </div>
                     <span
-                      className={`text-xs rounded-full border px-2 py-0.5 capitalize ${statusBadgeCls(trip.status)} whitespace-nowrap ml-2`}
+                      className={`ml-2 whitespace-nowrap rounded-full border px-2 py-0.5 text-xs capitalize ${statusBadgeCls(trip.status)}`}
                     >
                       {trip.status ?? "—"}
                   </span>
                 </div>
-                  <div className="text-xs text-slate-500 space-y-0.5 pl-6">
+                  <div className="space-y-0.5 pl-6 text-xs text-slate-500 dark:text-slate-400">
                     {trip.departureDate && (
-                      <p>📅 {formatDate(trip.departureDate)}</p>
+                      <p className="flex items-center gap-1.5">
+                        <Calendar className="h-3.5 w-3.5 text-slate-400" />
+                        {formatDate(trip.departureDate)}
+                      </p>
                     )}
-                    <p>👤 {drName ?? "Unassigned"}</p>
+                    <p className="flex items-center gap-1.5">
+                      <User className="h-3.5 w-3.5 text-slate-400" />
+                      {drName ?? "Unassigned"}
+                    </p>
                 </div>
                 </div>
 
                 {expandedTripId === trip._id && (
-                  <div className="px-4 pb-4 pt-1 border-t border-slate-100">
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-y-3 gap-x-4 mb-3 text-xs text-slate-600 pt-3 pl-2">
+                  <div className="border-t border-slate-100 px-4 pb-4 pt-1 dark:border-white/10">
+                    <div className="mb-3 grid grid-cols-2 gap-x-4 gap-y-3 pl-2 pt-3 text-xs text-slate-600 sm:grid-cols-3 dark:text-slate-300">
                       <EditableGridField
                         tripId={trip._id}
                         fieldKey="customer"
@@ -2297,7 +2326,7 @@ function TripDriverTab({
                           </p>
           </div>
         )}
-                      <div className="col-span-2 sm:col-span-3 grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-2 mt-2 border-t border-slate-100 pt-3">
+                      <div className="col-span-2 mt-2 grid grid-cols-2 gap-2 border-t border-slate-100 pt-3 sm:col-span-3 md:grid-cols-4 lg:grid-cols-7 dark:border-white/10">
                         <EditableGridField
                           tripId={trip._id}
                           fieldKey="agencyCost"
@@ -2354,10 +2383,10 @@ function TripDriverTab({
                           isCurrency
                         />
               <div>
-                          <span className="text-slate-400 block mb-0.5 text-[10px] uppercase">
+                          <span className="mb-0.5 block text-[10px] uppercase text-slate-400 dark:text-slate-500">
                             Agency profit
                           </span>
-                          <span className="font-bold text-slate-800">
+                          <span className="font-bold text-indigo-700 dark:text-indigo-300">
                             ₹
                             {Number(trip.agencyProfit || 0).toLocaleString(
                               "en-IN",
@@ -2366,18 +2395,18 @@ function TripDriverTab({
               </div>
             </div>
                     </div>
-                    <div className="flex flex-wrap gap-2 pt-2 border-t border-slate-100 pl-2 mt-3">
+                    <div className="mt-3 flex flex-wrap gap-2 border-t border-slate-100 pl-2 pt-2 dark:border-white/10">
                       <button
                         type="button"
                         onClick={() => onUpdateTrip(trip._id)}
-                        className="flex-1 rounded-lg border border-slate-200 px-3 py-1.5 text-[11px] font-medium text-slate-700 hover:bg-slate-50"
+                        className="flex-1 rounded-lg border border-slate-200 px-3 py-1.5 text-[11px] font-medium text-slate-700 hover:bg-slate-50 dark:border-white/10 dark:text-slate-300 dark:hover:bg-white/5"
                       >
                         Update
               </button>
                       <button
                         type="button"
                         onClick={() => onCancelTrip(trip._id)}
-                        className="flex-1 rounded-lg border border-red-200 px-3 py-1.5 text-[11px] font-medium text-red-600 hover:bg-red-50"
+                        className="flex-1 rounded-lg border border-red-200 px-3 py-1.5 text-[11px] font-medium text-red-600 hover:bg-red-50 dark:border-red-500/30 dark:text-red-300 dark:hover:bg-red-500/10"
                       >
                         Cancel
                       </button>
@@ -2385,7 +2414,7 @@ function TripDriverTab({
                         <button
                           type="button"
                           onClick={() => onSwitchVehicle(trip._id)}
-                          className="flex items-center justify-center gap-1 rounded-lg border border-amber-200 px-3 py-1.5 text-[11px] font-medium text-amber-800 hover:bg-amber-50"
+                          className="flex items-center justify-center gap-1 rounded-lg border border-amber-200 px-3 py-1.5 text-[11px] font-medium text-amber-800 hover:bg-amber-50 dark:border-amber-500/30 dark:text-amber-300 dark:hover:bg-amber-500/10"
                         >
                           <ArrowRightLeft className="h-3 w-3" />
                           Switch Vehicle
@@ -2396,7 +2425,7 @@ function TripDriverTab({
                           type="button"
                           onClick={() => handleUnassign(trip._id)}
                           disabled={unassigning}
-                          className="flex-1 rounded-lg border border-slate-200 px-3 py-1.5 text-[11px] font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                          className="flex-1 rounded-lg border border-slate-200 px-3 py-1.5 text-[11px] font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50 dark:border-white/10 dark:text-slate-300 dark:hover:bg-white/5"
                         >
                           Unassign Driver
                         </button>
@@ -2404,7 +2433,7 @@ function TripDriverTab({
                         <button
                           type="button"
                           onClick={() => onAssignDriver(trip._id)}
-                          className="flex-1 rounded-lg bg-slate-900 px-3 py-1.5 text-[11px] font-medium text-white hover:bg-slate-800"
+                          className="flex-1 rounded-lg bg-indigo-600 px-3 py-1.5 text-[11px] font-medium text-white hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-400"
                         >
                           Assign Driver
                         </button>
@@ -2473,6 +2502,31 @@ function VehicleDetailPanel({
     { key: "history", label: "History" },
   ];
 
+  const allTrips: TripItem[] = Array.isArray(vehicle.trips)
+    ? vehicle.trips
+    : [];
+  const hasLiveTripTabBadge = (() => {
+    const inProgress = allTrips.find(
+      (t) => (t.status ?? "").toLowerCase() === "in_progress",
+    );
+    const active: any =
+      inProgress ?? vehicle.activeTrip ?? vehicle.currentTrip ?? null;
+    return (
+      active &&
+      typeof active === "object" &&
+      !["cancelled", "completed"].includes((active.status ?? "").toLowerCase())
+    );
+  })();
+  const upcomingTabCount = allTrips.filter((t) => {
+    const s = (t.status ?? "").toLowerCase();
+    if (["cancelled", "completed"].includes(s)) return false;
+    const active: any =
+      allTrips.find((x) => (x.status ?? "").toLowerCase() === "in_progress") ??
+      vehicle.activeTrip ??
+      vehicle.currentTrip;
+    return !active || t._id !== (active as any)?._id;
+  }).length;
+
   const tripCallbacks = {
     resolveAgencyLabel,
     onUpdateTrip: (tripId: string) =>
@@ -2490,22 +2544,22 @@ function VehicleDetailPanel({
   };
 
   return (
-    <div className="flex h-full flex-col bg-slate-50">
+    <div className="flex h-full flex-col bg-slate-50 dark:bg-[#0e121d]">
       {/* Header */}
-      <div className="flex items-center justify-between border-b border-slate-200 bg-white px-4 lg:px-6 py-4 shrink-0">
+      <div className="flex shrink-0 items-center justify-between border-b border-slate-200 bg-white px-4 py-4 lg:px-6 dark:border-[#1e2638] dark:bg-[#0e121d]/80">
         <div className="flex items-center gap-3">
           <button
             type="button"
             onClick={onBackClicked}
-            className="md:hidden p-1.5 -ml-2 text-slate-500 hover:bg-slate-100 rounded-lg"
+            className="-ml-2 rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 md:hidden dark:text-slate-400 dark:hover:bg-white/5"
           >
             <ArrowLeft className="h-5 w-5" />
           </button>
           <div>
-            <h3 className="text-xl font-bold text-slate-900">
+            <h3 className="text-xl font-bold text-slate-900 dark:text-white">
               {vehicle.vehicleNumber}
             </h3>
-            <p className="text-sm text-slate-500">
+            <p className="text-sm text-slate-500 dark:text-slate-400">
               {[vehicle.vehicleType, vehicle.vehicleModel]
                 .filter(Boolean)
                 .join(" – ")}
@@ -2513,7 +2567,7 @@ function VehicleDetailPanel({
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex shrink-0 items-center gap-2">
           <span
             className={`rounded-full border px-3 py-0.5 text-xs font-semibold capitalize ${statusBadgeCls(getDisplayStatus())}`}
           >
@@ -2523,19 +2577,27 @@ function VehicleDetailPanel({
       </div>
 
       {/* Tab bar */}
-      <div className="flex border-b border-slate-200 bg-white shrink-0 overflow-x-auto hide-scrollbar">
+      <div className="hide-scrollbar flex shrink-0 overflow-x-auto border-b border-slate-200 bg-white dark:border-[#1e2638] dark:bg-[#0e121d]/80">
         {tabs.map((t) => (
           <button
             key={t.key}
             type="button"
             onClick={() => setTab(t.key)}
-            className={`flex-1 sm:flex-none whitespace-nowrap px-3 sm:px-5 py-3 text-xs sm:text-sm font-semibold normal-case tracking-normal transition border-b-2 ${
+            className={`flex flex-1 items-center justify-center gap-1.5 whitespace-nowrap border-b-2 px-3 py-3 text-xs font-semibold normal-case tracking-normal transition sm:flex-none sm:px-5 sm:text-sm ${
               tab === t.key
-                ? "border-blue-500 text-blue-600"
-                : "border-transparent text-slate-400 hover:text-slate-600"
+                ? "border-indigo-500 text-indigo-600 dark:border-indigo-400 dark:text-indigo-300"
+                : "border-transparent text-slate-400 hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-300"
             }`}
           >
             {t.label}
+            {t.key === "live" && hasLiveTripTabBadge && (
+              <span className="h-2 w-2 rounded-full bg-indigo-500 dark:bg-indigo-400" />
+            )}
+            {t.key === "upcoming" && upcomingTabCount > 0 && (
+              <span className="rounded-full border border-indigo-200 bg-indigo-50 px-1.5 text-[11px] font-bold text-indigo-600 dark:border-indigo-500/30 dark:bg-indigo-500/15 dark:text-indigo-300">
+                {upcomingTabCount}
+              </span>
+            )}
           </button>
         ))}
       </div>
@@ -2679,18 +2741,20 @@ export function VehiclesPage() {
   };
 
   return (
-    <div className="flex h-full overflow-hidden relative">
+    <div className="relative flex h-full overflow-hidden">
       {/* LEFT: vehicle list panel */}
       <div
-        className={`flex w-full md:w-72 lg:w-80 shrink-0 flex-col border-r border-slate-200 bg-white transition-all ${selectedIdx !== null ? "hidden md:flex" : "flex"}`}
+        className={`flex w-full shrink-0 flex-col border-r border-slate-200 bg-white transition-all md:w-72 lg:w-80 dark:border-[#1e2638] dark:bg-[#0e121d]/80 ${selectedIdx !== null ? "hidden md:flex" : "flex"}`}
       >
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
-          <h2 className="text-sm font-semibold text-slate-900">Trip Details</h2>
+        <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3 dark:border-[#1e2638]">
+          <h2 className="text-sm font-semibold text-slate-900 dark:text-white">
+            Trip Details
+          </h2>
           <button
             type="button"
             onClick={() => setPageModal("add")}
-            className="flex items-center gap-1 rounded-lg bg-blue-500 px-2.5 py-1.5 text-xs font-semibold text-white hover:bg-blue-600"
+            className="flex items-center gap-1 rounded-lg bg-indigo-600 px-2.5 py-1.5 text-xs font-semibold text-white hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-400"
           >
             <Plus className="h-3.5 w-3.5" />
             Add
@@ -2698,14 +2762,14 @@ export function VehiclesPage() {
         </div>
 
         {/* Search */}
-        <div className="relative border-b border-slate-100 px-3 py-2">
+        <div className="relative border-b border-slate-100 px-3 py-2 dark:border-white/10">
           <Search className="absolute left-5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
           <input
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search vehicles..."
-            className="w-full rounded-md border border-slate-200 bg-slate-50 py-1.5 pl-7 pr-3 text-xs text-slate-700 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400"
+            className="w-full rounded-md border border-slate-200 bg-slate-50 py-1.5 pl-7 pr-3 text-xs text-slate-700 outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400 dark:border-white/10 dark:bg-white/5 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-indigo-400"
           />
         </div>
 
@@ -2715,19 +2779,21 @@ export function VehiclesPage() {
             Array.from({ length: 6 }).map((_, i) => (
               <div
                 key={i}
-                className="h-24 animate-pulse rounded-xl bg-slate-100"
+                className="h-24 animate-pulse rounded-xl bg-slate-100 dark:bg-white/5"
               />
             ))
           ) : error ? (
             <p className="p-4 text-center text-xs text-red-500">{error}</p>
           ) : vehicles.length === 0 ? (
-            <div className="flex flex-col items-center justify-center gap-2 py-12 text-center">
-              <Car className="h-10 w-10 text-slate-300" />
-              <p className="text-sm text-slate-400">No vehicles found</p>
+            <div className="flex flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50/40 py-12 text-center dark:border-white/10 dark:bg-white/5">
+              <Car className="h-10 w-10 text-slate-300 dark:text-slate-600" />
+              <p className="text-sm text-slate-400 dark:text-slate-500">
+                No vehicles found
+              </p>
               <button
                 type="button"
                 onClick={() => setPageModal("add")}
-                className="text-xs text-blue-500 underline"
+                className="text-xs text-indigo-500 underline dark:text-indigo-400"
               >
                 Add your first vehicle
               </button>
@@ -2751,7 +2817,7 @@ export function VehiclesPage() {
 
       {/* RIGHT: detail panel */}
       <div
-        className={`flex-1 overflow-hidden transition-all ${selectedIdx !== null ? "flex flex-col" : "hidden md:flex flex-col"}`}
+        className={`flex-1 overflow-hidden transition-all dark:bg-[#0e121d] ${selectedIdx !== null ? "flex flex-col" : "hidden md:flex flex-col"}`}
       >
         {selectedVehicle ? (
           <VehicleDetailPanel
@@ -2761,12 +2827,12 @@ export function VehiclesPage() {
           />
         ) : !loading ? (
           <div className="flex h-full items-center justify-center">
-            <div className="text-center">
-              <Car className="mx-auto h-12 w-12 text-slate-300" />
-              <p className="mt-3 text-sm font-medium text-slate-500">
+            <div className="rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50/40 px-10 py-12 text-center dark:border-white/10 dark:bg-white/5">
+              <Car className="mx-auto h-12 w-12 text-slate-300 dark:text-slate-600" />
+              <p className="mt-3 text-sm font-medium text-slate-500 dark:text-slate-300">
                 No vehicle selected
               </p>
-              <p className="mt-1 text-xs text-slate-400">
+              <p className="mt-1 text-xs text-slate-400 dark:text-slate-500">
                 Select a vehicle from the list to view details
               </p>
             </div>

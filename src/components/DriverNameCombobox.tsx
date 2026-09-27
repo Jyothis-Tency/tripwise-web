@@ -12,7 +12,7 @@ import {
 } from "../lib/driverDisplay";
 
 const DRIVER_INPUT_CLS =
-  "w-full rounded-md border border-slate-200 px-2.5 py-2 text-sm outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-200 bg-white transition";
+  "w-full rounded-md border border-slate-200 px-2.5 py-2 text-sm text-slate-800 outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-200 bg-[var(--bg-elevated)] transition dark:border-[#1e2638] dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-indigo-400 dark:focus:ring-indigo-500/20";
 
 function ModalShell({
   title,
@@ -30,17 +30,19 @@ function ModalShell({
     <div
       ref={ref}
       onClick={(e) => e.target === ref.current && onClose()}
-      className="fixed inset-0 z-60 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4"
+      className="fixed inset-0 z-60 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm dark:bg-black/60"
     >
       <div
-        className={`w-full ${maxWidth} flex max-h-[90vh] flex-col rounded-2xl bg-white shadow-2xl`}
+        className={`flex w-full ${maxWidth} max-h-[90vh] flex-col rounded-2xl border border-slate-200 bg-[var(--bg-card)] shadow-2xl dark:border-[#1e2638]`}
       >
-        <div className="flex shrink-0 items-center justify-between border-b border-slate-100 px-6 py-4">
-          <h3 className="text-base font-semibold text-slate-900">{title}</h3>
+        <div className="flex shrink-0 items-center justify-between border-b border-slate-100 px-6 py-4 dark:border-white/10">
+          <h3 className="text-base font-semibold text-slate-900 dark:text-white">
+            {title}
+          </h3>
           <button
             type="button"
             onClick={onClose}
-            className="text-slate-400 hover:text-slate-600"
+            className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-white/5 dark:hover:text-slate-200"
             aria-label="Close"
           >
             <X className="h-5 w-5" />
@@ -105,15 +107,18 @@ export function CreateDriverModal({
     }
   };
 
+  const fieldCls =
+    "w-full rounded-lg border border-slate-300 bg-[var(--bg-elevated)] px-3 py-2 text-sm text-slate-800 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20 dark:border-white/10 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-indigo-400";
+
   return (
     <ModalShell title="Create New Driver" onClose={onClose} maxWidth="max-w-sm">
       <div className="space-y-4 p-6">
-        <p className="text-xs text-slate-500">
+        <p className="text-xs text-slate-500 dark:text-slate-400">
           New drivers appear in Drivers and Cash In / Out for salary and bulk
           advance.
         </p>
         <div className="space-y-1.5">
-          <label className="text-xs font-medium text-slate-600">
+          <label className="text-xs font-medium text-slate-600 dark:text-slate-400">
             Driver name <span className="text-red-500">*</span>
           </label>
           <input
@@ -125,11 +130,11 @@ export function CreateDriverModal({
             placeholder="e.g. John Doe"
             autoFocus
             onKeyDown={(e) => e.key === "Enter" && submit()}
-            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+            className={fieldCls}
           />
         </div>
         <div className="space-y-1.5">
-          <label className="text-xs font-medium text-slate-600">
+          <label className="text-xs font-medium text-slate-600 dark:text-slate-400">
             Phone number <span className="text-red-500">*</span>
           </label>
           <input
@@ -142,15 +147,17 @@ export function CreateDriverModal({
             type="tel"
             inputMode="numeric"
             onKeyDown={(e) => e.key === "Enter" && submit()}
-            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+            className={fieldCls}
           />
         </div>
-        {err && <p className="text-xs text-red-600">{err}</p>}
+        {err && (
+          <p className="text-xs text-red-600 dark:text-red-400">{err}</p>
+        )}
         <div className="flex justify-end gap-2 pt-2">
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg border border-slate-200 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"
+            className="rounded-lg border border-slate-200 bg-[var(--bg-card)] px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 dark:border-white/10 dark:text-slate-300 dark:hover:bg-white/5"
           >
             Cancel
           </button>
@@ -158,7 +165,7 @@ export function CreateDriverModal({
             type="button"
             onClick={submit}
             disabled={submitting}
-            className="rounded-lg bg-blue-500 px-5 py-2 text-sm font-semibold text-white hover:bg-blue-600 disabled:opacity-50"
+            className="rounded-lg bg-indigo-600 px-5 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-50 dark:bg-indigo-500 dark:hover:bg-indigo-400"
           >
             {submitting ? "Creating…" : "Create"}
           </button>
@@ -456,7 +463,7 @@ export function DriverNameCombobox({
           placeholder={placeholder}
         />
         {panelVisible && (
-          <div className="absolute z-30 mt-1 max-h-52 w-full overflow-auto rounded-md border border-slate-200 bg-white shadow-lg">
+          <div className="absolute z-30 mt-1 max-h-52 w-full overflow-auto rounded-md border border-slate-200 bg-[var(--bg-card)] shadow-lg dark:border-[#1e2638]">
             {filtered.map((driver) => {
               const key = driver._id ?? driver.id ?? driverDisplayName(driver);
               const label = formatDriverLabel(driver);
@@ -467,7 +474,11 @@ export function DriverNameCombobox({
                 <button
                   key={key}
                   type="button"
-                  className={`w-full px-3 py-2 text-left text-sm hover:bg-blue-50 ${isSelected ? "bg-blue-50 font-medium text-blue-800" : ""}`}
+                  className={`w-full px-3 py-2 text-left text-sm hover:bg-indigo-50 dark:hover:bg-indigo-500/10 ${
+                    isSelected
+                      ? "bg-indigo-50 font-medium text-indigo-800 dark:bg-indigo-500/15 dark:text-indigo-300"
+                      : "text-slate-800 dark:text-slate-200"
+                  }`}
                   onMouseDown={(e) => {
                     e.preventDefault();
                     pickDriver(driver);
@@ -480,7 +491,7 @@ export function DriverNameCombobox({
             {!inlineCreate && value.trim() && !exactMatch && (
               <button
                 type="button"
-                className="w-full border-t border-slate-100 px-3 py-2 text-left text-sm font-medium text-blue-700 hover:bg-blue-50"
+                className="w-full border-t border-slate-100 px-3 py-2 text-left text-sm font-medium text-indigo-700 hover:bg-indigo-50 dark:border-white/10 dark:text-indigo-300 dark:hover:bg-indigo-500/10"
                 onMouseDown={(e) => {
                   e.preventDefault();
                   openCreate(value.trim());
@@ -509,19 +520,22 @@ export function DriverNameCombobox({
               aria-label="New driver phone number"
             />
             {creating && (
-              <p className="text-[11px] font-medium text-blue-600">
+              <p className="text-[11px] font-medium text-indigo-600 dark:text-indigo-400">
                 Registering driver…
               </p>
             )}
-            {!creating && inlinePhone.replace(/\D/g, "").length > 0 &&
+            {!creating &&
+              inlinePhone.replace(/\D/g, "").length > 0 &&
               inlinePhone.replace(/\D/g, "").length < 10 && (
-                <p className="text-[11px] text-slate-400">
+                <p className="text-[11px] text-slate-400 dark:text-slate-500">
                   Enter {10 - inlinePhone.replace(/\D/g, "").length} more digit
                   {10 - inlinePhone.replace(/\D/g, "").length === 1 ? "" : "s"}
                 </p>
               )}
             {inlineErr && (
-              <p className="text-[11px] font-medium text-red-600">{inlineErr}</p>
+              <p className="text-[11px] font-medium text-red-600 dark:text-red-400">
+                {inlineErr}
+              </p>
             )}
           </div>
         )}

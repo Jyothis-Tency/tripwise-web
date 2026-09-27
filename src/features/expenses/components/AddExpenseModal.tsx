@@ -60,23 +60,23 @@ const AddExpenseModal: React.FC<Props> = ({ open, onClose, onCreated, expense })
     }
   };
 
-  const inputCls = 'w-full px-3 py-2 rounded-xl border border-slate-200 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition-all';
-  const labelCls = 'block text-xs font-semibold text-slate-500 mb-1.5 uppercase tracking-wide';
+  const inputCls = 'w-full px-3 py-2 rounded-xl border border-slate-200 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 transition-all dark:border-white/10 dark:bg-white/5 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-indigo-400 dark:focus:ring-indigo-500/30';
+  const labelCls = 'block text-xs font-semibold text-slate-500 mb-1.5 uppercase tracking-wide dark:text-slate-400';
 
   return (
     <div className="fixed inset-0 z-[999] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-      <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl overflow-hidden">
+      <div className="w-full max-w-md overflow-hidden rounded-2xl border border-slate-200 bg-[var(--bg-card)] shadow-2xl dark:border-[#1e2638]">
         {/* Header */}
-        <div className={`px-6 py-4 border-b border-slate-100 flex items-center justify-between ${isEdit ? 'bg-amber-50' : 'bg-blue-50'}`}>
+        <div className={`px-6 py-4 border-b border-slate-100 flex items-center justify-between dark:border-white/10 ${isEdit ? 'bg-amber-50 dark:bg-amber-500/10' : 'bg-indigo-50 dark:bg-indigo-500/10'}`}>
           <div>
-            <h3 className="text-base font-bold text-slate-800">
+            <h3 className="text-base font-bold text-slate-800 dark:text-white">
               {isEdit ? '✏️ Edit Expense' : '+ Add Expense'}
             </h3>
-            {isEdit && <p className="text-xs text-slate-400 mt-0.5">Update the details below</p>}
+            {isEdit && <p className="text-xs text-slate-400 mt-0.5 dark:text-slate-500">Update the details below</p>}
           </div>
           <button
             onClick={onClose}
-            className="h-8 w-8 flex items-center justify-center rounded-lg bg-white/70 hover:bg-white text-slate-400 hover:text-slate-600 transition-colors border border-slate-200"
+            className="h-8 w-8 flex items-center justify-center rounded-lg bg-white/70 hover:bg-white text-slate-400 hover:text-slate-600 transition-colors border border-slate-200 dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/10 dark:text-slate-400 dark:hover:text-slate-200"
           >
             ✕
           </button>
@@ -85,7 +85,7 @@ const AddExpenseModal: React.FC<Props> = ({ open, onClose, onCreated, expense })
         {/* Body */}
         <form onSubmit={handleSubmit} className="px-6 py-5 space-y-4">
           {error && (
-            <div className="bg-red-50 border border-red-200 text-red-600 px-3 py-2 rounded-xl text-xs">
+            <div className="bg-red-50 border border-red-200 text-red-600 px-3 py-2 rounded-xl text-xs dark:bg-red-500/10 dark:border-red-500/30 dark:text-red-400">
               {error}
             </div>
           )}
@@ -147,14 +147,14 @@ const AddExpenseModal: React.FC<Props> = ({ open, onClose, onCreated, expense })
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 py-2.5 rounded-xl border border-slate-200 bg-white text-slate-600 text-sm font-medium hover:bg-slate-50 transition-colors"
+              className="flex-1 py-2.5 rounded-xl border border-slate-200 bg-white text-slate-600 text-sm font-medium hover:bg-slate-50 transition-colors dark:border-white/10 dark:bg-white/5 dark:text-slate-300 dark:hover:bg-white/10"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={saving}
-              className={`flex-1 py-2.5 rounded-xl text-white text-sm font-semibold transition-colors disabled:opacity-60 ${isEdit ? 'bg-amber-500 hover:bg-amber-600' : 'bg-blue-600 hover:bg-blue-700'}`}
+              className={`flex-1 py-2.5 rounded-xl text-white text-sm font-semibold transition-colors disabled:opacity-60 ${isEdit ? 'bg-amber-500 hover:bg-amber-600' : 'bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-400'}`}
             >
               {saving ? (isEdit ? 'Saving…' : 'Adding…') : (isEdit ? 'Save Changes' : 'Add Expense')}
             </button>

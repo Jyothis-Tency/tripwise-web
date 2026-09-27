@@ -12,6 +12,9 @@ dist
 dist-ssr
 *.local
 
+# Generated seed snapshot
+src/features/trip-confirmation/seed.generated.json
+
 # Environment
 .env
 .env.*

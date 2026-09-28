@@ -2,13 +2,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   ArrowLeft,
-  Building2,
-  CalendarRange,
   Loader2,
   Plus,
   RefreshCw,
-  User,
+  Search,
+  Settings2,
   Wallet,
+  X,
 } from "lucide-react";
 import {
   fetchAgencies,
@@ -20,14 +20,6 @@ import {
   type Driver,
   type DriverCashInCashOutDetail,
 } from "../api";
-import {
-  ActiveFilterPill,
-  FilterChip,
-  FilterLabel,
-  SearchInput,
-  SearchSortBar,
-  filterControlCls,
-} from "../components/FilterControls";
 import {
   loadCashInCashOutUi,
   saveCashInCashOutUi,
@@ -51,6 +43,16 @@ type TxRow = {
   sortTime: number;
 };
 
+const AVATAR_COLORS = [
+  "#4f46e5",
+  "#0ea5a4",
+  "#e5484d",
+  "#f59e0b",
+  "#7c3aed",
+  "#0891b2",
+  "#db2777",
+];
+
 function fmtCurrency(n: number) {
   return `₹${Math.abs(n).toLocaleString("en-IN", {
     maximumFractionDigits: 0,
@@ -62,7 +64,6 @@ function fmtSignedCurrency(n: number) {
   return `${sign}${fmtCurrency(n)}`;
 }
 
-/** Same as Cash In / Cash Out: bulk remaining − vehicle remaining. */
 function agencyTotalRemaining(detail: AgencyCashInCashOutDetail): number {
   return (
     detail.summary.cashInBulk.remaining -
@@ -70,7 +71,6 @@ function agencyTotalRemaining(detail: AgencyCashInCashOutDetail): number {
   );
 }
 
-/** Same as Cash In / Cash Out: bata + bulk advance still owed. */
 function driverTotalRemaining(detail: DriverCashInCashOutDetail): number {
   return (
     detail.summary.vehicleBata.remaining +
@@ -96,7 +96,7 @@ function formatDate(d?: string | null) {
   const x = new Date(d);
   if (Number.isNaN(x.getTime())) return "—";
   return x.toLocaleDateString("en-IN", {
-    day: "2-digit",
+    day: "numeric",
     month: "short",
     year: "numeric",
   });
@@ -140,6 +140,20 @@ function driverName(d: Driver) {
   return `${d.firstName ?? ""} ${d.lastName ?? ""}`.trim() || "Driver";
 }
 
+function initials(name: string) {
+  return name
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((w) => w[0])
+    .slice(0, 2)
+    .join("")
+    .toUpperCase();
+}
+
+function avatarColor(index: number) {
+  return AVATAR_COLORS[Math.abs(index) % AVATAR_COLORS.length];
+}
+
 function buildAgencyTxRows(detail: AgencyCashInCashOutDetail): TxRow[] {
   const receipts = detail.tables.bulkReceiptPayments.map((r) => ({
     id: `in-${r._id}`,
@@ -151,7 +165,6 @@ function buildAgencyTxRows(detail: AgencyCashInCashOutDetail): TxRow[] {
     sortTime: sortTime(r.paymentDate, r._id),
   }));
 
-  // Vehicle-trip agency/owner profit → Cash Out only after trip is completed.
   const profitTrips = (detail.tables.vehicleTripsAgencyProfit || [])
     .filter(
       (t) =>
@@ -174,7 +187,6 @@ function buildAgencyTxRows(detail: AgencyCashInCashOutDetail): TxRow[] {
       };
     });
 
-  // Actual profit payouts recorded by owner.
   const payouts = detail.tables.agencyProfitPayoutPayments.map((r) => ({
     id: `out-${r._id}`,
     date: r.paymentDate,
@@ -198,7 +210,6 @@ function buildDriverTxRows(detail: DriverCashInCashOutDetail): TxRow[] {
     notes: r.notes || "Salary / bata",
     sortTime: sortTime(r.date, r._id),
   }));
-  // Advances are recorded as Cash in on Transaction page (money advanced to driver).
   const advances = detail.tables.advanceLedger.map((r) => ({
     id: `adv-${r._id}`,
     date: r.date,
@@ -238,60 +249,10 @@ function inDateRange(date: string | null, from: string, to: string) {
   return true;
 }
 
-function SummaryCard({
-  label,
-  value,
-  hint,
-  tone = "neutral",
-  signed,
-}: {
-  label: string;
-  value: number;
-  hint?: string;
-  tone?: "neutral" | "receive" | "pay" | "remaining";
-  signed?: boolean;
-}) {
-  const tones = {
-    neutral:
-      "border-slate-200 bg-[var(--bg-card)] dark:border-[#1e2638]",
-    receive:
-      "border-emerald-200 bg-emerald-50/70 dark:border-emerald-500/30 dark:bg-emerald-500/10",
-    pay: "border-rose-200 bg-rose-50/70 dark:border-rose-500/30 dark:bg-rose-500/10",
-    remaining:
-      "border-indigo-300 bg-indigo-50/80 ring-1 ring-indigo-100 dark:border-indigo-500/40 dark:bg-indigo-500/10 dark:ring-indigo-500/20",
-  };
-  const valueCls =
-    tone === "remaining"
-      ? value >= 0
-        ? "text-emerald-700 dark:text-emerald-400"
-        : "text-amber-700 dark:text-amber-400"
-      : tone === "receive"
-        ? "text-emerald-700 dark:text-emerald-400"
-        : tone === "pay"
-          ? "text-rose-700 dark:text-rose-400"
-          : "text-slate-900 dark:text-slate-100";
-
-  return (
-    <div className={`rounded-xl border p-3 sm:p-4 ${tones[tone]}`}>
-      <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-        {label}
-      </p>
-      {hint && (
-        <p className="mt-0.5 text-[10px] font-medium text-slate-400 dark:text-slate-500">
-          {hint}
-        </p>
-      )}
-      <p
-        className={`mt-2 font-mono text-xl font-bold tabular-nums sm:text-2xl ${valueCls}`}
-      >
-        {signed ? fmtSignedCurrency(value) : fmtCurrency(value)}
-      </p>
-    </div>
-  );
-}
+const fieldCls =
+  "w-full rounded-[10px] border border-slate-200 bg-[var(--bg-card)] px-3 py-2 text-sm text-slate-800 outline-none focus:border-indigo-500 dark:border-[#252c4d] dark:text-[#eef0ff]";
 
 export function TransactionHistoryPage() {
-  // Same persisted UI state as Cash In / Cash Out (shared localStorage key).
   const savedUi = useMemo(() => loadCashInCashOutUi(), []);
   const prevAgencyIdRef = useRef<string | null>(savedUi.selectedAgencyId);
   const prevDriverIdRef = useRef<string | null>(savedUi.selectedDriverId);
@@ -324,13 +285,13 @@ export function TransactionHistoryPage() {
   const [detailMonth, setDetailMonth] = useState(savedUi.detailMonth);
   const [error, setError] = useState<string | null>(null);
 
-  // Table-only filters (History-specific; not part of CICO shared UI).
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [tableSearch, setTableSearch] = useState("");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [directionFilter, setDirectionFilter] =
     useState<DirectionFilter>("all");
+  const [filtersOpen, setFiltersOpen] = useState(false);
 
   const loadAgencies = useCallback(async () => {
     setListLoading(true);
@@ -401,33 +362,39 @@ export function TransactionHistoryPage() {
     if (!exists) setSelectedDriverId(null);
   }, [drivers, listLoading, tab, selectedDriverId]);
 
-  const loadAgencyDetail = useCallback(async (agencyId: string, month: string) => {
-    setDetailLoading(true);
-    setError(null);
-    try {
-      const detail = await fetchCashInCashOutAgencyDetail(agencyId, month);
-      setAgencyDetail(detail);
-    } catch {
-      setAgencyDetail(null);
-      setError("Failed to load agency transactions.");
-    } finally {
-      setDetailLoading(false);
-    }
-  }, []);
+  const loadAgencyDetail = useCallback(
+    async (agencyId: string, month: string) => {
+      setDetailLoading(true);
+      setError(null);
+      try {
+        const detail = await fetchCashInCashOutAgencyDetail(agencyId, month);
+        setAgencyDetail(detail);
+      } catch {
+        setAgencyDetail(null);
+        setError("Failed to load agency transactions.");
+      } finally {
+        setDetailLoading(false);
+      }
+    },
+    [],
+  );
 
-  const loadDriverDetail = useCallback(async (driverId: string, month: string) => {
-    setDetailLoading(true);
-    setError(null);
-    try {
-      const detail = await fetchCashInCashOutDriverDetail(driverId, month);
-      setDriverDetail(detail);
-    } catch {
-      setDriverDetail(null);
-      setError("Failed to load driver transactions.");
-    } finally {
-      setDetailLoading(false);
-    }
-  }, []);
+  const loadDriverDetail = useCallback(
+    async (driverId: string, month: string) => {
+      setDetailLoading(true);
+      setError(null);
+      try {
+        const detail = await fetchCashInCashOutDriverDetail(driverId, month);
+        setDriverDetail(detail);
+      } catch {
+        setDriverDetail(null);
+        setError("Failed to load driver transactions.");
+      } finally {
+        setDetailLoading(false);
+      }
+    },
+    [],
+  );
 
   useEffect(() => {
     if (
@@ -483,8 +450,6 @@ export function TransactionHistoryPage() {
     });
   }, [drivers, listSearch]);
 
-  // Cards: same source fields as Cash In / Cash Out summary.
-  // Grand Total = bulk (+) − vehicle (−); Remaining = CICO net remaining.
   const agencyCards = useMemo(() => {
     if (!agencyDetail) return null;
     const bulk = agencyDetail.summary.cashInBulk;
@@ -494,13 +459,7 @@ export function TransactionHistoryPage() {
     const grandTotal = bulkTotal - vehicleOut;
     const received = Number(bulk.received) || 0;
     const remaining = agencyTotalRemaining(agencyDetail);
-    return {
-      grandTotal,
-      received,
-      remaining,
-      bulkTotal,
-      vehicleOut,
-    };
+    return { grandTotal, received, remaining, bulkTotal, vehicleOut };
   }, [agencyDetail]);
 
   const driverCards = useMemo(() => {
@@ -510,8 +469,18 @@ export function TransactionHistoryPage() {
     return {
       grandTotal: bulkTrips + vehicleTrips,
       toPay: driverTotalRemaining(driverDetail),
+      paid:
+        (Number(driverDetail.summary.vehicleBata.paid) || 0) +
+        (Number(driverDetail.summary.bulkAdvance.paid) || 0),
     };
   }, [driverDetail]);
+
+  const rawTxCount = useMemo(() => {
+    if (tab === "agencies") {
+      return agencyDetail ? buildAgencyTxRows(agencyDetail).length : 0;
+    }
+    return driverDetail ? buildDriverTxRows(driverDetail).length : 0;
+  }, [tab, agencyDetail, driverDetail]);
 
   const txRows = useMemo(() => {
     const raw =
@@ -559,12 +528,13 @@ export function TransactionHistoryPage() {
     directionFilter,
   ]);
 
+  const filterBadgeCount =
+    (detailMonth !== "all_time" ? 1 : 0) +
+    (dateFrom || dateTo ? 1 : 0) +
+    (directionFilter !== "all" ? 1 : 0);
+
   const hasActiveFilters =
-    !!dateFrom ||
-    !!dateTo ||
-    !!tableSearch.trim() ||
-    directionFilter !== "all" ||
-    detailMonth !== "all_time";
+    filterBadgeCount > 0 || !!tableSearch.trim() || sortDir !== "desc";
 
   const clearFilters = () => {
     setDateFrom("");
@@ -581,21 +551,24 @@ export function TransactionHistoryPage() {
   const selectedTitle =
     tab === "agencies"
       ? (() => {
-          const a = agencies.find(
-            (x) => (x._id ?? x.id) === selectedAgencyId,
-          );
+          const a = agencies.find((x) => (x._id ?? x.id) === selectedAgencyId);
           return a
             ? formatAgencyLabel(a)
-            : agencyDetail?.agency.name ?? "Agency";
+            : (agencyDetail?.agency.name ?? "Agency");
         })()
       : (() => {
-          const d = drivers.find(
-            (x) => (x._id ?? x.id) === selectedDriverId,
-          );
+          const d = drivers.find((x) => (x._id ?? x.id) === selectedDriverId);
           return d
             ? driverName(d)
-            : driverDetail?.driver.displayName ?? "Driver";
+            : (driverDetail?.driver.displayName ?? "Driver");
         })();
+
+  const selectedSubtitle =
+    tab === "agencies"
+      ? agencies.find((x) => (x._id ?? x.id) === selectedAgencyId)?.phone ||
+        "Agency"
+      : drivers.find((x) => (x._id ?? x.id) === selectedDriverId)?.phone ||
+        "Driver";
 
   const clearDetail = () => {
     if (tab === "agencies") setSelectedAgencyId(null);
@@ -612,56 +585,63 @@ export function TransactionHistoryPage() {
     }
   };
 
+  const switchTab = (next: EntityTab) => {
+    setTab(next);
+    setListSearch("");
+    setFiltersOpen(false);
+    setDateFrom("");
+    setDateTo("");
+    setTableSearch("");
+    setDirectionFilter("all");
+    setSortDir("desc");
+  };
+
+  const receivedPct =
+    tab === "agencies" && agencyCards && agencyCards.grandTotal
+      ? Math.min(
+          100,
+          Math.round(
+            (agencyCards.received / Math.abs(agencyCards.grandTotal)) * 100,
+          ),
+        )
+      : tab === "drivers" && driverCards && driverCards.grandTotal
+        ? Math.min(
+            100,
+            Math.round((driverCards.paid / driverCards.grandTotal) * 100),
+          )
+        : 0;
+
   return (
     <div className="flex h-full flex-col overflow-hidden bg-[var(--bg-main)]">
       {/* Top bar */}
-      <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-slate-200 bg-[var(--bg-card)] px-3 py-2.5 dark:border-[#1e2638] sm:px-4">
-        <div
-          className="grid h-10 w-full min-w-0 flex-1 grid-cols-2 rounded-xl border border-slate-200 bg-slate-100 p-1 dark:border-[#1e2638] dark:bg-[#060e20] sm:max-w-sm"
-          role="tablist"
-        >
-          {(
-            [
-              ["agencies", "Agencies", Building2],
-              ["drivers", "Drivers", User],
-            ] as const
-          ).map(([id, label, Icon]) => (
-            <button
-              key={id}
-              type="button"
-              role="tab"
-              aria-selected={tab === id}
-              className={`flex h-full min-w-0 items-center justify-center gap-1.5 rounded-lg px-2 text-xs font-semibold transition sm:text-sm ${
-                tab === id
-                  ? "border border-indigo-500/40 bg-[var(--bg-card)] text-indigo-600 shadow-xs dark:bg-[#131b2e] dark:text-indigo-300"
-                  : "bg-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
-              }`}
-              onClick={() => setTab(id)}
-            >
-              <Icon className="h-3.5 w-3.5 shrink-0" />
-              <span className="truncate">{label}</span>
-            </button>
-          ))}
+      <header className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-slate-200 bg-[var(--bg-card)] px-4 py-3.5 sm:px-7 dark:border-[#252c4d]">
+        <div className="min-w-0">
+          <h1 className="text-xl font-extrabold tracking-tight text-slate-900 dark:text-[#eef0ff]">
+            Transaction history
+          </h1>
+          <p className="text-xs text-slate-500 dark:text-[#8d94b8]">
+            Every payment in and out, by agency or driver
+          </p>
         </div>
-
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2.5">
           <Link
             to="/transaction"
-            className="inline-flex h-10 items-center gap-1.5 rounded-lg bg-indigo-600 px-3 text-xs font-semibold text-white hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-400 sm:h-9 sm:text-sm"
+            className="inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-br from-indigo-600 to-violet-600 px-4 py-2.5 text-sm font-bold text-white shadow-[0_6px_16px_-6px_#4f46e5] transition hover:-translate-y-px"
           >
             <Plus className="h-4 w-4" />
-            <span className="hidden sm:inline">New Transaction</span>
+            <span className="hidden sm:inline">New transaction</span>
+            <span className="sm:hidden">New</span>
           </Link>
           <button
             type="button"
             onClick={refreshAll}
-            className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-slate-200 bg-[var(--bg-elevated)] text-slate-600 hover:bg-slate-50 dark:border-[#1e2638] dark:text-slate-300 dark:hover:bg-white/5 sm:h-9 sm:w-9"
-            title="Refresh"
+            aria-label="Refresh"
+            className="flex h-[38px] w-[38px] items-center justify-center rounded-xl border border-slate-200 bg-[var(--bg-card)] text-slate-600 transition hover:bg-indigo-50 dark:border-[#252c4d] dark:text-[#8d94b8] dark:hover:bg-[#242a57]"
           >
             <RefreshCw className="h-4 w-4" />
           </button>
         </div>
-      </div>
+      </header>
 
       {error && (
         <div className="border-b border-rose-100 bg-rose-50 px-4 py-2 text-xs font-medium text-rose-700 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-300">
@@ -669,434 +649,545 @@ export function TransactionHistoryPage() {
         </div>
       )}
 
-      <div className="flex min-h-0 flex-1 overflow-hidden">
-        {/* Sidebar list */}
-        <div
-          className={`flex w-full shrink-0 flex-col border-r border-slate-200 bg-[var(--bg-card)] dark:border-[#1e2638] sm:w-64 md:w-72 lg:w-80 ${
-            hasSelection ? "hidden md:flex" : "flex"
+      <div className="flex min-h-0 flex-1 gap-0 p-0 sm:gap-5 sm:p-5">
+        {/* Entity list */}
+        <section
+          className={`flex w-full shrink-0 flex-col overflow-hidden border-slate-200 bg-[var(--bg-card)] sm:w-[300px] sm:rounded-2xl sm:border lg:w-[320px] dark:border-[#252c4d] ${
+            hasSelection ? "hidden sm:flex" : "flex"
           }`}
         >
-          <div className="border-b border-slate-100 px-3 py-3 dark:border-[#1e2638] sm:px-4">
-            <SearchInput
-              value={listSearch}
-              onChange={setListSearch}
-              placeholder={
-                tab === "agencies"
-                  ? "Search agencies…"
-                  : "Search drivers…"
-              }
-              resultCount={
-                tab === "agencies"
-                  ? filteredAgencies.length
-                  : filteredDrivers.length
-              }
-              size="sm"
-            />
+          <div className="shrink-0 space-y-3 border-b border-slate-100 p-3.5 dark:border-[#252c4d]">
+            <div className="grid grid-cols-2 gap-1 rounded-xl bg-[var(--bg-main)] p-1">
+              {(
+                [
+                  ["agencies", "🏢 Agencies"],
+                  ["drivers", "👤 Drivers"],
+                ] as const
+              ).map(([id, label]) => (
+                <button
+                  key={id}
+                  type="button"
+                  onClick={() => switchTab(id)}
+                  className={`rounded-[9px] py-2 text-xs font-bold transition ${
+                    tab === id
+                      ? "bg-[var(--bg-card)] text-indigo-600 shadow-sm dark:text-[#a5b4fc]"
+                      : "text-slate-500 hover:text-slate-800 dark:text-[#8d94b8]"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            <label className="flex items-center gap-2 rounded-xl border border-slate-200 bg-[var(--bg-main)] px-3 transition focus-within:border-indigo-500 dark:border-[#252c4d]">
+              <Search className="h-4 w-4 shrink-0 text-slate-400" />
+              <input
+                value={listSearch}
+                onChange={(e) => setListSearch(e.target.value)}
+                placeholder={
+                  tab === "agencies"
+                    ? "Search agencies…"
+                    : "Search drivers…"
+                }
+                className="w-full border-0 bg-transparent py-2.5 text-sm outline-none placeholder:text-slate-400 dark:text-[#eef0ff] dark:placeholder:text-[#8d94b8]"
+              />
+            </label>
           </div>
-          <div className="flex-1 space-y-1.5 overflow-y-auto p-2">
+
+          <div className="flex-1 space-y-1.5 overflow-y-auto p-2.5">
             {listLoading ? (
               Array.from({ length: 6 }).map((_, i) => (
                 <div
                   key={i}
-                  className="h-[4.5rem] animate-pulse rounded-xl bg-slate-100 dark:bg-white/5"
+                  className="h-[60px] animate-pulse rounded-[14px] bg-slate-100 dark:bg-white/5"
                 />
               ))
             ) : tab === "agencies" ? (
               filteredAgencies.length === 0 ? (
-                <p className="p-4 text-center text-xs text-slate-400 dark:text-slate-500">
-                  No agencies
-                </p>
+                <EmptyList label="No match" hint="Try a different name." />
               ) : (
-                filteredAgencies.map((a) => {
+                filteredAgencies.map((a, i) => {
                   const id = a._id ?? a.id ?? "";
+                  const name = formatAgencyLabel(a);
+                  const phone = a.phone || "";
                   const sel = id === selectedAgencyId;
                   return (
-                    <button
+                    <EntityRow
                       key={id}
-                      type="button"
+                      name={name}
+                      phone={phone}
+                      kind="Agency"
+                      color={avatarColor(i)}
+                      selected={sel}
                       onClick={() => setSelectedAgencyId(id)}
-                      className={`w-full rounded-xl border p-3 text-left transition ${
-                        sel
-                          ? "border-2 border-indigo-500/80 bg-indigo-50 shadow-sm dark:bg-indigo-500/10 dark:border-indigo-500/70"
-                          : "border-slate-200 bg-[var(--bg-elevated)] hover:border-slate-300 hover:bg-slate-50 dark:border-[#1e2638] dark:hover:border-white/15 dark:hover:bg-white/[0.04]"
-                      }`}
-                    >
-                      <div className="flex items-start gap-3">
-                        <div
-                          className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${
-                            sel
-                              ? "border border-indigo-500/40 bg-indigo-500/15 text-indigo-600 dark:text-indigo-300"
-                              : "bg-indigo-100 text-indigo-600 dark:bg-indigo-500/10 dark:text-indigo-400"
-                          }`}
-                        >
-                          <Building2 className="h-5 w-5" />
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <p className="truncate text-sm font-semibold text-slate-900 dark:text-slate-100">
-                            {formatAgencyLabel(a)}
-                          </p>
-                          <p className="truncate font-mono text-xs text-slate-400 dark:text-slate-500">
-                            {a.phone || "Agency"}
-                          </p>
-                        </div>
-                      </div>
-                    </button>
+                    />
                   );
                 })
               )
             ) : filteredDrivers.length === 0 ? (
-              <p className="p-4 text-center text-xs text-slate-400 dark:text-slate-500">
-                No drivers
-              </p>
+              <EmptyList label="No match" hint="Try a different name." />
             ) : (
-              filteredDrivers.map((d) => {
+              filteredDrivers.map((d, i) => {
+                const name = driverName(d);
                 const sel = d._id === selectedDriverId;
                 return (
-                  <button
+                  <EntityRow
                     key={d._id}
-                    type="button"
+                    name={name}
+                    phone={d.phone || ""}
+                    kind="Driver"
+                    color={avatarColor(i)}
+                    selected={sel}
                     onClick={() => setSelectedDriverId(d._id)}
-                    className={`w-full rounded-xl border p-3 text-left transition ${
-                      sel
-                        ? "border-2 border-indigo-500/80 bg-indigo-50 shadow-sm dark:bg-indigo-500/10 dark:border-indigo-500/70"
-                        : "border-slate-200 bg-[var(--bg-elevated)] hover:border-slate-300 hover:bg-slate-50 dark:border-[#1e2638] dark:hover:border-white/15 dark:hover:bg-white/[0.04]"
-                    }`}
-                  >
-                    <div className="flex items-start gap-3">
-                      <div
-                        className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${
-                          sel
-                            ? "border border-indigo-500/40 bg-indigo-500/15 text-indigo-600 dark:text-indigo-300"
-                            : "bg-violet-100 text-violet-600 dark:bg-violet-500/10 dark:text-violet-300"
-                        }`}
-                      >
-                        <User className="h-5 w-5" />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-semibold text-slate-900 dark:text-slate-100">
-                          {driverName(d)}
-                        </p>
-                        <p className="truncate font-mono text-xs text-slate-400 dark:text-slate-500">
-                          {d.phone || "Driver"}
-                        </p>
-                      </div>
-                    </div>
-                  </button>
+                  />
                 );
               })
             )}
           </div>
-        </div>
+        </section>
 
         {/* Detail pane */}
-        <div
-          className={`min-h-0 min-w-0 flex-1 flex-col overflow-hidden ${
-            hasSelection ? "flex" : "hidden md:flex"
+        <section
+          className={`min-h-0 min-w-0 flex-1 overflow-hidden ${
+            hasSelection ? "flex flex-col" : "hidden sm:flex sm:flex-col"
           }`}
         >
           {!hasSelection ? (
-            <div className="flex flex-1 flex-col items-center justify-center gap-3 p-8 text-center">
-              <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-slate-200 bg-[var(--bg-elevated)] text-slate-400 dark:border-[#1e2638] dark:text-slate-500">
-                <Wallet className="h-7 w-7" />
-              </div>
-              <p className="text-sm font-medium text-slate-600 dark:text-slate-300">
+            <div className="flex flex-1 flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-slate-200 bg-[var(--bg-card)] p-8 text-center dark:border-[#252c4d]">
+              <Wallet className="h-10 w-10 text-slate-300 dark:text-slate-600" />
+              <p className="text-[15px] font-bold text-slate-800 dark:text-[#eef0ff]">
                 Select an {tab === "agencies" ? "agency" : "driver"}
               </p>
-              <p className="max-w-xs text-xs text-slate-400 dark:text-slate-500">
+              <p className="max-w-xs text-xs text-slate-500 dark:text-[#8d94b8]">
                 View money summary and full transaction history with filters.
               </p>
             </div>
           ) : detailLoading && !agencyDetail && !driverDetail ? (
-            <div className="flex flex-1 items-center justify-center">
+            <div className="flex flex-1 items-center justify-center rounded-2xl border border-slate-200 bg-[var(--bg-card)] dark:border-[#252c4d]">
               <Loader2 className="h-7 w-7 animate-spin text-indigo-500" />
             </div>
           ) : (
-            <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-              {/* Header + summary */}
-              <div className="shrink-0 space-y-3 border-b border-slate-200 bg-[var(--bg-card)] px-3 py-3 dark:border-[#1e2638] sm:px-4 sm:py-4">
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-white/5 md:hidden"
-                    onClick={clearDetail}
-                  >
-                    <ArrowLeft className="h-5 w-5" />
-                  </button>
-                  <div className="min-w-0 flex-1">
-                    <h2 className="truncate text-base font-bold text-slate-900 dark:text-white sm:text-lg">
-                      {selectedTitle}
-                    </h2>
-                    <p className="text-xs text-slate-400 dark:text-slate-500">
-                      Transaction history
-                      {detailLoading ? " · Updating…" : ""}
-                    </p>
+            <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto sm:pr-0.5">
+              <div className="flex items-start gap-2">
+                <button
+                  type="button"
+                  className="mt-1 rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 sm:hidden dark:hover:bg-white/5"
+                  onClick={clearDetail}
+                >
+                  <ArrowLeft className="h-5 w-5" />
+                </button>
+                <div className="min-w-0">
+                  <h2 className="truncate text-[22px] font-extrabold tracking-tight text-slate-900 dark:text-[#eef0ff]">
+                    {selectedTitle}
+                    {selectedSubtitle && selectedSubtitle !== "Agency" &&
+                    selectedSubtitle !== "Driver"
+                      ? ` · ${selectedSubtitle}`
+                      : ""}
+                  </h2>
+                  <p className="text-[13px] text-slate-500 dark:text-[#8d94b8]">
+                    Transaction history
+                    {detailLoading ? " · Updating…" : ""}
+                  </p>
+                </div>
+              </div>
+
+              {/* KPIs */}
+              {tab === "agencies" && agencyCards && (
+                <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-3">
+                  <div className="rounded-[18px] bg-gradient-to-br from-indigo-900 to-violet-700 px-5 py-[18px] text-white">
+                    <span className="block text-[13px] font-bold">
+                      Grand total
+                    </span>
+                    <small className="text-xs text-white/75">
+                      Bulk +{fmtCurrency(agencyCards.bulkTotal)} · Vehicle −
+                      {fmtCurrency(agencyCards.vehicleOut)}
+                    </small>
+                    <b className="mt-2 block text-[28px] font-extrabold tracking-tight">
+                      {fmtSignedCurrency(agencyCards.grandTotal)}
+                    </b>
+                  </div>
+                  <div className="rounded-[18px] border border-slate-200 bg-[var(--bg-card)] px-5 py-[18px] dark:border-[#252c4d]">
+                    <span className="block text-[13px] font-bold text-slate-800 dark:text-[#eef0ff]">
+                      Received
+                    </span>
+                    <small className="text-xs text-slate-500 dark:text-[#8d94b8]">
+                      Cash in
+                    </small>
+                    <b className="mt-2 block text-[28px] font-extrabold tracking-tight text-emerald-600 dark:text-[#34d399]">
+                      {fmtCurrency(agencyCards.received)}
+                    </b>
+                    <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-slate-200 dark:bg-[#252c4d]">
+                      <div
+                        className="h-full min-w-[3px] rounded-full bg-emerald-500"
+                        style={{ width: `${receivedPct}%` }}
+                      />
+                    </div>
+                  </div>
+                  <div className="rounded-[18px] border border-slate-200 bg-[var(--bg-card)] px-5 py-[18px] dark:border-[#252c4d]">
+                    <span className="block text-[13px] font-bold text-slate-800 dark:text-[#eef0ff]">
+                      Remaining
+                    </span>
+                    <small className="text-xs text-slate-500 dark:text-[#8d94b8]">
+                      Net to collect (bulk remaining − vehicle remaining)
+                    </small>
+                    <b className="mt-2 block text-[28px] font-extrabold tracking-tight text-indigo-600 dark:text-[#a5b4fc]">
+                      {fmtSignedCurrency(agencyCards.remaining)}
+                    </b>
                   </div>
                 </div>
+              )}
 
-                {tab === "agencies" && agencyCards && (
-                  <div className="grid grid-cols-3 gap-2">
-                    <SummaryCard
-                      label="Grand Total"
-                      value={agencyCards.grandTotal}
-                      hint={`Bulk +₹${agencyCards.bulkTotal.toLocaleString("en-IN")} · Vehicle −₹${agencyCards.vehicleOut.toLocaleString("en-IN")}`}
-                      signed
+              {tab === "drivers" && driverCards && (
+                <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-3">
+                  <div className="rounded-[18px] bg-gradient-to-br from-indigo-900 to-violet-700 px-5 py-[18px] text-white">
+                    <span className="block text-[13px] font-bold">
+                      Grand total
+                    </span>
+                    <small className="text-xs text-white/75">
+                      Bata + bulk advances from trips
+                    </small>
+                    <b className="mt-2 block text-[28px] font-extrabold tracking-tight">
+                      {fmtCurrency(driverCards.grandTotal)}
+                    </b>
+                  </div>
+                  <div className="rounded-[18px] border border-slate-200 bg-[var(--bg-card)] px-5 py-[18px] dark:border-[#252c4d]">
+                    <span className="block text-[13px] font-bold dark:text-[#eef0ff]">
+                      Paid
+                    </span>
+                    <small className="text-xs text-slate-500 dark:text-[#8d94b8]">
+                      Cash out so far
+                    </small>
+                    <b className="mt-2 block text-[28px] font-extrabold text-emerald-600 dark:text-[#34d399]">
+                      {fmtCurrency(driverCards.paid)}
+                    </b>
+                    <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-slate-200 dark:bg-[#252c4d]">
+                      <div
+                        className="h-full min-w-[3px] rounded-full bg-emerald-500"
+                        style={{ width: `${receivedPct}%` }}
+                      />
+                    </div>
+                  </div>
+                  <div className="rounded-[18px] border border-slate-200 bg-[var(--bg-card)] px-5 py-[18px] dark:border-[#252c4d]">
+                    <span className="block text-[13px] font-bold dark:text-[#eef0ff]">
+                      To pay
+                    </span>
+                    <small className="text-xs text-slate-500 dark:text-[#8d94b8]">
+                      Still owed to driver
+                    </small>
+                    <b className="mt-2 block text-[28px] font-extrabold text-indigo-600 dark:text-[#a5b4fc]">
+                      {fmtCurrency(driverCards.toPay)}
+                    </b>
+                  </div>
+                </div>
+              )}
+
+              {/* Transactions card */}
+              <div
+                className={`overflow-hidden rounded-2xl border border-slate-200 bg-[var(--bg-card)] dark:border-[#252c4d] ${
+                  detailLoading ? "opacity-70" : ""
+                }`}
+              >
+                <div className="flex flex-wrap items-center gap-2.5 px-4 py-3.5">
+                  <h3 className="text-base font-extrabold text-slate-900 dark:text-[#eef0ff]">
+                    Transactions
+                  </h3>
+                  <span className="rounded-full bg-indigo-50 px-2.5 py-0.5 text-xs font-bold text-indigo-600 dark:bg-[#242a57] dark:text-[#a5b4fc]">
+                    {txRows.length}
+                  </span>
+                  <label className="flex w-40 shrink-0 items-center gap-2 rounded-xl border border-slate-200 bg-[var(--bg-main)] px-2.5 sm:w-44 dark:border-[#252c4d]">
+                    <Search className="h-3.5 w-3.5 shrink-0 text-slate-400" />
+                    <input
+                      value={tableSearch}
+                      onChange={(e) => setTableSearch(e.target.value)}
+                      placeholder="Search…"
+                      className="w-full min-w-0 border-0 bg-transparent py-2 text-sm outline-none dark:text-[#eef0ff]"
                     />
-                    <SummaryCard
-                      label="Received"
-                      value={agencyCards.received}
-                      hint="Cash In"
-                      tone="receive"
-                    />
-                    <SummaryCard
-                      label="Remaining"
-                      value={agencyCards.remaining}
-                      hint="Net to collect (bulk remaining − vehicle remaining)"
-                      tone="remaining"
-                      signed
-                    />
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setSortDir((s) => (s === "desc" ? "asc" : "desc"))
+                    }
+                    className="rounded-[10px] border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-500 transition hover:bg-[var(--bg-main)] dark:border-[#252c4d] dark:text-[#8d94b8]"
+                    title="Change sort order"
+                  >
+                    {sortDir === "desc" ? "↓ Newest" : "↑ Oldest"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setFiltersOpen((o) => !o)}
+                    aria-expanded={filtersOpen}
+                    className={`inline-flex items-center gap-1.5 rounded-[10px] border px-3 py-2 text-xs font-semibold transition ${
+                      filtersOpen || filterBadgeCount
+                        ? "border-indigo-500 bg-indigo-50 text-indigo-600 dark:border-indigo-400 dark:bg-[#242a57] dark:text-[#a5b4fc]"
+                        : "border-slate-200 text-slate-500 hover:bg-[var(--bg-main)] dark:border-[#252c4d] dark:text-[#8d94b8]"
+                    }`}
+                  >
+                    <Settings2 className="h-3.5 w-3.5" />
+                    Filters
+                    {filterBadgeCount > 0 && (
+                      <em className="not-italic rounded-full bg-indigo-600 px-1.5 text-[11px] font-bold text-white">
+                        {filterBadgeCount}
+                      </em>
+                    )}
+                  </button>
+                </div>
+
+                {!filtersOpen && filterBadgeCount > 0 && (
+                  <div className="flex flex-wrap items-center gap-1.5 px-4 pb-2.5">
+                    {detailMonth !== "all_time" && (
+                      <ActivePill
+                        label={
+                          MONTH_OPTIONS.find((o) => o.value === detailMonth)
+                            ?.label || detailMonth
+                        }
+                        onClear={() => setDetailMonth("all_time")}
+                      />
+                    )}
+                    {(dateFrom || dateTo) && (
+                      <ActivePill
+                        label={`${dateFrom || "…"} → ${dateTo || "…"}`}
+                        onClear={() => {
+                          setDateFrom("");
+                          setDateTo("");
+                        }}
+                      />
+                    )}
+                    {directionFilter !== "all" && (
+                      <ActivePill
+                        label={directionFilter}
+                        onClear={() => setDirectionFilter("all")}
+                      />
+                    )}
+                    <button
+                      type="button"
+                      onClick={clearFilters}
+                      className="ml-1 text-xs font-bold text-indigo-600 dark:text-[#a5b4fc]"
+                    >
+                      Clear all
+                    </button>
                   </div>
                 )}
 
-                {tab === "drivers" && driverCards && (
-                  <div className="grid grid-cols-2 gap-2 sm:max-w-md">
-                    <SummaryCard
-                      label="Grand Total"
-                      value={driverCards.grandTotal}
-                    />
-                    <SummaryCard
-                      label="To Pay"
-                      value={driverCards.toPay}
-                      hint="Still to pay driver"
-                      tone="remaining"
-                    />
-                  </div>
-                )}
-
-                {/* Filters */}
-                <div className="rounded-xl border border-slate-200 bg-slate-50/90 p-3 dark:border-[#1e2638] dark:bg-white/[0.03]">
-                  <div className="mb-2.5 flex flex-wrap items-center justify-between gap-2">
-                    <div className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                      <CalendarRange className="h-3.5 w-3.5" />
-                      Search & filters
+                {filtersOpen && (
+                  <div className="flex flex-wrap items-center gap-2.5 border-y border-slate-200 bg-[var(--bg-main)] px-4 py-2.5 dark:border-[#252c4d]">
+                    <select
+                      value={detailMonth}
+                      onChange={(e) => setDetailMonth(e.target.value)}
+                      aria-label="Month"
+                      className={fieldCls + " max-w-[180px]"}
+                    >
+                      {MONTH_OPTIONS.map((o) => (
+                        <option key={o.value} value={o.value}>
+                          {o.label}
+                        </option>
+                      ))}
+                    </select>
+                    <div className="flex items-center gap-1.5 text-slate-400">
+                      <input
+                        type="date"
+                        value={dateFrom}
+                        onChange={(e) => setDateFrom(e.target.value)}
+                        aria-label="From date"
+                        className={fieldCls}
+                      />
+                      <span>→</span>
+                      <input
+                        type="date"
+                        value={dateTo}
+                        onChange={(e) => setDateTo(e.target.value)}
+                        aria-label="To date"
+                        className={fieldCls}
+                      />
+                    </div>
+                    <div className="flex gap-1 rounded-xl border border-slate-200 bg-[var(--bg-card)] p-1 dark:border-[#252c4d]">
+                      {(
+                        [
+                          ["all", "All"],
+                          ["Cash in", "Cash in"],
+                          ["Cash out", "Cash out"],
+                        ] as const
+                      ).map(([k, label]) => (
+                        <button
+                          key={k}
+                          type="button"
+                          onClick={() => setDirectionFilter(k)}
+                          className={`rounded-[9px] px-3 py-1.5 text-xs font-semibold transition ${
+                            directionFilter === k
+                              ? "bg-[var(--bg-main)] text-indigo-600 shadow-sm dark:text-[#a5b4fc]"
+                              : "text-slate-500 dark:text-[#8d94b8]"
+                          }`}
+                        >
+                          {label}
+                        </button>
+                      ))}
                     </div>
                     {hasActiveFilters && (
                       <button
                         type="button"
                         onClick={clearFilters}
-                        className="text-[11px] font-semibold text-indigo-600 hover:text-indigo-700 dark:text-indigo-400 dark:hover:text-indigo-300"
+                        className="ml-auto text-xs font-bold text-indigo-600 dark:text-[#a5b4fc]"
                       >
-                        Reset all
+                        Clear
                       </button>
                     )}
                   </div>
+                )}
 
-                  <div className="flex flex-col gap-2.5">
-                    <SearchSortBar
-                      search={tableSearch}
-                      onSearchChange={setTableSearch}
-                      searchPlaceholder="Search amount, date, month, notes…"
-                      resultCount={txRows.length}
-                      sort={sortDir}
-                      onSortChange={setSortDir}
-                    />
-
-                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-                      <div>
-                        <FilterLabel>Month</FilterLabel>
-                        <select
-                          value={detailMonth}
-                          onChange={(e) => setDetailMonth(e.target.value)}
-                          className={filterControlCls}
-                        >
-                          {MONTH_OPTIONS.map((o) => (
-                            <option key={o.value} value={o.value}>
-                              {o.label}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                      <div>
-                        <FilterLabel>From date</FilterLabel>
-                        <input
-                          type="date"
-                          value={dateFrom}
-                          onChange={(e) => setDateFrom(e.target.value)}
-                          className={filterControlCls}
-                        />
-                      </div>
-                      <div>
-                        <FilterLabel>To date</FilterLabel>
-                        <input
-                          type="date"
-                          value={dateTo}
-                          onChange={(e) => setDateTo(e.target.value)}
-                          className={filterControlCls}
-                        />
-                      </div>
-                    </div>
-
-                    <div className="flex flex-wrap items-center gap-1.5">
-                      <span className="mr-1 text-[11px] font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">
-                        Type
-                      </span>
-                      <FilterChip
-                        active={directionFilter === "all"}
-                        onClick={() => setDirectionFilter("all")}
-                      >
-                        All
-                      </FilterChip>
-                      <FilterChip
-                        active={directionFilter === "Cash in"}
-                        onClick={() => setDirectionFilter("Cash in")}
-                        tone="in"
-                      >
-                        Cash In
-                      </FilterChip>
-                      <FilterChip
-                        active={directionFilter === "Cash out"}
-                        onClick={() => setDirectionFilter("Cash out")}
-                        tone="out"
-                      >
-                        Cash Out
-                      </FilterChip>
-                    </div>
-
-                    {hasActiveFilters && (
-                      <div className="flex flex-wrap gap-1.5 border-t border-slate-200/80 pt-2.5 dark:border-white/10">
-                        {detailMonth !== "all_time" && (
-                          <ActiveFilterPill
-                            label={
-                              MONTH_OPTIONS.find((o) => o.value === detailMonth)
-                                ?.label || detailMonth
-                            }
-                            onClear={() => setDetailMonth("all_time")}
-                          />
-                        )}
-                        {dateFrom && (
-                          <ActiveFilterPill
-                            label={`From ${dateFrom}`}
-                            onClear={() => setDateFrom("")}
-                          />
-                        )}
-                        {dateTo && (
-                          <ActiveFilterPill
-                            label={`To ${dateTo}`}
-                            onClear={() => setDateTo("")}
-                          />
-                        )}
-                        {directionFilter !== "all" && (
-                          <ActiveFilterPill
-                            label={directionFilter}
-                            onClear={() => setDirectionFilter("all")}
-                          />
-                        )}
-                        {tableSearch.trim() && (
-                          <ActiveFilterPill
-                            label={`“${tableSearch.trim()}”`}
-                            onClear={() => setTableSearch("")}
-                          />
-                        )}
-                      </div>
-                    )}
+                {txRows.length === 0 ? (
+                  <div className="px-4 py-11 text-center text-slate-500 dark:text-[#8d94b8]">
+                    <b className="mb-1 block text-[15px] text-slate-800 dark:text-[#eef0ff]">
+                      {rawTxCount
+                        ? "Nothing matches these filters"
+                        : "No transactions yet"}
+                    </b>
+                    {rawTxCount
+                      ? "Clear the filters to see all entries."
+                      : `Record a payment for ${selectedTitle} to see it here.`}
                   </div>
-                </div>
-              </div>
-
-              {/* Table */}
-              <div
-                className={`min-h-0 flex-1 overflow-auto p-3 sm:p-4 ${
-                  detailLoading ? "opacity-60" : ""
-                }`}
-              >
-                <div className="overflow-hidden rounded-xl border border-slate-200 bg-[var(--bg-card)] shadow-sm dark:border-[#1e2638]">
-                  <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50 px-3 py-2.5 dark:border-[#1e2638] dark:bg-white/[0.03] sm:px-4">
-                    <h4 className="text-xs font-semibold text-slate-800 dark:text-slate-200 sm:text-sm">
-                      Transactions
-                    </h4>
-                    <span className="rounded-full bg-slate-200/70 px-2 py-0.5 text-[10px] font-semibold text-slate-600 dark:bg-white/10 dark:text-slate-300">
-                      {txRows.length}
-                    </span>
-                  </div>
+                ) : (
                   <div className="overflow-x-auto">
-                    <table className="w-full min-w-[680px] text-left text-xs">
-                      <thead className="border-b border-slate-100 bg-[var(--bg-card)] text-[10px] uppercase tracking-wide text-slate-500 dark:border-[#1e2638] dark:text-slate-400">
-                        <tr>
-                          <th className="px-3 py-2.5 font-semibold sm:px-4">
-                            Date
-                          </th>
-                          <th className="px-3 py-2.5 font-semibold">Time</th>
-                          <th className="px-3 py-2.5 font-semibold">Month</th>
-                          <th className="px-3 py-2.5 font-semibold">Type</th>
-                          <th className="px-3 py-2.5 font-semibold">Method</th>
-                          <th className="px-3 py-2.5 font-semibold">Notes</th>
-                          <th className="px-3 py-2.5 text-right font-semibold sm:px-4">
-                            Amount
-                          </th>
+                    <table className="w-full min-w-[640px] border-collapse text-sm">
+                      <thead>
+                        <tr className="bg-[var(--bg-main)] text-left text-xs font-semibold text-slate-500 dark:text-[#8d94b8]">
+                          <th className="px-[18px] py-2.5">Date</th>
+                          <th className="px-[18px] py-2.5">Time</th>
+                          <th className="px-[18px] py-2.5">Month</th>
+                          <th className="px-[18px] py-2.5">Type</th>
+                          <th className="px-[18px] py-2.5">Method</th>
+                          <th className="px-[18px] py-2.5">Notes</th>
+                          <th className="px-[18px] py-2.5 text-right">Amount</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {txRows.length === 0 ? (
-                          <tr>
-                            <td
-                              colSpan={7}
-                              className="px-3 py-12 text-center text-slate-400 dark:text-slate-500"
-                            >
-                              No transactions for these filters
-                            </td>
-                          </tr>
-                        ) : (
-                          txRows.map((r) => (
+                        {txRows.map((r) => {
+                          const isIn = r.direction === "Cash in";
+                          return (
                             <tr
                               key={r.id}
-                              className="border-b border-slate-50 last:border-0 hover:bg-slate-50/70 dark:border-[#1e2638] dark:hover:bg-white/[0.03]"
+                              className="border-t border-slate-100 hover:bg-[var(--bg-main)] dark:border-[#252c4d]"
                             >
-                              <td className="whitespace-nowrap px-3 py-3 font-medium text-slate-700 dark:text-slate-200 sm:px-4">
+                              <td className="whitespace-nowrap px-[18px] py-3.5 font-medium text-slate-800 dark:text-[#eef0ff]">
                                 {formatDate(r.date)}
                               </td>
-                              <td className="whitespace-nowrap px-3 py-3 font-mono text-slate-500 dark:text-slate-400">
+                              <td className="whitespace-nowrap px-[18px] py-3.5 font-mono tabular-nums text-slate-500 dark:text-[#8d94b8]">
                                 {formatTime(r.date)}
                               </td>
-                              <td className="whitespace-nowrap px-3 py-3 text-slate-600 dark:text-slate-400">
+                              <td className="whitespace-nowrap px-[18px] py-3.5 text-slate-600 dark:text-[#8d94b8]">
                                 {formatMonth(r.date)}
                               </td>
-                              <td className="px-3 py-3">
+                              <td className="px-[18px] py-3.5">
                                 <span
-                                  className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold ${
-                                    r.direction === "Cash in"
-                                      ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-300"
-                                      : "bg-rose-100 text-rose-800 dark:bg-rose-500/15 dark:text-rose-300"
+                                  className={`rounded-full px-2.5 py-0.5 text-[11px] font-bold ${
+                                    isIn
+                                      ? "bg-emerald-50 text-emerald-700 dark:bg-[#0d3325] dark:text-[#34d399]"
+                                      : "bg-rose-50 text-rose-600 dark:bg-[#3a1a1e] dark:text-[#fda4af]"
                                   }`}
                                 >
                                   {r.direction}
                                 </span>
                               </td>
-                              <td className="px-3 py-3 capitalize text-slate-600 dark:text-slate-400">
+                              <td className="px-[18px] py-3.5 capitalize text-slate-600 dark:text-[#8d94b8]">
                                 {String(r.method).replace(/_/g, " ")}
                               </td>
-                              <td className="max-w-[200px] truncate px-3 py-3 text-slate-500 dark:text-slate-500">
+                              <td className="max-w-[200px] truncate px-[18px] py-3.5 text-slate-500 dark:text-[#8d94b8]">
                                 {r.notes || "—"}
                               </td>
                               <td
-                                className={`whitespace-nowrap px-3 py-3 text-right font-mono font-bold tabular-nums sm:px-4 ${
-                                  r.direction === "Cash in"
-                                    ? "text-emerald-700 dark:text-emerald-400"
-                                    : "text-rose-700 dark:text-rose-400"
+                                className={`whitespace-nowrap px-[18px] py-3.5 text-right font-extrabold tabular-nums ${
+                                  isIn
+                                    ? "text-emerald-600 dark:text-[#34d399]"
+                                    : "text-rose-600 dark:text-[#fda4af]"
                                 }`}
                               >
+                                {isIn ? "+" : "−"}
                                 {fmtCurrency(r.amount)}
                               </td>
                             </tr>
-                          ))
-                        )}
+                          );
+                        })}
                       </tbody>
                     </table>
                   </div>
-                </div>
+                )}
               </div>
             </div>
           )}
-        </div>
+        </section>
       </div>
     </div>
+  );
+}
+
+function EntityRow({
+  name,
+  phone,
+  kind,
+  color,
+  selected,
+  onClick,
+}: {
+  name: string;
+  phone: string;
+  kind: string;
+  color: string;
+  selected: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`flex w-full items-center gap-3 rounded-[14px] border p-2.5 text-left transition ${
+        selected
+          ? "border-indigo-500 bg-indigo-50/80 dark:border-indigo-400 dark:bg-[#242a57]"
+          : "border-transparent hover:bg-[var(--bg-main)] dark:hover:bg-white/[0.04]"
+      }`}
+    >
+      <span
+        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-[13px] font-extrabold text-white"
+        style={{ background: color }}
+      >
+        {initials(name)}
+      </span>
+      <span className="min-w-0">
+        <span className="block truncate text-sm font-bold text-slate-900 dark:text-[#eef0ff]">
+          {name}
+          {phone ? ` · ${phone}` : ""}
+        </span>
+        <span className="block truncate text-xs text-slate-500 dark:text-[#8d94b8]">
+          {phone || kind}
+        </span>
+      </span>
+    </button>
+  );
+}
+
+function EmptyList({ label, hint }: { label: string; hint: string }) {
+  return (
+    <div className="px-4 py-10 text-center text-slate-500 dark:text-[#8d94b8]">
+      <b className="mb-1 block text-[15px] text-slate-800 dark:text-[#eef0ff]">
+        {label}
+      </b>
+      {hint}
+    </div>
+  );
+}
+
+function ActivePill({
+  label,
+  onClear,
+}: {
+  label: string;
+  onClear: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClear}
+      className="inline-flex items-center gap-1 rounded-full bg-indigo-50 px-2.5 py-0.5 text-xs font-semibold text-indigo-600 dark:bg-[#242a57] dark:text-[#a5b4fc]"
+    >
+      {label}
+      <X className="h-3 w-3" />
+    </button>
   );
 }

@@ -751,7 +751,7 @@ function TableShell({
         <h4 className="text-xs font-semibold text-slate-800 sm:text-sm">{title}</h4>
       </div>
       <div className="overflow-x-auto overscroll-x-contain [-webkit-overflow-scrolling:touch]">
-        {children}
+      {children}
       </div>
     </div>
   );
@@ -924,34 +924,34 @@ export function CashInCashOutPage() {
 
   const loadAgencyDetail = useCallback(
     async (agencyId: string, month: string) => {
-      setDetailLoading(true);
-      setDetailError(null);
-      try {
+    setDetailLoading(true);
+    setDetailError(null);
+    try {
         const d = await fetchCashInCashOutAgencyDetail(agencyId, month);
-        setAgencyDetail(d);
-      } catch {
-        setAgencyDetail(null);
-        setDetailError("Could not load agency details.");
-      } finally {
-        setDetailLoading(false);
-      }
+      setAgencyDetail(d);
+    } catch {
+      setAgencyDetail(null);
+      setDetailError("Could not load agency details.");
+    } finally {
+      setDetailLoading(false);
+    }
     },
     [],
   );
 
   const loadDriverDetail = useCallback(
     async (driverId: string, month: string) => {
-      setDetailLoading(true);
-      setDetailError(null);
-      try {
+    setDetailLoading(true);
+    setDetailError(null);
+    try {
         const d = await fetchCashInCashOutDriverDetail(driverId, month);
-        setDriverDetail(d);
-      } catch {
-        setDriverDetail(null);
-        setDetailError("Could not load driver details.");
-      } finally {
-        setDetailLoading(false);
-      }
+      setDriverDetail(d);
+    } catch {
+      setDriverDetail(null);
+      setDetailError("Could not load driver details.");
+    } finally {
+      setDetailLoading(false);
+    }
     },
     [],
   );
@@ -1206,12 +1206,12 @@ export function CashInCashOutPage() {
         }
         const pay = Math.min(left, bulkRemaining);
         await addDriverPayoutPayment(agencyId, {
-          driverName: driverDetail.driver.displayName,
+        driverName: driverDetail.driver.displayName,
           amount: pay,
-          paymentDate: payDate,
-          paymentMethod: payMethod,
-          notes: payNotes,
-        });
+        paymentDate: payDate,
+        paymentMethod: payMethod,
+        notes: payNotes,
+      });
         left -= pay;
       }
 
@@ -1321,7 +1321,7 @@ export function CashInCashOutPage() {
                               {a.phone}
                             </p>
                           ) : (
-                            <p className="text-xs text-slate-400">Agency</p>
+                          <p className="text-xs text-slate-400">Agency</p>
                           )}
                         </div>
                       </div>
@@ -1389,16 +1389,16 @@ export function CashInCashOutPage() {
                     {selectedAgencyMeta
                       ? formatAgencyLabel(selectedAgencyMeta)
                       : agencyDetail?.agency.name ?? "…"}
-                  </h2>
+                    </h2>
                   <div className="ml-auto flex shrink-0">
-                    <button
-                      type="button"
+                  <button
+                    type="button"
                       onClick={openAgencyMarkPaymentModal}
                       disabled={!agencyDetail || detailLoading}
                       className="touch-manipulation rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50 sm:px-4 sm:py-2 sm:text-sm"
                     >
                       Mark Payment
-                    </button>
+                  </button>
                   </div>
                 </div>
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
@@ -1565,7 +1565,7 @@ export function CashInCashOutPage() {
                         History → Agency payout
                       </Link>
                     </p>
-                      </>
+                  </>
                     )}
                   </div>
                 ) : null}
@@ -1585,17 +1585,17 @@ export function CashInCashOutPage() {
                     <ArrowLeft className="h-5 w-5" />
                   </button>
                   <h2 className="min-w-0 truncate text-base font-bold text-slate-900 sm:text-lg">
-                    {driverDetail?.driver.displayName ?? "…"}
-                  </h2>
+                      {driverDetail?.driver.displayName ?? "…"}
+                    </h2>
                   <div className="ml-auto flex shrink-0">
-                    <button
-                      type="button"
+                  <button
+                    type="button"
                       onClick={openDriverMarkPaymentModal}
                       disabled={!driverDetail || detailLoading}
                       className="touch-manipulation rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50 sm:px-4 sm:py-2 sm:text-sm"
                     >
                       Cash out
-                    </button>
+                  </button>
                   </div>
                 </div>
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
@@ -1766,7 +1766,7 @@ export function CashInCashOutPage() {
                       </Link>
                       .
                     </p>
-                      </>
+                  </>
                     )}
                   </div>
                 ) : null}
@@ -1800,8 +1800,8 @@ export function CashInCashOutPage() {
           <fieldset className="block">
             <legend className="text-xs font-medium text-slate-600">Type</legend>
             <div className="mt-1.5 grid grid-cols-2 gap-1 rounded-xl border border-slate-200 bg-slate-50 p-1">
-              <button
-                type="button"
+            <button
+              type="button"
                 onClick={() => setAgencyPaymentKind("cash_in")}
                 className={`min-h-[40px] rounded-lg px-2 py-2 text-xs font-semibold sm:text-sm ${
                   agencyPaymentKind === "cash_in"
@@ -1810,9 +1810,9 @@ export function CashInCashOutPage() {
                 }`}
               >
                 Cash in
-              </button>
-              <button
-                type="button"
+            </button>
+            <button
+              type="button"
                 onClick={() => setAgencyPaymentKind("cash_out")}
                 className={`min-h-[40px] rounded-lg px-2 py-2 text-xs font-semibold sm:text-sm ${
                   agencyPaymentKind === "cash_out"
@@ -1821,8 +1821,8 @@ export function CashInCashOutPage() {
                 }`}
               >
                 Cash out
-              </button>
-            </div>
+            </button>
+          </div>
           </fieldset>
           <label className="mt-3 block text-xs font-medium text-slate-600">
             Amount (₹)
@@ -1916,8 +1916,8 @@ export function CashInCashOutPage() {
           <fieldset className="block">
             <legend className="text-xs font-medium text-slate-600">Type</legend>
             <div className="mt-1.5 grid grid-cols-2 gap-1 rounded-xl border border-slate-200 bg-slate-50 p-1">
-              <button
-                type="button"
+            <button
+              type="button"
                 onClick={() => setDriverPaymentKind("cash_out")}
                 className={`min-h-[40px] rounded-lg px-2 py-2 text-xs font-semibold sm:text-sm ${
                   driverPaymentKind === "cash_out"
@@ -1926,9 +1926,9 @@ export function CashInCashOutPage() {
                 }`}
               >
                 Cash out
-              </button>
-              <button
-                type="button"
+            </button>
+            <button
+              type="button"
                 onClick={() => setDriverPaymentKind("advance")}
                 className={`min-h-[40px] rounded-lg px-2 py-2 text-xs font-semibold sm:text-sm ${
                   driverPaymentKind === "advance"
@@ -1937,8 +1937,8 @@ export function CashInCashOutPage() {
                 }`}
               >
                 Advance
-              </button>
-            </div>
+            </button>
+          </div>
           </fieldset>
           <label className="mt-3 block text-xs font-medium text-slate-600">
             Amount (₹)
@@ -1960,20 +1960,20 @@ export function CashInCashOutPage() {
             />
           </label>
           {driverPaymentKind === "cash_out" && (
-            <label className="mt-3 block text-xs font-medium text-slate-600">
-              Method
-              <select
-                className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
-                value={payMethod}
-                onChange={(e) => setPayMethod(e.target.value)}
-              >
-                {PAYMENT_METHODS.map((m) => (
-                  <option key={m} value={m}>
-                    {m}
-                  </option>
-                ))}
-              </select>
-            </label>
+          <label className="mt-3 block text-xs font-medium text-slate-600">
+            Method
+            <select
+              className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+              value={payMethod}
+              onChange={(e) => setPayMethod(e.target.value)}
+            >
+              {PAYMENT_METHODS.map((m) => (
+                <option key={m} value={m}>
+                  {m}
+                </option>
+              ))}
+            </select>
+          </label>
           )}
           <label className="mt-3 block text-xs font-medium text-slate-600">
             Notes

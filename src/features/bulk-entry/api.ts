@@ -46,6 +46,7 @@ export interface AgencyTrip {
   date?: string;
   notes?: string;
   isCompleted?: boolean;
+  createdAt?: string;
 }
 
 // ─── Bulk Entry Row (local UI model) ─────────────────────────────────────────
@@ -66,6 +67,8 @@ export interface BulkTripRow {
   grandTotal: number;
   notes: string;
   isCompleted?: boolean;
+  /** Server createdAt — used to order driver groups by when they were created. */
+  createdAt?: string;
 }
 
 export interface DriverGroup {
@@ -76,6 +79,8 @@ export interface DriverGroup {
   driverPhone?: string;
   vehicleNumber: string;
   rows: BulkTripRow[];
+  /** When this driver/vehicle block was first created (client or earliest trip). */
+  groupCreatedAt?: string;
 }
 
 export interface NormalEntryRow {

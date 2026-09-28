@@ -6,8 +6,8 @@ import type { HistoryTripItem, VehicleHistoryResponse } from '../vehicles/api';
 export interface Driver {
   _id: string;
   id?: string;
-  firstName: string;
-  lastName: string;
+  firstName?: string;
+  lastName?: string;
   email: string;
   phone: string;
   place?: string;
@@ -97,8 +97,8 @@ export async function fetchDriverById(id: string): Promise<Driver> {
 }
 
 export async function createDriver(driver: {
-  firstName: string;
-  lastName: string;
+  firstName?: string;
+  lastName?: string;
   email: string;
   phone: string;
   place?: string;

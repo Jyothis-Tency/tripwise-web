@@ -381,6 +381,7 @@ function DetailsTab({ driver }: { driver: Driver }) {
         </div>
       </Section>
 
+      {/* Documents section hidden for now
       <Section title="Documents" padded>
         <div className="grid gap-3.5 sm:grid-cols-2">
           <DocDrop
@@ -395,37 +396,9 @@ function DetailsTab({ driver }: { driver: Driver }) {
           />
         </div>
       </Section>
+      */}
     </div>
   );
-}
-
-function DocDrop({
-  title,
-  present,
-  href,
-}: {
-  title: string;
-  present: boolean;
-  href?: string;
-}) {
-  const inner = (
-    <>
-      <b className="block text-sm text-slate-800 dark:text-[#eef0ff]">{title}</b>
-      <span className="text-xs">
-        {present ? "Uploaded — click to view" : "Not uploaded"}
-      </span>
-    </>
-  );
-  const cls =
-    "w-full rounded-[14px] border-2 border-dashed border-slate-200 px-3 py-5 text-center text-slate-500 transition hover:border-indigo-500 hover:bg-indigo-50/50 hover:text-indigo-600 dark:border-[#252c4d] dark:hover:bg-[#242a57] dark:hover:text-[#a5b4fc]";
-  if (present && href) {
-    return (
-      <a href={href} target="_blank" rel="noreferrer" className={cls}>
-        {inner}
-      </a>
-    );
-  }
-  return <div className={cls}>{inner}</div>;
 }
 
 function formatTxDisplayDate(tx: SalaryTransaction): string {

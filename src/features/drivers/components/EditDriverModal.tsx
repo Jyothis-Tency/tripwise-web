@@ -22,8 +22,8 @@ export function EditDriverModal({ driver, onClose, onSuccess }: EditDriverModalP
   const [error, setError] = useState('');
 
   const handleSubmit = async () => {
-    if (!firstName.trim() || !lastName.trim() || !email.trim() || !phone.trim()) {
-      setError('First Name, Last Name, Email, and Phone are required.');
+    if (!email.trim() || !phone.trim()) {
+      setError('Email and Phone are required.');
       return;
     }
     setSaving(true);
@@ -65,7 +65,7 @@ export function EditDriverModal({ driver, onClose, onSuccess }: EditDriverModalP
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">
-                First Name *
+                First Name
               </label>
               <input
                 value={firstName}
@@ -75,7 +75,7 @@ export function EditDriverModal({ driver, onClose, onSuccess }: EditDriverModalP
             </div>
             <div>
               <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">
-                Last Name *
+                Last Name
               </label>
               <input
                 value={lastName}

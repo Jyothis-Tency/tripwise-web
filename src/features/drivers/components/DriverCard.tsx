@@ -14,11 +14,17 @@ export function driverDisplayName(d: Driver): string {
   if (d.firstName || d.lastName) {
     return `${d.firstName ?? ""} ${d.lastName ?? ""}`.trim();
   }
-  return (d as { name?: string }).name ?? "—";
+  const named = (d as { name?: string }).name?.trim();
+  if (named) return named;
+  if (d.phone) return d.phone;
+  return "Driver";
 }
 
 export function driverInitials(d: Driver): string {
   const name = driverDisplayName(d);
+  if (name === "Driver" && d.phone) {
+    return d.phone.slice(-2);
+  }
   return name
     .split(/\s+/)
     .filter(Boolean)

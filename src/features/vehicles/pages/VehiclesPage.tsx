@@ -1591,7 +1591,7 @@ function VehicleHistoryTab({
                     <div className="flex items-center gap-3">
                       <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-indigo-200 bg-indigo-50 text-[11px] font-bold text-indigo-700 dark:border-indigo-500/30 dark:bg-indigo-500/15 dark:text-indigo-300">
                         {rowNumber}
-                      </div>
+          </div>
                       <div className="min-w-0">
                         <div className="truncate text-sm font-semibold text-slate-900 dark:text-white">
                           {t.tripNumber ?? "—"}
@@ -1623,7 +1623,7 @@ function VehicleHistoryTab({
                     >
                       {status.replaceAll("_", " ")}
                     </span>
-                  </div>
+      </div>
                 </div>
 
                 <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
@@ -1672,7 +1672,7 @@ function VehicleHistoryTab({
                     </div>
                   </div>
                 </div>
-              </section>
+      </section>
             );
           })}
         </div>
@@ -1825,7 +1825,7 @@ function TripDriverTab({
             {activeTrip.from && activeTrip.to && (
               <p className="flex items-center gap-1 font-medium">
                 <span>{activeTrip.from}</span>
-                    <ChevronRight className="h-3.5 w-3.5 text-indigo-400" />
+                <ChevronRight className="h-3.5 w-3.5 text-indigo-400" />
                 <span>{activeTrip.to}</span>
               </p>
             )}
@@ -2511,7 +2511,7 @@ function VehicleDetailPanel({
     );
     const active: any =
       inProgress ?? vehicle.activeTrip ?? vehicle.currentTrip ?? null;
-    return (
+  return (
       active &&
       typeof active === "object" &&
       !["cancelled", "completed"].includes((active.status ?? "").toLowerCase())

@@ -5,8 +5,11 @@ import {
   useRef,
   useState,
   useMemo,
+  forwardRef,
+  useImperativeHandle,
   type Dispatch,
   type SetStateAction,
+  type ReactNode,
 } from "react";
 import {
   Plus,
@@ -27,6 +30,7 @@ import {
   ListChecks,
   Search,
   FileText,
+  Settings2,
 } from "lucide-react";
 import jsPDF from "jspdf";
 import { useAuth } from "../../../hooks/useAuth";
@@ -98,7 +102,381 @@ function emptyDriverGroup(): DriverGroup {
     driverName: "",
     vehicleNumber: "",
     rows: [emptyBulkRow()],
+    groupCreatedAt: new Date().toISOString(),
   };
+}
+
+function objectIdTimeMs(id?: string): number {
+  if (!id || String(id).length < 8) return 0;
+  try {
+    return parseInt(String(id).slice(0, 8), 16) * 1000;
+  } catch {
+    return 0;
+  }
+}
+
+/** When a driver/vehicle group was created (for page-level newest/oldest sort). */
+function groupCreatedAtMs(g: DriverGroup): number {
+  if (g.groupCreatedAt) {
+    const t = new Date(g.groupCreatedAt).getTime();
+    if (Number.isFinite(t)) return t;
+  }
+  let earliest = Number.POSITIVE_INFINITY;
+  for (const r of g.rows) {
+    const fromRow = r.createdAt ? new Date(r.createdAt).getTime() : NaN;
+    const t = Number.isFinite(fromRow) && fromRow > 0 ? fromRow : objectIdTimeMs(r._id);
+    if (t > 0 && t < earliest) earliest = t;
+  }
+  return earliest === Number.POSITIVE_INFINITY ? 0 : earliest;
+}
+
+/** True if a bulk row has anything worth keeping/syncing (not a blank placeholder). */
+function bulkRowHasData(r: Partial<BulkTripRow> | null | undefined): boolean {
+  if (!r) return false;
+  return !!(
+    r._id ||
+    String(r.startDate ?? "").trim() ||
+    String(r.endDate ?? "").trim() ||
+    String(r.startKm ?? "").trim() ||
+    String(r.endKm ?? "").trim() ||
+    String(r.startTime ?? "").trim() ||
+    String(r.endTime ?? "").trim() ||
+    Number(r.grandTotal) ||
+    Number(r.advancePaid) ||
+    Number(r.toll) ||
+    String(r.notes ?? "").trim()
+  );
+}
+
+type EntryFilterStatus = "all" | "pending" | "completed";
+type EntrySortDir = "desc" | "asc";
+
+const entryFilterFieldCls =
+  "rounded-[10px] border border-slate-200 bg-[var(--bg-card)] px-2.5 py-2 text-xs text-slate-800 outline-none dark:border-[#252c4d] dark:bg-[#151b34] dark:text-[#eef0ff]";
+
+function entryDateInRange(
+  dateStr: string | undefined,
+  from: string,
+  to: string,
+): boolean {
+  if (!from && !to) return true;
+  const d = String(dateStr ?? "").trim();
+  // Keep undated drafts visible while filtering
+  if (!d) return true;
+  if (from && d < from) return false;
+  if (to && d > to) return false;
+  return true;
+}
+
+function entryStatusHidden(
+  isCompleted: boolean | undefined,
+  status: EntryFilterStatus,
+): boolean {
+  if (status === "pending") return !!isCompleted;
+  if (status === "completed") return !isCompleted;
+  return false;
+}
+
+function EntryActivePill({
+  label,
+  onClear,
+}: {
+  label: string;
+  onClear: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClear}
+      className="inline-flex items-center gap-1 rounded-full bg-indigo-50 px-2.5 py-0.5 text-xs font-semibold text-indigo-600 dark:bg-[#242a57] dark:text-[#a5b4fc]"
+    >
+      {label}
+      <X className="h-3 w-3" />
+    </button>
+  );
+}
+
+/** Transaction History–style search + filters bar for Bulk / Normal entry. */
+function EntryFiltersBar({
+  title,
+  count,
+  search,
+  onSearchChange,
+  searchPlaceholder,
+  sortDir,
+  onSortDirChange,
+  filtersOpen,
+  onFiltersOpenChange,
+  filterStatus,
+  onFilterStatusChange,
+  dateFrom,
+  dateTo,
+  onDateFromChange,
+  onDateToChange,
+  compact = false,
+  showDateFilters = true,
+  sortNewestLabel = "↓ Newest",
+  sortOldestLabel = "↑ Oldest",
+  defaultSortDir = "desc",
+  endAction,
+}: {
+  title: string;
+  count: number;
+  search: string;
+  onSearchChange: (v: string) => void;
+  searchPlaceholder?: string;
+  sortDir: EntrySortDir;
+  onSortDirChange: (v: EntrySortDir) => void;
+  filtersOpen: boolean;
+  onFiltersOpenChange: (v: boolean) => void;
+  filterStatus: EntryFilterStatus;
+  onFilterStatusChange: (v: EntryFilterStatus) => void;
+  dateFrom: string;
+  dateTo: string;
+  onDateFromChange: (v: string) => void;
+  onDateToChange: (v: string) => void;
+  /** Nested under a driver card — flatter chrome. */
+  compact?: boolean;
+  /** Page-level driver bar can hide date range (dates live on per-driver filters). */
+  showDateFilters?: boolean;
+  sortNewestLabel?: string;
+  sortOldestLabel?: string;
+  /** Neutral sort direction for “Clear” / active-filter detection. */
+  defaultSortDir?: EntrySortDir;
+  /** Right-side action (e.g. Download PDF) inside the bar. */
+  endAction?: ReactNode;
+}) {
+  const filterBadgeCount =
+    (filterStatus !== "all" ? 1 : 0) +
+    (showDateFilters && (dateFrom || dateTo) ? 1 : 0);
+  const hasActiveFilters =
+    filterBadgeCount > 0 ||
+    !!search.trim() ||
+    sortDir !== defaultSortDir;
+
+  const clearFilters = () => {
+    onFilterStatusChange("all");
+    if (showDateFilters) {
+      onDateFromChange("");
+      onDateToChange("");
+    }
+    onSearchChange("");
+    onSortDirChange(defaultSortDir);
+  };
+
+  return (
+    <div
+      className={
+        compact
+          ? "border-b border-slate-100 bg-[var(--bg-card)] dark:border-[#1e2638]"
+          : "overflow-hidden rounded-2xl border border-slate-200 bg-[var(--bg-card)] dark:border-[#252c4d]"
+      }
+    >
+      <div
+        className={`flex flex-wrap items-center gap-2 ${
+          compact ? "px-3 py-2.5 sm:px-4" : "gap-2.5 px-4 py-3.5"
+        }`}
+      >
+        <h3
+          className={`font-extrabold text-slate-900 dark:text-[#eef0ff] ${
+            compact ? "text-sm" : "text-base"
+          }`}
+        >
+          {title}
+        </h3>
+        <span className="rounded-full bg-indigo-50 px-2.5 py-0.5 text-xs font-bold text-indigo-600 dark:bg-[#242a57] dark:text-[#a5b4fc]">
+          {count}
+        </span>
+        <label className="flex w-36 shrink-0 items-center gap-2 rounded-xl border border-slate-200 bg-[var(--bg-main)] px-2.5 sm:w-44 dark:border-[#252c4d]">
+          <Search className="h-3.5 w-3.5 shrink-0 text-slate-400" />
+          <input
+            value={search}
+            onChange={(e) => onSearchChange(e.target.value)}
+            placeholder={searchPlaceholder ?? "Search…"}
+            className="w-full min-w-0 border-0 bg-transparent py-1.5 text-sm outline-none dark:text-[#eef0ff]"
+          />
+          {search.trim() ? (
+            <button
+              type="button"
+              onClick={() => onSearchChange("")}
+              className="shrink-0 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+              aria-label="Clear search"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          ) : null}
+        </label>
+        <button
+          type="button"
+          onClick={() =>
+            onSortDirChange(sortDir === "desc" ? "asc" : "desc")
+          }
+          className="rounded-[10px] border border-slate-200 px-2.5 py-1.5 text-xs font-semibold text-slate-500 transition hover:bg-[var(--bg-main)] dark:border-[#252c4d] dark:text-[#8d94b8]"
+          title="Change sort order"
+        >
+          {sortDir === "desc" ? sortNewestLabel : sortOldestLabel}
+        </button>
+        <button
+          type="button"
+          onClick={() => onFiltersOpenChange(!filtersOpen)}
+          aria-expanded={filtersOpen}
+          className={`inline-flex items-center gap-1.5 rounded-[10px] border px-2.5 py-1.5 text-xs font-semibold transition ${
+            filtersOpen || filterBadgeCount
+              ? "border-indigo-500 bg-indigo-50 text-indigo-600 dark:border-indigo-400 dark:bg-[#242a57] dark:text-[#a5b4fc]"
+              : "border-slate-200 text-slate-500 hover:bg-[var(--bg-main)] dark:border-[#252c4d] dark:text-[#8d94b8]"
+          }`}
+        >
+          <Settings2 className="h-3.5 w-3.5" />
+          Filters
+          {filterBadgeCount > 0 && (
+            <em className="not-italic rounded-full bg-indigo-600 px-1.5 text-[11px] font-bold text-white">
+              {filterBadgeCount}
+            </em>
+          )}
+        </button>
+        {endAction ? (
+          <div className="ml-auto flex shrink-0 items-center">{endAction}</div>
+        ) : null}
+      </div>
+
+      {!filtersOpen && filterBadgeCount > 0 && (
+        <div className="flex flex-wrap items-center gap-1.5 px-3 pb-2 sm:px-4">
+          {filterStatus !== "all" && (
+            <EntryActivePill
+              label={
+                filterStatus === "pending" ? "Pending" : "Completed"
+              }
+              onClear={() => onFilterStatusChange("all")}
+            />
+          )}
+          {showDateFilters && (dateFrom || dateTo) && (
+            <EntryActivePill
+              label={`${dateFrom || "…"} → ${dateTo || "…"}`}
+              onClear={() => {
+                onDateFromChange("");
+                onDateToChange("");
+              }}
+            />
+          )}
+          <button
+            type="button"
+            onClick={clearFilters}
+            className="ml-1 text-xs font-bold text-indigo-600 dark:text-[#a5b4fc]"
+          >
+            Clear all
+          </button>
+        </div>
+      )}
+
+      {filtersOpen && (
+        <div className="flex flex-wrap items-center gap-2 border-t border-slate-200 bg-[var(--bg-main)] px-3 py-2 sm:px-4 dark:border-[#252c4d]">
+          {showDateFilters && (
+            <div className="flex items-center gap-1.5 text-slate-400">
+              <input
+                type="date"
+                value={dateFrom}
+                onChange={(e) => onDateFromChange(e.target.value)}
+                aria-label="From date"
+                className={entryFilterFieldCls}
+              />
+              <span>→</span>
+              <input
+                type="date"
+                value={dateTo}
+                onChange={(e) => onDateToChange(e.target.value)}
+                aria-label="To date"
+                className={entryFilterFieldCls}
+              />
+            </div>
+          )}
+          <div className="flex gap-1 rounded-xl border border-slate-200 bg-[var(--bg-card)] p-1 dark:border-[#252c4d]">
+            {(
+              [
+                ["all", "All"],
+                ["pending", "Pending"],
+                ["completed", "Done"],
+              ] as const
+            ).map(([k, label]) => (
+              <button
+                key={k}
+                type="button"
+                onClick={() => onFilterStatusChange(k)}
+                className={`rounded-[9px] px-3 py-1.5 text-xs font-semibold transition ${
+                  filterStatus === k
+                    ? k === "pending"
+                      ? "bg-[var(--bg-main)] text-amber-600 shadow-sm dark:text-amber-400"
+                      : k === "completed"
+                        ? "bg-[var(--bg-main)] text-emerald-600 shadow-sm dark:text-emerald-400"
+                        : "bg-[var(--bg-main)] text-indigo-600 shadow-sm dark:text-[#a5b4fc]"
+                    : "text-slate-500 dark:text-[#8d94b8]"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          {hasActiveFilters && (
+            <button
+              type="button"
+              onClick={clearFilters}
+              className="ml-auto text-xs font-bold text-indigo-600 dark:text-[#a5b4fc]"
+            >
+              Clear
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+type GroupLocalFilter = {
+  search: string;
+  filtersOpen: boolean;
+  filterStatus: EntryFilterStatus;
+  dateFrom: string;
+  dateTo: string;
+  sortDir: EntrySortDir;
+};
+
+function defaultGroupLocalFilter(): GroupLocalFilter {
+  return {
+    search: "",
+    filtersOpen: false,
+    filterStatus: "all",
+    dateFrom: "",
+    dateTo: "",
+    // Trips in a driver card: oldest start date first
+    sortDir: "asc",
+  };
+}
+
+function groupFilterStorageKey(g: DriverGroup, gi: number): string {
+  const driver = (g.driverName || "").trim().toLowerCase();
+  const vehicle = (g.vehicleNumber || "").trim().toUpperCase();
+  if (driver || vehicle) return `${driver}|||${vehicle}`;
+  return `gi:${gi}`;
+}
+
+function rowMatchesLocalSearch(r: BulkTripRow, q: string): boolean {
+  if (!q) return true;
+  const hay = [
+    r.notes,
+    r.startDate,
+    r.endDate,
+    r.startTime,
+    r.endTime,
+    String(r.startKm ?? ""),
+    String(r.endKm ?? ""),
+    String(r.distance ?? ""),
+    String(r.hours ?? ""),
+    String(r.grandTotal ?? ""),
+    String(r.advancePaid ?? ""),
+    String(r.toll ?? ""),
+  ]
+    .join(" ")
+    .toLowerCase();
+  return hay.includes(q);
 }
 
 /** Day segment for bulk advance rules (matches backend `bulkEntryGroupKey`). */
@@ -176,6 +554,17 @@ function normalizeBulkGroups(groups: any[]): DriverGroup[] {
       driverPhone: group?.driverPhone,
       vehicleNumber: group?.vehicleNumber || "",
       rows: sortBulkRowsByDate(mappedRows),
+      groupCreatedAt:
+        group?.groupCreatedAt ||
+        (mappedRows.some((r: BulkTripRow) => r._id || r.createdAt)
+          ? new Date(
+              groupCreatedAtMs({
+                driverName: "",
+                vehicleNumber: "",
+                rows: mappedRows,
+              }) || Date.now(),
+            ).toISOString()
+          : new Date().toISOString()),
     };
   });
 }
@@ -1629,29 +2018,93 @@ const CellInput = memo(function CellInput({
 // BULK ENTRY TABLE
 // ═══════════════════════════════════════════════════════════════════════════════
 
-function BulkEntryTable({
-  groups,
-  onChange,
-  onDeleteTrip,
-  onDeleteTrips,
-  agencyId: _agencyId,
-  agencyName,
-  filterStatus = "all",
-}: {
-  groups: DriverGroup[];
-  onChange: Dispatch<SetStateAction<DriverGroup[]>>;
-  onDeleteTrip: (id: string) => Promise<void> | void;
-  onDeleteTrips?: (ids: string[]) => Promise<void> | void;
-  agencyId?: string;
-  agencyName?: string;
-  filterStatus?: "all" | "pending" | "completed";
-}) {
+export type BulkEntryTableHandle = {
+  openExport: () => void;
+};
+
+const BulkEntryTable = forwardRef<
+  BulkEntryTableHandle,
+  {
+    groups: DriverGroup[];
+    onChange: Dispatch<SetStateAction<DriverGroup[]>>;
+    onDeleteTrip: (id: string) => Promise<void> | void;
+    onDeleteTrips?: (ids: string[]) => Promise<void> | void;
+    agencyId?: string;
+    agencyName?: string;
+    filterStatus?: EntryFilterStatus;
+    search?: string;
+    dateFrom?: string;
+    dateTo?: string;
+    sortDir?: EntrySortDir;
+  }
+>(function BulkEntryTable(
+  {
+    groups,
+    onChange,
+    onDeleteTrip,
+    onDeleteTrips,
+    agencyId: _agencyId,
+    agencyName,
+    filterStatus = "all",
+    search = "",
+    dateFrom: _dateFrom = "",
+    dateTo: _dateTo = "",
+    sortDir = "desc",
+  },
+  ref,
+) {
   void _agencyId;
-  const isRowHidden = (isCompleted?: boolean) => {
-    if (filterStatus === "pending") return !!isCompleted;
-    if (filterStatus === "completed") return !isCompleted;
-    return false;
+  void _dateFrom;
+  void _dateTo;
+  // Page-level filter is status only (pending/done). Date filters live per-driver.
+  const isRowHidden = (r: BulkTripRow) =>
+    entryStatusHidden(r.isCompleted, filterStatus);
+
+  const q = search.trim().toLowerCase();
+  // Page search: driver name + vehicle only
+  const groupMatchesSearch = (g: DriverGroup) => {
+    if (!q) return true;
+    return [g.driverName, g.vehicleNumber]
+      .join(" ")
+      .toLowerCase()
+      .includes(q);
   };
+
+  const visibleGroupIndexes = useMemo(() => {
+    const scored: { gi: number; sortKey: number }[] = [];
+    groups.forEach((g, gi) => {
+      if (!groupMatchesSearch(g)) return;
+
+      const isBlankShell =
+        !g.driverName.trim() &&
+        !g.vehicleNumber.trim() &&
+        g.rows.every((r) => !bulkRowHasData(r));
+
+      const statusVisibleRows = g.rows.filter((r) => !isRowHidden(r));
+      if (
+        !isBlankShell &&
+        statusVisibleRows.length === 0 &&
+        (filterStatus !== "all" || q)
+      ) {
+        return;
+      }
+      if (
+        !isBlankShell &&
+        statusVisibleRows.length === 0 &&
+        g.rows.some((r) => bulkRowHasData(r) || r._id)
+      ) {
+        return;
+      }
+
+      // Sort drivers by when the group was created (not trip dates)
+      scored.push({ gi, sortKey: groupCreatedAtMs(g) });
+    });
+    scored.sort((a, b) =>
+      sortDir === "desc" ? b.sortKey - a.sortKey : a.sortKey - b.sortKey,
+    );
+    return scored.map((s) => s.gi);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [groups, q, filterStatus, sortDir]);
   const { user } = useAuth();
   // const [expandedPayoutGi, setExpandedPayoutGi] = useState<number | null>(null); // Driver Payout UI disabled
   const [exportOpen, setExportOpen] = useState(false);
@@ -1663,6 +2116,62 @@ function BulkEntryTable({
   const [exportShowPhone, setExportShowPhone] = useState(true);
   const [exportProfileLoading, setExportProfileLoading] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
+  const [groupLocalFilters, setGroupLocalFilters] = useState<
+    Record<string, GroupLocalFilter>
+  >({});
+
+  const getGroupLocalFilter = useCallback(
+    (key: string): GroupLocalFilter =>
+      groupLocalFilters[key] ?? defaultGroupLocalFilter(),
+    [groupLocalFilters],
+  );
+
+  const patchGroupLocalFilter = useCallback(
+    (key: string, patch: Partial<GroupLocalFilter>) => {
+      setGroupLocalFilters((prev) => ({
+        ...prev,
+        [key]: { ...defaultGroupLocalFilter(), ...prev[key], ...patch },
+      }));
+    },
+    [],
+  );
+
+  const getVisibleRowIndexes = useCallback(
+    (g: DriverGroup, gi: number): number[] => {
+      const gf = getGroupLocalFilter(groupFilterStorageKey(g, gi));
+      const lq = gf.search.trim().toLowerCase();
+      const scored: { ri: number; sortKey: number; startKm: number }[] = [];
+      g.rows.forEach((r, ri) => {
+        if (isRowHidden(r)) return;
+        if (entryStatusHidden(r.isCompleted, gf.filterStatus)) return;
+        if (!entryDateInRange(r.startDate, gf.dateFrom, gf.dateTo)) return;
+        if (!rowMatchesLocalSearch(r, lq)) return;
+        // Always sort by starting date
+        scored.push({
+          ri,
+          sortKey: bulkRowDateMs(r.startDate),
+          startKm: Number(r.startKm) || 0,
+        });
+      });
+      scored.sort((a, b) => {
+        const aBlank = a.sortKey === Number.POSITIVE_INFINITY;
+        const bBlank = b.sortKey === Number.POSITIVE_INFINITY;
+        // Rows without a start date always sink to the bottom
+        if (aBlank !== bBlank) return aBlank ? 1 : -1;
+        if (a.sortKey !== b.sortKey) {
+          return gf.sortDir === "desc"
+            ? b.sortKey - a.sortKey
+            : a.sortKey - b.sortKey;
+        }
+        if (a.startKm !== b.startKm) return a.startKm - b.startKm;
+        return a.ri - b.ri;
+      });
+      return scored.map((s) => s.ri);
+    },
+    // Page-level dates are unused for bulk rows (per-driver filters handle dates).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [getGroupLocalFilter, filterStatus, search],
+  );
 
   const ownerDisplayBase = useCallback(() => {
     const company = String(user?.company ?? "").trim();
@@ -1737,6 +2246,16 @@ function BulkEntryTable({
     user?.phone,
   ]);
 
+  useImperativeHandle(
+    ref,
+    () => ({
+      openExport: () => {
+        void openBulkExportModal();
+      },
+    }),
+    [openBulkExportModal],
+  );
+
   const buildBulkExportGroups = useCallback(
     (start: string, end: string) => {
       const startMs = start ? new Date(`${start}T00:00:00`).getTime() : null;
@@ -1757,13 +2276,15 @@ function BulkEntryTable({
           ...g,
           rows: sortBulkRowsByDate(
             (g.rows ?? []).filter(
-              (r) => !isRowHidden(r.isCompleted) && dateOk(r.startDate),
+              (r) =>
+                !entryStatusHidden(r.isCompleted, filterStatus) &&
+                dateOk(r.startDate),
             ),
           ),
         }))
         .filter((g) => (g.rows ?? []).length > 0);
     },
-    [groups, isRowHidden],
+    [groups, filterStatus],
   );
 
   const runBulkExport = useCallback(() => {
@@ -1923,17 +2444,29 @@ function BulkEntryTable({
   );
 
   const deleteServerRow = useCallback(
-    async (gi: number, rowId: string, serverId: string) => {
+    async (_gi: number, rowId: string, serverId: string) => {
       if (!serverId) return;
       try {
         await onDeleteTrip(serverId);
-        // remove locally after successful delete
-        removeRow(gi, rowId);
+        // Purge by id/clientRowId (not group index — index can shift after delete/reload).
+        onChange((prev) => {
+          const next = prev
+            .map((g) => ({
+              ...g,
+              rows: g.rows.filter(
+                (r) =>
+                  String(r._id ?? "") !== String(serverId) &&
+                  r.clientRowId !== rowId,
+              ),
+            }))
+            .filter((g) => g.rows.length > 0);
+          return next.length > 0 ? next : [emptyDriverGroup()];
+        });
       } catch {
-        // silent
+        // cancelled or failed — keep row
       }
     },
-    [onDeleteTrip, removeRow],
+    [onDeleteTrip, onChange],
   );
 
   const addGroup = useCallback(() => {
@@ -1949,46 +2482,59 @@ function BulkEntryTable({
 
   const deleteServerGroup = useCallback(
     async (gi: number) => {
-      const ids = (groups[gi]?.rows ?? [])
+      const group = groups[gi];
+      const ids = (group?.rows ?? [])
         .map((r) => r._id)
         .filter(Boolean) as string[];
+      const clientIds = new Set(
+        (group?.rows ?? []).map((r) => r.clientRowId).filter(Boolean),
+      );
+      const driverKey = `${(group?.driverName || "").trim().toLowerCase()}|||${(group?.vehicleNumber || "").trim().toUpperCase()}`;
+
       if (ids.length === 0) {
         removeGroup(gi);
         return;
       }
       try {
-        // Prefer batch delete confirmation (single modal) for saved groups.
         if (onDeleteTrips) {
           await onDeleteTrips(ids.map(String));
         } else {
-          // Fallback: sequential delete to reduce chance of missed deletes.
           for (const id of ids) await Promise.resolve(onDeleteTrip(String(id)));
         }
-        removeGroup(gi);
+        // Remove by identity, not stale group index (performDelete may already have purged).
+        const idSet = new Set(ids.map(String));
+        onChange((prev) => {
+          const next = prev
+            .map((g) => {
+              const k = `${(g.driverName || "").trim().toLowerCase()}|||${(g.vehicleNumber || "").trim().toUpperCase()}`;
+              if (k === driverKey) {
+                return {
+                  ...g,
+                  rows: g.rows.filter(
+                    (r) =>
+                      !idSet.has(String(r._id ?? "")) &&
+                      !clientIds.has(r.clientRowId),
+                  ),
+                };
+              }
+              return {
+                ...g,
+                rows: g.rows.filter((r) => !idSet.has(String(r._id ?? ""))),
+              };
+            })
+            .filter((g) => g.rows.length > 0);
+          return next.length > 0 ? next : [emptyDriverGroup()];
+        });
       } catch {
         // Silent: cancellation or failure means we keep local group.
       }
     },
-    [groups, onDeleteTrip, removeGroup, onDeleteTrips],
+    [groups, onDeleteTrip, removeGroup, onDeleteTrips, onChange],
   );
 
   return (
     <div className="flex h-full min-h-0 flex-col">
       <div className="min-h-0 flex-1 space-y-4 overflow-y-auto pb-2">
-      {/* Top Actions */}
-      {groups.length > 0 && groups.some((g) => g.rows.length > 0) && (
-        <div className="mb-2 flex justify-end">
-          <button
-            onClick={() => {
-              void openBulkExportModal();
-            }}
-            className="flex items-center gap-2 rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-2 text-sm font-semibold text-indigo-700 shadow-sm transition hover:bg-indigo-100 dark:border-indigo-500/30 dark:bg-indigo-500/15 dark:text-indigo-300 dark:hover:bg-indigo-500/25"
-          >
-            <FileDown className="h-4 w-4" /> Download Bulk Trips Report (PDF)
-          </button>
-        </div>
-      )}
-
       {exportOpen && (
         <ModalShell
           title="Export Bulk Trips (PDF)"
@@ -2136,16 +2682,31 @@ function BulkEntryTable({
       )}
 
       {/* All groups are editable — server trips are merged into groups[] */}
-      {groups.map((g, gi) => (
+      {visibleGroupIndexes.length === 0 ? (
+        <div className="rounded-2xl border border-slate-200 bg-[var(--bg-card)] px-4 py-11 text-center text-slate-500 dark:border-[#252c4d] dark:text-[#8d94b8]">
+          <b className="mb-1 block text-[15px] text-slate-800 dark:text-[#eef0ff]">
+            {groups.length > 0
+              ? "Nothing matches these filters"
+              : "No bulk entries yet"}
+          </b>
+          {groups.length > 0
+            ? "Clear the filters to see all entries."
+            : "Add a driver group to get started."}
+        </div>
+      ) : (
+        visibleGroupIndexes.map((gi, displayIdx) => {
+          const g = groups[gi];
+          if (!g) return null;
+          return (
         <div
-          key={gi}
-          className={`rounded-xl border border-slate-200 bg-[var(--bg-card)] shadow-sm overflow-hidden dark:border-[#1e2638] ${groups.length > 1 && g.rows.every((r) => isRowHidden(r.isCompleted)) ? "hidden" : ""}`}
+          key={g.rows[0]?.clientRowId ?? `g-${gi}`}
+          className="rounded-xl border border-slate-200 bg-[var(--bg-card)] shadow-sm overflow-hidden dark:border-[#1e2638]"
         >
           {/* Group header */}
           <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-2.5 sm:gap-3 border-b border-slate-100 bg-indigo-50/50 px-4 sm:px-5 py-3 sm:py-3.5 dark:border-[#1e2638] dark:bg-indigo-500/10">
             <div className="flex items-center gap-2.5 sm:gap-3">
               <span className="flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-full bg-indigo-100 text-xs sm:text-sm font-bold text-indigo-600 shrink-0 dark:bg-indigo-500/20 dark:text-indigo-300">
-                {gi + 1}
+                {displayIdx + 1}
               </span>
               <div className="flex items-center gap-2 flex-1 min-w-0">
                 <span className="text-xs sm:text-sm font-semibold text-slate-600 shrink-0 dark:text-slate-300">
@@ -2217,16 +2778,62 @@ function BulkEntryTable({
             </button>
           </div>
 
+          {(() => {
+            const gKey = groupFilterStorageKey(g, gi);
+            const gf = getGroupLocalFilter(gKey);
+            const visibleRowIndexes = getVisibleRowIndexes(g, gi);
+            return (
+              <>
+          <EntryFiltersBar
+            compact
+            title="Trips"
+            count={visibleRowIndexes.length}
+            search={gf.search}
+            onSearchChange={(v) => patchGroupLocalFilter(gKey, { search: v })}
+            searchPlaceholder="Search notes, dates, times, toll, total…"
+            sortDir={gf.sortDir}
+            onSortDirChange={(v) =>
+              patchGroupLocalFilter(gKey, { sortDir: v })
+            }
+            filtersOpen={gf.filtersOpen}
+            onFiltersOpenChange={(v) =>
+              patchGroupLocalFilter(gKey, { filtersOpen: v })
+            }
+            filterStatus={gf.filterStatus}
+            onFilterStatusChange={(v) =>
+              patchGroupLocalFilter(gKey, { filterStatus: v })
+            }
+            dateFrom={gf.dateFrom}
+            dateTo={gf.dateTo}
+            onDateFromChange={(v) =>
+              patchGroupLocalFilter(gKey, { dateFrom: v })
+            }
+            onDateToChange={(v) => patchGroupLocalFilter(gKey, { dateTo: v })}
+            sortNewestLabel="↓ Newest start"
+            sortOldestLabel="↑ Oldest start"
+            defaultSortDir="asc"
+          />
+
           {/* Trip rows — MOBILE CARD VIEW (below md) */}
           <div className="md:hidden divide-y divide-slate-100 dark:divide-[#1e2638]">
-            {g.rows.map((r, ri) => (
+            {visibleRowIndexes.length === 0 ? (
+              <div className="px-4 py-8 text-center text-sm text-slate-500 dark:text-[#8d94b8]">
+                {g.rows.some((r) => !isRowHidden(r))
+                  ? "Nothing matches this driver’s filters"
+                  : "No trips for this driver"}
+              </div>
+            ) : (
+              visibleRowIndexes.map((ri, displayRi) => {
+                const r = g.rows[ri];
+                if (!r) return null;
+                return (
               <div
                 key={r.clientRowId}
-                className={`p-4 space-y-3 ${isRowHidden(r.isCompleted) ? "hidden" : ""}`}
+                className="p-4 space-y-3"
               >
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-bold text-indigo-500 uppercase dark:text-indigo-300">
-                    Trip {ri + 1}
+                    Trip {displayRi + 1}
                   </span>
                   <div className="flex items-center gap-2.5">
                     {r.distance > 0 && (
@@ -2383,7 +2990,9 @@ function BulkEntryTable({
                   />
                 </div>
               </div>
-            ))}
+                );
+              })
+            )}
           </div>
 
           {/* Trip rows — DESKTOP TABLE VIEW (md and above) */}
@@ -2409,13 +3018,28 @@ function BulkEntryTable({
                 </tr>
               </thead>
               <tbody>
-                {g.rows.map((r, ri) => (
+                {visibleRowIndexes.length === 0 ? (
+                  <tr>
+                    <td
+                      colSpan={13}
+                      className="px-4 py-8 text-center text-sm text-slate-500 dark:text-[#8d94b8]"
+                    >
+                      {g.rows.some((r) => !isRowHidden(r))
+                        ? "Nothing matches this driver’s filters"
+                        : "No trips for this driver"}
+                    </td>
+                  </tr>
+                ) : (
+                  visibleRowIndexes.map((ri, displayRi) => {
+                    const r = g.rows[ri];
+                    if (!r) return null;
+                    return (
                   <tr
                     key={r.clientRowId}
-                    className={`border-t border-slate-50 hover:bg-slate-50/30 dark:border-[#1e2638] dark:hover:bg-white/[0.03] ${isRowHidden(r.isCompleted) ? "hidden" : ""}`}
+                    className="border-t border-slate-50 hover:bg-slate-50/30 dark:border-[#1e2638] dark:hover:bg-white/[0.03]"
                   >
                     <td className="px-2 py-1.5 text-slate-400 font-medium">
-                      {ri + 1}
+                      {displayRi + 1}
                     </td>
                     <td className="px-2 py-1.5">
                       <button
@@ -2547,7 +3171,9 @@ function BulkEntryTable({
                       </div>
                     </td>
                   </tr>
-                ))}
+                    );
+                  })
+                )}
               </tbody>
             </table>
           </div>
@@ -2563,15 +3189,18 @@ function BulkEntryTable({
             </button>
             <div className="flex flex-wrap items-center gap-x-5 gap-y-1 text-sm">
               {(() => {
-                const totalGrand = g.rows.reduce(
+                const rowsForTotals = visibleRowIndexes
+                  .map((ri) => g.rows[ri])
+                  .filter(Boolean) as BulkTripRow[];
+                const totalGrand = rowsForTotals.reduce(
                   (s, r) => s + (r.grandTotal || 0),
                   0,
                 );
-                const advance = g.rows.reduce(
+                const advance = rowsForTotals.reduce(
                   (s, r) => s + (r.advancePaid || 0),
                   0,
                 );
-                const balance = g.rows.reduce(
+                const balance = rowsForTotals.reduce(
                   (s, r) =>
                     s +
                     calculateBalanceAmount(
@@ -2605,6 +3234,9 @@ function BulkEntryTable({
               })()}
             </div>
           </div>
+              </>
+            );
+          })()}
 
           {/* Driver Payout — temporarily disabled
           {agencyId && g.driverName.trim() && (
@@ -2630,7 +3262,9 @@ function BulkEntryTable({
           )}
           */}
         </div>
-      ))}
+          );
+        })
+      )}
 
       </div>
 
@@ -2645,7 +3279,7 @@ function BulkEntryTable({
       </div>
     </div>
   );
-}
+});
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // COPY HELPERS
@@ -2726,33 +3360,54 @@ function NormalEntryTable({
   onDeleteTrip,
   agencyName,
   filterStatus = "all",
+  search = "",
+  dateFrom = "",
+  dateTo = "",
+  sortDir = "desc",
   onSendDriverToBulk,
 }: {
-  filterStatus?: "all" | "pending" | "completed";
+  filterStatus?: EntryFilterStatus;
   entries: NormalEntryRow[];
   onChange: Dispatch<SetStateAction<NormalEntryRow[]>>;
   onDeleteTrip: (id: string) => Promise<void> | void;
   agencyName?: string;
+  search?: string;
+  dateFrom?: string;
+  dateTo?: string;
+  sortDir?: EntrySortDir;
   /** Copy one Normal row's driver into Bulk Entry (one click = one driver). */
   onSendDriverToBulk?: (entry: NormalEntryRow) => void;
 }) {
-  const [rowFilter, setRowFilter] = useState("");
   const { user } = useAuth();
 
-  const isRowHidden = (isCompleted?: boolean) => {
-    if (filterStatus === "pending") return !!isCompleted;
-    if (filterStatus === "completed") return !isCompleted;
+  const isRowHidden = (e: NormalEntryRow) => {
+    if (entryStatusHidden(e.isCompleted, filterStatus)) return true;
+    if (!entryDateInRange(e.date, dateFrom, dateTo)) return true;
     return false;
   };
 
   const matchesSearch = (e: NormalEntryRow) => {
-    const q = rowFilter.trim().toLowerCase();
+    const q = search.trim().toLowerCase();
     if (!q) return true;
     return [e.driverName, e.mobileNumber, e.vehicleNumber, e.vehicleType, e.notes]
       .join(" ")
       .toLowerCase()
       .includes(q);
   };
+
+  const visibleIndexes = useMemo(() => {
+    const scored: { i: number; sortKey: number }[] = [];
+    entries.forEach((e, i) => {
+      if (isRowHidden(e) || !matchesSearch(e)) return;
+      const sortKey = bulkRowDateMs(e.date);
+      scored.push({ i, sortKey });
+    });
+    scored.sort((a, b) =>
+      sortDir === "desc" ? b.sortKey - a.sortKey : a.sortKey - b.sortKey,
+    );
+    return scored.map((s) => s.i);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [entries, search, filterStatus, dateFrom, dateTo, sortDir]);
 
   const toggleComplete = (i: number) => {
     onChange((prev) => {
@@ -2789,25 +3444,26 @@ function NormalEntryTable({
   );
 
   const deleteServerEntry = useCallback(
-    async (idx: number, id: string) => {
+    async (_idx: number, id: string) => {
       if (!id) return;
       try {
         await onDeleteTrip(id);
-        removeEntry(idx);
+        onChange((prev) => {
+          const next = prev.filter((e) => String(e._id ?? "") !== String(id));
+          return next.length > 0 ? next : [emptyNormalRow()];
+        });
       } catch {
-        // silent
+        // cancelled or failed — keep row
       }
     },
-    [onDeleteTrip, removeEntry],
+    [onDeleteTrip, onChange],
   );
 
   const filledCount = entries.filter(
     (e) => e.driverName || e.vehicleNumber || e.mobileNumber,
   ).length;
 
-  const visibleCount = entries.filter(
-    (e) => !isRowHidden(e.isCompleted) && matchesSearch(e),
-  ).length;
+  const visibleCount = visibleIndexes.length;
 
   const rowActions = (e: NormalEntryRow, i: number, compact = false) => (
     <div className={`flex items-center ${compact ? "gap-1" : "gap-1.5"}`}>
@@ -2885,23 +3541,26 @@ function NormalEntryTable({
             </p>
           </div>
         </div>
-        <div className="relative w-full sm:max-w-xs">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
-          <input
-            type="text"
-            value={rowFilter}
-            onChange={(ev) => setRowFilter(ev.target.value)}
-            placeholder="Filter driver, vehicle, or phone…"
-            className="w-full rounded-lg border border-slate-200 bg-[var(--bg-elevated)] py-2 pl-9 pr-3 text-xs text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-indigo-400 focus:ring-1 focus:ring-indigo-200 dark:border-[#1e2638] dark:text-slate-100 dark:placeholder:text-slate-500"
-          />
-        </div>
       </div>
 
       {/* MOBILE CARD VIEW */}
       <div className="space-y-3 md:hidden">
-        {entries.map((e, i) => {
-          if (isRowHidden(e.isCompleted) || !matchesSearch(e)) return null;
-          return (
+        {visibleIndexes.length === 0 ? (
+          <div className="rounded-2xl border border-slate-200 bg-[var(--bg-card)] px-4 py-11 text-center text-slate-500 dark:border-[#252c4d] dark:text-[#8d94b8]">
+            <b className="mb-1 block text-[15px] text-slate-800 dark:text-[#eef0ff]">
+              {entries.some((e) => e.driverName || e.vehicleNumber)
+                ? "Nothing matches these filters"
+                : "No entries yet"}
+            </b>
+            {entries.some((e) => e.driverName || e.vehicleNumber)
+              ? "Clear the filters to see all entries."
+              : "Add a row to get started."}
+          </div>
+        ) : (
+          visibleIndexes.map((i, displayIdx) => {
+            const e = entries[i];
+            if (!e) return null;
+            return (
             <div
               key={e.clientRowId ?? i}
               className={`overflow-hidden rounded-2xl border bg-[var(--bg-card)] shadow-sm dark:border-[#1e2638] ${
@@ -2920,10 +3579,10 @@ function NormalEntryTable({
               <div className="flex items-center justify-between gap-2 border-b border-slate-100 px-3.5 py-2.5 dark:border-[#1e2638]">
                 <div className="flex min-w-0 items-center gap-2">
                   <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-indigo-500/40 bg-indigo-500/15 font-mono text-[11px] font-bold text-indigo-600 dark:text-indigo-300">
-                    {i + 1}
+                    {displayIdx + 1}
                   </span>
                   <span className="truncate text-xs font-semibold uppercase tracking-wide text-slate-700 dark:text-slate-200">
-                    {e.driverName?.trim() || `Entry ${i + 1}`}
+                    {e.driverName?.trim() || `Entry ${displayIdx + 1}`}
                   </span>
                   <span
                     className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium ${
@@ -3040,7 +3699,8 @@ function NormalEntryTable({
               </div>
             </div>
           );
-        })}
+          })
+        )}
       </div>
 
       {/* DESKTOP TABLE */}
@@ -3060,8 +3720,26 @@ function NormalEntryTable({
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-[#1e2638]">
-              {entries.map((e, i) => {
-                if (isRowHidden(e.isCompleted) || !matchesSearch(e)) return null;
+              {visibleIndexes.length === 0 ? (
+                <tr>
+                  <td
+                    colSpan={8}
+                    className="px-4 py-11 text-center text-slate-500 dark:text-[#8d94b8]"
+                  >
+                    <b className="mb-1 block text-[15px] text-slate-800 dark:text-[#eef0ff]">
+                      {entries.some((e) => e.driverName || e.vehicleNumber)
+                        ? "Nothing matches these filters"
+                        : "No entries yet"}
+                    </b>
+                    {entries.some((e) => e.driverName || e.vehicleNumber)
+                      ? "Clear the filters to see all entries."
+                      : "Add a row to get started."}
+                  </td>
+                </tr>
+              ) : (
+                visibleIndexes.map((i, displayIdx) => {
+                  const e = entries[i];
+                  if (!e) return null;
                 const isDraft =
                   !e.driverName?.trim() &&
                   !e.vehicleNumber?.trim() &&
@@ -3085,7 +3763,7 @@ function NormalEntryTable({
                             : "bg-slate-100 text-slate-500 dark:bg-white/10 dark:text-slate-400"
                         }`}
                       >
-                        {i + 1}
+                        {displayIdx + 1}
                       </span>
                     </td>
                     <td className="px-2 py-1.5">
@@ -3176,19 +3854,12 @@ function NormalEntryTable({
                     </td>
                   </tr>
                 );
-              })}
+                })
+              )}
             </tbody>
           </table>
         </div>
       </div>
-
-      {visibleCount === 0 && (
-        <p className="py-6 text-center text-sm text-slate-400 dark:text-slate-500">
-          {rowFilter.trim()
-            ? "No entries match this filter"
-            : "No entries for this status"}
-        </p>
-      )}
       </div>
 
       <div className="shrink-0 border-t border-slate-200 bg-[var(--bg-main)]/95 pt-3 backdrop-blur-sm dark:border-[#1e2638]">
@@ -3214,9 +3885,7 @@ function NormalEntryTable({
                   .filter(
                     (e) => e.driverName || e.vehicleNumber || e.mobileNumber,
                   )
-                  .filter(
-                    (e) => !isRowHidden(e.isCompleted) && matchesSearch(e),
-                  );
+                  .filter((e) => !isRowHidden(e) && matchesSearch(e));
                 generateNormalTripsPDF(
                   user?.name || "Owner",
                   agencyName || "Agency",
@@ -3286,9 +3955,13 @@ export function BulkEntryPage() {
   );
 
   // State — bulk data (functional updater pattern for perf)
-  const [filterStatus, setFilterStatus] = useState<
-    "all" | "pending" | "completed"
-  >("pending");
+  const [filterStatus, setFilterStatus] = useState<EntryFilterStatus>("pending");
+  const [tableSearch, setTableSearch] = useState("");
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+  const [sortDir, setSortDir] = useState<EntrySortDir>("desc");
+  const bulkTableRef = useRef<BulkEntryTableHandle>(null);
 
   // State — bulk data (functional updater pattern for perf)
   const [bulkGroups, setBulkGroupsRaw] = useState<DriverGroup[]>([
@@ -3349,9 +4022,31 @@ export function BulkEntryPage() {
   const syncBulkToBackend = useCallback(
     async (groups: DriverGroup[]) => {
       if (!selectedAgency) return;
-      const validGroups = groups.filter(
-        (g) => g.driverName.trim() && g.vehicleNumber.trim(),
-      );
+      // Persist named driver/vehicle groups even with no trip fields yet
+      // (one draft placeholder row). Skip completely blank shells.
+      const validGroups = groups
+        .map((g) => {
+          const driverName = g.driverName.trim();
+          const vehicleNumber = g.vehicleNumber.trim();
+          if (!driverName || !vehicleNumber) return null;
+
+          const dataRows = g.rows.filter((r) => bulkRowHasData(r));
+          if (dataRows.length > 0) {
+            return { ...g, driverName, vehicleNumber, rows: dataRows };
+          }
+
+          // Driver-only: keep first row (or a fresh placeholder) so autosync
+          // can create a draft AgencyTrip and survive navigation/reload.
+          const shell = g.rows[0] ? { ...g.rows[0] } : emptyBulkRow();
+          return {
+            ...g,
+            driverName,
+            vehicleNumber,
+            rows: [shell],
+          };
+        })
+        .filter(Boolean) as DriverGroup[];
+
       if (validGroups.length === 0) return;
       const res = await syncBulkEntry({
         agencyId: selectedAgency._id ?? selectedAgency.id,
@@ -3538,161 +4233,194 @@ export function BulkEntryPage() {
       if (isBulkMode) {
         const trips = await fetchBulkEntryTrips(selectedId);
         // Convert server trips into editable DriverGroup[] format
-        if (trips.length > 0) {
-          const grouped: Record<string, typeof trips> = {};
-          for (const t of trips) {
-            const key = `${(t.driverName || "").trim()}|||${(t.vehicleNumber || "").trim().toUpperCase()}`;
-            if (!grouped[key]) grouped[key] = [];
-            grouped[key].push(t);
+        const grouped: Record<string, typeof trips> = {};
+        for (const t of trips) {
+          const key = `${(t.driverName || "").trim()}|||${(t.vehicleNumber || "").trim().toUpperCase()}`;
+          if (!grouped[key]) grouped[key] = [];
+          grouped[key].push(t);
+        }
+        const serverGroups: DriverGroup[] = Object.values(grouped).map(
+          (grp) => {
+            const first = grp[0];
+            const rows = sortBulkRowsByDate(
+              grp.map((t) => ({
+                // Preserve server clientRowId so refresh can dedupe against local drafts
+                clientRowId: (t as any).clientRowId ?? nextRowId(),
+                _id: t._id ?? t.id,
+                startDate: t.startDate ? t.startDate.split("T")[0] : "",
+                endDate: t.endDate ? t.endDate.split("T")[0] : "",
+                startKm: String(t.startKm ?? ""),
+                endKm: String(t.endKm ?? ""),
+                startTime: t.startTime || "",
+                endTime: t.endTime || "",
+                distance: Number(t.distance ?? 0),
+                hours: Number(t.hours ?? 0),
+                toll: Number(t.toll ?? 0),
+                advancePaid: Number(t.advancePaid ?? 0),
+                grandTotal: Number(t.grandTotal ?? 0),
+                notes: t.notes || "",
+                isCompleted: !!t.isCompleted,
+                createdAt: (t as any).createdAt
+                  ? String((t as any).createdAt)
+                  : undefined,
+              })),
+            );
+            const createdMs = rows
+              .map((r) => groupCreatedAtMs({ driverName: "", vehicleNumber: "", rows: [r] }))
+              .filter((n) => n > 0);
+            const groupCreatedAt =
+              createdMs.length > 0
+                ? new Date(Math.min(...createdMs)).toISOString()
+                : undefined;
+            return {
+              driverName: first.driverName || "",
+              vehicleNumber: first.vehicleNumber || "",
+              rows,
+              groupCreatedAt,
+            };
+          },
+        );
+        setBulkGroupsRaw((prev) => {
+          // Canonical merge: one group per (driverName, vehicleNumber).
+          // Start from server state, then merge in any local unsaved rows (no _id).
+          const keyOf = (
+            g: Pick<DriverGroup, "driverName" | "vehicleNumber">,
+          ) =>
+            `${(g.driverName || "").trim().toLowerCase()}|||${(g.vehicleNumber || "").trim().toUpperCase()}`;
+
+          const rowKey = (r: any) =>
+            r?._id
+              ? `id:${String(r._id)}`
+              : `cr:${String(r.clientRowId || "")}`;
+
+          const outByKey = new Map<string, DriverGroup>();
+          for (const sg of serverGroups) {
+            const k = keyOf(sg);
+            outByKey.set(k, {
+              ...sg,
+              rows: [...sg.rows],
+            });
           }
-          const serverGroups: DriverGroup[] = Object.values(grouped).map(
-            (grp) => {
-              const first = grp[0];
-              return {
-                driverName: first.driverName || "",
-                vehicleNumber: first.vehicleNumber || "",
-                rows: sortBulkRowsByDate(
-                  grp.map((t) => ({
-                    // Preserve server clientRowId so refresh can dedupe against local drafts
-                    clientRowId: (t as any).clientRowId ?? nextRowId(),
-                    _id: t._id ?? t.id,
-                    startDate: t.startDate ? t.startDate.split("T")[0] : "",
-                    endDate: t.endDate ? t.endDate.split("T")[0] : "",
-                    startKm: String(t.startKm ?? ""),
-                    endKm: String(t.endKm ?? ""),
-                    startTime: t.startTime || "",
-                    endTime: t.endTime || "",
-                    distance: Number(t.distance ?? 0),
-                    hours: Number(t.hours ?? 0),
-                    toll: Number(t.toll ?? 0),
-                    advancePaid: Number(t.advancePaid ?? 0),
-                    grandTotal: Number(t.grandTotal ?? 0),
-                    notes: t.notes || "",
-                    isCompleted: !!t.isCompleted,
-                  })),
-                ),
-              };
-            },
-          );
-          setBulkGroupsRaw((prev) => {
-            // Canonical merge: one group per (driverName, vehicleNumber).
-            // Start from server state, then merge in any local unsaved rows (no _id) that aren't already on server.
-            const keyOf = (
-              g: Pick<DriverGroup, "driverName" | "vehicleNumber">,
-            ) =>
-              `${(g.driverName || "").trim().toLowerCase()}|||${(g.vehicleNumber || "").trim().toUpperCase()}`;
 
-            const rowKey = (r: any) =>
-              r?._id
-                ? `id:${String(r._id)}`
-                : `cr:${String(r.clientRowId || "")}`;
+          const existingRowKeysByGroup = new Map<string, Set<string>>();
+          for (const [k, g] of outByKey.entries()) {
+            existingRowKeysByGroup.set(
+              k,
+              new Set(g.rows.map(rowKey).filter(Boolean)),
+            );
+          }
 
-            const outByKey = new Map<string, DriverGroup>();
-            for (const sg of serverGroups) {
-              const k = keyOf(sg);
-              outByKey.set(k, {
-                ...sg,
-                rows: [...sg.rows],
-              });
-            }
+          // Keep unsaved local drafts (no _id) with trip data.
+          // Also keep local-only driver/vehicle shells so they aren't lost before
+          // (or if) the draft placeholder has synced.
+          for (const lg of prev) {
+            const k = keyOf(lg);
+            const target = outByKey.get(k) ?? {
+              driverName: lg.driverName,
+              vehicleNumber: lg.vehicleNumber,
+              rows: [],
+              groupCreatedAt: lg.groupCreatedAt,
+              driverId: lg.driverId,
+              driverPhone: lg.driverPhone,
+            };
 
-            // Track row keys already present per group
-            const existingRowKeysByGroup = new Map<string, Set<string>>();
-            for (const [k, g] of outByKey.entries()) {
-              existingRowKeysByGroup.set(
-                k,
-                new Set(g.rows.map(rowKey).filter(Boolean)),
-              );
-            }
-
-            // Merge local rows/groups
-            for (const lg of prev) {
-              const k = keyOf(lg);
-              const target = outByKey.get(k) ?? {
-                driverName: lg.driverName,
-                vehicleNumber: lg.vehicleNumber,
-                rows: [],
-              };
-
-              const seen = existingRowKeysByGroup.get(k) ?? new Set<string>();
-              for (const r of lg.rows) {
-                const rk = rowKey(r);
-                if (!rk) continue;
-                if (!seen.has(rk)) {
-                  target.rows.push({
-                    ...emptyBulkRow(),
-                    ...r,
-                    advancePaid: Number((r as any).advancePaid ?? 0) || 0,
-                  });
-                  seen.add(rk);
-                }
+            const seen = existingRowKeysByGroup.get(k) ?? new Set<string>();
+            for (const r of lg.rows) {
+              if (r?._id) continue;
+              if (!bulkRowHasData(r)) continue;
+              const rk = rowKey(r);
+              if (!rk) continue;
+              if (!seen.has(rk)) {
+                target.rows.push({
+                  ...emptyBulkRow(),
+                  ...r,
+                  advancePaid: Number((r as any).advancePaid ?? 0) || 0,
+                });
+                seen.add(rk);
               }
+            }
 
+            const hasIdentity =
+              !!(lg.driverName || "").trim() ||
+              !!(lg.vehicleNumber || "").trim();
+            const alreadyOnServer = outByKey.has(k);
+
+            if (target.rows.length > 0 || alreadyOnServer) {
+              if (!target.groupCreatedAt && lg.groupCreatedAt) {
+                target.groupCreatedAt = lg.groupCreatedAt;
+              }
+              outByKey.set(k, target);
+              existingRowKeysByGroup.set(k, seen);
+            } else if (hasIdentity) {
+              // Driver-only local shell (no trip fields yet)
+              target.rows =
+                lg.rows.length > 0
+                  ? lg.rows.map((r) => ({ ...emptyBulkRow(), ...r }))
+                  : [emptyBulkRow()];
               outByKey.set(k, target);
               existingRowKeysByGroup.set(k, seen);
             }
+          }
 
-            const merged = Array.from(outByKey.values()).map((g) => ({
+          const merged = Array.from(outByKey.values())
+            .map((g) => ({
               ...g,
-              rows: sortBulkRowsByDate(g.rows),
-            }));
-            const hasAnyData = merged.some(
+              rows: sortBulkRowsByDate(
+                g.rows.length > 0 ? g.rows : [emptyBulkRow()],
+              ),
+            }))
+            .filter(
               (g) =>
+                g.rows.length > 0 ||
                 g.driverName.trim() ||
-                g.vehicleNumber.trim() ||
-                g.rows.some(
-                  (r) =>
-                    r.startDate || r.startKm || r.grandTotal || r.advancePaid,
-                ),
+                g.vehicleNumber.trim(),
             );
 
-            return hasAnyData ? merged : [emptyDriverGroup()];
-          });
-        }
+          return merged.length > 0 ? merged : [emptyDriverGroup()];
+        });
       } else {
         const trips = await fetchNormalEntryTrips(selectedId);
-        // Convert server trips into editable NormalEntryRow[] format
-        if (trips.length > 0) {
-          const serverEntries: NormalEntryRow[] = trips.map((t) => ({
-            _id: t._id ?? t.id,
-            date: t.date ? t.date.split("T")[0] : "",
-            driverName: t.driverName || "",
-            mobileNumber: t.mobileNumber || "",
-            vehicleNumber: t.vehicleNumber || "",
-            vehicleType: t.vehicleType || "",
-            notes: t.notes || "",
-            isCompleted: !!t.isCompleted,
-          }));
-          setNormalEntriesRaw((prev) => {
-            // Canonical merge: prefer server entries, then keep local-only entries that aren't on server.
-            const key = (e: any) =>
-              e?._id
-                ? `id:${String(e._id)}`
-                : `local:${String(e.driverName || "")}|${String(e.vehicleNumber || "")}|${String(e.date || "")}`;
-            const seen = new Set<string>();
-            const out: NormalEntryRow[] = [];
+        const serverEntries: NormalEntryRow[] = trips.map((t) => ({
+          _id: t._id ?? t.id,
+          clientRowId: (t as any).clientRowId,
+          date: t.date ? t.date.split("T")[0] : "",
+          driverName: t.driverName || "",
+          mobileNumber: t.mobileNumber || "",
+          vehicleNumber: t.vehicleNumber || "",
+          vehicleType: t.vehicleType || "",
+          notes: t.notes || "",
+          isCompleted: !!t.isCompleted,
+        }));
+        setNormalEntriesRaw((prev) => {
+          // Prefer server entries. Keep only local drafts that never had a server _id.
+          const key = (e: any) =>
+            e?._id
+              ? `id:${String(e._id)}`
+              : `local:${String(e.clientRowId || "")}|${String(e.driverName || "")}|${String(e.vehicleNumber || "")}|${String(e.date || "")}`;
+          const seen = new Set<string>();
+          const out: NormalEntryRow[] = [];
 
-            for (const se of serverEntries) {
-              const k = key(se);
-              if (!seen.has(k)) {
-                out.push(se);
-                seen.add(k);
-              }
+          for (const se of serverEntries) {
+            const k = key(se);
+            if (!seen.has(k)) {
+              out.push(se);
+              seen.add(k);
             }
-            for (const le of prev) {
-              const k = key(le);
-              if (!seen.has(k)) {
-                out.push(le);
-                seen.add(k);
-              }
+          }
+          for (const le of prev) {
+            if (le._id) continue;
+            const k = key(le);
+            if (!seen.has(k)) {
+              out.push(le);
+              seen.add(k);
             }
+          }
 
-            const hasAny = out.some(
-              (e) => e.driverName.trim() || e.vehicleNumber.trim(),
-            );
-            return hasAny ? out : [emptyNormalRow()];
-          });
-        }
+          const hasAny = out.some(
+            (e) => e.driverName.trim() || e.vehicleNumber.trim(),
+          );
+          return hasAny ? out : [emptyNormalRow()];
+        });
       }
     } catch {
       /* silent */
@@ -3706,6 +4434,29 @@ export function BulkEntryPage() {
         if (isBulkMode) await deleteBulkEntryTrip(id);
         else await deleteNormalEntryTrip(id);
       }
+
+      // Drop deleted rows from local state immediately so autosave/localStorage
+      // cannot resurrect them before (or after) the reload merge.
+      const idSet = new Set(uniq);
+      if (isBulkMode) {
+        setBulkGroupsRaw((prev) => {
+          const next = prev
+            .map((g) => ({
+              ...g,
+              rows: g.rows.filter((r) => !r._id || !idSet.has(String(r._id))),
+            }))
+            .filter((g) => g.rows.length > 0);
+          return next.length > 0 ? next : [emptyDriverGroup()];
+        });
+      } else {
+        setNormalEntriesRaw((prev) => {
+          const next = prev.filter(
+            (e) => !e._id || !idSet.has(String(e._id)),
+          );
+          return next.length > 0 ? next : [emptyNormalRow()];
+        });
+      }
+
       await loadTrips();
     },
     [isBulkMode, loadTrips],
@@ -4030,45 +4781,6 @@ export function BulkEntryPage() {
           {/* Sync status */}
           <SyncBadge status={currentSyncStatus} />
 
-          {/* Filter Status toggle */}
-          {activeTab !== "payout" && (
-            <div className="hidden sm:flex items-center rounded-lg border border-slate-200 bg-slate-50 p-0.5 dark:border-[#1e2638] dark:bg-white/5">
-              <button
-                type="button"
-                onClick={() => setFilterStatus("all")}
-                className={`rounded-md px-2 sm:px-3 py-1.5 sm:py-2 text-xs font-semibold transition ${
-                  filterStatus === "all"
-                    ? "bg-white text-slate-700 shadow-sm dark:bg-[#0e121d] dark:text-slate-200"
-                    : "text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
-                }`}
-              >
-                All
-              </button>
-              <button
-                type="button"
-                onClick={() => setFilterStatus("pending")}
-                className={`rounded-md px-2 sm:px-3 py-1.5 sm:py-2 text-xs font-semibold transition ${
-                  filterStatus === "pending"
-                    ? "bg-white text-amber-600 shadow-sm dark:bg-[#0e121d] dark:text-amber-400"
-                    : "text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
-                }`}
-              >
-                Pending
-              </button>
-              <button
-                type="button"
-                onClick={() => setFilterStatus("completed")}
-                className={`rounded-md px-2 sm:px-3 py-1.5 sm:py-2 text-xs font-semibold transition ${
-                  filterStatus === "completed"
-                    ? "bg-white text-emerald-600 shadow-sm dark:bg-[#0e121d] dark:text-emerald-400"
-                    : "text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
-                }`}
-              >
-                Done
-              </button>
-            </div>
-          )}
-
           {/* Mode toggle */}
           <div className="flex items-center rounded-lg border border-slate-200 bg-slate-50 p-0.5 dark:border-[#1e2638] dark:bg-white/5">
             <button
@@ -4122,48 +4834,92 @@ export function BulkEntryPage() {
               Choose from the dropdown above, or create a new agency.
             </p>
           </div>
-        ) : /* activeTab === "payout" ? (
-          <div className="max-w-2xl mx-auto">
-            <div className="mb-5 flex items-center justify-between gap-2">
-              <button
-                type="button"
-                onClick={() => toggleMode("bulk")}
-                className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-[var(--bg-elevated)] px-3 py-1.5 text-xs sm:text-sm font-medium text-slate-600 hover:bg-slate-50 transition dark:border-[#1e2638] dark:text-slate-300 dark:hover:bg-white/10"
-              >
-                <ArrowLeft className="h-4 w-4" />
-                Back
-              </button>
-              <div className="flex items-center gap-2">
-                <Wallet className="h-5 w-5 text-emerald-500" />
-                <h2 className="text-base font-bold text-slate-800">
-                  {formatAgencyLabel(selectedAgency)} — Payout
-                </h2>
-              </div>
-            </div>
-            <AgencyPayoutTab
-              agencyId={selectedAgency._id ?? selectedAgency.id ?? ""}
-              agencyName={formatAgencyLabel(selectedAgency)}
-            />
-          </div>
-        ) : */ activeTab === "bulk" ? (
-          <BulkEntryTable
-            groups={bulkGroups}
-            onChange={setBulkGroups}
-            filterStatus={filterStatus}
-            onDeleteTrip={handleDeleteTrip}
-            onDeleteTrips={handleDeleteTrips}
-            agencyId={selectedAgency._id ?? selectedAgency.id ?? ""}
-            agencyName={formatAgencyLabel(selectedAgency)}
-          />
         ) : (
-          <NormalEntryTable
-            entries={normalEntries}
-            onChange={setNormalEntries}
-            filterStatus={filterStatus}
-            onDeleteTrip={handleDeleteTrip}
-            agencyName={formatAgencyLabel(selectedAgency)}
-            onSendDriverToBulk={sendNormalDriverToBulk}
-          />
+          <div className="flex min-h-0 flex-1 flex-col gap-3">
+            <EntryFiltersBar
+              title={isBulkMode ? "Drivers" : "Normal entries"}
+              count={
+                isBulkMode
+                  ? bulkGroups.filter(
+                      (g) =>
+                        g.driverName.trim() ||
+                        g.vehicleNumber.trim() ||
+                        g.rows.some((r) => bulkRowHasData(r) || r._id),
+                    ).length
+                  : normalEntries.length
+              }
+              search={tableSearch}
+              onSearchChange={setTableSearch}
+              searchPlaceholder={
+                isBulkMode
+                  ? "Search driver or vehicle…"
+                  : "Search driver, vehicle, phone…"
+              }
+              sortDir={sortDir}
+              onSortDirChange={setSortDir}
+              filtersOpen={filtersOpen}
+              onFiltersOpenChange={setFiltersOpen}
+              filterStatus={filterStatus}
+              onFilterStatusChange={setFilterStatus}
+              dateFrom={dateFrom}
+              dateTo={dateTo}
+              onDateFromChange={setDateFrom}
+              onDateToChange={setDateTo}
+              showDateFilters={!isBulkMode}
+              sortNewestLabel={
+                isBulkMode ? "↓ Newest driver" : "↓ Newest"
+              }
+              sortOldestLabel={
+                isBulkMode ? "↑ Oldest driver" : "↑ Oldest"
+              }
+              endAction={
+                isBulkMode ? (
+                  <button
+                    type="button"
+                    onClick={() => bulkTableRef.current?.openExport()}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-1.5 text-xs font-semibold text-indigo-700 shadow-sm transition hover:bg-indigo-100 dark:border-indigo-500/30 dark:bg-indigo-500/15 dark:text-indigo-300 dark:hover:bg-indigo-500/25"
+                  >
+                    <FileDown className="h-3.5 w-3.5" />
+                    <span className="hidden sm:inline">
+                      Download Bulk Trips Report (PDF)
+                    </span>
+                    <span className="sm:hidden">PDF</span>
+                  </button>
+                ) : null
+              }
+            />
+            <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+              {activeTab === "bulk" ? (
+                <BulkEntryTable
+                  ref={bulkTableRef}
+                  groups={bulkGroups}
+                  onChange={setBulkGroups}
+                  filterStatus={filterStatus}
+                  search={tableSearch}
+                  dateFrom={dateFrom}
+                  dateTo={dateTo}
+                  sortDir={sortDir}
+                  onDeleteTrip={handleDeleteTrip}
+                  onDeleteTrips={handleDeleteTrips}
+                  agencyId={selectedAgency._id ?? selectedAgency.id ?? ""}
+                  agencyName={formatAgencyLabel(selectedAgency)}
+                />
+              ) : (
+                <NormalEntryTable
+                  entries={normalEntries}
+                  onChange={setNormalEntries}
+                  filterStatus={filterStatus}
+                  search={tableSearch}
+                  dateFrom={dateFrom}
+                  dateTo={dateTo}
+                  sortDir={sortDir}
+                  onDeleteTrip={handleDeleteTrip}
+                  agencyName={formatAgencyLabel(selectedAgency)}
+                  onSendDriverToBulk={sendNormalDriverToBulk}
+                />
+              )}
+            </div>
+          </div>
         )}
       </div>
 

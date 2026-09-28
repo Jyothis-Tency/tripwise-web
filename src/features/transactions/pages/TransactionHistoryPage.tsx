@@ -66,15 +66,15 @@ function fmtSignedCurrency(n: number) {
 
 function agencyTotalRemaining(detail: AgencyCashInCashOutDetail): number {
   return (
-    detail.summary.cashInBulk.remaining -
-    detail.summary.cashOutAgencyProfit.remaining
+    (detail.summary?.cashInBulk?.remaining ?? 0) -
+    (detail.summary?.cashOutAgencyProfit?.remaining ?? 0)
   );
 }
 
 function driverTotalRemaining(detail: DriverCashInCashOutDetail): number {
   return (
-    detail.summary.vehicleBata.remaining +
-    detail.summary.bulkAdvance.remaining
+    (detail.summary?.vehicleBata?.remaining ?? 0) +
+    (detail.summary?.bulkAdvance?.remaining ?? 0)
   );
 }
 
@@ -155,7 +155,10 @@ function avatarColor(index: number) {
 }
 
 function buildAgencyTxRows(detail: AgencyCashInCashOutDetail): TxRow[] {
-  const receipts = detail.tables.bulkReceiptPayments.map((r) => ({
+  const tables = detail?.tables;
+  if (!tables) return [];
+
+  const receipts = (tables.bulkReceiptPayments ?? []).map((r) => ({
     id: `in-${r._id}`,
     date: r.paymentDate,
     amount: r.amount,
@@ -165,7 +168,7 @@ function buildAgencyTxRows(detail: AgencyCashInCashOutDetail): TxRow[] {
     sortTime: sortTime(r.paymentDate, r._id),
   }));
 
-  const profitTrips = (detail.tables.vehicleTripsAgencyProfit || [])
+  const profitTrips = (tables.vehicleTripsAgencyProfit ?? [])
     .filter(
       (t) =>
         String(t.status || "").toLowerCase() === "completed" &&
@@ -187,7 +190,7 @@ function buildAgencyTxRows(detail: AgencyCashInCashOutDetail): TxRow[] {
       };
     });
 
-  const payouts = detail.tables.agencyProfitPayoutPayments.map((r) => ({
+  const payouts = (tables.agencyProfitPayoutPayments ?? []).map((r) => ({
     id: `out-${r._id}`,
     date: r.paymentDate,
     amount: r.amount,
@@ -201,7 +204,10 @@ function buildAgencyTxRows(detail: AgencyCashInCashOutDetail): TxRow[] {
 }
 
 function buildDriverTxRows(detail: DriverCashInCashOutDetail): TxRow[] {
-  const bata = detail.tables.salaryPayments.map((r) => ({
+  const tables = detail?.tables;
+  if (!tables) return [];
+
+  const bata = (tables.salaryPayments ?? []).map((r) => ({
     id: `salary-${r._id}`,
     date: r.date,
     amount: r.amount,
@@ -210,7 +216,7 @@ function buildDriverTxRows(detail: DriverCashInCashOutDetail): TxRow[] {
     notes: r.notes || "Salary / bata",
     sortTime: sortTime(r.date, r._id),
   }));
-  const advances = detail.tables.advanceLedger.map((r) => ({
+  const advances = (tables.advanceLedger ?? []).map((r) => ({
     id: `adv-${r._id}`,
     date: r.date,
     amount: r.amount,
@@ -219,7 +225,7 @@ function buildDriverTxRows(detail: DriverCashInCashOutDetail): TxRow[] {
     notes: r.notes || "Advance",
     sortTime: sortTime(r.date, r._id),
   }));
-  const bulk = detail.tables.bulkAdvancePayouts.map((r) => ({
+  const bulk = (tables.bulkAdvancePayouts ?? []).map((r) => ({
     id: `bulk-${r._id}`,
     date: r.paymentDate,
     amount: r.amount,
@@ -229,6 +235,23 @@ function buildDriverTxRows(detail: DriverCashInCashOutDetail): TxRow[] {
     sortTime: sortTime(r.paymentDate, r._id),
   }));
   return [...bata, ...advances, ...bulk];
+}
+
+function apiErrMessage(err: unknown, fallback: string): string {
+  if (!err || typeof err !== "object") return fallback;
+  const ax = err as {
+    code?: string;
+    name?: string;
+    response?: { status?: number; data?: { message?: string } };
+    message?: string;
+  };
+  if (ax.code === "ERR_CANCELED" || ax.name === "CanceledError") return "";
+  const status = ax.response?.status;
+  const msg = ax.response?.data?.message?.trim();
+  if (status === 404) return msg || "Record not found.";
+  if (status === 403) return msg || "You don’t have access to this record.";
+  if (msg) return msg;
+  return fallback;
 }
 
 function inDateRange(date: string | null, from: string, to: string) {
@@ -256,6 +279,8 @@ export function TransactionHistoryPage() {
   const savedUi = useMemo(() => loadCashInCashOutUi(), []);
   const prevAgencyIdRef = useRef<string | null>(savedUi.selectedAgencyId);
   const prevDriverIdRef = useRef<string | null>(savedUi.selectedDriverId);
+  const agencyReqSeq = useRef(0);
+  const driverReqSeq = useRef(0);
 
   const [tab, setTab] = useState<EntityTab>(savedUi.tab);
   const [listSearch, setListSearch] = useState(savedUi.listSearch);
@@ -351,7 +376,11 @@ export function TransactionHistoryPage() {
     const exists = agencies.some(
       (a) => (a._id ?? a.id ?? "") === selectedAgencyId,
     );
-    if (!exists) setSelectedAgencyId(null);
+    if (!exists) {
+      setSelectedAgencyId(null);
+      setAgencyDetail(null);
+      setError(null);
+    }
   }, [agencies, listLoading, tab, selectedAgencyId]);
 
   useEffect(() => {
@@ -359,21 +388,30 @@ export function TransactionHistoryPage() {
     const exists = drivers.some(
       (d) => (d._id ?? d.id ?? "") === selectedDriverId,
     );
-    if (!exists) setSelectedDriverId(null);
+    if (!exists) {
+      setSelectedDriverId(null);
+      setDriverDetail(null);
+      setError(null);
+    }
   }, [drivers, listLoading, tab, selectedDriverId]);
 
   const loadAgencyDetail = useCallback(
     async (agencyId: string, month: string) => {
+      const seq = ++agencyReqSeq.current;
       setDetailLoading(true);
       setError(null);
       try {
         const detail = await fetchCashInCashOutAgencyDetail(agencyId, month);
+        if (seq !== agencyReqSeq.current) return;
         setAgencyDetail(detail);
-      } catch {
+      } catch (err) {
+        if (seq !== agencyReqSeq.current) return;
+        const msg = apiErrMessage(err, "Failed to load agency transactions.");
+        if (!msg) return;
         setAgencyDetail(null);
-        setError("Failed to load agency transactions.");
+        setError(msg);
       } finally {
-        setDetailLoading(false);
+        if (seq === agencyReqSeq.current) setDetailLoading(false);
       }
     },
     [],
@@ -381,16 +419,21 @@ export function TransactionHistoryPage() {
 
   const loadDriverDetail = useCallback(
     async (driverId: string, month: string) => {
+      const seq = ++driverReqSeq.current;
       setDetailLoading(true);
       setError(null);
       try {
         const detail = await fetchCashInCashOutDriverDetail(driverId, month);
+        if (seq !== driverReqSeq.current) return;
         setDriverDetail(detail);
-      } catch {
+      } catch (err) {
+        if (seq !== driverReqSeq.current) return;
+        const msg = apiErrMessage(err, "Failed to load driver transactions.");
+        if (!msg) return;
         setDriverDetail(null);
-        setError("Failed to load driver transactions.");
+        setError(msg);
       } finally {
-        setDetailLoading(false);
+        if (seq === driverReqSeq.current) setDetailLoading(false);
       }
     },
     [],
@@ -402,6 +445,7 @@ export function TransactionHistoryPage() {
       prevAgencyIdRef.current !== selectedAgencyId
     ) {
       setAgencyDetailTab("trips");
+      setError(null);
     }
     prevAgencyIdRef.current = selectedAgencyId;
   }, [selectedAgencyId]);
@@ -412,25 +456,44 @@ export function TransactionHistoryPage() {
       prevDriverIdRef.current !== selectedDriverId
     ) {
       setDriverDetailTab("trips");
+      setError(null);
     }
     prevDriverIdRef.current = selectedDriverId;
   }, [selectedDriverId]);
 
+  // Wait until the sidebar list is loaded + selection is valid before fetching
+  // detail — avoids 404/403 flashes from stale localStorage ids.
   useEffect(() => {
-    if (tab === "agencies" && selectedAgencyId) {
-      loadAgencyDetail(selectedAgencyId, detailMonth);
-    } else {
+    if (tab !== "agencies") return;
+    if (listLoading) return;
+    if (!selectedAgencyId) {
+      agencyReqSeq.current += 1;
       setAgencyDetail(null);
+      setDetailLoading(false);
+      return;
     }
-  }, [tab, selectedAgencyId, detailMonth, loadAgencyDetail]);
+    const exists = agencies.some(
+      (a) => (a._id ?? a.id ?? "") === selectedAgencyId,
+    );
+    if (!exists) return;
+    loadAgencyDetail(selectedAgencyId, detailMonth);
+  }, [tab, selectedAgencyId, detailMonth, listLoading, agencies, loadAgencyDetail]);
 
   useEffect(() => {
-    if (tab === "drivers" && selectedDriverId) {
-      loadDriverDetail(selectedDriverId, detailMonth);
-    } else {
+    if (tab !== "drivers") return;
+    if (listLoading) return;
+    if (!selectedDriverId) {
+      driverReqSeq.current += 1;
       setDriverDetail(null);
+      setDetailLoading(false);
+      return;
     }
-  }, [tab, selectedDriverId, detailMonth, loadDriverDetail]);
+    const exists = drivers.some(
+      (d) => (d._id ?? d.id ?? "") === selectedDriverId,
+    );
+    if (!exists) return;
+    loadDriverDetail(selectedDriverId, detailMonth);
+  }, [tab, selectedDriverId, detailMonth, listLoading, drivers, loadDriverDetail]);
 
   const filteredAgencies = useMemo(() => {
     const q = listSearch.trim().toLowerCase();
@@ -451,9 +514,10 @@ export function TransactionHistoryPage() {
   }, [drivers, listSearch]);
 
   const agencyCards = useMemo(() => {
-    if (!agencyDetail) return null;
+    if (!agencyDetail?.summary) return null;
     const bulk = agencyDetail.summary.cashInBulk;
     const profit = agencyDetail.summary.cashOutAgencyProfit;
+    if (!bulk || !profit) return null;
     const bulkTotal = Number(bulk.fromTrips) || 0;
     const vehicleOut = Number(profit.fromTrips) || 0;
     const grandTotal = bulkTotal - vehicleOut;
@@ -463,15 +527,16 @@ export function TransactionHistoryPage() {
   }, [agencyDetail]);
 
   const driverCards = useMemo(() => {
-    if (!driverDetail) return null;
-    const bulkTrips = Number(driverDetail.summary.bulkAdvance.fromTrips) || 0;
-    const vehicleTrips = Number(driverDetail.summary.vehicleBata.fromTrips) || 0;
+    if (!driverDetail?.summary) return null;
+    const bata = driverDetail.summary.vehicleBata;
+    const bulk = driverDetail.summary.bulkAdvance;
+    if (!bata || !bulk) return null;
+    const bulkTrips = Number(bulk.fromTrips) || 0;
+    const vehicleTrips = Number(bata.fromTrips) || 0;
     return {
       grandTotal: bulkTrips + vehicleTrips,
       toPay: driverTotalRemaining(driverDetail),
-      paid:
-        (Number(driverDetail.summary.vehicleBata.paid) || 0) +
-        (Number(driverDetail.summary.bulkAdvance.paid) || 0),
+      paid: (Number(bata.paid) || 0) + (Number(bulk.paid) || 0),
     };
   }, [driverDetail]);
 
@@ -594,6 +659,11 @@ export function TransactionHistoryPage() {
     setTableSearch("");
     setDirectionFilter("all");
     setSortDir("desc");
+    setError(null);
+    agencyReqSeq.current += 1;
+    driverReqSeq.current += 1;
+    setAgencyDetail(null);
+    setDriverDetail(null);
   };
 
   const receivedPct =
@@ -644,8 +714,16 @@ export function TransactionHistoryPage() {
       </header>
 
       {error && (
-        <div className="border-b border-rose-100 bg-rose-50 px-4 py-2 text-xs font-medium text-rose-700 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-300">
-          {error}
+        <div className="flex items-center justify-between gap-3 border-b border-rose-100 bg-rose-50 px-4 py-2 text-xs font-medium text-rose-700 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-300">
+          <span className="min-w-0 flex-1">{error}</span>
+          <button
+            type="button"
+            onClick={() => setError(null)}
+            className="shrink-0 rounded-md px-2 py-0.5 font-bold hover:bg-rose-100 dark:hover:bg-rose-500/20"
+            aria-label="Dismiss error"
+          >
+            ✕
+          </button>
         </div>
       )}
 

@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
-import { Link } from "react-router-dom";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import {
   ArrowDownLeft,
   ArrowUpRight,
@@ -8,7 +8,9 @@ import {
   History,
   Loader2,
   User,
+  UserRound,
   Wallet,
+  X,
 } from "lucide-react";
 import {
   fetchAgencies,
@@ -149,10 +151,23 @@ function isoDateOffset(days: number) {
 }
 
 export function TransactionPage() {
-  const [entityType, setEntityType] = useState<EntityType>("agency");
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const prefillEntity = searchParams.get("entity");
+  const prefillId = searchParams.get("id")?.trim() || "";
+  const returnTo = searchParams.get("returnTo")?.trim() || "";
+  const skipEntityClearRef = useRef(
+    Boolean(prefillId && (prefillEntity === "driver" || prefillEntity === "agency")),
+  );
+
+  const [entityType, setEntityType] = useState<EntityType>(
+    prefillEntity === "driver" ? "driver" : "agency",
+  );
   const [nameQuery, setNameQuery] = useState("");
   const [selectedId, setSelectedId] = useState("");
-  const [cashKind, setCashKind] = useState<CashKind>("cash_in");
+  const [cashKind, setCashKind] = useState<CashKind>(
+    prefillEntity === "driver" ? "cash_out" : "cash_in",
+  );
   const [amount, setAmount] = useState("");
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [method, setMethod] = useState("cash");
@@ -172,6 +187,7 @@ export function TransactionPage() {
   const [recentDriverIds, setRecentDriverIds] = useState<string[]>(() =>
     loadRecentIds(LS_RECENT_DRIVERS),
   );
+  const [returnPromptOpen, setReturnPromptOpen] = useState(false);
 
   const recentIds =
     entityType === "agency" ? recentAgencyIds : recentDriverIds;
@@ -210,6 +226,11 @@ export function TransactionPage() {
   }, [loadLists]);
 
   useEffect(() => {
+    if (skipEntityClearRef.current) {
+      skipEntityClearRef.current = false;
+      setCashKind(entityType === "driver" ? "cash_out" : "cash_in");
+      return;
+    }
     setSelectedId("");
     setNameQuery("");
     setMessage(null);
@@ -218,6 +239,35 @@ export function TransactionPage() {
     setRemaining(null);
     setCashKind(entityType === "driver" ? "cash_out" : "cash_in");
   }, [entityType]);
+
+  // Prefill party from Drivers → Salary/Advance deep link.
+  useEffect(() => {
+    if (loadingLists || !prefillId) return;
+    if (entityType === "driver") {
+      const exists = drivers.some((d) => d._id === prefillId);
+      if (exists) {
+        setSelectedId(prefillId);
+        setRecentDriverIds(pushRecentId(LS_RECENT_DRIVERS, prefillId));
+      }
+    } else {
+      const exists = agencies.some(
+        (a) => (a._id ?? a.id ?? "") === prefillId,
+      );
+      if (exists) {
+        setSelectedId(prefillId);
+        setRecentAgencyIds(pushRecentId(LS_RECENT_AGENCIES, prefillId));
+      }
+    }
+  }, [loadingLists, prefillId, entityType, drivers, agencies]);
+
+  useEffect(() => {
+    if (!returnPromptOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setReturnPromptOpen(false);
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [returnPromptOpen]);
 
   const loadBalance = useCallback(
     async (id: string, type: EntityType) => {
@@ -436,6 +486,10 @@ export function TransactionPage() {
       setNotes("");
       setMessage("Transaction recorded successfully.");
       if (selectedId) loadBalance(selectedId, entityType);
+
+      if (returnTo) {
+        setReturnPromptOpen(true);
+      }
     } catch (e: unknown) {
       const msg =
         (e as { message?: string })?.message ||
@@ -888,6 +942,71 @@ export function TransactionPage() {
           </section>
         )}
       </div>
+
+      {returnPromptOpen && returnTo && (
+        <div
+          className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/40 p-4 backdrop-blur-[2px] sm:items-center dark:bg-black/55"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setReturnPromptOpen(false);
+          }}
+          role="presentation"
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="tx-success-title"
+            className="w-full max-w-md overflow-hidden rounded-2xl border border-slate-200/80 bg-[var(--bg-card)] shadow-2xl dark:border-[#252c4d]"
+          >
+            <div className="relative px-6 pb-2 pt-6 text-center">
+              <button
+                type="button"
+                onClick={() => setReturnPromptOpen(false)}
+                className="absolute right-3 top-3 flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-white/5 dark:hover:text-slate-200"
+                aria-label="Dismiss"
+              >
+                <X className="h-4 w-4" />
+              </button>
+              <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-600 ring-1 ring-emerald-200/80 dark:bg-emerald-500/15 dark:text-emerald-300 dark:ring-emerald-500/30">
+                <CheckCircle2 className="h-7 w-7" strokeWidth={2} />
+              </div>
+              <h3
+                id="tx-success-title"
+                className="text-lg font-extrabold tracking-tight text-slate-900 dark:text-[#eef0ff]"
+              >
+                Transaction saved
+              </h3>
+              <p className="mt-1.5 text-sm leading-relaxed text-slate-500 dark:text-[#8d94b8]">
+                All set. You can keep recording here, or optionally jump back to
+                the driver&apos;s salary view.
+              </p>
+            </div>
+
+            <div className="flex flex-col gap-2 px-6 pb-6 pt-4">
+              <button
+                type="button"
+                onClick={() => setReturnPromptOpen(false)}
+                className="flex w-full items-center justify-center rounded-xl bg-indigo-600 px-4 py-3 text-sm font-bold text-white shadow-[0_6px_16px_-6px_#4f46e5] transition hover:bg-indigo-500"
+              >
+                Stay here
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setReturnPromptOpen(false);
+                  navigate(returnTo);
+                }}
+                className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-transparent px-4 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-50 dark:border-[#252c4d] dark:text-[#aab0d0] dark:hover:bg-white/[0.04]"
+              >
+                <UserRound className="h-4 w-4" />
+                Back to driver
+                <span className="text-xs font-medium text-slate-400 dark:text-[#6b7191]">
+                  optional
+                </span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

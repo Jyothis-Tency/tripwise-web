@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Phone,
   History,
@@ -14,6 +15,7 @@ import {
   Banknote,
   MapPin,
   DollarSign,
+  ArrowRightLeft,
 } from "lucide-react";
 import type {
   Driver,
@@ -27,11 +29,9 @@ import {
   fetchDriverSalary,
   fetchDriverTrips,
   fetchDriverSalaryLedger,
-  createSalaryTransaction,
   deleteSalaryTransaction,
 } from "../api";
 import { DriverHistoryModal } from "./DriverHistoryModal";
-import { DriverPayModal } from "./DriverPayModal";
 import {
   driverAvatarColor,
   driverDisplayName,
@@ -168,6 +168,7 @@ function Section({
 interface DriverDetailProps {
   driver: Driver;
   avatarIndex?: number;
+  initialTab?: "details" | "salary";
   onBack?: () => void;
   onEdit?: () => void;
   onBlockChange: () => void;
@@ -177,12 +178,17 @@ interface DriverDetailProps {
 export function DriverDetail({
   driver,
   avatarIndex = 0,
+  initialTab = "details",
   onEdit,
   onBlockChange,
 }: DriverDetailProps) {
-  const [tab, setTab] = useState<"details" | "salary">("details");
+  const [tab, setTab] = useState<"details" | "salary">(initialTab);
   const [blockBusy, setBlockBusy] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
+
+  useEffect(() => {
+    setTab(initialTab);
+  }, [initialTab, driver._id]);
 
   const name = driverDisplayName(driver);
   const isBlocked = !!driver.isBlocked;
@@ -440,17 +446,13 @@ function txRowKey(tx: SalaryTransaction): string {
 }
 
 function SalaryTab({ driver }: { driver: Driver }) {
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [salaryData, setSalaryData] = useState<DriverSalaryData | null>(null);
   const [trips, setTrips] = useState<DriverTrip[]>([]);
   const [ledger, setLedger] = useState<SalaryTransaction[]>([]);
   const [error, setError] = useState("");
-  const [showAddAdvance, setShowAddAdvance] = useState(false);
-  const [advanceAmount, setAdvanceAmount] = useState("");
-  const [advanceDesc, setAdvanceDesc] = useState("");
-  const [addingSalary, setAddingSalary] = useState(false);
   const [monthFilter, setMonthFilter] = useState(currentMonthValue);
-  const [payOpen, setPayOpen] = useState(false);
 
   const driverId = driver._id ?? (driver as { id?: string }).id;
 
@@ -487,27 +489,6 @@ function SalaryTab({ driver }: { driver: Driver }) {
     }
   };
 
-  const handleAddAdvance = async () => {
-    const amt = parseFloat(advanceAmount);
-    if (!amt || amt <= 0) return;
-    setAddingSalary(true);
-    try {
-      await createSalaryTransaction(driverId!, {
-        amount: amt,
-        type: "advance",
-        notes: advanceDesc.trim() || "Advance payment",
-      });
-      setShowAddAdvance(false);
-      setAdvanceAmount("");
-      setAdvanceDesc("");
-      loadData();
-    } catch {
-      alert("Failed to add advance payment");
-    } finally {
-      setAddingSalary(false);
-    }
-  };
-
   const handleDeleteTransaction = async (txId: string) => {
     if (!confirm("Delete this transaction?")) return;
     try {
@@ -516,6 +497,14 @@ function SalaryTab({ driver }: { driver: Driver }) {
     } catch {
       alert("Failed to delete transaction");
     }
+  };
+
+  const goSalaryAdvance = () => {
+    if (!driverId) return;
+    const returnTo = `/drivers?driver=${encodeURIComponent(driverId)}&tab=salary`;
+    navigate(
+      `/transaction?entity=driver&id=${encodeURIComponent(driverId)}&returnTo=${encodeURIComponent(returnTo)}`,
+    );
   };
 
   if (loading) {
@@ -581,25 +570,35 @@ function SalaryTab({ driver }: { driver: Driver }) {
             you pick.
           </p>
         </div>
-        <div className="flex items-center gap-1 rounded-xl border border-slate-200 bg-[var(--bg-main)] p-1 dark:border-[#252c4d]">
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex items-center gap-1 rounded-xl border border-slate-200 bg-[var(--bg-main)] p-1 dark:border-[#252c4d]">
+            <button
+              type="button"
+              aria-label="Previous month"
+              onClick={() => setMonthFilter((m) => shiftMonth(m, -1))}
+              className="flex h-8 w-8 items-center justify-center rounded-[9px] text-slate-600 transition hover:bg-[var(--bg-card)] dark:text-[#8d94b8]"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </button>
+            <b className="min-w-[130px] text-center text-sm font-bold text-slate-800 dark:text-[#eef0ff]">
+              {monthLabel(monthFilter)}
+            </b>
+            <button
+              type="button"
+              aria-label="Next month"
+              onClick={() => setMonthFilter((m) => shiftMonth(m, 1))}
+              className="flex h-8 w-8 items-center justify-center rounded-[9px] text-slate-600 transition hover:bg-[var(--bg-card)] dark:text-[#8d94b8]"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </button>
+          </div>
           <button
             type="button"
-            aria-label="Previous month"
-            onClick={() => setMonthFilter((m) => shiftMonth(m, -1))}
-            className="flex h-8 w-8 items-center justify-center rounded-[9px] text-slate-600 transition hover:bg-[var(--bg-card)] dark:text-[#8d94b8]"
+            onClick={goSalaryAdvance}
+            className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-br from-indigo-600 to-violet-600 px-4 py-2.5 text-sm font-bold text-white shadow-[0_6px_16px_-6px_#4f46e5] transition hover:-translate-y-px active:scale-[0.98]"
           >
-            <ChevronLeft className="h-4 w-4" />
-          </button>
-          <b className="min-w-[130px] text-center text-sm font-bold text-slate-800 dark:text-[#eef0ff]">
-            {monthLabel(monthFilter)}
-          </b>
-          <button
-            type="button"
-            aria-label="Next month"
-            onClick={() => setMonthFilter((m) => shiftMonth(m, 1))}
-            className="flex h-8 w-8 items-center justify-center rounded-[9px] text-slate-600 transition hover:bg-[var(--bg-card)] dark:text-[#8d94b8]"
-          >
-            <ChevronRight className="h-4 w-4" />
+            <ArrowRightLeft className="h-4 w-4" />
+            Salary/Advance
           </button>
         </div>
       </div>
@@ -663,45 +662,7 @@ function SalaryTab({ driver }: { driver: Driver }) {
         </div>
       </div>
 
-      <Section
-        title="Advance payments"
-        action={
-          <button
-            type="button"
-            onClick={() => setShowAddAdvance((s) => !s)}
-            className="rounded-lg px-2.5 py-1 text-xs font-bold text-indigo-600 transition hover:bg-indigo-50 dark:text-[#a5b4fc] dark:hover:bg-[#242a57]"
-          >
-            ＋ Record advance
-          </button>
-        }
-        padded
-      >
-        {showAddAdvance && (
-          <div className="mb-3 flex flex-wrap items-center gap-2 rounded-xl bg-[var(--bg-main)] p-2">
-            <input
-              type="number"
-              value={advanceAmount}
-              onChange={(e) => setAdvanceAmount(e.target.value)}
-              placeholder="Amount"
-              className="w-24 rounded-lg border border-slate-200 bg-[var(--bg-card)] px-2.5 py-1.5 text-sm outline-none focus:border-indigo-500 dark:border-[#252c4d] dark:text-[#eef0ff]"
-            />
-            <input
-              type="text"
-              value={advanceDesc}
-              onChange={(e) => setAdvanceDesc(e.target.value)}
-              placeholder="Description"
-              className="min-w-[140px] flex-1 rounded-lg border border-slate-200 bg-[var(--bg-card)] px-2.5 py-1.5 text-sm outline-none focus:border-indigo-500 dark:border-[#252c4d] dark:text-[#eef0ff]"
-            />
-            <button
-              type="button"
-              onClick={handleAddAdvance}
-              disabled={addingSalary}
-              className="rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-bold text-white disabled:opacity-50"
-            >
-              {addingSalary ? "…" : "Add"}
-            </button>
-          </div>
-        )}
+      <Section title="Advance payments" padded>
         {(salaryData?.advancePayments ?? []).length === 0 ? (
           <EmptyMsg icon="👛" text="No advances this month." />
         ) : (
@@ -735,19 +696,7 @@ function SalaryTab({ driver }: { driver: Driver }) {
         )}
       </Section>
 
-      <Section
-        title="Salary & payment history"
-        action={
-          <button
-            type="button"
-            onClick={() => setPayOpen(true)}
-            className="rounded-lg px-2.5 py-1 text-xs font-bold text-indigo-600 transition hover:bg-indigo-50 dark:text-[#a5b4fc] dark:hover:bg-[#242a57]"
-          >
-            ＋ Pay salary
-          </button>
-        }
-        padded
-      >
+      <Section title="Salary & payment history" padded>
         {ledger.length === 0 ? (
           <EmptyMsg icon="🧾" text="No transactions for this period." />
         ) : (
@@ -850,20 +799,6 @@ function SalaryTab({ driver }: { driver: Driver }) {
           </div>
         )}
       </Section>
-
-      {payOpen && driverId && (
-        <DriverPayModal
-          open={payOpen}
-          onClose={() => setPayOpen(false)}
-          onSuccess={() => {
-            setPayOpen(false);
-            loadData();
-          }}
-          driverId={driverId}
-          driverDisplayName={driverDisplayName(driver)}
-          detailMonth={monthFilter || "all_time"}
-        />
-      )}
     </div>
   );
 }

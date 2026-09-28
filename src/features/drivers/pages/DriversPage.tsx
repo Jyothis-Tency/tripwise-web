@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Search, UserPlus, Users, ArrowLeft } from "lucide-react";
 import type { Driver, DriverBlockFilter } from "../api";
 import { fetchDrivers } from "../api";
@@ -9,6 +10,10 @@ import { EditDriverModal } from "../components/EditDriverModal";
 import { EmptyState } from "../../../components/ui/EmptyState";
 
 export default function DriversPage() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const driverParam = searchParams.get("driver");
+  const tabParam = searchParams.get("tab");
+
   const [drivers, setDrivers] = useState<Driver[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -17,7 +22,7 @@ export default function DriversPage() {
   const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingDriver, setEditingDriver] = useState<Driver | null>(null);
-  const selectedIdRef = useRef<string | null>(null);
+  const selectedIdRef = useRef<string | null>(driverParam);
 
   const loadDrivers = useCallback(async () => {
     setLoading(true);
@@ -51,12 +56,39 @@ export default function DriversPage() {
     return () => clearTimeout(t);
   }, [loadDrivers, search]);
 
+  // Deep-link from Transaction return: /drivers?driver=…&tab=salary
+  useEffect(() => {
+    if (!driverParam || loading || drivers.length === 0) return;
+    const idx = drivers.findIndex((d) => d._id === driverParam);
+    if (idx >= 0) {
+      setSelectedIdx(idx);
+      selectedIdRef.current = driverParam;
+    }
+  }, [driverParam, drivers, loading]);
+
   const selectedDriver =
     selectedIdx !== null ? (drivers[selectedIdx] ?? null) : null;
 
   const selectDriver = (i: number) => {
     setSelectedIdx(i);
-    selectedIdRef.current = drivers[i]?._id ?? null;
+    const id = drivers[i]?._id ?? null;
+    selectedIdRef.current = id;
+    if (id) {
+      const next = new URLSearchParams(searchParams);
+      next.set("driver", id);
+      if (tabParam === "salary") next.set("tab", "salary");
+      else next.delete("tab");
+      setSearchParams(next, { replace: true });
+    }
+  };
+
+  const clearSelection = () => {
+    setSelectedIdx(null);
+    selectedIdRef.current = null;
+    const next = new URLSearchParams(searchParams);
+    next.delete("driver");
+    next.delete("tab");
+    setSearchParams(next, { replace: true });
   };
 
   return (
@@ -172,10 +204,7 @@ export default function DriversPage() {
               <div className="flex shrink-0 items-center gap-2 border-b border-slate-200 px-3 py-2 sm:hidden dark:border-[#252c4d]">
                 <button
                   type="button"
-                  onClick={() => {
-                    setSelectedIdx(null);
-                    selectedIdRef.current = null;
-                  }}
+                  onClick={clearSelection}
                   className="flex items-center gap-1 text-sm font-medium text-slate-600 dark:text-[#8d94b8]"
                 >
                   <ArrowLeft className="h-4 w-4" /> Back
@@ -185,10 +214,8 @@ export default function DriversPage() {
                 key={selectedDriver._id}
                 driver={selectedDriver}
                 avatarIndex={selectedIdx ?? 0}
-                onBack={() => {
-                  setSelectedIdx(null);
-                  selectedIdRef.current = null;
-                }}
+                initialTab={tabParam === "salary" ? "salary" : "details"}
+                onBack={clearSelection}
                 onEdit={() => setEditingDriver(selectedDriver)}
                 onBlockChange={() => loadDrivers()}
                 onUpdated={() => loadDrivers()}

@@ -26,7 +26,8 @@ export default defineConfig({
       // Use trailing slash so SPA route /guest-bulk/:token is NOT proxied.
       // API paths are /guest/bulk/:token.
       "/guest/": { target: BACKEND, changeOrigin: true },
-      "/drivers": { target: BACKEND, changeOrigin: true },
+      // Do NOT proxy "/drivers" — that is the owner SPA route (/drivers).
+      // Owner APIs live under /owners/drivers; driver-app APIs are unused here.
       "/admin": { target: BACKEND, changeOrigin: true },
       "/health": { target: BACKEND, changeOrigin: true },
     },

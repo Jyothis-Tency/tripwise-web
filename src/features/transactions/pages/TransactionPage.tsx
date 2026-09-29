@@ -59,10 +59,10 @@ function loadRecentIds(key: string): string[] {
 
 function pushRecentId(key: string, id: string): string[] {
   if (!id) return loadRecentIds(key);
-  const next = [id, ...loadRecentIds(key).filter((x) => x !== id)].slice(
-    0,
-    RECENT_PARTY_LIMIT,
-  );
+  const current = loadRecentIds(key);
+  // Already in Recent — keep list order stable (selecting must not reshuffle).
+  if (current.includes(id)) return current;
+  const next = [id, ...current].slice(0, RECENT_PARTY_LIMIT);
   try {
     localStorage.setItem(key, JSON.stringify(next));
   } catch {
@@ -283,21 +283,21 @@ export function TransactionPage() {
           const bulk = Number(detail.summary.cashInBulk.fromTrips) || 0;
           const vehicle =
             Number(detail.summary.cashOutAgencyProfit.fromTrips) || 0;
-          setGrandTotal(bulk - vehicle);
-          setRemaining(
-            detail.summary.cashInBulk.remaining -
-              detail.summary.cashOutAgencyProfit.remaining,
-          );
+          const gt = bulk - vehicle;
+          const received = Number(detail.summary.cashInBulk.received) || 0;
+          setGrandTotal(gt);
+          // Remaining vs grand total after cash-in — not bulk-entry (GT − advance) balance
+          setRemaining(gt - received);
         } else {
           const detail = await fetchCashInCashOutDriverDetail(id, "all_time");
-          setGrandTotal(
+          const gt =
             (Number(detail.summary.bulkAdvance.fromTrips) || 0) +
-              (Number(detail.summary.vehicleBata.fromTrips) || 0),
-          );
-          setRemaining(
-            detail.summary.vehicleBata.remaining +
-              detail.summary.bulkAdvance.remaining,
-          );
+            (Number(detail.summary.vehicleBata.fromTrips) || 0);
+          const paid =
+            (Number(detail.summary.vehicleBata.paid) || 0) +
+            (Number(detail.summary.bulkAdvance.paid) || 0);
+          setGrandTotal(gt);
+          setRemaining(gt - paid);
         }
       } catch {
         setGrandTotal(null);

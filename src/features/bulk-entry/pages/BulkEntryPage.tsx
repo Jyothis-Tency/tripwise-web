@@ -79,6 +79,10 @@ function nextRowId() {
   return `r_${Date.now()}_${++_rowCounter}`;
 }
 
+function nextGroupId() {
+  return `g_${Date.now()}_${++_rowCounter}`;
+}
+
 function emptyBulkRow(): BulkTripRow {
   return {
     clientRowId: nextRowId(),
@@ -99,6 +103,7 @@ function emptyBulkRow(): BulkTripRow {
 
 function emptyDriverGroup(): DriverGroup {
   return {
+    clientGroupId: nextGroupId(),
     driverName: "",
     vehicleNumber: "",
     rows: [emptyBulkRow()],
@@ -452,6 +457,7 @@ function defaultGroupLocalFilter(): GroupLocalFilter {
 }
 
 function groupFilterStorageKey(g: DriverGroup, gi: number): string {
+  if (g.clientGroupId) return `cg:${g.clientGroupId}`;
   const driver = (g.driverName || "").trim().toLowerCase();
   const vehicle = (g.vehicleNumber || "").trim().toUpperCase();
   if (driver || vehicle) return `${driver}|||${vehicle}`;
@@ -540,6 +546,8 @@ function normalizeBulkGroups(groups: any[]): DriverGroup[] {
       ? rows.map((row: any, idx: number) => ({
           ...emptyBulkRow(),
           ...row,
+          // Always keep a non-empty clientRowId (empty string breaks React keys)
+          clientRowId: String(row?.clientRowId || "").trim() || nextRowId(),
           advancePaid:
             row?.advancePaid !== undefined
               ? Number(row.advancePaid) || 0
@@ -549,6 +557,7 @@ function normalizeBulkGroups(groups: any[]): DriverGroup[] {
         }))
       : [emptyBulkRow()];
     return {
+      clientGroupId: String(group?.clientGroupId || "").trim() || nextGroupId(),
       driverName: group?.driverName || "",
       driverId: group?.driverId,
       driverPhone: group?.driverPhone,
@@ -2470,12 +2479,18 @@ const BulkEntryTable = forwardRef<
   );
 
   const addGroup = useCallback(() => {
+    // Always append a brand-new empty card — never clone an existing group.
     onChange((prev) => [...prev, emptyDriverGroup()]);
   }, [onChange]);
 
   const removeGroup = useCallback(
-    (gi: number) => {
-      onChange((prev) => prev.filter((_: DriverGroup, i: number) => i !== gi));
+    (gi: number, groupId?: string) => {
+      onChange((prev) => {
+        const next = prev.filter((g, i) =>
+          groupId ? g.clientGroupId !== groupId : i !== gi,
+        );
+        return next.length > 0 ? next : [emptyDriverGroup()];
+      });
     },
     [onChange],
   );
@@ -2483,16 +2498,17 @@ const BulkEntryTable = forwardRef<
   const deleteServerGroup = useCallback(
     async (gi: number) => {
       const group = groups[gi];
-      const ids = (group?.rows ?? [])
+      if (!group) return;
+
+      // Scope delete to THIS card only (clientGroupId) — never by driver/vehicle name,
+      // or deleting one card would wipe another with the same driver/vehicle.
+      const groupId = group.clientGroupId;
+      const ids = (group.rows ?? [])
         .map((r) => r._id)
         .filter(Boolean) as string[];
-      const clientIds = new Set(
-        (group?.rows ?? []).map((r) => r.clientRowId).filter(Boolean),
-      );
-      const driverKey = `${(group?.driverName || "").trim().toLowerCase()}|||${(group?.vehicleNumber || "").trim().toUpperCase()}`;
 
       if (ids.length === 0) {
-        removeGroup(gi);
+        removeGroup(gi, groupId);
         return;
       }
       try {
@@ -2501,35 +2517,13 @@ const BulkEntryTable = forwardRef<
         } else {
           for (const id of ids) await Promise.resolve(onDeleteTrip(String(id)));
         }
-        // Remove by identity, not stale group index (performDelete may already have purged).
-        const idSet = new Set(ids.map(String));
-        onChange((prev) => {
-          const next = prev
-            .map((g) => {
-              const k = `${(g.driverName || "").trim().toLowerCase()}|||${(g.vehicleNumber || "").trim().toUpperCase()}`;
-              if (k === driverKey) {
-                return {
-                  ...g,
-                  rows: g.rows.filter(
-                    (r) =>
-                      !idSet.has(String(r._id ?? "")) &&
-                      !clientIds.has(r.clientRowId),
-                  ),
-                };
-              }
-              return {
-                ...g,
-                rows: g.rows.filter((r) => !idSet.has(String(r._id ?? ""))),
-              };
-            })
-            .filter((g) => g.rows.length > 0);
-          return next.length > 0 ? next : [emptyDriverGroup()];
-        });
+        // Drop only this card. performDeleteTrips may already have purged server ids.
+        removeGroup(gi, groupId);
       } catch {
         // Silent: cancellation or failure means we keep local group.
       }
     },
-    [groups, onDeleteTrip, removeGroup, onDeleteTrips, onChange],
+    [groups, onDeleteTrip, removeGroup, onDeleteTrips],
   );
 
   return (
@@ -2699,7 +2693,7 @@ const BulkEntryTable = forwardRef<
           if (!g) return null;
           return (
         <div
-          key={g.rows[0]?.clientRowId ?? `g-${gi}`}
+          key={g.clientGroupId || `g-${gi}`}
           className="rounded-xl border border-slate-200 bg-[var(--bg-card)] shadow-sm overflow-hidden dark:border-[#1e2638]"
         >
           {/* Group header */}
@@ -3421,8 +3415,10 @@ function NormalEntryTable({
     (idx: number, field: keyof NormalEntryRow, val: string) => {
       onChange((prev) => {
         const next = [...prev];
-        (next[idx] as any)[field] =
-          field === "vehicleNumber" ? val.toUpperCase() : val;
+        next[idx] = {
+          ...next[idx],
+          [field]: field === "vehicleNumber" ? val.toUpperCase() : val,
+        };
         return next;
       });
     },
@@ -3562,7 +3558,7 @@ function NormalEntryTable({
             if (!e) return null;
             return (
             <div
-              key={e.clientRowId ?? i}
+              key={String(e.clientRowId || "").trim() || `n-${i}`}
               className={`overflow-hidden rounded-2xl border bg-[var(--bg-card)] shadow-sm dark:border-[#1e2638] ${
                 e.isCompleted
                   ? "border-emerald-300/60 dark:border-emerald-500/30"
@@ -3746,7 +3742,7 @@ function NormalEntryTable({
                   !e.mobileNumber?.trim();
                 return (
                   <tr
-                    key={e.clientRowId ?? i}
+                    key={String(e.clientRowId || "").trim() || `n-${i}`}
                     className={`group transition hover:bg-slate-50/50 dark:hover:bg-white/[0.03] ${
                       e.isCompleted
                         ? "bg-emerald-50/40 dark:bg-emerald-500/[0.04]"
@@ -4245,7 +4241,8 @@ export function BulkEntryPage() {
             const rows = sortBulkRowsByDate(
               grp.map((t) => ({
                 // Preserve server clientRowId so refresh can dedupe against local drafts
-                clientRowId: (t as any).clientRowId ?? nextRowId(),
+                clientRowId:
+                  String((t as any).clientRowId || "").trim() || nextRowId(),
                 _id: t._id ?? t.id,
                 startDate: t.startDate ? t.startDate.split("T")[0] : "",
                 endDate: t.endDate ? t.endDate.split("T")[0] : "",
@@ -4266,13 +4263,20 @@ export function BulkEntryPage() {
               })),
             );
             const createdMs = rows
-              .map((r) => groupCreatedAtMs({ driverName: "", vehicleNumber: "", rows: [r] }))
+              .map((r) =>
+                groupCreatedAtMs({
+                  driverName: "",
+                  vehicleNumber: "",
+                  rows: [r],
+                }),
+              )
               .filter((n) => n > 0);
             const groupCreatedAt =
               createdMs.length > 0
                 ? new Date(Math.min(...createdMs)).toISOString()
                 : undefined;
             return {
+              clientGroupId: nextGroupId(),
               driverName: first.driverName || "",
               vehicleNumber: first.vehicleNumber || "",
               rows,
@@ -4281,8 +4285,9 @@ export function BulkEntryPage() {
           },
         );
         setBulkGroupsRaw((prev) => {
-          // Canonical merge: one group per (driverName, vehicleNumber).
-          // Start from server state, then merge in any local unsaved rows (no _id).
+          // Canonical merge: one group per (driverName, vehicleNumber) for named cards.
+          // Blank local shells keep their own clientGroupId so "+ Add Driver / Vehicle"
+          // cards never collapse into (or clone) another card.
           const keyOf = (
             g: Pick<DriverGroup, "driverName" | "vehicleNumber">,
           ) =>
@@ -4293,11 +4298,27 @@ export function BulkEntryPage() {
               ? `id:${String(r._id)}`
               : `cr:${String(r.clientRowId || "")}`;
 
+          const prevByKey = new Map<string, DriverGroup>();
+          for (const lg of prev) {
+            const k = keyOf(lg);
+            if (
+              (lg.driverName || "").trim() ||
+              (lg.vehicleNumber || "").trim()
+            ) {
+              if (!prevByKey.has(k)) prevByKey.set(k, lg);
+            }
+          }
+
           const outByKey = new Map<string, DriverGroup>();
           for (const sg of serverGroups) {
             const k = keyOf(sg);
+            const localMatch = prevByKey.get(k);
             outByKey.set(k, {
               ...sg,
+              clientGroupId:
+                localMatch?.clientGroupId || sg.clientGroupId || nextGroupId(),
+              driverId: localMatch?.driverId ?? sg.driverId,
+              driverPhone: localMatch?.driverPhone ?? sg.driverPhone,
               rows: [...sg.rows],
             });
           }
@@ -4310,12 +4331,42 @@ export function BulkEntryPage() {
             );
           }
 
+          const blankShells: DriverGroup[] = [];
+          const seenBlankIds = new Set<string>();
+
           // Keep unsaved local drafts (no _id) with trip data.
-          // Also keep local-only driver/vehicle shells so they aren't lost before
-          // (or if) the draft placeholder has synced.
+          // Also keep local-only driver/vehicle shells and brand-new blank cards.
           for (const lg of prev) {
             const k = keyOf(lg);
+            const hasIdentity =
+              !!(lg.driverName || "").trim() ||
+              !!(lg.vehicleNumber || "").trim();
+
+            if (!hasIdentity) {
+              const gid =
+                String(lg.clientGroupId || "").trim() || nextGroupId();
+              if (seenBlankIds.has(gid)) continue;
+              seenBlankIds.add(gid);
+              // Brand-new empty cards (or unnamed local drafts) stay as their own
+              // card — never merge into another driver/vehicle group via key "|||".
+              blankShells.push({
+                ...lg,
+                clientGroupId: gid,
+                rows:
+                  lg.rows.length > 0
+                    ? lg.rows.map((r) => ({
+                        ...emptyBulkRow(),
+                        ...r,
+                        clientRowId:
+                          String(r.clientRowId || "").trim() || nextRowId(),
+                      }))
+                    : [emptyBulkRow()],
+              });
+              continue;
+            }
+
             const target = outByKey.get(k) ?? {
+              clientGroupId: lg.clientGroupId || nextGroupId(),
               driverName: lg.driverName,
               vehicleNumber: lg.vehicleNumber,
               rows: [],
@@ -4334,20 +4385,22 @@ export function BulkEntryPage() {
                 target.rows.push({
                   ...emptyBulkRow(),
                   ...r,
+                  clientRowId:
+                    String(r.clientRowId || "").trim() || nextRowId(),
                   advancePaid: Number((r as any).advancePaid ?? 0) || 0,
                 });
                 seen.add(rk);
               }
             }
 
-            const hasIdentity =
-              !!(lg.driverName || "").trim() ||
-              !!(lg.vehicleNumber || "").trim();
             const alreadyOnServer = outByKey.has(k);
 
             if (target.rows.length > 0 || alreadyOnServer) {
               if (!target.groupCreatedAt && lg.groupCreatedAt) {
                 target.groupCreatedAt = lg.groupCreatedAt;
+              }
+              if (!target.clientGroupId && lg.clientGroupId) {
+                target.clientGroupId = lg.clientGroupId;
               }
               outByKey.set(k, target);
               existingRowKeysByGroup.set(k, seen);
@@ -4355,16 +4408,25 @@ export function BulkEntryPage() {
               // Driver-only local shell (no trip fields yet)
               target.rows =
                 lg.rows.length > 0
-                  ? lg.rows.map((r) => ({ ...emptyBulkRow(), ...r }))
+                  ? lg.rows.map((r) => ({
+                      ...emptyBulkRow(),
+                      ...r,
+                      clientRowId:
+                        String(r.clientRowId || "").trim() || nextRowId(),
+                    }))
                   : [emptyBulkRow()];
               outByKey.set(k, target);
               existingRowKeysByGroup.set(k, seen);
             }
           }
 
-          const merged = Array.from(outByKey.values())
+          const merged = [
+            ...Array.from(outByKey.values()),
+            ...blankShells,
+          ]
             .map((g) => ({
               ...g,
+              clientGroupId: g.clientGroupId || nextGroupId(),
               rows: sortBulkRowsByDate(
                 g.rows.length > 0 ? g.rows : [emptyBulkRow()],
               ),
@@ -4373,7 +4435,8 @@ export function BulkEntryPage() {
               (g) =>
                 g.rows.length > 0 ||
                 g.driverName.trim() ||
-                g.vehicleNumber.trim(),
+                g.vehicleNumber.trim() ||
+                !!g.clientGroupId,
             );
 
           return merged.length > 0 ? merged : [emptyDriverGroup()];
@@ -4382,7 +4445,8 @@ export function BulkEntryPage() {
         const trips = await fetchNormalEntryTrips(selectedId);
         const serverEntries: NormalEntryRow[] = trips.map((t) => ({
           _id: t._id ?? t.id,
-          clientRowId: (t as any).clientRowId,
+          clientRowId:
+            String((t as any).clientRowId || "").trim() || nextRowId(),
           date: t.date ? t.date.split("T")[0] : "",
           driverName: t.driverName || "",
           mobileNumber: t.mobileNumber || "",
@@ -4409,9 +4473,15 @@ export function BulkEntryPage() {
           }
           for (const le of prev) {
             if (le._id) continue;
-            const k = key(le);
+            // Ensure every local draft has a stable clientRowId (never share keys)
+            const row: NormalEntryRow = {
+              ...le,
+              clientRowId:
+                String(le.clientRowId || "").trim() || nextRowId(),
+            };
+            const k = key(row);
             if (!seen.has(k)) {
-              out.push(le);
+              out.push(row);
               seen.add(k);
             }
           }

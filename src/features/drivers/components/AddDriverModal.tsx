@@ -41,7 +41,16 @@ export function AddDriverModal({ onClose, onSuccess }: AddDriverModalProps) {
       });
       onSuccess();
     } catch (err: any) {
-      setError(err?.response?.data?.message || 'Failed to add driver.');
+      const raw = String(err?.response?.data?.message || "");
+      if (/E11000|duplicate key/i.test(raw)) {
+        setError(
+          /phone/i.test(raw)
+            ? "A driver with this phone number already exists. Please use a different phone number."
+            : "A driver with this email already exists. Please use a different email.",
+        );
+      } else {
+        setError(raw || "Failed to add driver.");
+      }
     } finally {
       setSaving(false);
     }

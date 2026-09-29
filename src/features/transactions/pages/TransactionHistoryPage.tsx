@@ -64,18 +64,9 @@ function fmtSignedCurrency(n: number) {
   return `${sign}${fmtCurrency(n)}`;
 }
 
-function agencyTotalRemaining(detail: AgencyCashInCashOutDetail): number {
-  return (
-    (detail.summary?.cashInBulk?.remaining ?? 0) -
-    (detail.summary?.cashOutAgencyProfit?.remaining ?? 0)
-  );
-}
-
-function driverTotalRemaining(detail: DriverCashInCashOutDetail): number {
-  return (
-    (detail.summary?.vehicleBata?.remaining ?? 0) +
-    (detail.summary?.bulkAdvance?.remaining ?? 0)
-  );
+/** Still to collect from agency against net grand total (not bulk-entry balance after advances). */
+function agencyCollectRemaining(grandTotal: number, received: number): number {
+  return grandTotal - received;
 }
 
 function mongoIdTime(id?: string) {
@@ -183,9 +174,7 @@ function buildAgencyTxRows(detail: AgencyCashInCashOutDetail): TxRow[] {
         amount: Number(t.agencyProfit) || 0,
         direction: "Cash out" as const,
         method: "—",
-        notes: [tripLabel, route, "Agency profit"]
-          .filter(Boolean)
-          .join(" · "),
+        notes: [tripLabel, route, "Agency profit"].filter(Boolean).join(" · "),
         sortTime: sortTime(t.date, t._id),
       };
     });
@@ -477,7 +466,14 @@ export function TransactionHistoryPage() {
     );
     if (!exists) return;
     loadAgencyDetail(selectedAgencyId, detailMonth);
-  }, [tab, selectedAgencyId, detailMonth, listLoading, agencies, loadAgencyDetail]);
+  }, [
+    tab,
+    selectedAgencyId,
+    detailMonth,
+    listLoading,
+    agencies,
+    loadAgencyDetail,
+  ]);
 
   useEffect(() => {
     if (tab !== "drivers") return;
@@ -493,7 +489,14 @@ export function TransactionHistoryPage() {
     );
     if (!exists) return;
     loadDriverDetail(selectedDriverId, detailMonth);
-  }, [tab, selectedDriverId, detailMonth, listLoading, drivers, loadDriverDetail]);
+  }, [
+    tab,
+    selectedDriverId,
+    detailMonth,
+    listLoading,
+    drivers,
+    loadDriverDetail,
+  ]);
 
   const filteredAgencies = useMemo(() => {
     const q = listSearch.trim().toLowerCase();
@@ -522,7 +525,7 @@ export function TransactionHistoryPage() {
     const vehicleOut = Number(profit.fromTrips) || 0;
     const grandTotal = bulkTotal - vehicleOut;
     const received = Number(bulk.received) || 0;
-    const remaining = agencyTotalRemaining(agencyDetail);
+    const remaining = agencyCollectRemaining(grandTotal, received);
     return { grandTotal, received, remaining, bulkTotal, vehicleOut };
   }, [agencyDetail]);
 
@@ -533,10 +536,12 @@ export function TransactionHistoryPage() {
     if (!bata || !bulk) return null;
     const bulkTrips = Number(bulk.fromTrips) || 0;
     const vehicleTrips = Number(bata.fromTrips) || 0;
+    const grandTotal = bulkTrips + vehicleTrips;
+    const paid = (Number(bata.paid) || 0) + (Number(bulk.paid) || 0);
     return {
-      grandTotal: bulkTrips + vehicleTrips,
-      toPay: driverTotalRemaining(driverDetail),
-      paid: (Number(bata.paid) || 0) + (Number(bulk.paid) || 0),
+      grandTotal,
+      paid,
+      toPay: grandTotal - paid,
     };
   }, [driverDetail]);
 
@@ -762,9 +767,7 @@ export function TransactionHistoryPage() {
                 value={listSearch}
                 onChange={(e) => setListSearch(e.target.value)}
                 placeholder={
-                  tab === "agencies"
-                    ? "Search agencies…"
-                    : "Search drivers…"
+                  tab === "agencies" ? "Search agencies…" : "Search drivers…"
                 }
                 className="w-full border-0 bg-transparent py-2.5 text-sm outline-none placeholder:text-slate-400 dark:text-[#eef0ff] dark:placeholder:text-[#8d94b8]"
               />
@@ -856,7 +859,8 @@ export function TransactionHistoryPage() {
                 <div className="min-w-0">
                   <h2 className="truncate text-[22px] font-extrabold tracking-tight text-slate-900 dark:text-[#eef0ff]">
                     {selectedTitle}
-                    {selectedSubtitle && selectedSubtitle !== "Agency" &&
+                    {selectedSubtitle &&
+                    selectedSubtitle !== "Agency" &&
                     selectedSubtitle !== "Driver"
                       ? ` · ${selectedSubtitle}`
                       : ""}
@@ -905,7 +909,7 @@ export function TransactionHistoryPage() {
                       Remaining
                     </span>
                     <small className="text-xs text-slate-500 dark:text-[#8d94b8]">
-                      Net to collect (bulk remaining − vehicle remaining)
+                      Still to collect (grand total − received)
                     </small>
                     <b className="mt-2 block text-[28px] font-extrabold tracking-tight text-indigo-600 dark:text-[#a5b4fc]">
                       {fmtSignedCurrency(agencyCards.remaining)}
@@ -1133,7 +1137,9 @@ export function TransactionHistoryPage() {
                           <th className="px-[18px] py-2.5">Type</th>
                           <th className="px-[18px] py-2.5">Method</th>
                           <th className="px-[18px] py-2.5">Notes</th>
-                          <th className="px-[18px] py-2.5 text-right">Amount</th>
+                          <th className="px-[18px] py-2.5 text-right">
+                            Amount
+                          </th>
                         </tr>
                       </thead>
                       <tbody>

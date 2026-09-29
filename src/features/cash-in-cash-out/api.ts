@@ -242,9 +242,12 @@ export async function fetchCashInCashOutAgencyDetail(
 ): Promise<AgencyCashInCashOutDetail> {
   const params: Record<string, string> = {};
   if (month) params.month = month;
-  const res = await apiClient.get(ApiEndpoints.cashInCashOutAgencyDetail(agencyId), {
-    params,
-  });
+  const res = await apiClient.get(
+    ApiEndpoints.cashInCashOutAgencyDetail(agencyId),
+    {
+      params,
+    },
+  );
   const raw: any = res.data ?? {};
   return (raw.data ?? raw) as AgencyCashInCashOutDetail;
 }
@@ -255,9 +258,12 @@ export async function fetchCashInCashOutDriverDetail(
 ): Promise<DriverCashInCashOutDetail> {
   const params: Record<string, string> = {};
   if (month) params.month = month;
-  const res = await apiClient.get(ApiEndpoints.cashInCashOutDriverDetail(driverId), {
-    params,
-  });
+  const res = await apiClient.get(
+    ApiEndpoints.cashInCashOutDriverDetail(driverId),
+    {
+      params,
+    },
+  );
   const raw: any = res.data ?? {};
   return (raw.data ?? raw) as DriverCashInCashOutDetail;
 }

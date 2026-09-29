@@ -17,9 +17,21 @@ import {
   type AgencyCashInCashOutDetail,
   type DriverCashInCashOutDetail,
 } from "../api";
-import { fetchAgencies, addAgencyPayoutPayment, addDriverPayoutPayment, type Agency } from "../../bulk-entry/api";
-import { formatAgencyLabel, resolveAgencyLabelFromName } from "../../../lib/agencyDisplay";
-import { fetchDrivers, createSalaryTransaction, type Driver } from "../../drivers/api";
+import {
+  fetchAgencies,
+  addAgencyPayoutPayment,
+  addDriverPayoutPayment,
+  type Agency,
+} from "../../bulk-entry/api";
+import {
+  formatAgencyLabel,
+  resolveAgencyLabelFromName,
+} from "../../../lib/agencyDisplay";
+import {
+  fetchDrivers,
+  createSalaryTransaction,
+  type Driver,
+} from "../../drivers/api";
 import {
   loadCashInCashOutUi,
   saveCashInCashOutUi,
@@ -81,7 +93,9 @@ function verifyAgencyCashMath(detail: AgencyCashInCashOutDetail): string[] {
     detail.tables.bulkTripsCashIn.map((r) => r.grandTotal),
   );
   const bulkAdvancesTable = sumMoney(
-    detail.tables.bulkTripsCashIn.map((r) => Number((r as any).advancePaid) || 0),
+    detail.tables.bulkTripsCashIn.map(
+      (r) => Number((r as any).advancePaid) || 0,
+    ),
   );
   const vehicleTable = sumMoney(
     detail.tables.vehicleTripsAgencyProfit.map((r) => r.agencyProfit),
@@ -127,7 +141,9 @@ function verifyAgencyCashMath(detail: AgencyCashInCashOutDetail): string[] {
     detail.summary.cashOutAgencyProfit.totalOwed,
     -detail.summary.cashOutAgencyProfit.paid,
   ]);
-  if (!moneyEq(vehicleRemainingCalc, detail.summary.cashOutAgencyProfit.remaining)) {
+  if (
+    !moneyEq(vehicleRemainingCalc, detail.summary.cashOutAgencyProfit.remaining)
+  ) {
     issues.push("Vehicle remaining ≠ total owed − paid.");
   }
   const netCard = agencyTotalRemaining(detail);
@@ -136,7 +152,9 @@ function verifyAgencyCashMath(detail: AgencyCashInCashOutDetail): string[] {
     -detail.summary.cashOutAgencyProfit.remaining,
   ]);
   if (!moneyEq(netCard, netCalc)) {
-    issues.push("Net remaining card does not match bulk remaining − vehicle remaining.");
+    issues.push(
+      "Net remaining card does not match bulk remaining − vehicle remaining.",
+    );
   }
   return issues;
 }
@@ -217,8 +235,7 @@ function agencyTotalRemaining(detail: AgencyCashInCashOutDetail): number {
 /** Trip bata + bulk advance still owed to the driver (cash out). */
 function driverTotalRemaining(detail: DriverCashInCashOutDetail): number {
   return (
-    detail.summary.vehicleBata.remaining +
-    detail.summary.bulkAdvance.remaining
+    detail.summary.vehicleBata.remaining + detail.summary.bulkAdvance.remaining
   );
 }
 
@@ -395,7 +412,9 @@ function DetailMonthFilter({
         ))}
       </select>
       {monthLabel && month !== "all_time" && (
-        <span className="text-[11px] text-slate-500 sm:text-xs">{monthLabel}</span>
+        <span className="text-[11px] text-slate-500 sm:text-xs">
+          {monthLabel}
+        </span>
       )}
     </div>
   );
@@ -455,8 +474,9 @@ type AgencyUnifiedCashRow = {
 function buildAgencyUnifiedTrips(
   detail: AgencyCashInCashOutDetail,
 ): AgencyUnifiedTripRow[] {
-  const bulk: Array<AgencyUnifiedTripRow & { sortDate: number; sortId: string }> =
-    detail.tables.bulkTripsCashIn.map((r) => ({
+  const bulk: Array<
+    AgencyUnifiedTripRow & { sortDate: number; sortId: string }
+  > = detail.tables.bulkTripsCashIn.map((r) => ({
     id: `bulk-${r._id}`,
     source: "Bulk" as const,
     date: r.date,
@@ -469,8 +489,9 @@ function buildAgencyUnifiedTrips(
     sortDate: cashInCashOutSortTime(r.date, r._id),
     sortId: r._id,
   }));
-  const vehicle: Array<AgencyUnifiedTripRow & { sortDate: number; sortId: string }> =
-    detail.tables.vehicleTripsAgencyProfit.map((r) => ({
+  const vehicle: Array<
+    AgencyUnifiedTripRow & { sortDate: number; sortId: string }
+  > = detail.tables.vehicleTripsAgencyProfit.map((r) => ({
     id: `vehicle-${r._id}`,
     source: "Vehicle" as const,
     date: r.date,
@@ -564,8 +585,9 @@ function buildDriverUnifiedTrips(
   detail: DriverCashInCashOutDetail,
   resolveAgencyLabel?: (agencyName?: string) => string,
 ): DriverUnifiedTripRow[] {
-  const vehicle: Array<DriverUnifiedTripRow & { sortDate: number; sortId: string }> =
-    detail.tables.vehicleTrips.map((r) => ({
+  const vehicle: Array<
+    DriverUnifiedTripRow & { sortDate: number; sortId: string }
+  > = detail.tables.vehicleTrips.map((r) => ({
     id: `vehicle-${r._id}`,
     source: "Vehicle" as const,
     date: r.date,
@@ -577,8 +599,9 @@ function buildDriverUnifiedTrips(
     sortDate: cashInCashOutSortTime(r.date, r._id),
     sortId: r._id,
   }));
-  const bulk: Array<DriverUnifiedTripRow & { sortDate: number; sortId: string }> =
-    detail.tables.bulkTripsAdvance.map((r) => ({
+  const bulk: Array<
+    DriverUnifiedTripRow & { sortDate: number; sortId: string }
+  > = detail.tables.bulkTripsAdvance.map((r) => ({
     id: `bulk-${r._id}`,
     source: "Bulk" as const,
     date: r.date,
@@ -748,16 +771,24 @@ function TableShell({
   return (
     <div className="mb-3 overflow-hidden rounded-xl border border-slate-200 bg-white sm:mb-4">
       <div className="border-b border-slate-100 bg-slate-50 px-3 py-2.5 sm:px-4 sm:py-2">
-        <h4 className="text-xs font-semibold text-slate-800 sm:text-sm">{title}</h4>
+        <h4 className="text-xs font-semibold text-slate-800 sm:text-sm">
+          {title}
+        </h4>
       </div>
       <div className="overflow-x-auto overscroll-x-contain [-webkit-overflow-scrolling:touch]">
-      {children}
+        {children}
       </div>
     </div>
   );
 }
 
-function EmptyTableRow({ colSpan, message }: { colSpan: number; message: string }) {
+function EmptyTableRow({
+  colSpan,
+  message,
+}: {
+  colSpan: number;
+  message: string;
+}) {
   return (
     <tr>
       <td
@@ -839,15 +870,17 @@ export function CashInCashOutPage() {
     savedUi.driverDetailTab,
   );
 
-  const [agencyDetail, setAgencyDetail] = useState<AgencyCashInCashOutDetail | null>(null);
-  const [driverDetail, setDriverDetail] = useState<DriverCashInCashOutDetail | null>(null);
+  const [agencyDetail, setAgencyDetail] =
+    useState<AgencyCashInCashOutDetail | null>(null);
+  const [driverDetail, setDriverDetail] =
+    useState<DriverCashInCashOutDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState<string | null>(null);
   const [detailMonth, setDetailMonth] = useState(savedUi.detailMonth);
 
-  const [modal, setModal] = useState<"agencyMarkPayment" | "driverMarkPayment" | null>(
-    null,
-  );
+  const [modal, setModal] = useState<
+    "agencyMarkPayment" | "driverMarkPayment" | null
+  >(null);
   const [agencyPaymentKind, setAgencyPaymentKind] = useState<
     "cash_in" | "cash_out"
   >("cash_in");
@@ -855,7 +888,9 @@ export function CashInCashOutPage() {
     "cash_out" | "advance"
   >("cash_out");
   const [payAmount, setPayAmount] = useState("");
-  const [payDate, setPayDate] = useState(() => new Date().toISOString().split("T")[0]);
+  const [payDate, setPayDate] = useState(
+    () => new Date().toISOString().split("T")[0],
+  );
   const [payMethod, setPayMethod] = useState<string>("cash");
   const [payNotes, setPayNotes] = useState("");
   const [paySaving, setPaySaving] = useState(false);
@@ -912,46 +947,50 @@ export function CashInCashOutPage() {
 
   useEffect(() => {
     if (listLoading || tab !== "agencies" || !selectedAgencyId) return;
-    const exists = agencies.some((a) => (a._id ?? a.id ?? "") === selectedAgencyId);
+    const exists = agencies.some(
+      (a) => (a._id ?? a.id ?? "") === selectedAgencyId,
+    );
     if (!exists) setSelectedAgencyId(null);
   }, [agencies, listLoading, tab, selectedAgencyId]);
 
   useEffect(() => {
     if (listLoading || tab !== "drivers" || !selectedDriverId) return;
-    const exists = drivers.some((d) => (d._id ?? d.id ?? "") === selectedDriverId);
+    const exists = drivers.some(
+      (d) => (d._id ?? d.id ?? "") === selectedDriverId,
+    );
     if (!exists) setSelectedDriverId(null);
   }, [drivers, listLoading, tab, selectedDriverId]);
 
   const loadAgencyDetail = useCallback(
     async (agencyId: string, month: string) => {
-    setDetailLoading(true);
-    setDetailError(null);
-    try {
+      setDetailLoading(true);
+      setDetailError(null);
+      try {
         const d = await fetchCashInCashOutAgencyDetail(agencyId, month);
-      setAgencyDetail(d);
-    } catch {
-      setAgencyDetail(null);
-      setDetailError("Could not load agency details.");
-    } finally {
-      setDetailLoading(false);
-    }
+        setAgencyDetail(d);
+      } catch {
+        setAgencyDetail(null);
+        setDetailError("Could not load agency details.");
+      } finally {
+        setDetailLoading(false);
+      }
     },
     [],
   );
 
   const loadDriverDetail = useCallback(
     async (driverId: string, month: string) => {
-    setDetailLoading(true);
-    setDetailError(null);
-    try {
+      setDetailLoading(true);
+      setDetailError(null);
+      try {
         const d = await fetchCashInCashOutDriverDetail(driverId, month);
-      setDriverDetail(d);
-    } catch {
-      setDriverDetail(null);
-      setDetailError("Could not load driver details.");
-    } finally {
-      setDetailLoading(false);
-    }
+        setDriverDetail(d);
+      } catch {
+        setDriverDetail(null);
+        setDetailError("Could not load driver details.");
+      } finally {
+        setDetailLoading(false);
+      }
     },
     [],
   );
@@ -1197,7 +1236,10 @@ export function CashInCashOutPage() {
       }
 
       if (left > 0 && bulkRemaining > 0) {
-        const agencyId = pickAgencyIdForDriverBulkPayout(driverDetail, agencies);
+        const agencyId = pickAgencyIdForDriverBulkPayout(
+          driverDetail,
+          agencies,
+        );
         if (!agencyId) {
           setPayMessage(
             "Could not record bulk advance: no agency available. Link a bulk trip to an agency first.",
@@ -1206,12 +1248,12 @@ export function CashInCashOutPage() {
         }
         const pay = Math.min(left, bulkRemaining);
         await addDriverPayoutPayment(agencyId, {
-        driverName: driverDetail.driver.displayName,
+          driverName: driverDetail.driver.displayName,
           amount: pay,
-        paymentDate: payDate,
-        paymentMethod: payMethod,
-        notes: payNotes,
-      });
+          paymentDate: payDate,
+          paymentMethod: payMethod,
+          notes: payNotes,
+        });
         left -= pay;
       }
 
@@ -1281,18 +1323,25 @@ export function CashInCashOutPage() {
               type="search"
               value={listSearch}
               onChange={(e) => setListSearch(e.target.value)}
-              placeholder={tab === "agencies" ? "Search agencies…" : "Search drivers…"}
+              placeholder={
+                tab === "agencies" ? "Search agencies…" : "Search drivers…"
+              }
               className="w-full rounded-lg border border-slate-200 bg-slate-50 py-2.5 pl-8 pr-3 text-sm text-slate-800 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 sm:rounded-md sm:py-1.5 sm:pl-7 sm:pr-2 sm:text-xs"
             />
           </div>
           <div className="flex-1 space-y-2 overflow-y-auto p-2 sm:space-y-1.5">
             {listLoading ? (
               Array.from({ length: 6 }).map((_, i) => (
-                <div key={i} className="h-20 animate-pulse rounded-xl bg-slate-100" />
+                <div
+                  key={i}
+                  className="h-20 animate-pulse rounded-xl bg-slate-100"
+                />
               ))
             ) : tab === "agencies" ? (
               filteredAgencies.length === 0 ? (
-                <p className="p-4 text-center text-xs text-slate-400">No agencies</p>
+                <p className="p-4 text-center text-xs text-slate-400">
+                  No agencies
+                </p>
               ) : (
                 filteredAgencies.map((a) => {
                   const id = a._id ?? a.id ?? "";
@@ -1321,7 +1370,7 @@ export function CashInCashOutPage() {
                               {a.phone}
                             </p>
                           ) : (
-                          <p className="text-xs text-slate-400">Agency</p>
+                            <p className="text-xs text-slate-400">Agency</p>
                           )}
                         </div>
                       </div>
@@ -1330,7 +1379,9 @@ export function CashInCashOutPage() {
                 })
               )
             ) : filteredDrivers.length === 0 ? (
-              <p className="p-4 text-center text-xs text-slate-400">No drivers</p>
+              <p className="p-4 text-center text-xs text-slate-400">
+                No drivers
+              </p>
             ) : (
               filteredDrivers.map((d) => {
                 const id = d._id;
@@ -1355,7 +1406,9 @@ export function CashInCashOutPage() {
                           {driverListName(d)}
                         </p>
                         {d.phone ? (
-                          <p className="truncate text-xs text-slate-400">{d.phone}</p>
+                          <p className="truncate text-xs text-slate-400">
+                            {d.phone}
+                          </p>
                         ) : (
                           <p className="text-xs text-slate-400">Driver</p>
                         )}
@@ -1388,17 +1441,17 @@ export function CashInCashOutPage() {
                   <h2 className="min-w-0 truncate text-base font-bold text-slate-900 sm:text-lg">
                     {selectedAgencyMeta
                       ? formatAgencyLabel(selectedAgencyMeta)
-                      : agencyDetail?.agency.name ?? "…"}
-                    </h2>
+                      : (agencyDetail?.agency.name ?? "…")}
+                  </h2>
                   <div className="ml-auto flex shrink-0">
-                  <button
-                    type="button"
+                    <button
+                      type="button"
                       onClick={openAgencyMarkPaymentModal}
                       disabled={!agencyDetail || detailLoading}
                       className="touch-manipulation rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50 sm:px-4 sm:py-2 sm:text-sm"
                     >
                       Mark Payment
-                  </button>
+                    </button>
                   </div>
                 </div>
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
@@ -1449,123 +1502,162 @@ export function CashInCashOutPage() {
 
                     {agencyDetailTab === "trips" && (
                       <TableShell title="Trips (bulk & vehicle)">
-                      <div>
-                        <table className="min-w-[36rem] w-full text-left text-xs sm:min-w-full">
-                          <thead>
-                            <tr className="border-b border-slate-100 text-slate-500">
-                              <th className="px-3 py-2 font-medium">Source</th>
-                              <th className="px-3 py-2 font-medium">Date</th>
-                              <th className="px-3 py-2 font-medium">Trip / vehicle</th>
-                              <th className="px-3 py-2 font-medium">Details</th>
-                              <th className="px-3 py-2 text-right font-medium">Cash in</th>
-                              <th className="px-3 py-2 text-right font-medium">Cash out</th>
-                              <th className="px-3 py-2 text-right font-medium">Advance</th>
-                              <th className="px-3 py-2 font-medium">Status</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {agencyUnifiedTrips.length === 0 ? (
-                              <EmptyTableRow colSpan={8} message="No trips." />
-                            ) : (
-                              agencyUnifiedTrips.map((r) => (
-                                <tr
-                                  key={r.id}
-                                  className="border-b border-slate-50 text-slate-800"
-                                >
-                                  <td className="whitespace-nowrap px-3 py-2">
-                                    <span
-                                      className={`inline-block rounded-md px-1.5 py-0.5 text-[10px] font-semibold ${sourceBadgeCls(r.source)}`}
-                                    >
-                                      {r.source}
-                                    </span>
-                                  </td>
-                                  <td className="whitespace-nowrap px-3 py-2">
-                                    {formatDate(r.date)}
-                                  </td>
-                                  <td className="whitespace-nowrap px-3 py-2 font-medium">
-                                    {r.reference}
-                                  </td>
-                                  <td className="max-w-[140px] truncate px-3 py-2">
-                                    {r.details}
-                                  </td>
-                                  <td className="px-3 py-2 text-right tabular-nums text-emerald-700">
-                                    {r.cashIn != null ? fmtCurrency(r.cashIn) : "—"}
-                                  </td>
-                                  <td className="px-3 py-2 text-right tabular-nums text-amber-700">
-                                    {r.cashOut != null ? fmtCurrency(r.cashOut) : "—"}
-                                  </td>
-                                  <td className="px-3 py-2 text-right tabular-nums text-slate-500">
-                                    {r.advance != null ? fmtCurrency(r.advance) : "—"}
-                                  </td>
-                                  <td className="px-3 py-2 capitalize text-slate-500">
-                                    {r.status}
-                                  </td>
-                                </tr>
-                              ))
-                            )}
-                          </tbody>
-                        </table>
-                      </div>
-                    </TableShell>
+                        <div>
+                          <table className="min-w-[36rem] w-full text-left text-xs sm:min-w-full">
+                            <thead>
+                              <tr className="border-b border-slate-100 text-slate-500">
+                                <th className="px-3 py-2 font-medium">
+                                  Source
+                                </th>
+                                <th className="px-3 py-2 font-medium">Date</th>
+                                <th className="px-3 py-2 font-medium">
+                                  Trip / vehicle
+                                </th>
+                                <th className="px-3 py-2 font-medium">
+                                  Details
+                                </th>
+                                <th className="px-3 py-2 text-right font-medium">
+                                  Cash in
+                                </th>
+                                <th className="px-3 py-2 text-right font-medium">
+                                  Cash out
+                                </th>
+                                <th className="px-3 py-2 text-right font-medium">
+                                  Advance
+                                </th>
+                                <th className="px-3 py-2 font-medium">
+                                  Status
+                                </th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {agencyUnifiedTrips.length === 0 ? (
+                                <EmptyTableRow
+                                  colSpan={8}
+                                  message="No trips."
+                                />
+                              ) : (
+                                agencyUnifiedTrips.map((r) => (
+                                  <tr
+                                    key={r.id}
+                                    className="border-b border-slate-50 text-slate-800"
+                                  >
+                                    <td className="whitespace-nowrap px-3 py-2">
+                                      <span
+                                        className={`inline-block rounded-md px-1.5 py-0.5 text-[10px] font-semibold ${sourceBadgeCls(r.source)}`}
+                                      >
+                                        {r.source}
+                                      </span>
+                                    </td>
+                                    <td className="whitespace-nowrap px-3 py-2">
+                                      {formatDate(r.date)}
+                                    </td>
+                                    <td className="whitespace-nowrap px-3 py-2 font-medium">
+                                      {r.reference}
+                                    </td>
+                                    <td className="max-w-[140px] truncate px-3 py-2">
+                                      {r.details}
+                                    </td>
+                                    <td className="px-3 py-2 text-right tabular-nums text-emerald-700">
+                                      {r.cashIn != null
+                                        ? fmtCurrency(r.cashIn)
+                                        : "—"}
+                                    </td>
+                                    <td className="px-3 py-2 text-right tabular-nums text-amber-700">
+                                      {r.cashOut != null
+                                        ? fmtCurrency(r.cashOut)
+                                        : "—"}
+                                    </td>
+                                    <td className="px-3 py-2 text-right tabular-nums text-slate-500">
+                                      {r.advance != null
+                                        ? fmtCurrency(r.advance)
+                                        : "—"}
+                                    </td>
+                                    <td className="px-3 py-2 capitalize text-slate-500">
+                                      {r.status}
+                                    </td>
+                                  </tr>
+                                ))
+                              )}
+                            </tbody>
+                          </table>
+                        </div>
+                      </TableShell>
                     )}
 
                     {agencyDetailTab === "cashHistory" && (
                       <>
-                    <TableShell title="Cash history (bulk & vehicle)">
-                      <div>
-                        <table className="min-w-[36rem] w-full text-left text-xs sm:min-w-full">
-                          <thead>
-                            <tr className="border-b border-slate-100 text-slate-500">
-                              <th className="px-3 py-2 font-medium">Type</th>
-                              <th className="px-3 py-2 font-medium">Date</th>
-                              <th className="px-3 py-2 text-right font-medium">Amount</th>
-                              <th className="px-3 py-2 font-medium">Method</th>
-                              <th className="px-3 py-2 font-medium">Notes</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {agencyUnifiedCashHistory.length === 0 ? (
-                              <EmptyTableRow colSpan={5} message="No cash history yet." />
-                            ) : (
-                              agencyUnifiedCashHistory.map((r) => (
-                                <tr
-                                  key={r.id}
-                                  className="border-b border-slate-50 text-slate-800"
-                                >
-                                  <td className="whitespace-nowrap px-3 py-2">
-                                    <span
-                                      className={`inline-block rounded-md px-1.5 py-0.5 text-[10px] font-semibold ${directionBadgeCls(r.direction)}`}
-                                    >
-                                      {r.direction}
-                                    </span>
-                                  </td>
-                                  <td className="whitespace-nowrap px-3 py-2">
-                                    {formatDate(r.date)}
-                                  </td>
-                                  <td
-                                    className={`px-3 py-2 text-right font-medium tabular-nums ${cashAmountCls(r.direction)}`}
-                                  >
-                                    {fmtCurrency(r.amount)}
-                                  </td>
-                                  <td className="px-3 py-2">{r.method}</td>
-                                  <td className="max-w-[200px] truncate px-3 py-2 text-slate-500">
-                                    {r.notes || "—"}
-                                  </td>
+                        <TableShell title="Cash history (bulk & vehicle)">
+                          <div>
+                            <table className="min-w-[36rem] w-full text-left text-xs sm:min-w-full">
+                              <thead>
+                                <tr className="border-b border-slate-100 text-slate-500">
+                                  <th className="px-3 py-2 font-medium">
+                                    Type
+                                  </th>
+                                  <th className="px-3 py-2 font-medium">
+                                    Date
+                                  </th>
+                                  <th className="px-3 py-2 text-right font-medium">
+                                    Amount
+                                  </th>
+                                  <th className="px-3 py-2 font-medium">
+                                    Method
+                                  </th>
+                                  <th className="px-3 py-2 font-medium">
+                                    Notes
+                                  </th>
                                 </tr>
-                              ))
-                            )}
-                          </tbody>
-                        </table>
-                      </div>
-                    </TableShell>
+                              </thead>
+                              <tbody>
+                                {agencyUnifiedCashHistory.length === 0 ? (
+                                  <EmptyTableRow
+                                    colSpan={5}
+                                    message="No cash history yet."
+                                  />
+                                ) : (
+                                  agencyUnifiedCashHistory.map((r) => (
+                                    <tr
+                                      key={r.id}
+                                      className="border-b border-slate-50 text-slate-800"
+                                    >
+                                      <td className="whitespace-nowrap px-3 py-2">
+                                        <span
+                                          className={`inline-block rounded-md px-1.5 py-0.5 text-[10px] font-semibold ${directionBadgeCls(r.direction)}`}
+                                        >
+                                          {r.direction}
+                                        </span>
+                                      </td>
+                                      <td className="whitespace-nowrap px-3 py-2">
+                                        {formatDate(r.date)}
+                                      </td>
+                                      <td
+                                        className={`px-3 py-2 text-right font-medium tabular-nums ${cashAmountCls(r.direction)}`}
+                                      >
+                                        {fmtCurrency(r.amount)}
+                                      </td>
+                                      <td className="px-3 py-2">{r.method}</td>
+                                      <td className="max-w-[200px] truncate px-3 py-2 text-slate-500">
+                                        {r.notes || "—"}
+                                      </td>
+                                    </tr>
+                                  ))
+                                )}
+                              </tbody>
+                            </table>
+                          </div>
+                        </TableShell>
 
-                    <p className="px-1 text-center text-[11px] leading-relaxed text-slate-400 sm:px-0">
-                      Main-trip agency receipts:{" "}
-                      <Link to="/history/payout" className="text-blue-600 hover:underline">
-                        History → Agency payout
-                      </Link>
-                    </p>
-                  </>
+                        <p className="px-1 text-center text-[11px] leading-relaxed text-slate-400 sm:px-0">
+                          Main-trip agency receipts:{" "}
+                          <Link
+                            to="/history/payout"
+                            className="text-blue-600 hover:underline"
+                          >
+                            History → Agency payout
+                          </Link>
+                        </p>
+                      </>
                     )}
                   </div>
                 ) : null}
@@ -1585,17 +1677,17 @@ export function CashInCashOutPage() {
                     <ArrowLeft className="h-5 w-5" />
                   </button>
                   <h2 className="min-w-0 truncate text-base font-bold text-slate-900 sm:text-lg">
-                      {driverDetail?.driver.displayName ?? "…"}
-                    </h2>
+                    {driverDetail?.driver.displayName ?? "…"}
+                  </h2>
                   <div className="ml-auto flex shrink-0">
-                  <button
-                    type="button"
+                    <button
+                      type="button"
                       onClick={openDriverMarkPaymentModal}
                       disabled={!driverDetail || detailLoading}
                       className="touch-manipulation rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50 sm:px-4 sm:py-2 sm:text-sm"
                     >
                       Cash out
-                  </button>
+                    </button>
                   </div>
                 </div>
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
@@ -1649,124 +1741,160 @@ export function CashInCashOutPage() {
 
                     {driverDetailTab === "trips" && (
                       <TableShell title="Trips (bulk & vehicle)">
-                      <div>
-                        <table className="min-w-[36rem] w-full text-left text-xs sm:min-w-full">
-                          <thead>
-                            <tr className="border-b border-slate-100 text-slate-500">
-                              <th className="px-3 py-2 font-medium">Source</th>
-                              <th className="px-3 py-2 font-medium">Date</th>
-                              <th className="px-3 py-2 font-medium">Trip / vehicle</th>
-                              <th className="px-3 py-2 font-medium">Details</th>
-                              <th className="px-3 py-2 text-right font-medium">Cash out</th>
-                              <th className="px-3 py-2 text-right font-medium">Grand total</th>
-                              <th className="px-3 py-2 font-medium">Status</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {driverUnifiedTrips.length === 0 ? (
-                              <EmptyTableRow colSpan={7} message="No trips." />
-                            ) : (
-                              driverUnifiedTrips.map((r) => (
-                                <tr
-                                  key={r.id}
-                                  className="border-b border-slate-50 text-slate-800"
-                                >
-                                  <td className="whitespace-nowrap px-3 py-2">
-                                    <span
-                                      className={`inline-block rounded-md px-1.5 py-0.5 text-[10px] font-semibold ${sourceBadgeCls(r.source)}`}
-                                    >
-                                      {r.source}
-                                    </span>
-                                  </td>
-                                  <td className="whitespace-nowrap px-3 py-2">
-                                    {formatDate(r.date)}
-                                  </td>
-                                  <td className="whitespace-nowrap px-3 py-2 font-medium">
-                                    {r.reference}
-                                  </td>
-                                  <td className="max-w-[140px] truncate px-3 py-2">
-                                    {r.details}
-                                  </td>
-                                  <td className="px-3 py-2 text-right tabular-nums text-amber-700">
-                                    {fmtCurrency(r.cashOut)}
-                                  </td>
-                                  <td className="px-3 py-2 text-right tabular-nums text-slate-500">
-                                    {r.grandTotal != null ? fmtCurrency(r.grandTotal) : "—"}
-                                  </td>
-                                  <td className="px-3 py-2 capitalize text-slate-500">
-                                    {r.status}
-                                  </td>
-                                </tr>
-                              ))
-                            )}
-                          </tbody>
-                        </table>
-                      </div>
-                    </TableShell>
+                        <div>
+                          <table className="min-w-[36rem] w-full text-left text-xs sm:min-w-full">
+                            <thead>
+                              <tr className="border-b border-slate-100 text-slate-500">
+                                <th className="px-3 py-2 font-medium">
+                                  Source
+                                </th>
+                                <th className="px-3 py-2 font-medium">Date</th>
+                                <th className="px-3 py-2 font-medium">
+                                  Trip / vehicle
+                                </th>
+                                <th className="px-3 py-2 font-medium">
+                                  Details
+                                </th>
+                                <th className="px-3 py-2 text-right font-medium">
+                                  Cash out
+                                </th>
+                                <th className="px-3 py-2 text-right font-medium">
+                                  Grand total
+                                </th>
+                                <th className="px-3 py-2 font-medium">
+                                  Status
+                                </th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {driverUnifiedTrips.length === 0 ? (
+                                <EmptyTableRow
+                                  colSpan={7}
+                                  message="No trips."
+                                />
+                              ) : (
+                                driverUnifiedTrips.map((r) => (
+                                  <tr
+                                    key={r.id}
+                                    className="border-b border-slate-50 text-slate-800"
+                                  >
+                                    <td className="whitespace-nowrap px-3 py-2">
+                                      <span
+                                        className={`inline-block rounded-md px-1.5 py-0.5 text-[10px] font-semibold ${sourceBadgeCls(r.source)}`}
+                                      >
+                                        {r.source}
+                                      </span>
+                                    </td>
+                                    <td className="whitespace-nowrap px-3 py-2">
+                                      {formatDate(r.date)}
+                                    </td>
+                                    <td className="whitespace-nowrap px-3 py-2 font-medium">
+                                      {r.reference}
+                                    </td>
+                                    <td className="max-w-[140px] truncate px-3 py-2">
+                                      {r.details}
+                                    </td>
+                                    <td className="px-3 py-2 text-right tabular-nums text-amber-700">
+                                      {fmtCurrency(r.cashOut)}
+                                    </td>
+                                    <td className="px-3 py-2 text-right tabular-nums text-slate-500">
+                                      {r.grandTotal != null
+                                        ? fmtCurrency(r.grandTotal)
+                                        : "—"}
+                                    </td>
+                                    <td className="px-3 py-2 capitalize text-slate-500">
+                                      {r.status}
+                                    </td>
+                                  </tr>
+                                ))
+                              )}
+                            </tbody>
+                          </table>
+                        </div>
+                      </TableShell>
                     )}
 
                     {driverDetailTab === "cashHistory" && (
                       <>
-                    <TableShell title="Cash history (bulk & vehicle)">
-                      <div>
-                        <table className="min-w-[36rem] w-full text-left text-xs sm:min-w-full">
-                          <thead>
-                            <tr className="border-b border-slate-100 text-slate-500">
-                              <th className="px-3 py-2 font-medium">Type</th>
-                              <th className="px-3 py-2 font-medium">Date</th>
-                              <th className="px-3 py-2 text-right font-medium">Amount</th>
-                              <th className="px-3 py-2 font-medium">Method</th>
-                              <th className="px-3 py-2 font-medium">Notes</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {driverUnifiedCashHistory.length === 0 ? (
-                              <EmptyTableRow colSpan={5} message="No cash history yet." />
-                            ) : (
-                              driverUnifiedCashHistory.map((r) => (
-                                <tr
-                                  key={r.id}
-                                  className="border-b border-slate-50 text-slate-800"
-                                >
-                                  <td className="whitespace-nowrap px-3 py-2">
-                                    <span
-                                      className={`inline-block rounded-md px-1.5 py-0.5 text-[10px] font-semibold ${driverCashKindBadgeCls(r.kind)}`}
-                                    >
-                                      {r.kind}
-                                    </span>
-                                  </td>
-                                  <td className="whitespace-nowrap px-3 py-2">
-                                    {formatDate(r.date)}
-                                  </td>
-                                  <td
-                                    className={`px-3 py-2 text-right font-medium tabular-nums ${cashAmountCls(r.direction)}`}
-                                  >
-                                    {fmtCurrency(r.amount)}
-                                  </td>
-                                  <td className="px-3 py-2">{r.method}</td>
-                                  <td className="max-w-[200px] truncate px-3 py-2 text-slate-500">
-                                    {r.notes || "—"}
-                                  </td>
+                        <TableShell title="Cash history (bulk & vehicle)">
+                          <div>
+                            <table className="min-w-[36rem] w-full text-left text-xs sm:min-w-full">
+                              <thead>
+                                <tr className="border-b border-slate-100 text-slate-500">
+                                  <th className="px-3 py-2 font-medium">
+                                    Type
+                                  </th>
+                                  <th className="px-3 py-2 font-medium">
+                                    Date
+                                  </th>
+                                  <th className="px-3 py-2 text-right font-medium">
+                                    Amount
+                                  </th>
+                                  <th className="px-3 py-2 font-medium">
+                                    Method
+                                  </th>
+                                  <th className="px-3 py-2 font-medium">
+                                    Notes
+                                  </th>
                                 </tr>
-                              ))
-                            )}
-                          </tbody>
-                        </table>
-                      </div>
-                    </TableShell>
+                              </thead>
+                              <tbody>
+                                {driverUnifiedCashHistory.length === 0 ? (
+                                  <EmptyTableRow
+                                    colSpan={5}
+                                    message="No cash history yet."
+                                  />
+                                ) : (
+                                  driverUnifiedCashHistory.map((r) => (
+                                    <tr
+                                      key={r.id}
+                                      className="border-b border-slate-50 text-slate-800"
+                                    >
+                                      <td className="whitespace-nowrap px-3 py-2">
+                                        <span
+                                          className={`inline-block rounded-md px-1.5 py-0.5 text-[10px] font-semibold ${driverCashKindBadgeCls(r.kind)}`}
+                                        >
+                                          {r.kind}
+                                        </span>
+                                      </td>
+                                      <td className="whitespace-nowrap px-3 py-2">
+                                        {formatDate(r.date)}
+                                      </td>
+                                      <td
+                                        className={`px-3 py-2 text-right font-medium tabular-nums ${cashAmountCls(r.direction)}`}
+                                      >
+                                        {fmtCurrency(r.amount)}
+                                      </td>
+                                      <td className="px-3 py-2">{r.method}</td>
+                                      <td className="max-w-[200px] truncate px-3 py-2 text-slate-500">
+                                        {r.notes || "—"}
+                                      </td>
+                                    </tr>
+                                  ))
+                                )}
+                              </tbody>
+                            </table>
+                          </div>
+                        </TableShell>
 
-                    <p className="px-1 text-center text-[11px] leading-relaxed text-slate-400 sm:px-0">
-                      You can also manage salary from{" "}
-                      <Link to="/drivers" className="text-blue-600 hover:underline">
-                        Drivers
-                      </Link>{" "}
-                      and bulk payouts from{" "}
-                      <Link to="/bulk-entry" className="text-blue-600 hover:underline">
-                        Bulk Entry
-                      </Link>
-                      .
-                    </p>
-                  </>
+                        <p className="px-1 text-center text-[11px] leading-relaxed text-slate-400 sm:px-0">
+                          You can also manage salary from{" "}
+                          <Link
+                            to="/drivers"
+                            className="text-blue-600 hover:underline"
+                          >
+                            Drivers
+                          </Link>{" "}
+                          and bulk payouts from{" "}
+                          <Link
+                            to="/bulk-entry"
+                            className="text-blue-600 hover:underline"
+                          >
+                            Bulk Entry
+                          </Link>
+                          .
+                        </p>
+                      </>
                     )}
                   </div>
                 ) : null}
@@ -1785,7 +1913,8 @@ export function CashInCashOutPage() {
                 {tab === "agencies" ? "Select an agency" : "Select a driver"}
               </p>
               <p className="mt-1 max-w-xs text-xs text-slate-400">
-                Choose an item from the list to see amounts in tables and record cash in or cash out.
+                Choose an item from the list to see amounts in tables and record
+                cash in or cash out.
               </p>
             </div>
           )}
@@ -1800,8 +1929,8 @@ export function CashInCashOutPage() {
           <fieldset className="block">
             <legend className="text-xs font-medium text-slate-600">Type</legend>
             <div className="mt-1.5 grid grid-cols-2 gap-1 rounded-xl border border-slate-200 bg-slate-50 p-1">
-            <button
-              type="button"
+              <button
+                type="button"
                 onClick={() => setAgencyPaymentKind("cash_in")}
                 className={`min-h-[40px] rounded-lg px-2 py-2 text-xs font-semibold sm:text-sm ${
                   agencyPaymentKind === "cash_in"
@@ -1810,9 +1939,9 @@ export function CashInCashOutPage() {
                 }`}
               >
                 Cash in
-            </button>
-            <button
-              type="button"
+              </button>
+              <button
+                type="button"
                 onClick={() => setAgencyPaymentKind("cash_out")}
                 className={`min-h-[40px] rounded-lg px-2 py-2 text-xs font-semibold sm:text-sm ${
                   agencyPaymentKind === "cash_out"
@@ -1821,8 +1950,8 @@ export function CashInCashOutPage() {
                 }`}
               >
                 Cash out
-            </button>
-          </div>
+              </button>
+            </div>
           </fieldset>
           <label className="mt-3 block text-xs font-medium text-slate-600">
             Amount (₹)
@@ -1865,7 +1994,9 @@ export function CashInCashOutPage() {
               onChange={(e) => setPayNotes(e.target.value)}
             />
           </label>
-          {payMessage && <p className="mt-2 text-xs text-red-600">{payMessage}</p>}
+          {payMessage && (
+            <p className="mt-2 text-xs text-red-600">{payMessage}</p>
+          )}
           <div className="mt-4 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
             <button
               type="button"
@@ -1880,7 +2011,11 @@ export function CashInCashOutPage() {
               onClick={submitAgencyMarkPayment}
               className="inline-flex min-h-[44px] w-full items-center justify-center rounded-lg bg-blue-600 px-3 py-2.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50 sm:min-h-0 sm:w-auto sm:py-2"
             >
-              {paySaving ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save"}
+              {paySaving ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                "Save"
+              )}
             </button>
           </div>
         </Modal>
@@ -1916,8 +2051,8 @@ export function CashInCashOutPage() {
           <fieldset className="block">
             <legend className="text-xs font-medium text-slate-600">Type</legend>
             <div className="mt-1.5 grid grid-cols-2 gap-1 rounded-xl border border-slate-200 bg-slate-50 p-1">
-            <button
-              type="button"
+              <button
+                type="button"
                 onClick={() => setDriverPaymentKind("cash_out")}
                 className={`min-h-[40px] rounded-lg px-2 py-2 text-xs font-semibold sm:text-sm ${
                   driverPaymentKind === "cash_out"
@@ -1926,9 +2061,9 @@ export function CashInCashOutPage() {
                 }`}
               >
                 Cash out
-            </button>
-            <button
-              type="button"
+              </button>
+              <button
+                type="button"
                 onClick={() => setDriverPaymentKind("advance")}
                 className={`min-h-[40px] rounded-lg px-2 py-2 text-xs font-semibold sm:text-sm ${
                   driverPaymentKind === "advance"
@@ -1937,8 +2072,8 @@ export function CashInCashOutPage() {
                 }`}
               >
                 Advance
-            </button>
-          </div>
+              </button>
+            </div>
           </fieldset>
           <label className="mt-3 block text-xs font-medium text-slate-600">
             Amount (₹)
@@ -1960,20 +2095,20 @@ export function CashInCashOutPage() {
             />
           </label>
           {driverPaymentKind === "cash_out" && (
-          <label className="mt-3 block text-xs font-medium text-slate-600">
-            Method
-            <select
-              className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
-              value={payMethod}
-              onChange={(e) => setPayMethod(e.target.value)}
-            >
-              {PAYMENT_METHODS.map((m) => (
-                <option key={m} value={m}>
-                  {m}
-                </option>
-              ))}
-            </select>
-          </label>
+            <label className="mt-3 block text-xs font-medium text-slate-600">
+              Method
+              <select
+                className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                value={payMethod}
+                onChange={(e) => setPayMethod(e.target.value)}
+              >
+                {PAYMENT_METHODS.map((m) => (
+                  <option key={m} value={m}>
+                    {m}
+                  </option>
+                ))}
+              </select>
+            </label>
           )}
           <label className="mt-3 block text-xs font-medium text-slate-600">
             Notes
@@ -1988,7 +2123,9 @@ export function CashInCashOutPage() {
               }
             />
           </label>
-          {payMessage && <p className="mt-2 text-xs text-red-600">{payMessage}</p>}
+          {payMessage && (
+            <p className="mt-2 text-xs text-red-600">{payMessage}</p>
+          )}
           <div className="mt-4 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
             <button
               type="button"
@@ -2003,7 +2140,11 @@ export function CashInCashOutPage() {
               onClick={submitDriverMarkPayment}
               className="inline-flex min-h-[44px] w-full items-center justify-center rounded-lg bg-blue-600 px-3 py-2.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50 sm:min-h-0 sm:w-auto sm:py-2"
             >
-              {paySaving ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save"}
+              {paySaving ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                "Save"
+              )}
             </button>
           </div>
         </Modal>

@@ -72,6 +72,12 @@ export interface BulkTripRow {
 }
 
 export interface DriverGroup {
+  /**
+   * Stable UI identity for this driver/vehicle card.
+   * Never reuse across cards — used for React keys and delete scoping
+   * so two cards never share identity even with the same driver/vehicle.
+   */
+  clientGroupId?: string;
   driverName: string;
   /** Set when picked from drivers list or after create — links bulk trips to Driver doc. */
   driverId?: string;

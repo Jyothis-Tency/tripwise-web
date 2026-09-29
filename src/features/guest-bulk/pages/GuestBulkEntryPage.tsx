@@ -80,11 +80,41 @@ function emptyRow(): BulkTripRow {
 
 function emptyVehicleGroup(): DriverGroup {
   return {
+    clientGroupId: `g_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
     driverName: "",
     driverPhone: "",
     vehicleNumber: "",
     rows: [emptyRow()],
+    groupCreatedAt: new Date().toISOString(),
   };
+}
+
+function ensureGroupIds(groups: DriverGroup[] | undefined): DriverGroup[] {
+  const list = Array.isArray(groups) ? groups : [];
+  if (list.length === 0) return [emptyVehicleGroup()];
+  return list.map((g) => ({
+    ...g,
+    clientGroupId:
+      String(g.clientGroupId || "").trim() ||
+      `g_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+    rows:
+      Array.isArray(g.rows) && g.rows.length > 0
+        ? g.rows.map((r) => ({
+            ...emptyRow(),
+            ...r,
+            clientRowId: String(r.clientRowId || "").trim() || nextRowId(),
+          }))
+        : [emptyRow()],
+  }));
+}
+
+function normalizeGuestBlocks(blocks: GuestAgencyBlock[]): GuestAgencyBlock[] {
+  if (!blocks?.length) return [emptyBlock()];
+  return blocks.map((b) => ({
+    ...b,
+    clientId: b.clientId || newBlockClientId(),
+    driverGroups: ensureGroupIds(b.driverGroups),
+  }));
 }
 
 function emptyBlock(): GuestAgencyBlock {
@@ -192,7 +222,7 @@ function VehicleGroupsEditor({
     <div className="space-y-3">
       {groups.map((g, gi) => (
         <div
-          key={gi}
+          key={g.clientGroupId || `guest-g-${gi}`}
           className="overflow-hidden rounded-xl border border-slate-200 bg-[var(--bg-card)] shadow-sm dark:border-[#1e2638]"
         >
           <div className="flex items-center gap-2 border-b border-slate-100 bg-indigo-50/50 px-3 py-2.5 dark:border-[#1e2638] dark:bg-indigo-500/10 sm:px-4 sm:py-3">
@@ -217,7 +247,13 @@ function VehicleGroupsEditor({
               <button
                 type="button"
                 onClick={() =>
-                  onChange((prev) => prev.filter((_, i) => i !== gi))
+                  onChange((prev) => {
+                    const groupId = g.clientGroupId;
+                    const next = prev.filter((item, i) =>
+                      groupId ? item.clientGroupId !== groupId : i !== gi,
+                    );
+                    return next.length > 0 ? next : [emptyVehicleGroup()];
+                  })
                 }
                 className="shrink-0 rounded-lg p-2 text-rose-400 transition hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-500/10"
                 aria-label="Remove vehicle"
@@ -523,9 +559,9 @@ export function GuestBulkEntryPage() {
         setAgencies(data.agencies ?? []);
         setDriverName(data.driverName || "");
         setDriverPhone(data.driverPhone || "");
-        const loaded = data.draft?.blocks?.length
-          ? data.draft.blocks
-          : [emptyBlock()];
+        const loaded = normalizeGuestBlocks(
+          data.draft?.blocks?.length ? data.draft.blocks : [emptyBlock()],
+        );
         setBlocks(loaded);
         skipNextSync.current = true;
         lastBackendHash.current = quickHash(
@@ -611,7 +647,10 @@ export function GuestBulkEntryPage() {
         if (data.draft?.blocks) {
           setBlocks((prev) => {
             const serverMap = new Map(
-              data.draft!.blocks.map((b) => [b.clientId, b]),
+              normalizeGuestBlocks(data.draft!.blocks).map((b) => [
+                b.clientId,
+                b,
+              ]),
             );
             return prev.map((b) => {
               const s = serverMap.get(b.clientId);

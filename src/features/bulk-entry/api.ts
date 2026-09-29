@@ -10,7 +10,11 @@ import {
 } from "../../lib/agencyDisplay";
 
 export type { AgencyDisplayFields } from "../../lib/agencyDisplay";
-export { formatAgencyLabel, resolveAgencyLabelFromName, buildAgencyLabelLookup };
+export {
+  formatAgencyLabel,
+  resolveAgencyLabelFromName,
+  buildAgencyLabelLookup,
+};
 
 export interface Agency {
   _id?: string;

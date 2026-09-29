@@ -261,6 +261,16 @@ function inDateRange(date: string | null, from: string, to: string) {
   return true;
 }
 
+/** Month filter for the transactions table only (`YYYY-MM` or all_time). */
+function inDetailMonth(date: string | null, month: string) {
+  if (!month || month === "all_time") return true;
+  if (!date) return false;
+  const d = new Date(date);
+  if (Number.isNaN(d.getTime())) return false;
+  const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+  return key === month;
+}
+
 const fieldCls =
   "w-full rounded-[10px] border border-slate-200 bg-[var(--bg-card)] px-3 py-2 text-sm text-slate-800 outline-none focus:border-indigo-500 dark:border-[#252c4d] dark:text-[#eef0ff]";
 
@@ -465,15 +475,9 @@ export function TransactionHistoryPage() {
       (a) => (a._id ?? a.id ?? "") === selectedAgencyId,
     );
     if (!exists) return;
-    loadAgencyDetail(selectedAgencyId, detailMonth);
-  }, [
-    tab,
-    selectedAgencyId,
-    detailMonth,
-    listLoading,
-    agencies,
-    loadAgencyDetail,
-  ]);
+    // Cards + payload are always all-time; month/search/sort only filter the table.
+    loadAgencyDetail(selectedAgencyId, "all_time");
+  }, [tab, selectedAgencyId, listLoading, agencies, loadAgencyDetail]);
 
   useEffect(() => {
     if (tab !== "drivers") return;
@@ -488,15 +492,9 @@ export function TransactionHistoryPage() {
       (d) => (d._id ?? d.id ?? "") === selectedDriverId,
     );
     if (!exists) return;
-    loadDriverDetail(selectedDriverId, detailMonth);
-  }, [
-    tab,
-    selectedDriverId,
-    detailMonth,
-    listLoading,
-    drivers,
-    loadDriverDetail,
-  ]);
+    // Cards + payload are always all-time; month/search/sort only filter the table.
+    loadDriverDetail(selectedDriverId, "all_time");
+  }, [tab, selectedDriverId, listLoading, drivers, loadDriverDetail]);
 
   const filteredAgencies = useMemo(() => {
     const q = listSearch.trim().toLowerCase();
@@ -563,7 +561,11 @@ export function TransactionHistoryPage() {
           : [];
 
     const q = tableSearch.trim().toLowerCase();
-    let rows = raw.filter((r) => inDateRange(r.date, dateFrom, dateTo));
+    let rows = raw.filter(
+      (r) =>
+        inDetailMonth(r.date, detailMonth) &&
+        inDateRange(r.date, dateFrom, dateTo),
+    );
     if (directionFilter !== "all") {
       rows = rows.filter((r) => r.direction === directionFilter);
     }
@@ -591,6 +593,7 @@ export function TransactionHistoryPage() {
     tab,
     agencyDetail,
     driverDetail,
+    detailMonth,
     dateFrom,
     dateTo,
     tableSearch,
@@ -648,10 +651,10 @@ export function TransactionHistoryPage() {
   const refreshAll = () => {
     if (tab === "agencies") {
       loadAgencies();
-      if (selectedAgencyId) loadAgencyDetail(selectedAgencyId, detailMonth);
+      if (selectedAgencyId) loadAgencyDetail(selectedAgencyId, "all_time");
     } else {
       loadDrivers();
-      if (selectedDriverId) loadDriverDetail(selectedDriverId, detailMonth);
+      if (selectedDriverId) loadDriverDetail(selectedDriverId, "all_time");
     }
   };
 
@@ -880,8 +883,8 @@ export function TransactionHistoryPage() {
                       Grand total
                     </span>
                     <small className="text-xs text-white/75">
-                      Bulk +{fmtCurrency(agencyCards.bulkTotal)} · Vehicle −
-                      {fmtCurrency(agencyCards.vehicleOut)}
+                      All time · Bulk +{fmtCurrency(agencyCards.bulkTotal)} ·
+                      Vehicle −{fmtCurrency(agencyCards.vehicleOut)}
                     </small>
                     <b className="mt-2 block text-[28px] font-extrabold tracking-tight">
                       {fmtSignedCurrency(agencyCards.grandTotal)}
@@ -892,7 +895,7 @@ export function TransactionHistoryPage() {
                       Received
                     </span>
                     <small className="text-xs text-slate-500 dark:text-[#8d94b8]">
-                      Cash in
+                      All time · Cash in
                     </small>
                     <b className="mt-2 block text-[28px] font-extrabold tracking-tight text-emerald-600 dark:text-[#34d399]">
                       {fmtCurrency(agencyCards.received)}
@@ -909,7 +912,7 @@ export function TransactionHistoryPage() {
                       Remaining
                     </span>
                     <small className="text-xs text-slate-500 dark:text-[#8d94b8]">
-                      Still to collect (grand total − received)
+                      All time · Still to collect (grand total − received)
                     </small>
                     <b className="mt-2 block text-[28px] font-extrabold tracking-tight text-indigo-600 dark:text-[#a5b4fc]">
                       {fmtSignedCurrency(agencyCards.remaining)}
@@ -925,7 +928,7 @@ export function TransactionHistoryPage() {
                       Grand total
                     </span>
                     <small className="text-xs text-white/75">
-                      Bata + bulk advances from trips
+                      All time · Bata + bulk advances from trips
                     </small>
                     <b className="mt-2 block text-[28px] font-extrabold tracking-tight">
                       {fmtCurrency(driverCards.grandTotal)}
@@ -936,7 +939,7 @@ export function TransactionHistoryPage() {
                       Paid
                     </span>
                     <small className="text-xs text-slate-500 dark:text-[#8d94b8]">
-                      Cash out so far
+                      All time · Cash out so far
                     </small>
                     <b className="mt-2 block text-[28px] font-extrabold text-emerald-600 dark:text-[#34d399]">
                       {fmtCurrency(driverCards.paid)}
@@ -953,10 +956,10 @@ export function TransactionHistoryPage() {
                       To pay
                     </span>
                     <small className="text-xs text-slate-500 dark:text-[#8d94b8]">
-                      Still owed to driver
+                      All time · Still owed to driver
                     </small>
                     <b className="mt-2 block text-[28px] font-extrabold text-indigo-600 dark:text-[#a5b4fc]">
-                      {fmtCurrency(driverCards.toPay)}
+                      {fmtSignedCurrency(driverCards.toPay)}
                     </b>
                   </div>
                 </div>

@@ -384,8 +384,8 @@ export function TransactionPage() {
         ? "Money received from agency"
         : "Money paid to agency"
       : cashKind === "cash_in"
-        ? "Advance given to driver"
-        : "Salary / bata payment to driver";
+        ? "Advance given to the driver"
+        : "Salary payment to the driver";
 
   const addQuickAmount = (n: number) => {
     const cur = Number(amount) || 0;
@@ -457,7 +457,7 @@ export function TransactionPage() {
             type: "salary",
             amount: pay,
             date,
-            notes,
+            notes: notes.trim() || "Salary",
           });
           left -= pay;
         }
@@ -475,7 +475,7 @@ export function TransactionPage() {
             amount: pay,
             paymentDate: date,
             paymentMethod: method,
-            notes,
+            notes: notes.trim() || "Salary",
           });
           left -= pay;
         }
@@ -515,7 +515,9 @@ export function TransactionPage() {
                 Transaction
               </h1>
               <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">
-                Record cash in or cash out for an agency or driver.
+                {entityType === "driver"
+                  ? "Record salary or advance for a driver."
+                  : "Record cash in or cash out for an agency."}
               </p>
             </div>
           </div>
@@ -730,7 +732,9 @@ export function TransactionPage() {
                   </div>
 
                   <div>
-                    <FieldLabel>Cash flow direction</FieldLabel>
+                    <FieldLabel>
+                      {entityType === "driver" ? "Type" : "Cash flow direction"}
+                    </FieldLabel>
                     <div className="grid grid-cols-2 gap-2">
                       {entityType === "agency" ? (
                         <>
@@ -766,23 +770,23 @@ export function TransactionPage() {
                             onClick={() => setCashKind("cash_out")}
                             className={`flex items-center justify-center gap-2 rounded-xl border px-3 py-3 text-sm font-semibold transition ${
                               cashKind === "cash_out"
-                                ? "border-rose-500/80 bg-rose-50 text-rose-700 dark:bg-rose-950/30 dark:text-rose-400"
-                                : "border-slate-200 bg-[var(--bg-elevated)] text-slate-500 hover:border-rose-500/40 hover:text-rose-500 dark:border-[#1e2638] dark:text-slate-400 dark:hover:bg-rose-950/10"
+                                ? "border-emerald-500/80 bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400"
+                                : "border-slate-200 bg-[var(--bg-elevated)] text-slate-500 hover:border-emerald-500/40 hover:text-emerald-600 dark:border-[#1e2638] dark:text-slate-400 dark:hover:bg-emerald-950/10"
                             }`}
                           >
-                            <ArrowUpRight className="h-4 w-4" />
-                            Cash Out
+                            <Wallet className="h-4 w-4" />
+                            Salary
                           </button>
                           <button
                             type="button"
                             onClick={() => setCashKind("cash_in")}
                             className={`flex items-center justify-center gap-2 rounded-xl border px-3 py-3 text-sm font-semibold transition ${
                               cashKind === "cash_in"
-                                ? "border-sky-500/80 bg-sky-50 text-sky-700 dark:bg-sky-950/30 dark:text-sky-400"
-                                : "border-slate-200 bg-[var(--bg-elevated)] text-slate-500 hover:border-sky-500/40 hover:text-sky-600 dark:border-[#1e2638] dark:text-slate-400 dark:hover:bg-sky-950/10"
+                                ? "border-indigo-500/80 bg-indigo-50 text-indigo-700 dark:bg-[#242a57] dark:text-[#a5b4fc]"
+                                : "border-slate-200 bg-[var(--bg-elevated)] text-slate-500 hover:border-indigo-500/40 hover:text-indigo-600 dark:border-[#1e2638] dark:text-slate-400 dark:hover:bg-[#242a57]/40"
                             }`}
                           >
-                            <Wallet className="h-4 w-4" />
+                            <ArrowDownLeft className="h-4 w-4" />
                             Advance
                           </button>
                         </>

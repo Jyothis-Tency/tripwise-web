@@ -26,6 +26,10 @@ export function EditDriverModal({ driver, onClose, onSuccess }: EditDriverModalP
       setError('Email and Phone are required.');
       return;
     }
+    if (phone.replace(/\D/g, '').length !== 10) {
+      setError('Phone number must be exactly 10 digits.');
+      return;
+    }
     setSaving(true);
     setError('');
     try {
@@ -38,7 +42,12 @@ export function EditDriverModal({ driver, onClose, onSuccess }: EditDriverModalP
       });
       onSuccess();
     } catch (err: any) {
-      setError(err?.response?.data?.message || 'Failed to update driver.');
+      const raw = err?.response?.data?.message || '';
+      setError(
+        /phone/i.test(raw)
+          ? 'A driver with this phone number already exists. Please use a different phone number.'
+          : raw || 'Failed to update driver.',
+      );
     } finally {
       setSaving(false);
     }

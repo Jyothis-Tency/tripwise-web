@@ -31,13 +31,18 @@ import { formatAgencyLabel } from "../../../lib/agencyDisplay";
 type EntityTab = CashInCashOutTabId;
 type DetailTabId = CashInCashOutDetailTabId;
 type SortDir = "desc" | "asc";
-type DirectionFilter = "all" | "Cash in" | "Cash out";
+type AgencyTypeFilter = "all" | "Cash in" | "Cash out";
+type DriverTypeFilter = "all" | "Salary" | "Advance";
+type TypeFilter = AgencyTypeFilter | DriverTypeFilter;
 
 type TxRow = {
   id: string;
   date: string | null;
   amount: number;
-  direction: "Cash in" | "Cash out";
+  /** Display label in Type column */
+  type: "Cash in" | "Cash out" | "Salary" | "Advance";
+  /** Controls +/- amount color (money toward vs away from entity books) */
+  flow: "in" | "out";
   method: string;
   notes: string;
   sortTime: number;
@@ -153,7 +158,8 @@ function buildAgencyTxRows(detail: AgencyCashInCashOutDetail): TxRow[] {
     id: `in-${r._id}`,
     date: r.paymentDate,
     amount: r.amount,
-    direction: "Cash in" as const,
+    type: "Cash in" as const,
+    flow: "in" as const,
     method: r.paymentMethod || "—",
     notes: r.notes || "",
     sortTime: sortTime(r.paymentDate, r._id),
@@ -172,7 +178,8 @@ function buildAgencyTxRows(detail: AgencyCashInCashOutDetail): TxRow[] {
         id: `profit-${t._id}`,
         date: t.date,
         amount: Number(t.agencyProfit) || 0,
-        direction: "Cash out" as const,
+        type: "Cash out" as const,
+        flow: "out" as const,
         method: "—",
         notes: [tripLabel, route, "Agency profit"].filter(Boolean).join(" · "),
         sortTime: sortTime(t.date, t._id),
@@ -183,7 +190,8 @@ function buildAgencyTxRows(detail: AgencyCashInCashOutDetail): TxRow[] {
     id: `out-${r._id}`,
     date: r.paymentDate,
     amount: r.amount,
-    direction: "Cash out" as const,
+    type: "Cash out" as const,
+    flow: "out" as const,
     method: r.paymentMethod || "—",
     notes: r.notes || "Profit payout",
     sortTime: sortTime(r.paymentDate, r._id),
@@ -200,7 +208,8 @@ function buildDriverTxRows(detail: DriverCashInCashOutDetail): TxRow[] {
     id: `salary-${r._id}`,
     date: r.date,
     amount: r.amount,
-    direction: "Cash out" as const,
+    type: "Salary" as const,
+    flow: "out" as const,
     method: "—",
     notes: r.notes || "Salary / bata",
     sortTime: sortTime(r.date, r._id),
@@ -209,7 +218,8 @@ function buildDriverTxRows(detail: DriverCashInCashOutDetail): TxRow[] {
     id: `adv-${r._id}`,
     date: r.date,
     amount: r.amount,
-    direction: "Cash in" as const,
+    type: "Advance" as const,
+    flow: "in" as const,
     method: "—",
     notes: r.notes || "Advance",
     sortTime: sortTime(r.date, r._id),
@@ -218,9 +228,10 @@ function buildDriverTxRows(detail: DriverCashInCashOutDetail): TxRow[] {
     id: `bulk-${r._id}`,
     date: r.paymentDate,
     amount: r.amount,
-    direction: "Cash out" as const,
+    type: "Salary" as const,
+    flow: "out" as const,
     method: r.paymentMethod || "—",
-    notes: r.notes || "Advance payout",
+    notes: r.notes?.trim() || "Salary",
     sortTime: sortTime(r.paymentDate, r._id),
   }));
   return [...bata, ...advances, ...bulk];
@@ -313,8 +324,7 @@ export function TransactionHistoryPage() {
   const [dateTo, setDateTo] = useState("");
   const [tableSearch, setTableSearch] = useState("");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
-  const [directionFilter, setDirectionFilter] =
-    useState<DirectionFilter>("all");
+  const [typeFilter, setTypeFilter] = useState<TypeFilter>("all");
   const [filtersOpen, setFiltersOpen] = useState(false);
 
   const loadAgencies = useCallback(async () => {
@@ -566,14 +576,14 @@ export function TransactionHistoryPage() {
         inDetailMonth(r.date, detailMonth) &&
         inDateRange(r.date, dateFrom, dateTo),
     );
-    if (directionFilter !== "all") {
-      rows = rows.filter((r) => r.direction === directionFilter);
+    if (typeFilter !== "all") {
+      rows = rows.filter((r) => r.type === typeFilter);
     }
     if (q) {
       rows = rows.filter((r) => {
         const hay = [
           r.amount.toString(),
-          r.direction,
+          r.type,
           r.method,
           r.notes,
           formatDate(r.date),
@@ -598,13 +608,13 @@ export function TransactionHistoryPage() {
     dateTo,
     tableSearch,
     sortDir,
-    directionFilter,
+    typeFilter,
   ]);
 
   const filterBadgeCount =
     (detailMonth !== "all_time" ? 1 : 0) +
     (dateFrom || dateTo ? 1 : 0) +
-    (directionFilter !== "all" ? 1 : 0);
+    (typeFilter !== "all" ? 1 : 0);
 
   const hasActiveFilters =
     filterBadgeCount > 0 || !!tableSearch.trim() || sortDir !== "desc";
@@ -613,7 +623,7 @@ export function TransactionHistoryPage() {
     setDateFrom("");
     setDateTo("");
     setTableSearch("");
-    setDirectionFilter("all");
+    setTypeFilter("all");
     setDetailMonth("all_time");
     setSortDir("desc");
   };
@@ -665,7 +675,7 @@ export function TransactionHistoryPage() {
     setDateFrom("");
     setDateTo("");
     setTableSearch("");
-    setDirectionFilter("all");
+    setTypeFilter("all");
     setSortDir("desc");
     setError(null);
     agencyReqSeq.current += 1;
@@ -939,7 +949,7 @@ export function TransactionHistoryPage() {
                       Paid
                     </span>
                     <small className="text-xs text-slate-500 dark:text-[#8d94b8]">
-                      All time · Cash out so far
+                      All time · Paid to driver so far
                     </small>
                     <b className="mt-2 block text-[28px] font-extrabold text-emerald-600 dark:text-[#34d399]">
                       {fmtCurrency(driverCards.paid)}
@@ -1037,10 +1047,10 @@ export function TransactionHistoryPage() {
                         }}
                       />
                     )}
-                    {directionFilter !== "all" && (
+                    {typeFilter !== "all" && (
                       <ActivePill
-                        label={directionFilter}
-                        onClear={() => setDirectionFilter("all")}
+                        label={typeFilter}
+                        onClear={() => setTypeFilter("all")}
                       />
                     )}
                     <button
@@ -1086,18 +1096,24 @@ export function TransactionHistoryPage() {
                     </div>
                     <div className="flex gap-1 rounded-xl border border-slate-200 bg-[var(--bg-card)] p-1 dark:border-[#252c4d]">
                       {(
-                        [
-                          ["all", "All"],
-                          ["Cash in", "Cash in"],
-                          ["Cash out", "Cash out"],
-                        ] as const
+                        tab === "drivers"
+                          ? ([
+                              ["all", "All"],
+                              ["Salary", "Salary"],
+                              ["Advance", "Advance"],
+                            ] as const)
+                          : ([
+                              ["all", "All"],
+                              ["Cash in", "Cash in"],
+                              ["Cash out", "Cash out"],
+                            ] as const)
                       ).map(([k, label]) => (
                         <button
                           key={k}
                           type="button"
-                          onClick={() => setDirectionFilter(k)}
+                          onClick={() => setTypeFilter(k)}
                           className={`rounded-[9px] px-3 py-1.5 text-xs font-semibold transition ${
-                            directionFilter === k
+                            typeFilter === k
                               ? "bg-[var(--bg-main)] text-indigo-600 shadow-sm dark:text-[#a5b4fc]"
                               : "text-slate-500 dark:text-[#8d94b8]"
                           }`}
@@ -1147,7 +1163,8 @@ export function TransactionHistoryPage() {
                       </thead>
                       <tbody>
                         {txRows.map((r) => {
-                          const isIn = r.direction === "Cash in";
+                          const isIn = r.flow === "in";
+                          const isSalary = r.type === "Salary";
                           return (
                             <tr
                               key={r.id}
@@ -1165,12 +1182,16 @@ export function TransactionHistoryPage() {
                               <td className="px-[18px] py-3.5">
                                 <span
                                   className={`rounded-full px-2.5 py-0.5 text-[11px] font-bold ${
-                                    isIn
-                                      ? "bg-emerald-50 text-emerald-700 dark:bg-[#0d3325] dark:text-[#34d399]"
-                                      : "bg-rose-50 text-rose-600 dark:bg-[#3a1a1e] dark:text-[#fda4af]"
+                                    tab === "drivers"
+                                      ? isSalary
+                                        ? "bg-emerald-50 text-emerald-700 dark:bg-[#0d3325] dark:text-[#34d399]"
+                                        : "bg-indigo-50 text-indigo-700 dark:bg-[#242a57] dark:text-[#a5b4fc]"
+                                      : isIn
+                                        ? "bg-emerald-50 text-emerald-700 dark:bg-[#0d3325] dark:text-[#34d399]"
+                                        : "bg-rose-50 text-rose-600 dark:bg-[#3a1a1e] dark:text-[#fda4af]"
                                   }`}
                                 >
-                                  {r.direction}
+                                  {r.type}
                                 </span>
                               </td>
                               <td className="px-[18px] py-3.5 capitalize text-slate-600 dark:text-[#8d94b8]">

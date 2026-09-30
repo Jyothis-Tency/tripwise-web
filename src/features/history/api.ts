@@ -1,6 +1,10 @@
 import apiClient from '../../services/axios';
 import { ApiEndpoints } from '../../services/apiEndpoints';
 import {
+  fetchAllPages,
+  DEFAULT_LIST_PAGE_SIZE,
+} from '../../lib/fetchAllPages';
+import {
   normalizeHistoryTripDriver,
   normalizeHistoryTripVehicle,
 } from './historyTripDisplay';
@@ -181,6 +185,43 @@ export async function fetchTripHistory(params: HistoryParams = {}): Promise<{
     pagination: data.pagination ?? { page: 1, limit: 10, total: 0, pages: 1, hasNext: false, hasPrev: false },
     paymentSummary: data.paymentSummary ?? { totalAmount: 0, totalPaid: 0, totalOutstanding: 0 },
     allTimePaymentSummary: data.allTimePaymentSummary,
+  };
+}
+
+/** Load all trips matching filters (for exports / full financial reports). */
+export async function fetchAllTripHistory(
+  params: HistoryParams = {},
+): Promise<{
+  trips: HistoryTrip[];
+  complete: boolean;
+  paymentSummary: HistoryPaymentSummary;
+  allTimePaymentSummary?: HistoryPaymentSummary;
+}> {
+  let paymentSummary: HistoryPaymentSummary | null = null;
+  let allTimePaymentSummary: HistoryPaymentSummary | undefined;
+
+  const result = await fetchAllPages(
+    async (page, limit) => {
+      const res = await fetchTripHistory({ ...params, page, limit });
+      if (!paymentSummary) {
+        paymentSummary = res.paymentSummary;
+        allTimePaymentSummary = res.allTimePaymentSummary;
+      }
+      return { items: res.trips, pagination: res.pagination };
+    },
+    { pageSize: DEFAULT_LIST_PAGE_SIZE },
+  );
+
+  return {
+    trips: result.items,
+    complete: result.complete,
+    paymentSummary:
+      paymentSummary ?? {
+        totalAmount: 0,
+        totalPaid: 0,
+        totalOutstanding: 0,
+      },
+    allTimePaymentSummary,
   };
 }
 

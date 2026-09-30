@@ -13,7 +13,7 @@ import {
   X,
 } from "lucide-react";
 import {
-  fetchAgencies,
+  fetchAllAgencies,
   fetchDrivers,
   fetchCashInCashOutAgencyDetail,
   fetchCashInCashOutDriverDetail,
@@ -209,7 +209,7 @@ export function TransactionPage() {
     setLoadingLists(true);
     try {
       const [a, d] = await Promise.all([
-        fetchAgencies(1, 200),
+        fetchAllAgencies().then((r) => ({ agencies: r.agencies })),
         fetchDrivers({ page: 1, limit: 200, blockFilter: "unblocked" }),
       ]);
       setAgencies(a.agencies);

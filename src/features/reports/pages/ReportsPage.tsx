@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import {
   fetchTripHistory,
+  fetchAllTripHistory,
   type HistoryTrip,
   type HistoryPagination,
   type HistoryPaymentSummary,
@@ -49,7 +50,7 @@ const STATUS_OPTIONS = [
 ];
 
 const PREVIEW_LIMIT = 20;
-const PDF_LIMIT = 10000;
+/** Preview table page size; PDF uses fetchAllTripHistory (full pagination). */
 
 const fieldCls =
   "w-full rounded-lg border border-slate-200 bg-[var(--bg-elevated)] px-3 py-2.5 text-sm font-medium text-slate-700 outline-none transition focus:border-indigo-400 focus:ring-1 focus:ring-indigo-200 dark:border-[#1e2638] dark:text-slate-100 dark:focus:border-indigo-400";
@@ -258,12 +259,17 @@ export function ReportsPage() {
         entityFilter,
         status,
         dateFilter,
-        { page: 1, limit: PDF_LIMIT, tripSource },
+        { tripSource },
       );
-      const result = await fetchTripHistory(params);
+      const result = await fetchAllTripHistory(params);
       if (!result.trips.length) {
         alert("No trips match your filters.");
         return;
+      }
+      if (!result.complete) {
+        alert(
+          "Warning: not all trips could be loaded for this report. PDF may be incomplete. Try narrowing the date range or contact support.",
+        );
       }
       const subtitle = reportFilterSubtitle(entityFilter, dateFilter);
       downloadTripReportPdf(result.trips, {

@@ -430,9 +430,9 @@ export function GuestLinkButton({
       type="button"
       onClick={onClick}
       title="Driver guest links"
-      className="relative flex items-center gap-1.5 rounded-lg border border-slate-200 bg-[var(--bg-elevated)] px-3 py-2.5 text-xs sm:text-sm font-semibold text-slate-600 hover:border-indigo-300 hover:text-indigo-600 transition shadow-sm shrink-0 dark:border-[#1e2638] dark:text-slate-300 dark:hover:border-indigo-400 dark:hover:text-indigo-300"
+      className="relative flex items-center gap-1 rounded-md border border-slate-200 bg-[var(--bg-elevated)] px-2 py-1 text-[11px] font-semibold text-slate-600 shadow-sm transition hover:border-indigo-300 hover:text-indigo-600 shrink-0 sm:gap-1.5 sm:rounded-lg sm:px-3 sm:py-2 sm:text-xs dark:border-[#1e2638] dark:text-slate-300 dark:hover:border-indigo-400 dark:hover:text-indigo-300"
     >
-      <Link2 className="h-4 w-4" />
+      <Link2 className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
       <span className="hidden sm:inline">Guest link</span>
       {(pendingCount ?? 0) > 0 && (
         <span className="absolute -top-1.5 -right-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-orange-500 px-1 text-[10px] font-bold text-white">

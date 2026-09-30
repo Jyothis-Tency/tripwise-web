@@ -11,7 +11,7 @@ import {
   X,
 } from "lucide-react";
 import {
-  fetchAgencies,
+  fetchAllAgencies,
   fetchDrivers,
   fetchCashInCashOutAgencyDetail,
   fetchCashInCashOutDriverDetail,
@@ -331,7 +331,7 @@ export function TransactionHistoryPage() {
     setListLoading(true);
     setError(null);
     try {
-      const { agencies: list } = await fetchAgencies(1, 300);
+      const { agencies: list } = await fetchAllAgencies();
       setAgencies(list);
     } catch {
       setAgencies([]);

@@ -9,6 +9,7 @@ export {
 
 export {
   fetchAgencies,
+  fetchAllAgencies,
   addAgencyPayoutPayment,
   addDriverPayoutPayment,
   type Agency,

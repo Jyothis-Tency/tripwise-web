@@ -3,12 +3,13 @@ import {
   useMemo,
   useRef,
   useState,
+  type ComponentProps,
   type Dispatch,
+  type ReactNode,
   type SetStateAction,
 } from "react";
 import { useParams } from "react-router-dom";
 import {
-  Building2,
   Loader2,
   Plus,
   Trash2,
@@ -22,6 +23,11 @@ import {
   RotateCcw,
   Moon,
   Sun,
+  ChevronDown,
+  Building2,
+  Car,
+  Pencil,
+  User,
 } from "lucide-react";
 import {
   approveGuestBulk,
@@ -47,13 +53,266 @@ type SyncStatus = "idle" | "saving" | "saved" | "error";
 const AUTOSAVE_DELAY = 800;
 
 const inputCls =
-  "w-full rounded-lg border border-slate-200 bg-[var(--bg-elevated)] px-3 py-2.5 text-sm text-slate-800 outline-none transition focus:border-indigo-400 focus:ring-1 focus:ring-indigo-200 disabled:cursor-not-allowed disabled:opacity-60 dark:border-[#1e2638] dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-indigo-400";
+  "w-full touch-manipulation rounded-md border border-slate-200 bg-[var(--bg-elevated)] px-2 py-1.5 text-sm text-slate-800 outline-none transition focus:border-indigo-400 focus:ring-1 focus:ring-indigo-200 disabled:cursor-not-allowed disabled:opacity-60 sm:rounded-lg sm:px-3 sm:py-2.5 dark:border-[#1e2638] dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-indigo-400";
 
 const cellCls =
-  "w-full min-w-[88px] rounded-md border border-slate-200 bg-[var(--bg-elevated)] px-2 py-1.5 text-sm text-slate-800 outline-none transition focus:border-indigo-400 focus:ring-1 focus:ring-indigo-200 disabled:opacity-60 dark:border-[#1e2638] dark:text-slate-100 dark:placeholder:text-slate-500";
+  "w-full min-w-0 touch-manipulation rounded-md border border-slate-200 bg-[var(--bg-elevated)] px-1.5 py-1 text-xs text-slate-800 outline-none transition focus:border-indigo-400 focus:ring-1 focus:ring-indigo-200 disabled:opacity-60 sm:px-2 sm:py-1.5 sm:text-sm dark:border-[#1e2638] dark:text-slate-100 dark:placeholder:text-slate-500";
+
+const mobileLabelCls =
+  "text-[9px] font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500";
+
+/** Compact tap targets on phones; normal size from `sm` up */
+const btnOutlineCls =
+  "inline-flex items-center gap-1 rounded-md border font-semibold min-h-8 px-2 py-1 text-[11px] shadow-xs transition sm:min-h-10 sm:gap-1.5 sm:rounded-lg sm:px-3 sm:py-2 sm:text-xs";
+
+const btnSolidCls =
+  "inline-flex items-center justify-center gap-1 rounded-md font-bold min-h-8 px-2.5 py-1 text-[11px] transition disabled:opacity-60 sm:min-h-10 sm:rounded-lg sm:gap-1.5 sm:px-3 sm:py-2 sm:text-xs";
+
+const btnIconCls =
+  "inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border transition sm:h-10 sm:w-10 sm:rounded-lg";
+
+const fieldMinHCls = "min-h-8 sm:min-h-10";
+
+const selectTriggerCls =
+  "flex w-full min-w-0 touch-manipulation items-center gap-2 rounded-md border border-slate-200 bg-[var(--bg-elevated)] px-2.5 text-left text-sm outline-none transition focus:border-indigo-400 focus:ring-1 focus:ring-indigo-200 disabled:cursor-not-allowed disabled:opacity-60 sm:rounded-lg sm:px-3 dark:border-[#1e2638] dark:focus:border-indigo-400";
+
+const selectCls =
+  `w-full min-w-0 touch-manipulation appearance-none cursor-pointer truncate rounded-md border border-slate-200 bg-[var(--bg-elevated)] py-1.5 pl-2.5 pr-8 text-sm font-medium text-slate-800 outline-none transition focus:border-indigo-400 focus:ring-1 focus:ring-indigo-200 disabled:cursor-not-allowed disabled:opacity-60 sm:rounded-lg sm:px-3 sm:py-2.5 dark:border-[#1e2638] dark:text-slate-100 dark:focus:border-indigo-400 ${fieldMinHCls}`;
 
 const plateCls =
   "font-mono font-semibold uppercase tracking-wider !text-amber-700 dark:!text-amber-300";
+
+function vehicleOptionLabel(vg: DriverGroup, index: number): string {
+  const plate = vg.vehicleNumber.trim();
+  if (plate) return plate;
+  return `Vehicle ${index + 1} — add plate`;
+}
+
+const guestPenBtnCls =
+  "inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-slate-200 bg-[var(--bg-elevated)] text-slate-500 transition hover:border-indigo-300 hover:text-indigo-600 dark:border-[#1e2638] dark:hover:border-indigo-400 dark:hover:text-indigo-300";
+
+function GuestDriverSummary({
+  name,
+  phone,
+  editing,
+  onEdit,
+  onDone,
+  onNameChange,
+  onPhoneChange,
+}: {
+  name: string;
+  phone: string;
+  editing: boolean;
+  onEdit: () => void;
+  onDone: () => void;
+  onNameChange: (v: string) => void;
+  onPhoneChange: (v: string) => void;
+}) {
+  if (editing) {
+    return (
+      <div className="space-y-2 rounded-md border border-slate-200/80 p-2 dark:border-[#1e2638]">
+        <div className="grid grid-cols-2 gap-2">
+          <label className="col-span-2 block sm:col-span-1">
+            <span className={mobileLabelCls}>Name *</span>
+            <input
+              value={name}
+              onChange={(e) => onNameChange(e.target.value)}
+              className={`mt-0.5 ${inputCls}`}
+              placeholder="Driver name"
+              autoFocus
+            />
+          </label>
+          <label className="col-span-2 block sm:col-span-1">
+            <span className={mobileLabelCls}>Phone</span>
+            <input
+              value={phone}
+              onChange={(e) => onPhoneChange(e.target.value)}
+              inputMode="tel"
+              className={`mt-0.5 ${inputCls} font-mono`}
+              placeholder="Mobile number"
+            />
+          </label>
+        </div>
+        <button
+          type="button"
+          onClick={onDone}
+          className="text-[11px] font-semibold text-indigo-600 dark:text-indigo-300"
+        >
+          Done
+        </button>
+      </div>
+    );
+  }
+
+  const primary = name.trim() || "Add driver name";
+  const secondary = phone.trim() || "No phone";
+
+  return (
+    <div className="flex items-center gap-2 rounded-md border border-slate-200/80 bg-slate-50/60 px-2 py-1.5 dark:border-[#1e2638] dark:bg-white/[0.03]">
+      <User className="h-3.5 w-3.5 shrink-0 text-indigo-500/90 dark:text-indigo-400" />
+      <div className="min-w-0 flex-1">
+        <p
+          className={`truncate text-xs font-semibold ${
+            name.trim()
+              ? "text-slate-800 dark:text-slate-100"
+              : "text-slate-400 dark:text-slate-500"
+          }`}
+        >
+          {primary}
+        </p>
+        <p
+          className={`truncate font-mono text-[10px] ${
+            phone.trim()
+              ? "text-slate-600 dark:text-slate-300"
+              : "text-slate-400 dark:text-slate-500"
+          }`}
+        >
+          {secondary}
+        </p>
+      </div>
+      <button
+        type="button"
+        onClick={onEdit}
+        className={guestPenBtnCls}
+        aria-label="Edit driver"
+      >
+        <Pencil className="h-3.5 w-3.5" />
+      </button>
+    </div>
+  );
+}
+
+function GuestStyledSelect({
+  icon,
+  className,
+  children,
+  ...props
+}: ComponentProps<"select"> & { icon?: ReactNode }) {
+  return (
+    <div className="relative mt-0.5 min-w-0">
+      {icon ? (
+        <span className="pointer-events-none absolute left-2.5 top-1/2 z-[1] -translate-y-1/2 text-indigo-500/80 dark:text-indigo-400/90 [&_svg]:h-4 [&_svg]:w-4">
+          {icon}
+        </span>
+      ) : null}
+      <select
+        {...props}
+        className={`${selectCls} ${icon ? "pl-9 sm:pl-10" : ""} ${className ?? ""}`}
+      >
+        {children}
+      </select>
+      <ChevronDown
+        className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 dark:text-slate-500"
+        aria-hidden
+      />
+    </div>
+  );
+}
+
+function GuestAgencyPicker({
+  agencies,
+  value,
+  fallbackName,
+  disabled,
+  onChange,
+}: {
+  agencies: Agency[];
+  value: string;
+  fallbackName?: string;
+  disabled?: boolean;
+  onChange: (agencyId: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDoc = (e: MouseEvent) => {
+      if (rootRef.current?.contains(e.target as Node)) return;
+      setOpen(false);
+    };
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, [open]);
+
+  const selected = agencies.find((a) => (a._id ?? a.id) === value);
+  const label = selected
+    ? formatAgencyLabel(selected)
+    : fallbackName?.trim() || "";
+
+  return (
+    <div ref={rootRef} className="relative mt-0.5 min-w-0">
+      <button
+        type="button"
+        disabled={disabled}
+        aria-expanded={open}
+        aria-haspopup="listbox"
+        onClick={() => !disabled && setOpen((o) => !o)}
+        className={`${selectTriggerCls} ${fieldMinHCls} py-1.5 sm:py-2.5 ${
+          label
+            ? "font-medium text-slate-800 dark:text-slate-100"
+            : "font-normal text-slate-400 dark:text-slate-500"
+        }`}
+      >
+        <Building2 className="h-4 w-4 shrink-0 text-indigo-500 dark:text-indigo-400" />
+        <span className="min-w-0 flex-1 truncate">
+          {label || "Select agency…"}
+        </span>
+        <ChevronDown
+          className={`h-4 w-4 shrink-0 text-slate-400 transition-transform dark:text-slate-500 ${
+            open ? "rotate-180" : ""
+          }`}
+        />
+      </button>
+      {open && (
+        <ul
+          role="listbox"
+          className="absolute left-0 right-0 top-full z-40 mt-1 max-h-56 overflow-y-auto rounded-lg border border-slate-200 bg-[var(--bg-card)] py-1 shadow-lg dark:border-[#1e2638]"
+        >
+          {agencies.length === 0 ? (
+            <li className="px-3 py-2.5 text-xs text-slate-500 dark:text-slate-400">
+              No agencies yet — use New agency
+            </li>
+          ) : (
+            agencies.map((a) => {
+              const id = a._id ?? a.id ?? "";
+              const active = id === value;
+              const name = a.name?.trim() || "Unnamed";
+              const phone = a.phone?.trim();
+              return (
+                <li key={id}>
+                  <button
+                    type="button"
+                    role="option"
+                    aria-selected={active}
+                    onClick={() => {
+                      onChange(id);
+                      setOpen(false);
+                    }}
+                    className={`w-full px-3 py-2.5 text-left transition ${
+                      active
+                        ? "bg-indigo-50 text-indigo-800 dark:bg-indigo-500/15 dark:text-indigo-200"
+                        : "text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-white/5"
+                    }`}
+                  >
+                    <span className="block truncate text-sm font-medium">
+                      {name}
+                    </span>
+                    {phone ? (
+                      <span className="mt-0.5 block truncate font-mono text-[11px] text-slate-500 dark:text-slate-400">
+                        {phone}
+                      </span>
+                    ) : null}
+                  </button>
+                </li>
+              );
+            })
+          )}
+        </ul>
+      )}
+    </div>
+  );
+}
 
 let _rowCounter = 0;
 function nextRowId() {
@@ -127,12 +386,57 @@ function emptyBlock(): GuestAgencyBlock {
   };
 }
 
+function blockHasTripData(block: GuestAgencyBlock) {
+  return block.driverGroups.some(
+    (g) =>
+      String(g.vehicleNumber ?? "").trim() ||
+      (g.rows ?? []).some(
+        (r) =>
+          String(r.startDate ?? "").trim() ||
+          String(r.endDate ?? "").trim() ||
+          String(r.startKm ?? "").trim() ||
+          String(r.endKm ?? "").trim() ||
+          Number(r.grandTotal) > 0 ||
+          String(r.notes ?? "").trim(),
+      ),
+  );
+}
+
+function pickActiveBlockId(blocks: GuestAgencyBlock[]): string {
+  const open = blocks.filter((b) => b.status !== "accepted");
+  const withAgency = open.find((b) => b.agencyId || b.agencyName?.trim());
+  const withTrips = open.find((b) => blockHasTripData(b));
+  return (
+    withAgency?.clientId ??
+    withTrips?.clientId ??
+    open[0]?.clientId ??
+    blocks[0]?.clientId ??
+    ""
+  );
+}
+
 function quickHash(s: string) {
+  if (!s) return "empty";
   let h = 0;
   for (let i = 0; i < s.length; i++) {
     h = ((h << 5) - h + s.charCodeAt(i)) | 0;
   }
   return `${s.length}_${h}`;
+}
+
+/** Merge only accepted agency blocks from server (never overwrite open drafts). */
+function mergeAcceptedBlocksFromServer(
+  prev: GuestAgencyBlock[],
+  serverBlocks: GuestAgencyBlock[],
+): GuestAgencyBlock[] {
+  const serverMap = new Map(
+    normalizeGuestBlocks(serverBlocks).map((b) => [b.clientId, b]),
+  );
+  return prev.map((b) => {
+    const s = serverMap.get(b.clientId);
+    if (s?.status === "accepted") return s;
+    return b;
+  });
 }
 
 function SyncBadge({ status }: { status: SyncStatus }) {
@@ -156,11 +460,22 @@ function SyncBadge({ status }: { status: SyncStatus }) {
   }[status];
   return (
     <span
-      className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-semibold ${cfg.cls}`}
+      className={`inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[10px] font-semibold sm:gap-1.5 sm:rounded-lg sm:px-2.5 sm:py-1.5 sm:text-xs ${cfg.cls}`}
     >
-      {cfg.icon}
+      <span className="[&_svg]:h-3.5 [&_svg]:w-3.5 sm:[&_svg]:h-4 sm:[&_svg]:w-4">
+        {cfg.icon}
+      </span>
       {cfg.text}
     </span>
+  );
+}
+
+function pickActiveVehicleGroupId(groups: DriverGroup[]): string {
+  const withPlate = groups.find((g) => String(g.vehicleNumber ?? "").trim());
+  return (
+    withPlate?.clientGroupId ??
+    groups[0]?.clientGroupId ??
+    ""
   );
 }
 
@@ -173,6 +488,36 @@ function VehicleGroupsEditor({
   onChange: Dispatch<SetStateAction<DriverGroup[]>>;
   readOnly?: boolean;
 }) {
+  const [activeGroupId, setActiveGroupId] = useState(() =>
+    pickActiveVehicleGroupId(groups),
+  );
+
+  useEffect(() => {
+    if (!groups.length) return;
+    if (!groups.some((g) => g.clientGroupId === activeGroupId)) {
+      setActiveGroupId(pickActiveVehicleGroupId(groups));
+    }
+  }, [groups, activeGroupId]);
+
+  const gi = Math.max(
+    0,
+    groups.findIndex((g) => g.clientGroupId === activeGroupId),
+  );
+  const g = groups[gi] ?? groups[0];
+  if (!g) {
+    return null;
+  }
+
+  const selectVehicle = (value: string) => {
+    if (value === "__new__") {
+      const ng = emptyVehicleGroup();
+      onChange((prev) => [...prev, ng]);
+      setActiveGroupId(ng.clientGroupId ?? pickActiveVehicleGroupId([ng]));
+      return;
+    }
+    setActiveGroupId(value);
+  };
+
   const updateRowField = (
     gi: number,
     ri: number,
@@ -192,19 +537,6 @@ function VehicleGroupsEditor({
     });
   };
 
-  const fields = [
-    ["startDate", "date", "Start date"],
-    ["endDate", "date", "End date"],
-    ["startKm", "text", "Start KM"],
-    ["endKm", "text", "End KM"],
-    ["startTime", "time", "Start time"],
-    ["endTime", "time", "End time"],
-    ["toll", "number", "Toll"],
-    ["advancePaid", "number", "Advance"],
-    ["grandTotal", "number", "Total"],
-    ["notes", "text", "Notes"],
-  ] as const;
-
   const tableFields = [
     ["startDate", "date"],
     ["endDate", "date"],
@@ -218,148 +550,183 @@ function VehicleGroupsEditor({
     ["notes", "text"],
   ] as const;
 
+  const tripControl = (
+    gi: number,
+    ri: number,
+    r: BulkTripRow,
+    field: keyof BulkTripRow,
+    type: "date" | "number" | "text" | "time",
+  ) => {
+    if (type === "time") {
+      return (
+        <TimePicker12h
+          value={String(r[field] ?? "")}
+          allowEmpty
+          compact
+          disabled={readOnly}
+          onChange={(v) => updateRowField(gi, ri, field, "time", v)}
+          className="mt-0.5 w-full min-w-0"
+        />
+      );
+    }
+    return (
+      <input
+        disabled={readOnly}
+        type={
+          type === "date"
+            ? "date"
+            : type === "number"
+              ? "number"
+              : "text"
+        }
+        inputMode={type === "number" ? "decimal" : undefined}
+        value={
+          type === "number"
+            ? String(r[field] || "")
+            : String(r[field] ?? "")
+        }
+        onChange={(e) =>
+          updateRowField(gi, ri, field, type, e.target.value)
+        }
+        className={`mt-0.5 min-w-0 ${inputCls}`}
+      />
+    );
+  };
+
+  const removeActiveVehicle = () => {
+    const groupId = g.clientGroupId;
+    onChange((prev) => {
+      const next = prev.filter((item, i) =>
+        groupId ? item.clientGroupId !== groupId : i !== gi,
+      );
+      const normalized = next.length > 0 ? next : [emptyVehicleGroup()];
+      setActiveGroupId(pickActiveVehicleGroupId(normalized));
+      return normalized;
+    });
+  };
+
   return (
-    <div className="space-y-3">
-      {groups.map((g, gi) => (
-        <div
-          key={g.clientGroupId || `guest-g-${gi}`}
-          className="overflow-hidden rounded-xl border border-slate-200 bg-[var(--bg-card)] shadow-sm dark:border-[#1e2638]"
-        >
-          <div className="flex items-center gap-2 border-b border-slate-100 bg-indigo-50/50 px-3 py-2.5 dark:border-[#1e2638] dark:bg-indigo-500/10 sm:px-4 sm:py-3">
-            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-indigo-100 text-xs font-bold text-indigo-600 dark:bg-indigo-500/20 dark:text-indigo-300">
-              {gi + 1}
-            </span>
-            <input
-              value={g.vehicleNumber}
-              disabled={readOnly}
-              onChange={(e) => {
-                const v = e.target.value.toUpperCase();
-                onChange((prev) => {
-                  const next = [...prev];
-                  next[gi] = { ...next[gi], vehicleNumber: v };
-                  return next;
-                });
-              }}
-              placeholder="Vehicle number"
-              className={`${inputCls} min-w-0 flex-1 font-medium ${plateCls}`}
-            />
-            {!readOnly && groups.length > 1 && (
-              <button
-                type="button"
-                onClick={() =>
-                  onChange((prev) => {
-                    const groupId = g.clientGroupId;
-                    const next = prev.filter((item, i) =>
-                      groupId ? item.clientGroupId !== groupId : i !== gi,
-                    );
-                    return next.length > 0 ? next : [emptyVehicleGroup()];
-                  })
-                }
-                className="shrink-0 rounded-lg p-2 text-rose-400 transition hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-500/10"
-                aria-label="Remove vehicle"
-              >
-                <Trash2 className="h-4 w-4" />
-              </button>
-            )}
-          </div>
-
-          {/* Mobile cards */}
-          <div className="space-y-3 p-3 md:hidden">
-            {g.rows.map((r, ri) => (
-              <div
-                key={r.clientRowId}
-                className="rounded-xl border border-slate-200 bg-slate-50/80 p-3 dark:border-[#1e2638] dark:bg-white/[0.03]"
-              >
-                <div className="mb-2 flex items-center justify-between gap-2">
-                  <span className="text-[10px] font-bold uppercase tracking-wide text-indigo-500 dark:text-indigo-300">
-                    Trip {ri + 1}
-                  </span>
-                  {!readOnly && g.rows.length > 1 && (
-                    <button
-                      type="button"
-                      onClick={() =>
-                        onChange((prev) => {
-                          const next = [...prev];
-                          next[gi] = {
-                            ...next[gi],
-                            rows: next[gi].rows.filter((_, i) => i !== ri),
-                          };
-                          return next;
-                        })
-                      }
-                      className="rounded-lg p-1.5 text-rose-400 hover:bg-rose-50 hover:text-rose-500 dark:hover:bg-rose-500/10"
-                      aria-label="Remove trip"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </button>
-                  )}
-                </div>
-                <div className="grid grid-cols-2 gap-2.5">
-                  {fields.map(([field, type, label]) => (
-                    <label
-                      key={field}
-                      className={
-                        field === "notes" ||
-                        field === "grandTotal" ||
-                        field === "startTime" ||
-                        field === "endTime"
-                          ? "col-span-2 block"
-                          : "block"
-                      }
-                    >
-                      <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">
-                        {label}
-                      </span>
-                      {type === "time" ? (
-                        <div className="mt-1">
-                          <TimePicker12h
-                            value={String((r as any)[field] ?? "")}
-                            allowEmpty
-                            compact
-                            disabled={readOnly}
-                            onChange={(v) =>
-                              updateRowField(gi, ri, field, "time", v)
-                            }
-                            className="w-full"
-                          />
-                        </div>
-                      ) : (
-                        <input
-                          disabled={readOnly}
-                          type={
-                            type === "date"
-                              ? "date"
-                              : type === "number"
-                                ? "number"
-                                : "text"
-                          }
-                          inputMode={type === "number" ? "decimal" : undefined}
-                          value={
-                            type === "number"
-                              ? String((r as any)[field] || "")
-                              : String((r as any)[field] ?? "")
-                          }
-                          onChange={(e) =>
-                            updateRowField(
-                              gi,
-                              ri,
-                              field,
-                              type,
-                              e.target.value,
-                            )
-                          }
-                          className={`mt-1 ${inputCls}`}
-                        />
-                      )}
-                    </label>
-                  ))}
-                </div>
-              </div>
+    <div className="space-y-2 sm:space-y-3">
+      <div className="grid grid-cols-2 gap-2 items-end">
+        <label className="min-w-0">
+          <span className={mobileLabelCls}>Vehicle</span>
+          <GuestStyledSelect
+            value={g.clientGroupId}
+            disabled={readOnly}
+            onChange={(e) => selectVehicle(e.target.value)}
+            icon={<Car className="h-4 w-4" aria-hidden />}
+          >
+            {groups.map((vg, i) => (
+              <option key={vg.clientGroupId} value={vg.clientGroupId}>
+                {vehicleOptionLabel(vg, i)}
+              </option>
             ))}
-          </div>
+            {!readOnly && <option value="__new__">+ Add another vehicle</option>}
+          </GuestStyledSelect>
+        </label>
+        <label className="min-w-0">
+          <span className={mobileLabelCls}>Plate number *</span>
+          <input
+            value={g.vehicleNumber}
+            disabled={readOnly}
+            onChange={(e) => {
+              const v = e.target.value.toUpperCase();
+              onChange((prev) => {
+                const next = [...prev];
+                next[gi] = { ...next[gi], vehicleNumber: v };
+                return next;
+              });
+            }}
+            placeholder="KL07AB1234"
+            className={`mt-0.5 ${inputCls} font-medium ${plateCls}`}
+          />
+        </label>
+        {!readOnly && groups.length > 1 && (
+          <button
+            type="button"
+            onClick={removeActiveVehicle}
+            className="col-span-2 justify-self-end px-1 text-[11px] font-semibold text-rose-500 hover:text-rose-600 sm:text-xs"
+          >
+            Remove vehicle
+          </button>
+        )}
+      </div>
 
-          {/* Desktop table */}
-          <div className="hidden overflow-x-auto md:block">
+      <div className="overflow-hidden rounded-lg border border-slate-200 bg-[var(--bg-card)] dark:border-[#1e2638]">
+        <div className="divide-y divide-slate-200 dark:divide-[#1e2638] md:hidden">
+          {g.rows.map((r, ri) => (
+            <section key={r.clientRowId} className="p-2">
+              <header className="mb-1.5 flex items-center justify-between gap-2">
+                <span className="text-[9px] font-bold uppercase tracking-wide text-indigo-500 dark:text-indigo-300">
+                  Trip {ri + 1}
+                </span>
+                {!readOnly && g.rows.length > 1 && (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      onChange((prev) => {
+                        const next = [...prev];
+                        next[gi] = {
+                          ...next[gi],
+                          rows: next[gi].rows.filter((_, i) => i !== ri),
+                        };
+                        return next;
+                      })
+                    }
+                    className="rounded-lg p-1.5 text-rose-400 hover:bg-rose-50 hover:text-rose-500 dark:hover:bg-rose-500/10"
+                    aria-label="Remove trip"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                )}
+              </header>
+              <div className="grid grid-cols-2 gap-x-2 gap-y-1.5">
+                <label className="block min-w-0">
+                  <span className={mobileLabelCls}>Start date</span>
+                  {tripControl(gi, ri, r, "startDate", "date")}
+                </label>
+                <label className="block min-w-0">
+                  <span className={mobileLabelCls}>End date</span>
+                  {tripControl(gi, ri, r, "endDate", "date")}
+                </label>
+                <label className="block min-w-0">
+                  <span className={mobileLabelCls}>Start KM</span>
+                  {tripControl(gi, ri, r, "startKm", "text")}
+                </label>
+                <label className="block min-w-0">
+                  <span className={mobileLabelCls}>End KM</span>
+                  {tripControl(gi, ri, r, "endKm", "text")}
+                </label>
+                <label className="block min-w-0">
+                  <span className={mobileLabelCls}>Start time</span>
+                  {tripControl(gi, ri, r, "startTime", "time")}
+                </label>
+                <label className="block min-w-0">
+                  <span className={mobileLabelCls}>End time</span>
+                  {tripControl(gi, ri, r, "endTime", "time")}
+                </label>
+                <label className="block min-w-0">
+                  <span className={mobileLabelCls}>Toll</span>
+                  {tripControl(gi, ri, r, "toll", "number")}
+                </label>
+                <label className="block min-w-0">
+                  <span className={mobileLabelCls}>Advance</span>
+                  {tripControl(gi, ri, r, "advancePaid", "number")}
+                </label>
+                <label className="block min-w-0">
+                  <span className={mobileLabelCls}>Total</span>
+                  {tripControl(gi, ri, r, "grandTotal", "number")}
+                </label>
+                <label className="col-span-2 block min-w-0">
+                  <span className={mobileLabelCls}>Notes</span>
+                  {tripControl(gi, ri, r, "notes", "text")}
+                </label>
+              </div>
+            </section>
+          ))}
+        </div>
+
+        <div className="hidden overflow-x-auto md:block">
             <table className="w-full min-w-[900px] text-sm">
               <thead>
                 <tr className="border-b border-slate-100 bg-slate-50/90 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:border-[#1e2638] dark:bg-white/[0.03] dark:text-slate-400">
@@ -467,40 +834,27 @@ function VehicleGroupsEditor({
             </table>
           </div>
 
-          {!readOnly && (
-            <div className="border-t border-slate-100 px-3 py-2.5 dark:border-[#1e2638] sm:px-4">
-              <button
-                type="button"
-                onClick={() =>
-                  onChange((prev) => {
-                    const next = [...prev];
-                    next[gi] = {
-                      ...next[gi],
-                      rows: [...next[gi].rows, emptyRow()],
-                    };
-                    return next;
-                  })
-                }
-                className="w-full rounded-lg py-2 text-xs font-semibold text-indigo-600 transition hover:bg-indigo-50 dark:text-indigo-300 dark:hover:bg-indigo-500/10 sm:w-auto sm:py-1"
-              >
-                + Add trip
-              </button>
-            </div>
-          )}
-        </div>
-      ))}
-
-      {!readOnly && (
-        <div className="sticky bottom-0 z-10 -mx-1 bg-[var(--bg-main)]/95 py-2 backdrop-blur-sm dark:bg-[#07090e]/95">
-          <button
-            type="button"
-            onClick={() => onChange((prev) => [...prev, emptyVehicleGroup()])}
-            className="flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-slate-300 bg-[var(--bg-card)] px-4 py-3 text-sm font-semibold text-slate-600 shadow-sm transition hover:border-indigo-400 hover:text-indigo-600 dark:border-[#334155] dark:text-slate-300 dark:hover:border-indigo-500/50 dark:hover:text-indigo-300"
-          >
-            <Plus className="h-4 w-4" /> Add vehicle
-          </button>
-        </div>
-      )}
+        {!readOnly && (
+          <div className="border-t border-slate-100 px-2 py-2 dark:border-[#1e2638] sm:px-4 sm:py-2.5">
+            <button
+              type="button"
+              onClick={() =>
+                onChange((prev) => {
+                  const next = [...prev];
+                  next[gi] = {
+                    ...next[gi],
+                    rows: [...next[gi].rows, emptyRow()],
+                  };
+                  return next;
+                })
+              }
+              className="w-full rounded-md py-1.5 text-xs font-semibold text-indigo-600 transition hover:bg-indigo-50 dark:text-indigo-300 dark:hover:bg-indigo-500/10 sm:w-auto sm:rounded-lg sm:py-2"
+            >
+              + Add trip
+            </button>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -516,9 +870,10 @@ export function GuestBulkEntryPage() {
   const [driverName, setDriverName] = useState("");
   const [driverPhone, setDriverPhone] = useState("");
   const [blocks, setBlocks] = useState<GuestAgencyBlock[]>([emptyBlock()]);
+  const [activeClientId, setActiveClientId] = useState("");
   const [isOwner, setIsOwner] = useState(false);
 
-  const [showCreateFor, setShowCreateFor] = useState<string | null>(null);
+  const [showCreateAgency, setShowCreateAgency] = useState(false);
   const [newName, setNewName] = useState("");
   const [newPhone, setNewPhone] = useState("");
   const [creating, setCreating] = useState(false);
@@ -528,16 +883,27 @@ export function GuestBulkEntryPage() {
   const [approving, setApproving] = useState<string | null>(null);
   const [linkCopied, setLinkCopied] = useState(false);
   const [ownerBusy, setOwnerBusy] = useState(false);
+  const [editingDriver, setEditingDriver] = useState(false);
 
   const lastBackendHash = useRef("");
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const mountedRef = useRef(true);
   const skipNextSync = useRef(true);
+  const syncPayloadRef = useRef({
+    driverName: "",
+    driverPhone: "",
+    blocks: [] as GuestAgencyBlock[],
+  });
+  const syncGenerationRef = useRef(0);
+  const editingDepthRef = useRef(0);
+  const pendingAcceptedDraftRef = useRef<GuestAgencyBlock[] | null>(null);
+  const blurFlushTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     mountedRef.current = true;
     return () => {
       mountedRef.current = false;
+      if (blurFlushTimerRef.current) clearTimeout(blurFlushTimerRef.current);
     };
   }, []);
 
@@ -563,6 +929,7 @@ export function GuestBulkEntryPage() {
           data.draft?.blocks?.length ? data.draft.blocks : [emptyBlock()],
         );
         setBlocks(loaded);
+        setActiveClientId(pickActiveBlockId(loaded));
         skipNextSync.current = true;
         lastBackendHash.current = quickHash(
           JSON.stringify({
@@ -586,6 +953,25 @@ export function GuestBulkEntryPage() {
     };
   }, [token]);
 
+  useEffect(() => {
+    if (!activeClientId && blocks.length > 0) {
+      setActiveClientId(pickActiveBlockId(blocks));
+      return;
+    }
+    if (activeClientId && !blocks.some((b) => b.clientId === activeClientId)) {
+      setActiveClientId(pickActiveBlockId(blocks));
+    }
+  }, [blocks, activeClientId]);
+
+  const activeBlock = useMemo(() => {
+    if (!blocks.length) return null;
+    return (
+      blocks.find((b) => b.clientId === activeClientId) ??
+      blocks.find((b) => b.status !== "accepted") ??
+      blocks[0]
+    );
+  }, [blocks, activeClientId]);
+
   const syncPayload = useMemo(
     () => ({
       driverName,
@@ -601,6 +987,32 @@ export function GuestBulkEntryPage() {
     [driverName, driverPhone, blocks],
   );
 
+  syncPayloadRef.current = syncPayload;
+
+  const flushPendingAcceptedMerge = () => {
+    const pending = pendingAcceptedDraftRef.current;
+    if (!pending) return;
+    pendingAcceptedDraftRef.current = null;
+    setBlocks((prev) => mergeAcceptedBlocksFromServer(prev, pending));
+  };
+
+  const handleFormFocusIn = () => {
+    editingDepthRef.current += 1;
+    if (blurFlushTimerRef.current) {
+      clearTimeout(blurFlushTimerRef.current);
+      blurFlushTimerRef.current = null;
+    }
+  };
+
+  const handleFormFocusOut = () => {
+    editingDepthRef.current = Math.max(0, editingDepthRef.current - 1);
+    if (editingDepthRef.current > 0) return;
+    if (blurFlushTimerRef.current) clearTimeout(blurFlushTimerRef.current);
+    blurFlushTimerRef.current = setTimeout(() => {
+      if (editingDepthRef.current === 0) flushPendingAcceptedMerge();
+    }, 150);
+  };
+
   useEffect(() => {
     if (!token || !invite || loading) return;
     if (skipNextSync.current) {
@@ -615,9 +1027,11 @@ export function GuestBulkEntryPage() {
     if (timerRef.current) clearTimeout(timerRef.current);
     timerRef.current = setTimeout(async () => {
       if (!mountedRef.current) return;
+      const payload = syncPayloadRef.current;
+      const gen = ++syncGenerationRef.current;
       setSyncStatus("saving");
       try {
-        const openBlocks = syncPayload.blocks
+        const openBlocks = payload.blocks
           .filter((b) => b.status !== "accepted")
           .map((b) => ({
             clientId: b.clientId,
@@ -625,12 +1039,10 @@ export function GuestBulkEntryPage() {
             agencyName: b.agencyName,
             driverGroups: b.driverGroups,
           }));
-        const accepted = syncPayload.blocks.filter(
-          (b) => b.status === "accepted",
-        );
+        const accepted = payload.blocks.filter((b) => b.status === "accepted");
         const data = await syncGuestBulk(token, {
-          driverName: syncPayload.driverName,
-          driverPhone: syncPayload.driverPhone,
+          driverName: payload.driverName,
+          driverPhone: payload.driverPhone,
           blocks: [
             ...openBlocks,
             ...accepted.map((b) => ({
@@ -641,23 +1053,17 @@ export function GuestBulkEntryPage() {
             })),
           ],
         });
-        if (!mountedRef.current) return;
-        lastBackendHash.current = hash;
+        if (!mountedRef.current || gen !== syncGenerationRef.current) return;
+        lastBackendHash.current = quickHash(JSON.stringify(syncPayloadRef.current));
         setSyncStatus("saved");
         if (data.draft?.blocks) {
-          setBlocks((prev) => {
-            const serverMap = new Map(
-              normalizeGuestBlocks(data.draft!.blocks).map((b) => [
-                b.clientId,
-                b,
-              ]),
+          if (editingDepthRef.current > 0) {
+            pendingAcceptedDraftRef.current = data.draft.blocks;
+          } else {
+            setBlocks((prev) =>
+              mergeAcceptedBlocksFromServer(prev, data.draft!.blocks),
             );
-            return prev.map((b) => {
-              const s = serverMap.get(b.clientId);
-              if (s?.status === "accepted") return s;
-              return b;
-            });
-          });
+          }
         }
         setTimeout(() => {
           if (mountedRef.current) setSyncStatus("idle");
@@ -672,24 +1078,76 @@ export function GuestBulkEntryPage() {
     };
   }, [token, invite, loading, syncPayload]);
 
-  const updateBlock = (clientId: string, patch: Partial<GuestAgencyBlock>) => {
-    setBlocks((prev) =>
-      prev.map((b) => (b.clientId === clientId ? { ...b, ...patch } : b)),
-    );
+  const selectAgency = (agencyId: string) => {
+    const agency = agencies.find((x) => (x._id ?? x.id) === agencyId);
+    const agencyName = agency?.name ?? "";
+
+    if (!agencyId) {
+      setBlocks((prev) =>
+        prev.map((b) =>
+          b.clientId === activeClientId && b.status === "open"
+            ? { ...b, agencyId: null, agencyName: "" }
+            : b,
+        ),
+      );
+      return;
+    }
+
+    setBlocks((prev) => {
+      const existingOpen = prev.find(
+        (b) =>
+          b.status === "open" &&
+          agencyId &&
+          String(b.agencyId ?? "") === String(agencyId),
+      );
+      if (existingOpen) {
+        setActiveClientId(existingOpen.clientId);
+        return prev;
+      }
+
+      const active =
+        prev.find((b) => b.clientId === activeClientId) ??
+        prev.find((b) => b.status === "open");
+
+      if (active?.status === "accepted") {
+        const nb = emptyBlock();
+        nb.agencyId = agencyId || null;
+        nb.agencyName = agencyName;
+        setActiveClientId(nb.clientId);
+        return [...prev, nb];
+      }
+
+      if (active && !blockHasTripData(active)) {
+        setActiveClientId(active.clientId);
+        return prev.map((b) =>
+          b.clientId === active.clientId
+            ? {
+                ...b,
+                agencyId: agencyId || null,
+                agencyName,
+              }
+            : b,
+        );
+      }
+
+      const nb = emptyBlock();
+      nb.agencyId = agencyId || null;
+      nb.agencyName = agencyName;
+      setActiveClientId(nb.clientId);
+      return [...prev, nb];
+    });
   };
 
   const onCreateAgency = async () => {
-    if (!token || !showCreateFor) return;
+    if (!token) return;
     setCreating(true);
     setApproveError(null);
     try {
       const agency = await createGuestAgency(token, newName, newPhone);
       setAgencies((prev) => [...prev, agency]);
-      updateBlock(showCreateFor, {
-        agencyId: agency._id ?? agency.id ?? null,
-        agencyName: agency.name,
-      });
-      setShowCreateFor(null);
+      const id = agency._id ?? agency.id ?? "";
+      selectAgency(id);
+      setShowCreateAgency(false);
       setNewName("");
       setNewPhone("");
     } catch (e: unknown) {
@@ -711,7 +1169,11 @@ export function GuestBulkEntryPage() {
         clientId ? { clientId } : { all: true },
       );
       skipNextSync.current = true;
-      if (data.draft?.blocks) setBlocks(data.draft.blocks);
+      if (data.draft?.blocks) {
+        const next = normalizeGuestBlocks(data.draft.blocks);
+        setBlocks(next);
+        setActiveClientId(pickActiveBlockId(next));
+      }
       setInvite((prev) => (prev ? { ...prev, ...data } : data));
       lastBackendHash.current = quickHash(
         JSON.stringify({
@@ -839,10 +1301,10 @@ export function GuestBulkEntryPage() {
 
   return (
     <div className="flex h-dvh flex-col overflow-hidden bg-[var(--bg-main)]">
-      <header className="shrink-0 border-b border-slate-200 bg-[var(--bg-card)]/95 px-3 py-2.5 shadow-sm backdrop-blur dark:border-[#1e2638] sm:px-4 sm:py-3">
-        <div className="mx-auto flex max-w-5xl flex-col gap-2.5 sm:flex-row sm:items-center sm:gap-4">
-          <div className="flex min-w-0 flex-1 items-start gap-3">
-            <TripwiseLogo className="mt-0.5 h-12 w-12 shrink-0" />
+      <header className="shrink-0 border-b border-slate-200 bg-[var(--bg-card)]/95 px-2.5 py-2 shadow-sm backdrop-blur dark:border-[#1e2638] sm:px-4 sm:py-3">
+        <div className="mx-auto flex max-w-5xl flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
+          <div className="flex min-w-0 flex-1 items-start gap-2 sm:gap-3">
+            <TripwiseLogo className="mt-0.5 h-9 w-9 shrink-0 sm:h-12 sm:w-12" />
             <div className="min-w-0 flex-1">
             <p className="text-[10px] font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">
               {isOwner
@@ -859,25 +1321,25 @@ export function GuestBulkEntryPage() {
             )}
             </div>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
             <SyncBadge status={syncStatus} />
             <button
               type="button"
               onClick={toggleTheme}
               title={theme === "dark" ? "Light mode" : "Dark mode"}
-              className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-slate-200 bg-[var(--bg-elevated)] text-slate-500 transition hover:text-indigo-600 dark:border-[#1e2638] dark:text-slate-400 dark:hover:text-indigo-300"
+              className={`${btnIconCls} border-slate-200 bg-[var(--bg-elevated)] text-slate-500 hover:text-indigo-600 dark:border-[#1e2638] dark:text-slate-400 dark:hover:text-indigo-300`}
             >
               {theme === "dark" ? (
-                <Sun className="h-4 w-4" />
+                <Sun className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
               ) : (
-                <Moon className="h-4 w-4" />
+                <Moon className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
               )}
             </button>
             <button
               type="button"
               onClick={copyShareLink}
               title="Copy share link"
-              className="inline-flex min-h-10 items-center gap-1.5 rounded-lg border border-slate-200 bg-[var(--bg-elevated)] px-3 py-2 text-xs font-semibold text-slate-600 shadow-xs transition hover:border-indigo-300 hover:text-indigo-600 dark:border-[#1e2638] dark:text-slate-300 dark:hover:border-indigo-400 dark:hover:text-indigo-300 sm:text-sm"
+              className={`${btnOutlineCls} border-slate-200 bg-[var(--bg-elevated)] text-slate-600 hover:border-indigo-300 hover:text-indigo-600 dark:border-[#1e2638] dark:text-slate-300 dark:hover:border-indigo-400 dark:hover:text-indigo-300 sm:text-sm`}
             >
               {linkCopied ? (
                 <Check className="h-4 w-4 text-emerald-600" />
@@ -901,7 +1363,7 @@ export function GuestBulkEntryPage() {
                     ? "Unrevoke — allow drivers"
                     : "Revoke — block drivers"
                 }
-                className={`inline-flex min-h-10 items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-semibold shadow-xs disabled:opacity-60 sm:text-sm ${
+                className={`${btnOutlineCls} disabled:opacity-60 sm:text-sm ${
                   invite.status === "revoked"
                     ? "border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300"
                     : "border-rose-200 bg-[var(--bg-elevated)] text-rose-600 hover:bg-rose-50 dark:border-rose-500/30 dark:text-rose-400 dark:hover:bg-rose-500/10"
@@ -922,7 +1384,7 @@ export function GuestBulkEntryPage() {
                 type="button"
                 disabled={Boolean(approving)}
                 onClick={() => onApprove()}
-                className="min-h-10 flex-1 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-bold text-white shadow-sm hover:bg-emerald-700 disabled:opacity-60 dark:bg-emerald-500 dark:hover:bg-emerald-400 sm:flex-none"
+                className={`${btnSolidCls} flex-1 bg-emerald-600 text-white shadow-sm hover:bg-emerald-700 dark:bg-emerald-500 dark:hover:bg-emerald-400 sm:flex-none sm:text-sm`}
               >
                 {approving === "__all__" ? "Approving…" : "Approve all"}
               </button>
@@ -931,7 +1393,11 @@ export function GuestBulkEntryPage() {
         </div>
       </header>
 
-      <main className="mx-auto min-h-0 w-full max-w-5xl flex-1 space-y-3 overflow-y-auto p-3 sm:space-y-4 sm:p-6">
+      <main
+        className="mx-auto min-h-0 w-full max-w-5xl flex-1 space-y-3 overflow-y-auto p-3 pb-28 sm:space-y-4 sm:p-6 sm:pb-24"
+        onFocusCapture={handleFormFocusIn}
+        onBlurCapture={handleFormFocusOut}
+      >
         {isOwner && (
           <div className="space-y-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-3 text-sm text-emerald-800 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300 sm:rounded-lg sm:px-4">
             <p className="text-xs leading-relaxed sm:text-sm">
@@ -971,147 +1437,129 @@ export function GuestBulkEntryPage() {
           </div>
         )}
 
-        <div className="space-y-3 rounded-xl border border-slate-200 bg-[var(--bg-card)] p-3 shadow-sm dark:border-[#1e2638] sm:p-4">
-          <p className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-            Driver details
-          </p>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <label className="block">
-              <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">
-                Name *
-              </span>
-              <input
-                value={driverName}
-                onChange={(e) => setDriverName(e.target.value)}
-                className={`mt-1 ${inputCls}`}
-                placeholder="Driver name"
-              />
-            </label>
-            <label className="block">
-              <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">
-                Phone
-              </span>
-              <input
-                value={driverPhone}
-                onChange={(e) => setDriverPhone(e.target.value)}
-                inputMode="tel"
-                className={`mt-1 ${inputCls} font-mono`}
-                placeholder="Mobile number"
-              />
-            </label>
-          </div>
-        </div>
+        <GuestDriverSummary
+          name={driverName}
+          phone={driverPhone}
+          editing={editingDriver}
+          onEdit={() => setEditingDriver(true)}
+          onDone={() => setEditingDriver(false)}
+          onNameChange={setDriverName}
+          onPhoneChange={setDriverPhone}
+        />
 
-        {blocks.map((block, bi) => {
-          const accepted = block.status === "accepted";
+        {activeBlock && (() => {
+          const showNewAgency =
+            invite.allowCreateAgency && activeBlock.status !== "accepted";
+          const showApproveBtn =
+            isOwner && activeBlock.status !== "accepted";
+          const agencyOnly = !showNewAgency && !showApproveBtn;
           return (
-            <section
-              key={block.clientId}
-              className={`space-y-3 rounded-2xl border p-3 sm:p-5 ${
-                accepted
-                  ? "border-emerald-200 bg-emerald-50/40 dark:border-emerald-500/30 dark:bg-emerald-500/10"
-                  : "border-slate-200 bg-[var(--bg-card)] shadow-sm dark:border-[#1e2638]"
-              }`}
-            >
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <div className="flex min-w-0 items-center gap-2">
-                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-indigo-200 bg-indigo-50 text-indigo-600 dark:border-indigo-500/30 dark:bg-indigo-500/15 dark:text-indigo-300">
-                    <Building2 className="h-3.5 w-3.5" />
-                  </span>
-                  <h2 className="text-sm font-bold text-slate-800 dark:text-slate-100">
-                    Agency {bi + 1}
-                  </h2>
-                  {accepted && (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold uppercase text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300">
-                      <CheckCircle2 className="h-3 w-3" /> Approved
-                    </span>
-                  )}
-                </div>
-                <div className="flex items-center gap-2">
-                  {isOwner && !accepted && (
-                    <button
-                      type="button"
-                      disabled={Boolean(approving)}
-                      onClick={() => onApprove(block.clientId)}
-                      className="min-h-9 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-bold text-white hover:bg-emerald-700 disabled:opacity-60 dark:bg-emerald-500"
-                    >
-                      {approving === block.clientId ? "…" : "Approve"}
-                    </button>
-                  )}
-                  {!accepted && blocks.length > 1 && (
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setBlocks((prev) =>
-                          prev.filter((b) => b.clientId !== block.clientId),
-                        )
-                      }
-                      className="rounded-lg p-2 text-rose-400 hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-500/10"
-                      title="Remove agency"
-                      aria-label="Remove agency"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              {!accepted ? (
-                <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-                  <select
-                    value={block.agencyId ?? ""}
-                    onChange={(e) => {
-                      const id = e.target.value;
-                      const a = agencies.find((x) => (x._id ?? x.id) === id);
-                      updateBlock(block.clientId, {
-                        agencyId: id || null,
-                        agencyName: a?.name ?? "",
-                      });
-                    }}
-                    className={`${inputCls} min-h-11 min-w-0 flex-1 sm:min-w-[180px]`}
-                  >
-                    <option value="">Select agency…</option>
-                    {agencies.map((a) => (
-                      <option key={a._id ?? a.id} value={a._id ?? a.id}>
-                        {formatAgencyLabel(a)}
-                      </option>
-                    ))}
-                  </select>
-                  {invite.allowCreateAgency && (
-                    <button
-                      type="button"
-                      onClick={() => setShowCreateFor(block.clientId)}
-                      className="inline-flex min-h-11 w-full items-center justify-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-400 sm:w-auto"
-                    >
-                      <Plus className="h-4 w-4" /> New agency
-                    </button>
-                  )}
-                </div>
-              ) : (
-                <p className="text-sm font-medium text-slate-700 dark:text-slate-200">
-                  {block.agencyName || "Agency"}
-                </p>
+          <section
+            className={`space-y-2 rounded-lg border p-2.5 sm:space-y-3 sm:rounded-xl sm:p-4 ${
+              activeBlock.status === "accepted"
+                ? "border-emerald-200 bg-emerald-50/40 dark:border-emerald-500/30 dark:bg-emerald-500/10"
+                : "border-slate-200 bg-[var(--bg-card)] shadow-sm dark:border-[#1e2638]"
+            }`}
+          >
+            <div className="grid grid-cols-2 gap-2 items-end">
+              <label
+                className={`min-w-0 ${agencyOnly ? "col-span-2" : "col-span-1"}`}
+              >
+                <span className={mobileLabelCls}>Agency *</span>
+                <GuestAgencyPicker
+                  agencies={agencies}
+                  value={activeBlock.agencyId ?? ""}
+                  fallbackName={activeBlock.agencyName}
+                  disabled={activeBlock.status === "accepted"}
+                  onChange={selectAgency}
+                />
+              </label>
+              {showNewAgency && (
+                <button
+                  type="button"
+                  onClick={() => setShowCreateAgency(true)}
+                  className={`${btnSolidCls} col-span-1 w-full bg-indigo-600 font-semibold text-white hover:bg-indigo-700 sm:text-sm dark:bg-indigo-500 dark:hover:bg-indigo-400`}
+                >
+                  <Plus className="h-3.5 w-3.5 sm:h-4 sm:w-4" /> New agency
+                </button>
               )}
+              {showApproveBtn && (
+                <button
+                  type="button"
+                  disabled={Boolean(approving)}
+                  onClick={() => onApprove(activeBlock.clientId)}
+                  className={`${btnSolidCls} w-full bg-emerald-600 text-white hover:bg-emerald-700 dark:bg-emerald-500 sm:text-sm ${
+                    showNewAgency ? "col-span-2" : "col-span-1"
+                  }`}
+                >
+                  {approving === activeBlock.clientId ? "Approving…" : "Approve"}
+                </button>
+              )}
+            </div>
 
-              <VehicleGroupsEditor
-                groups={block.driverGroups}
-                readOnly={accepted}
-                onChange={(updater) => {
-                  setBlocks((prev) =>
-                    prev.map((b) => {
-                      if (b.clientId !== block.clientId) return b;
-                      const nextGroups =
-                        typeof updater === "function"
-                          ? updater(b.driverGroups)
-                          : updater;
-                      return { ...b, driverGroups: nextGroups };
-                    }),
-                  );
-                }}
-              />
-            </section>
+            {activeBlock.status === "accepted" && (
+              <p className="flex items-center gap-1.5 text-xs font-medium text-emerald-700 dark:text-emerald-300">
+                <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
+                Approved — trips for this agency are read-only. Choose another
+                agency to enter more.
+              </p>
+            )}
+
+            {(blocks.some(
+              (b) =>
+                (b.status === "accepted" || blockHasTripData(b)) &&
+                (b.agencyName || b.agencyId),
+            ) ||
+              blocks.filter((b) => b.status === "open").length > 1) && (
+              <div className="flex flex-wrap gap-1.5">
+                {blocks
+                  .filter(
+                    (b) =>
+                      (b.agencyName || b.agencyId) &&
+                      (b.status === "accepted" || blockHasTripData(b)),
+                  )
+                  .map((b) => (
+                    <button
+                      key={b.clientId}
+                      type="button"
+                      onClick={() => setActiveClientId(b.clientId)}
+                      className={`inline-flex max-w-full items-center gap-1 rounded-full border px-2.5 py-1 text-[10px] font-semibold transition sm:text-[11px] ${
+                        b.clientId === activeBlock.clientId
+                          ? b.status === "accepted"
+                            ? "border-emerald-300 bg-emerald-100 text-emerald-900 dark:border-emerald-500/40 dark:bg-emerald-500/20 dark:text-emerald-200"
+                            : "border-indigo-200 bg-indigo-50 text-indigo-800 dark:border-indigo-500/30 dark:bg-indigo-500/15 dark:text-indigo-200"
+                          : "border-transparent bg-slate-100 text-slate-600 hover:border-slate-200 dark:bg-white/10 dark:text-slate-300 dark:hover:border-white/10"
+                      }`}
+                    >
+                      <Building2 className="h-3 w-3 shrink-0 opacity-70" />
+                      <span className="truncate">{b.agencyName || "Agency"}</span>
+                      {b.status === "accepted" ? (
+                        <CheckCircle2 className="h-3 w-3 shrink-0 text-emerald-600 dark:text-emerald-400" />
+                      ) : null}
+                    </button>
+                  ))}
+              </div>
+            )}
+
+            <VehicleGroupsEditor
+              groups={activeBlock.driverGroups}
+              readOnly={activeBlock.status === "accepted"}
+              onChange={(updater) => {
+                setBlocks((prev) =>
+                  prev.map((b) => {
+                    if (b.clientId !== activeBlock.clientId) return b;
+                    const nextGroups =
+                      typeof updater === "function"
+                        ? updater(b.driverGroups)
+                        : updater;
+                    return { ...b, driverGroups: nextGroups };
+                  }),
+                );
+              }}
+            />
+          </section>
           );
-        })}
+        })()}
 
         <p className="pb-2 text-center text-xs text-slate-400 dark:text-slate-500">
           Autosaves as you type · no submit needed
@@ -1119,23 +1567,11 @@ export function GuestBulkEntryPage() {
         </p>
       </main>
 
-      <div className="shrink-0 border-t border-slate-200 bg-[var(--bg-card)]/95 px-3 py-3 backdrop-blur dark:border-[#1e2638] sm:px-6">
-        <div className="mx-auto max-w-5xl pb-[env(safe-area-inset-bottom)]">
-          <button
-            type="button"
-            onClick={() => setBlocks((prev) => [...prev, emptyBlock()])}
-            className="flex min-h-12 w-full items-center justify-center gap-2 rounded-xl border border-dashed border-slate-300 bg-[var(--bg-elevated)] px-4 py-3 text-sm font-semibold text-slate-600 transition hover:border-indigo-400 hover:text-indigo-600 dark:border-[#334155] dark:text-slate-300 dark:hover:border-indigo-500/50 dark:hover:text-indigo-300"
-          >
-            <Plus className="h-4 w-4" /> Add another agency
-          </button>
-        </div>
-      </div>
-
-      {showCreateFor && (
+      {showCreateAgency && (
         <div
           className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-0 dark:bg-black/60 sm:items-center sm:p-4"
           onClick={(e) =>
-            e.target === e.currentTarget && setShowCreateFor(null)
+            e.target === e.currentTarget && setShowCreateAgency(false)
           }
         >
           <div className="w-full max-w-md space-y-4 rounded-t-2xl border border-slate-200 bg-[var(--bg-card)] p-5 shadow-xl dark:border-[#1e2638] sm:rounded-2xl sm:p-6">
@@ -1158,8 +1594,8 @@ export function GuestBulkEntryPage() {
             <div className="flex gap-2 pb-[env(safe-area-inset-bottom)] sm:pb-0">
               <button
                 type="button"
-                onClick={() => setShowCreateFor(null)}
-                className="min-h-11 flex-1 rounded-lg border border-slate-200 bg-[var(--bg-elevated)] py-2.5 text-sm font-semibold text-slate-600 dark:border-[#1e2638] dark:text-slate-300"
+                onClick={() => setShowCreateAgency(false)}
+                className={`${btnOutlineCls} flex-1 border-slate-200 bg-[var(--bg-elevated)] text-slate-600 dark:border-[#1e2638] dark:text-slate-300 sm:text-sm`}
               >
                 Cancel
               </button>
@@ -1167,7 +1603,7 @@ export function GuestBulkEntryPage() {
                 type="button"
                 disabled={creating}
                 onClick={onCreateAgency}
-                className="min-h-11 flex-1 rounded-lg bg-indigo-600 py-2.5 text-sm font-bold text-white disabled:opacity-60 dark:bg-indigo-500"
+                className={`${btnSolidCls} flex-1 bg-indigo-600 text-white dark:bg-indigo-500 sm:text-sm`}
               >
                 {creating ? "Creating…" : "Create"}
               </button>

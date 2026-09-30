@@ -18,7 +18,7 @@ import {
   type DriverCashInCashOutDetail,
 } from "../api";
 import {
-  fetchAgencies,
+  fetchAllAgencies,
   addAgencyPayoutPayment,
   addDriverPayoutPayment,
   type Agency,
@@ -899,7 +899,7 @@ export function CashInCashOutPage() {
   const loadAgencies = useCallback(async () => {
     setListLoading(true);
     try {
-      const { agencies: list } = await fetchAgencies(1, 300);
+      const { agencies: list } = await fetchAllAgencies();
       setAgencies(list);
     } catch {
       setAgencies([]);

@@ -8,6 +8,11 @@ import {
   resolveAgencyLabelFromName,
   buildAgencyLabelLookup,
 } from "../../lib/agencyDisplay";
+import {
+  fetchAllPages,
+  DEFAULT_LIST_PAGE_SIZE,
+  type PagePagination,
+} from "../../lib/fetchAllPages";
 
 export type { AgencyDisplayFields } from "../../lib/agencyDisplay";
 export {
@@ -133,6 +138,29 @@ export async function fetchAgencies(
   };
 }
 
+/** Load every agency for the owner (paginated). */
+export async function fetchAllAgencies(search?: string): Promise<{
+  agencies: Agency[];
+  complete: boolean;
+}> {
+  const result = await fetchAllPages(async (page, pageSize) => {
+    const { agencies, total } = await fetchAgencies(page, pageSize, search);
+    const pages = Math.max(1, Math.ceil(total / pageSize));
+    return {
+      items: agencies,
+      pagination: {
+        page,
+        limit: pageSize,
+        total,
+        pages,
+        hasNext: page < pages,
+        hasPrev: page > 1,
+      },
+    };
+  });
+  return { agencies: result.items, complete: result.complete };
+}
+
 /** Create an agency */
 export async function createAgency(
   name: string,
@@ -159,23 +187,96 @@ export async function deleteAgency(id: string): Promise<void> {
 
 // ── Bulk Entry ──
 
-/** Fetch bulk entry trips for an agency */
-export async function fetchBulkEntryTrips(
-  agencyId: string,
-  page = 1,
-  limit = 100,
-): Promise<AgencyTrip[]> {
-  const res = await apiClient.get(
-    `${ApiEndpoints.bulkEntryTrips}?agencyId=${agencyId}&page=${page}&limit=${limit}`,
-  );
-  const raw: any = res.data ?? {};
-  const root = raw.data ?? raw;
-  return (
+export type EntryTripsPagination = PagePagination;
+
+function parseBulkEntryTripsResponse(raw: unknown): {
+  trips: AgencyTrip[];
+  pagination: EntryTripsPagination | null;
+} {
+  const root: any = (raw as any)?.data ?? raw ?? {};
+  const trips: AgencyTrip[] =
     root.bulkEntryTrips ??
     root.agencyTrips ??
     root.documents ??
     root.items ??
-    []
+    [];
+  const pagination = root.pagination ?? null;
+  return { trips, pagination };
+}
+
+function parseNormalEntryTripsResponse(raw: unknown): {
+  trips: AgencyTrip[];
+  pagination: EntryTripsPagination | null;
+} {
+  const root: any = (raw as any)?.data ?? raw ?? {};
+  const trips: AgencyTrip[] =
+    root.normalEntryTrips ??
+    root.agencyTrips ??
+    root.documents ??
+    root.items ??
+    [];
+  const pagination = root.pagination ?? null;
+  return { trips, pagination };
+}
+
+export type FetchAllEntryTripsResult = {
+  trips: AgencyTrip[];
+  /** False if server total not reached or safety cap hit */
+  complete: boolean;
+  loadedCount: number;
+  expectedTotal: number | null;
+};
+
+async function fetchAllEntryTripsPaginated(
+  fetchPage: (
+    page: number,
+    limit: number,
+  ) => Promise<{ trips: AgencyTrip[]; pagination: EntryTripsPagination | null }>,
+): Promise<FetchAllEntryTripsResult> {
+  const result = await fetchAllPages((page, pageSize) =>
+    fetchPage(page, pageSize).then(({ trips, pagination }) => ({
+      items: trips,
+      pagination,
+    })),
+  );
+  return {
+    trips: result.items,
+    complete: result.complete,
+    loadedCount: result.loadedCount,
+    expectedTotal: result.expectedTotal,
+  };
+}
+
+/** Fetch one page of bulk entry trips for an agency */
+export async function fetchBulkEntryTrips(
+  agencyId: string,
+  page = 1,
+  limit = DEFAULT_LIST_PAGE_SIZE,
+): Promise<AgencyTrip[]> {
+  const { trips } = await fetchBulkEntryTripsPage(agencyId, page, limit);
+  return trips;
+}
+
+export async function fetchBulkEntryTripsPage(
+  agencyId: string,
+  page = 1,
+  limit = DEFAULT_LIST_PAGE_SIZE,
+): Promise<{ trips: AgencyTrip[]; pagination: EntryTripsPagination | null }> {
+  const res = await apiClient.get(
+    `${ApiEndpoints.bulkEntryTrips}?agencyId=${agencyId}&page=${page}&limit=${limit}`,
+  );
+  return parseBulkEntryTripsResponse(res.data);
+}
+
+/**
+ * Load every bulk trip for an agency.
+ * Paginates until `pagination.total` is loaded or the server has no next page.
+ */
+export async function fetchAllBulkEntryTrips(
+  agencyId: string,
+): Promise<FetchAllEntryTripsResult> {
+  return fetchAllEntryTripsPaginated((page, limit) =>
+    fetchBulkEntryTripsPage(agencyId, page, limit),
   );
 }
 
@@ -232,23 +333,33 @@ export async function deleteBulkEntryTrip(id: string): Promise<void> {
 
 // ── Normal Entry ──
 
-/** Fetch normal entry trips for an agency */
+/** Fetch one page of normal entry trips for an agency */
 export async function fetchNormalEntryTrips(
   agencyId: string,
   page = 1,
-  limit = 100,
+  limit = DEFAULT_LIST_PAGE_SIZE,
 ): Promise<AgencyTrip[]> {
+  const { trips } = await fetchNormalEntryTripsPage(agencyId, page, limit);
+  return trips;
+}
+
+export async function fetchNormalEntryTripsPage(
+  agencyId: string,
+  page = 1,
+  limit = DEFAULT_LIST_PAGE_SIZE,
+): Promise<{ trips: AgencyTrip[]; pagination: EntryTripsPagination | null }> {
   const res = await apiClient.get(
     `${ApiEndpoints.normalEntryTrips}?agencyId=${agencyId}&page=${page}&limit=${limit}`,
   );
-  const raw: any = res.data ?? {};
-  const root = raw.data ?? raw;
-  return (
-    root.normalEntryTrips ??
-    root.agencyTrips ??
-    root.documents ??
-    root.items ??
-    []
+  return parseNormalEntryTripsResponse(res.data);
+}
+
+/** Load every normal entry trip for an agency (same pagination rules as bulk). */
+export async function fetchAllNormalEntryTrips(
+  agencyId: string,
+): Promise<FetchAllEntryTripsResult> {
+  return fetchAllEntryTripsPaginated((page, limit) =>
+    fetchNormalEntryTripsPage(agencyId, page, limit),
   );
 }
 

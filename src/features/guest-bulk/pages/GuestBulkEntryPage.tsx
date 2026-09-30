@@ -3,7 +3,6 @@ import {
   useMemo,
   useRef,
   useState,
-  type ComponentProps,
   type Dispatch,
   type ReactNode,
   type SetStateAction,
@@ -24,6 +23,7 @@ import {
   Moon,
   Sun,
   ChevronDown,
+  X,
   Building2,
   Car,
   Pencil,
@@ -48,6 +48,7 @@ import { TimePicker12h } from "../../../components/ui/TimePicker12h";
 import { normalizeHHmm } from "../../../lib/timePickerUtils";
 import { useTheme } from "../../../hooks/useTheme";
 import { TripwiseLogo } from "../../../components/brand/TripwiseLogo";
+import { fetchVehicles } from "../../vehicles/api";
 
 type SyncStatus = "idle" | "saving" | "saved" | "error";
 const AUTOSAVE_DELAY = 800;
@@ -76,16 +77,118 @@ const fieldMinHCls = "min-h-8 sm:min-h-10";
 const selectTriggerCls =
   "flex w-full min-w-0 touch-manipulation items-center gap-2 rounded-md border border-slate-200 bg-[var(--bg-elevated)] px-2.5 text-left text-sm outline-none transition focus:border-indigo-400 focus:ring-1 focus:ring-indigo-200 disabled:cursor-not-allowed disabled:opacity-60 sm:rounded-lg sm:px-3 dark:border-[#1e2638] dark:focus:border-indigo-400";
 
-const selectCls =
-  `w-full min-w-0 touch-manipulation appearance-none cursor-pointer truncate rounded-md border border-slate-200 bg-[var(--bg-elevated)] py-1.5 pl-2.5 pr-8 text-sm font-medium text-slate-800 outline-none transition focus:border-indigo-400 focus:ring-1 focus:ring-indigo-200 disabled:cursor-not-allowed disabled:opacity-60 sm:rounded-lg sm:px-3 sm:py-2.5 dark:border-[#1e2638] dark:text-slate-100 dark:focus:border-indigo-400 ${fieldMinHCls}`;
+const comboIconBtnCls =
+  "inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-slate-400 transition hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-white/10 dark:hover:text-slate-200";
 
-const plateCls =
-  "font-mono font-semibold uppercase tracking-wider !text-amber-700 dark:!text-amber-300";
+function comboboxShowClear(
+  disabled: boolean | undefined,
+  open: boolean,
+  query: string,
+  closedLabel: string,
+  storedValue?: string | null,
+) {
+  if (disabled) return false;
+  const text = (open ? query : closedLabel).trim();
+  if (text) return true;
+  return Boolean(String(storedValue ?? "").trim());
+}
 
-function vehicleOptionLabel(vg: DriverGroup, index: number): string {
-  const plate = vg.vehicleNumber.trim();
+function GuestComboboxClearButton({
+  show,
+  disabled,
+  label,
+  onClear,
+}: {
+  show: boolean;
+  disabled?: boolean;
+  label: string;
+  onClear: () => void;
+}) {
+  if (!show) return null;
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      aria-label={label}
+      onMouseDown={(e) => e.preventDefault()}
+      onClick={onClear}
+      className={comboIconBtnCls}
+    >
+      <X className="h-3.5 w-3.5" />
+    </button>
+  );
+}
+
+function vehicleOptionLabel(
+  vg: DriverGroup,
+  index: number,
+  livePlate?: string,
+): string {
+  const plate = (livePlate ?? vg.vehicleNumber).trim();
   if (plate) return plate;
   return `Vehicle ${index + 1} — add plate`;
+}
+
+function collectSavedPlates(blocks: GuestAgencyBlock[]): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const block of blocks) {
+    for (const g of block.driverGroups ?? []) {
+      const plate = String(g.vehicleNumber ?? "").trim();
+      if (!plate) continue;
+      const key = plate.toUpperCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push(plate);
+    }
+  }
+  return out;
+}
+
+type VehiclePickerOption =
+  | {
+      kind: "group";
+      key: string;
+      groupId: string;
+      plate: string;
+      index: number;
+      label: string;
+    }
+  | { kind: "saved"; key: string; plate: string };
+
+function buildVehiclePickerOptions(
+  groups: DriverGroup[],
+  extraPlates: string[],
+): VehiclePickerOption[] {
+  const options: VehiclePickerOption[] = groups.map((vg, i) => {
+    const groupId = String(vg.clientGroupId ?? "").trim() || `idx-${i}`;
+    const plate = String(vg.vehicleNumber ?? "").trim();
+    return {
+      kind: "group",
+      key: `g:${groupId}`,
+      groupId,
+      plate,
+      index: i,
+      label: vehicleOptionLabel(vg, i),
+    };
+  });
+
+  const inGroups = new Set(
+    options.map((o) => o.plate.toUpperCase()).filter(Boolean),
+  );
+  for (const plate of extraPlates) {
+    const p = String(plate ?? "").trim();
+    if (!p) continue;
+    const key = p.toUpperCase();
+    if (inGroups.has(key)) continue;
+    inGroups.add(key);
+    options.push({
+      kind: "saved",
+      key: `p:${key}`,
+      plate: p,
+    });
+  }
+  return options;
 }
 
 const guestPenBtnCls =
@@ -110,9 +213,9 @@ function GuestDriverSummary({
 }) {
   if (editing) {
     return (
-      <div className="space-y-2 rounded-md border border-slate-200/80 p-2 dark:border-[#1e2638]">
-        <div className="grid grid-cols-2 gap-2">
-          <label className="col-span-2 block sm:col-span-1">
+      <div className="w-fit max-w-full space-y-1.5 rounded-md border border-slate-200/80 p-2 dark:border-[#1e2638]">
+        <div className="flex flex-wrap gap-2">
+          <label className="block w-[9.5rem] min-w-0">
             <span className={mobileLabelCls}>Name *</span>
             <input
               value={name}
@@ -122,14 +225,14 @@ function GuestDriverSummary({
               autoFocus
             />
           </label>
-          <label className="col-span-2 block sm:col-span-1">
+          <label className="block w-[9.5rem] min-w-0">
             <span className={mobileLabelCls}>Phone</span>
             <input
               value={phone}
               onChange={(e) => onPhoneChange(e.target.value)}
               inputMode="tel"
               className={`mt-0.5 ${inputCls} font-mono`}
-              placeholder="Mobile number"
+              placeholder="Mobile"
             />
           </label>
         </div>
@@ -144,15 +247,15 @@ function GuestDriverSummary({
     );
   }
 
-  const primary = name.trim() || "Add driver name";
+  const primary = name.trim() || "Add driver";
   const secondary = phone.trim() || "No phone";
 
   return (
-    <div className="flex items-center gap-2 rounded-md border border-slate-200/80 bg-slate-50/60 px-2 py-1.5 dark:border-[#1e2638] dark:bg-white/[0.03]">
-      <User className="h-3.5 w-3.5 shrink-0 text-indigo-500/90 dark:text-indigo-400" />
-      <div className="min-w-0 flex-1">
+    <div className="inline-flex max-w-full items-center gap-2.5 rounded-lg border border-slate-200/80 bg-slate-50/60 px-3 py-2 dark:border-[#1e2638] dark:bg-white/[0.03]">
+      <User className="h-4 w-4 shrink-0 text-indigo-500/90 dark:text-indigo-400" />
+      <div className="min-w-0">
         <p
-          className={`truncate text-xs font-semibold ${
+          className={`truncate text-sm font-semibold ${
             name.trim()
               ? "text-slate-800 dark:text-slate-100"
               : "text-slate-400 dark:text-slate-500"
@@ -161,7 +264,7 @@ function GuestDriverSummary({
           {primary}
         </p>
         <p
-          className={`truncate font-mono text-[10px] ${
+          className={`truncate font-mono text-xs ${
             phone.trim()
               ? "text-slate-600 dark:text-slate-300"
               : "text-slate-400 dark:text-slate-500"
@@ -182,133 +285,435 @@ function GuestDriverSummary({
   );
 }
 
-function GuestStyledSelect({
-  icon,
-  className,
-  children,
-  ...props
-}: ComponentProps<"select"> & { icon?: ReactNode }) {
-  return (
-    <div className="relative mt-0.5 min-w-0">
-      {icon ? (
-        <span className="pointer-events-none absolute left-2.5 top-1/2 z-[1] -translate-y-1/2 text-indigo-500/80 dark:text-indigo-400/90 [&_svg]:h-4 [&_svg]:w-4">
-          {icon}
-        </span>
-      ) : null}
-      <select
-        {...props}
-        className={`${selectCls} ${icon ? "pl-9 sm:pl-10" : ""} ${className ?? ""}`}
-      >
-        {children}
-      </select>
-      <ChevronDown
-        className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 dark:text-slate-500"
-        aria-hidden
-      />
-    </div>
-  );
-}
-
 function GuestAgencyPicker({
   agencies,
   value,
   fallbackName,
   disabled,
   onChange,
+  onCreateNew,
 }: {
   agencies: Agency[];
   value: string;
   fallbackName?: string;
   disabled?: boolean;
   onChange: (agencyId: string) => void;
+  onCreateNew?: () => void;
 }) {
   const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
   const rootRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const selected = agencies.find((a) => (a._id ?? a.id) === value);
+  const selectedLabel = selected
+    ? formatAgencyLabel(selected)
+    : fallbackName?.trim() || "";
+
+  useEffect(() => {
+    if (!open) setQuery(selectedLabel);
+  }, [selectedLabel, open]);
 
   useEffect(() => {
     if (!open) return;
     const onDoc = (e: MouseEvent) => {
       if (rootRef.current?.contains(e.target as Node)) return;
       setOpen(false);
+      setQuery(selectedLabel);
     };
     document.addEventListener("mousedown", onDoc);
     return () => document.removeEventListener("mousedown", onDoc);
-  }, [open]);
+  }, [open, selectedLabel]);
 
-  const selected = agencies.find((a) => (a._id ?? a.id) === value);
-  const label = selected
-    ? formatAgencyLabel(selected)
-    : fallbackName?.trim() || "";
+  const q = query.trim().toLowerCase();
+  const filtered = !open
+    ? agencies
+    : agencies.filter((a) => {
+        if (!q) return true;
+        const name = (a.name || "").toLowerCase();
+        const phone = (a.phone || "").toLowerCase();
+        return name.includes(q) || phone.includes(q);
+      });
+
+  const pick = (id: string) => {
+    onChange(id);
+    setOpen(false);
+    const a = agencies.find((x) => (x._id ?? x.id) === id);
+    setQuery(a ? formatAgencyLabel(a) : "");
+  };
+
+  const showClear = comboboxShowClear(
+    disabled,
+    open,
+    query,
+    selectedLabel,
+    value || fallbackName,
+  );
+
+  const clear = () => {
+    onChange("");
+    setQuery("");
+    setOpen(false);
+    queueMicrotask(() => inputRef.current?.focus());
+  };
 
   return (
-    <div ref={rootRef} className="relative mt-0.5 min-w-0">
-      <button
-        type="button"
-        disabled={disabled}
-        aria-expanded={open}
-        aria-haspopup="listbox"
-        onClick={() => !disabled && setOpen((o) => !o)}
-        className={`${selectTriggerCls} ${fieldMinHCls} py-1.5 sm:py-2.5 ${
-          label
-            ? "font-medium text-slate-800 dark:text-slate-100"
-            : "font-normal text-slate-400 dark:text-slate-500"
-        }`}
+    <div ref={rootRef} className="relative w-[13.5rem] max-w-full sm:w-[15rem]">
+      <div
+        className={`${selectTriggerCls} ${fieldMinHCls} gap-1.5 py-1 pl-2 pr-1 sm:py-1.5`}
       >
-        <Building2 className="h-4 w-4 shrink-0 text-indigo-500 dark:text-indigo-400" />
-        <span className="min-w-0 flex-1 truncate">
-          {label || "Select agency…"}
-        </span>
-        <ChevronDown
-          className={`h-4 w-4 shrink-0 text-slate-400 transition-transform dark:text-slate-500 ${
-            open ? "rotate-180" : ""
-          }`}
+        <Building2 className="h-3.5 w-3.5 shrink-0 text-indigo-500 dark:text-indigo-400" />
+        <input
+          ref={inputRef}
+          value={open ? query : selectedLabel}
+          disabled={disabled}
+          placeholder="Search agency…"
+          aria-label="Agency"
+          aria-expanded={open}
+          aria-autocomplete="list"
+          onFocus={() => {
+            if (disabled) return;
+            setOpen(true);
+            setQuery(selectedLabel);
+          }}
+          onChange={(e) => {
+            setQuery(e.target.value);
+            setOpen(true);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Escape") {
+              setOpen(false);
+              setQuery(selectedLabel);
+            }
+            if (e.key === "Enter" && filtered.length === 1) {
+              e.preventDefault();
+              pick(filtered[0]._id ?? filtered[0].id ?? "");
+            }
+          }}
+          className="min-w-0 flex-1 border-0 bg-transparent p-0 text-sm font-medium text-slate-800 outline-none placeholder:font-normal placeholder:text-slate-400 focus:ring-0 disabled:cursor-not-allowed disabled:opacity-60 dark:text-slate-100"
         />
-      </button>
-      {open && (
-        <ul
-          role="listbox"
-          className="absolute left-0 right-0 top-full z-40 mt-1 max-h-56 overflow-y-auto rounded-lg border border-slate-200 bg-[var(--bg-card)] py-1 shadow-lg dark:border-[#1e2638]"
+        <GuestComboboxClearButton
+          show={showClear}
+          disabled={disabled}
+          label="Clear agency"
+          onClear={clear}
+        />
+        <button
+          type="button"
+          disabled={disabled}
+          aria-label="Toggle agency list"
+          onClick={() => {
+            if (disabled) return;
+            setOpen((o) => {
+              const next = !o;
+              if (next) {
+                setQuery(selectedLabel);
+                queueMicrotask(() => inputRef.current?.focus());
+              } else setQuery(selectedLabel);
+              return next;
+            });
+          }}
+          className={comboIconBtnCls}
         >
-          {agencies.length === 0 ? (
-            <li className="px-3 py-2.5 text-xs text-slate-500 dark:text-slate-400">
-              No agencies yet — use New agency
-            </li>
-          ) : (
-            agencies.map((a) => {
-              const id = a._id ?? a.id ?? "";
-              const active = id === value;
-              const name = a.name?.trim() || "Unnamed";
-              const phone = a.phone?.trim();
-              return (
-                <li key={id}>
-                  <button
-                    type="button"
-                    role="option"
-                    aria-selected={active}
-                    onClick={() => {
-                      onChange(id);
-                      setOpen(false);
-                    }}
-                    className={`w-full px-3 py-2.5 text-left transition ${
-                      active
-                        ? "bg-indigo-50 text-indigo-800 dark:bg-indigo-500/15 dark:text-indigo-200"
-                        : "text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-white/5"
-                    }`}
-                  >
-                    <span className="block truncate text-sm font-medium">
-                      {name}
-                    </span>
-                    {phone ? (
-                      <span className="mt-0.5 block truncate font-mono text-[11px] text-slate-500 dark:text-slate-400">
-                        {phone}
+          <ChevronDown
+            className={`h-4 w-4 transition-transform ${open ? "rotate-180" : ""}`}
+          />
+        </button>
+      </div>
+      {open && !disabled && (
+        <div className="absolute left-0 z-40 mt-1 w-[min(100vw-2rem,18rem)] overflow-hidden rounded-lg border border-slate-200 bg-[var(--bg-card)] shadow-lg dark:border-[#1e2638]">
+          {onCreateNew ? (
+            <button
+              type="button"
+              onClick={() => {
+                setOpen(false);
+                onCreateNew();
+              }}
+              className="flex w-full items-center gap-1.5 border-b border-slate-100 px-3 py-2 text-left text-xs font-semibold text-indigo-600 hover:bg-indigo-50 dark:border-[#1e2638] dark:text-indigo-300 dark:hover:bg-indigo-500/10"
+            >
+              <Plus className="h-3.5 w-3.5" /> New agency
+            </button>
+          ) : null}
+          <ul role="listbox" className="max-h-48 overflow-y-auto py-1">
+            {filtered.length === 0 ? (
+              <li className="px-3 py-2.5 text-xs text-slate-500 dark:text-slate-400">
+                No match
+              </li>
+            ) : (
+              filtered.map((a) => {
+                const id = a._id ?? a.id ?? "";
+                const active = id === value;
+                const name = a.name?.trim() || "Unnamed";
+                const phone = a.phone?.trim();
+                return (
+                  <li key={id}>
+                    <button
+                      type="button"
+                      role="option"
+                      aria-selected={active}
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => pick(id)}
+                      className={`w-full px-3 py-2 text-left transition ${
+                        active
+                          ? "bg-indigo-50 text-indigo-800 dark:bg-indigo-500/15 dark:text-indigo-200"
+                          : "text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-white/5"
+                      }`}
+                    >
+                      <span className="block truncate text-sm font-medium">
+                        {name}
                       </span>
-                    ) : null}
-                  </button>
-                </li>
-              );
-            })
-          )}
-        </ul>
+                      {phone ? (
+                        <span className="mt-0.5 block truncate font-mono text-[11px] text-slate-500 dark:text-slate-400">
+                          {phone}
+                        </span>
+                      ) : null}
+                    </button>
+                  </li>
+                );
+              })
+            )}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function GuestVehiclePicker({
+  groups,
+  activeGroupId,
+  plate,
+  extraPlates,
+  disabled,
+  onSelect,
+  onPlateChange,
+  onAdd,
+}: {
+  groups: DriverGroup[];
+  activeGroupId: string;
+  plate: string;
+  extraPlates?: string[];
+  disabled?: boolean;
+  onSelect: (groupId: string) => void;
+  onPlateChange: (plate: string) => void;
+  onAdd: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const rootRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const selectedLabel = plate.trim();
+  const allOptions = useMemo(
+    () => buildVehiclePickerOptions(groups, extraPlates ?? []),
+    [groups, extraPlates],
+  );
+
+  useEffect(() => {
+    if (!open) setQuery(selectedLabel);
+  }, [selectedLabel, open]);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDoc = (e: MouseEvent) => {
+      if (rootRef.current?.contains(e.target as Node)) return;
+      setOpen(false);
+      setQuery(selectedLabel);
+    };
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, [open, selectedLabel]);
+
+  const q = query.trim().toLowerCase();
+  const filtered = !open
+    ? allOptions
+    : allOptions.filter((opt) => {
+        if (!q) return true;
+        if (opt.kind === "saved") {
+          return opt.plate.toLowerCase().includes(q);
+        }
+        const plateText = opt.plate.toLowerCase();
+        const label = opt.label.toLowerCase();
+        return plateText.includes(q) || label.includes(q);
+      });
+
+  const labelForOption = (opt: VehiclePickerOption) => {
+    if (opt.kind === "saved") return opt.plate;
+    return opt.plate.trim() ? opt.plate : opt.label;
+  };
+
+  const pick = (opt: VehiclePickerOption) => {
+    if (opt.kind === "group") {
+      const id = opt.groupId;
+      if (id.startsWith("idx-")) {
+        const index = Number(id.slice(4));
+        const fallbackId = groups[index]?.clientGroupId;
+        onSelect(fallbackId ?? id);
+      } else {
+        onSelect(id);
+      }
+    } else {
+      const existing = groups.find(
+        (g) =>
+          String(g.vehicleNumber ?? "")
+            .trim()
+            .toUpperCase() === opt.plate.toUpperCase(),
+      );
+      if (existing?.clientGroupId) {
+        onSelect(existing.clientGroupId);
+      } else {
+        onPlateChange(opt.plate);
+      }
+    }
+    setOpen(false);
+    setQuery(labelForOption(opt));
+  };
+
+  const showClear = comboboxShowClear(
+    disabled,
+    open,
+    query,
+    selectedLabel,
+    plate,
+  );
+
+  const clear = () => {
+    onPlateChange("");
+    setQuery("");
+    setOpen(false);
+    queueMicrotask(() => inputRef.current?.focus());
+  };
+
+  return (
+    <div ref={rootRef} className="relative w-[13.5rem] max-w-full sm:w-[15rem]">
+      <div
+        className={`${selectTriggerCls} ${fieldMinHCls} gap-1.5 py-1 pl-2 pr-1 sm:py-1.5`}
+      >
+        <Car className="h-3.5 w-3.5 shrink-0 text-indigo-500 dark:text-indigo-400" />
+        <input
+          ref={inputRef}
+          value={open ? query : selectedLabel}
+          disabled={disabled}
+          placeholder="Search vehicle…"
+          aria-label="Vehicle"
+          aria-expanded={open}
+          aria-autocomplete="list"
+          onFocus={() => {
+            if (disabled) return;
+            setOpen(true);
+            setQuery(selectedLabel);
+          }}
+          onChange={(e) => {
+            setQuery(e.target.value);
+            setOpen(true);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Escape") {
+              setOpen(false);
+              setQuery(selectedLabel);
+            }
+            if (e.key === "Enter") {
+              if (filtered.length === 1) {
+                e.preventDefault();
+                pick(filtered[0]);
+              } else if (query.trim() && filtered.length === 0) {
+                e.preventDefault();
+                onPlateChange(query.trim());
+                setOpen(false);
+                setQuery(query.trim());
+              }
+            }
+          }}
+          className="min-w-0 flex-1 border-0 bg-transparent p-0 text-sm font-medium text-slate-800 outline-none placeholder:font-normal placeholder:text-slate-400 focus:ring-0 disabled:cursor-not-allowed disabled:opacity-60 dark:text-slate-100"
+        />
+        <GuestComboboxClearButton
+          show={showClear}
+          disabled={disabled}
+          label="Clear vehicle"
+          onClear={clear}
+        />
+        <button
+          type="button"
+          disabled={disabled}
+          aria-label="Toggle vehicle list"
+          onClick={() => {
+            if (disabled) return;
+            setOpen((o) => {
+              const next = !o;
+              if (next) {
+                setQuery(selectedLabel);
+                queueMicrotask(() => inputRef.current?.focus());
+              } else setQuery(selectedLabel);
+              return next;
+            });
+          }}
+          className={comboIconBtnCls}
+        >
+          <ChevronDown
+            className={`h-4 w-4 transition-transform ${open ? "rotate-180" : ""}`}
+          />
+        </button>
+      </div>
+      {open && !disabled && (
+        <div className="absolute left-0 z-40 mt-1 w-[min(100vw-2rem,18rem)] overflow-hidden rounded-lg border border-slate-200 bg-[var(--bg-card)] shadow-lg dark:border-[#1e2638]">
+          <button
+            type="button"
+            onClick={() => {
+              setOpen(false);
+              onAdd();
+            }}
+            className="flex w-full items-center gap-1.5 border-b border-slate-100 px-3 py-2 text-left text-xs font-semibold text-indigo-600 hover:bg-indigo-50 dark:border-[#1e2638] dark:text-indigo-300 dark:hover:bg-indigo-500/10"
+          >
+            <Plus className="h-3.5 w-3.5" /> Add vehicle
+          </button>
+          <ul role="listbox" className="max-h-48 overflow-y-auto py-1">
+            {filtered.length === 0 ? (
+              <li className="px-3 py-2.5 text-xs text-slate-500 dark:text-slate-400">
+                No match
+              </li>
+            ) : (
+              filtered.map((opt) => {
+                const active =
+                  opt.kind === "group"
+                    ? opt.groupId === activeGroupId
+                    : selectedLabel.toUpperCase() === opt.plate.toUpperCase();
+                const primary =
+                  opt.kind === "saved"
+                    ? opt.plate
+                    : opt.plate.trim()
+                      ? opt.plate
+                      : `Vehicle ${opt.index + 1}`;
+                const secondary =
+                  opt.kind === "saved" ? "Fleet / other entry" : undefined;
+                return (
+                  <li key={opt.key}>
+                    <button
+                      type="button"
+                      role="option"
+                      aria-selected={active}
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => pick(opt)}
+                      className={`w-full px-3 py-2 text-left transition ${
+                        active
+                          ? "bg-indigo-50 text-indigo-800 dark:bg-indigo-500/15 dark:text-indigo-200"
+                          : "text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-white/5"
+                      }`}
+                    >
+                      <span className="block truncate text-sm font-medium">
+                        {primary}
+                      </span>
+                      {secondary ? (
+                        <span className="mt-0.5 block truncate font-mono text-[11px] text-slate-500 dark:text-slate-400">
+                          {secondary}
+                        </span>
+                      ) : null}
+                    </button>
+                  </li>
+                );
+              })
+            )}
+          </ul>
+        </div>
       )}
     </div>
   );
@@ -483,10 +888,14 @@ function VehicleGroupsEditor({
   groups,
   onChange,
   readOnly,
+  toolbarStart,
+  extraPlates,
 }: {
   groups: DriverGroup[];
   onChange: Dispatch<SetStateAction<DriverGroup[]>>;
   readOnly?: boolean;
+  toolbarStart?: ReactNode;
+  extraPlates?: string[];
 }) {
   const [activeGroupId, setActiveGroupId] = useState(() =>
     pickActiveVehicleGroupId(groups),
@@ -516,6 +925,20 @@ function VehicleGroupsEditor({
       return;
     }
     setActiveGroupId(value);
+  };
+
+  const addTripBtnCls =
+    "w-full rounded-md py-1.5 text-xs font-semibold text-indigo-600 transition hover:bg-indigo-50 dark:text-indigo-300 dark:hover:bg-indigo-500/10 sm:w-auto sm:rounded-lg sm:py-2";
+
+  const addTrip = () => {
+    onChange((prev) => {
+      const next = [...prev];
+      next[gi] = {
+        ...next[gi],
+        rows: [...next[gi].rows, emptyRow()],
+      };
+      return next;
+    });
   };
 
   const updateRowField = (
@@ -593,66 +1016,41 @@ function VehicleGroupsEditor({
     );
   };
 
-  const removeActiveVehicle = () => {
-    const groupId = g.clientGroupId;
-    onChange((prev) => {
-      const next = prev.filter((item, i) =>
-        groupId ? item.clientGroupId !== groupId : i !== gi,
-      );
-      const normalized = next.length > 0 ? next : [emptyVehicleGroup()];
-      setActiveGroupId(pickActiveVehicleGroupId(normalized));
-      return normalized;
-    });
-  };
-
   return (
-    <div className="space-y-2 sm:space-y-3">
-      <div className="grid grid-cols-2 gap-2 items-end">
+    <div className="space-y-2">
+      <div className="flex flex-wrap items-end gap-3 sm:gap-4">
+        {toolbarStart}
         <label className="min-w-0">
-          <span className={mobileLabelCls}>Vehicle</span>
-          <GuestStyledSelect
-            value={g.clientGroupId}
-            disabled={readOnly}
-            onChange={(e) => selectVehicle(e.target.value)}
-            icon={<Car className="h-4 w-4" aria-hidden />}
-          >
-            {groups.map((vg, i) => (
-              <option key={vg.clientGroupId} value={vg.clientGroupId}>
-                {vehicleOptionLabel(vg, i)}
-              </option>
-            ))}
-            {!readOnly && <option value="__new__">+ Add another vehicle</option>}
-          </GuestStyledSelect>
+          <span className={mobileLabelCls}>Plate *</span>
+          <div className="mt-0.5">
+            <GuestVehiclePicker
+              groups={groups}
+              activeGroupId={g.clientGroupId ?? ""}
+              plate={g.vehicleNumber}
+              extraPlates={extraPlates}
+              disabled={readOnly}
+              onSelect={(id) => selectVehicle(id)}
+              onPlateChange={(v) => {
+                onChange((prev) => {
+                  const next = [...prev];
+                  next[gi] = { ...next[gi], vehicleNumber: v };
+                  return next;
+                });
+              }}
+              onAdd={() => selectVehicle("__new__")}
+            />
+          </div>
         </label>
-        <label className="min-w-0">
-          <span className={mobileLabelCls}>Plate number *</span>
-          <input
-            value={g.vehicleNumber}
-            disabled={readOnly}
-            onChange={(e) => {
-              const v = e.target.value.toUpperCase();
-              onChange((prev) => {
-                const next = [...prev];
-                next[gi] = { ...next[gi], vehicleNumber: v };
-                return next;
-              });
-            }}
-            placeholder="KL07AB1234"
-            className={`mt-0.5 ${inputCls} font-medium ${plateCls}`}
-          />
-        </label>
-        {!readOnly && groups.length > 1 && (
-          <button
-            type="button"
-            onClick={removeActiveVehicle}
-            className="col-span-2 justify-self-end px-1 text-[11px] font-semibold text-rose-500 hover:text-rose-600 sm:text-xs"
-          >
-            Remove vehicle
-          </button>
-        )}
       </div>
 
       <div className="overflow-hidden rounded-lg border border-slate-200 bg-[var(--bg-card)] dark:border-[#1e2638]">
+        {!readOnly && (
+          <div className="border-b border-slate-100 px-2 py-2 dark:border-[#1e2638] sm:px-4 sm:py-2.5">
+            <button type="button" onClick={addTrip} className={addTripBtnCls}>
+              + Add trip
+            </button>
+          </div>
+        )}
         <div className="divide-y divide-slate-200 dark:divide-[#1e2638] md:hidden">
           {g.rows.map((r, ri) => (
             <section key={r.clientRowId} className="p-2">
@@ -836,20 +1234,7 @@ function VehicleGroupsEditor({
 
         {!readOnly && (
           <div className="border-t border-slate-100 px-2 py-2 dark:border-[#1e2638] sm:px-4 sm:py-2.5">
-            <button
-              type="button"
-              onClick={() =>
-                onChange((prev) => {
-                  const next = [...prev];
-                  next[gi] = {
-                    ...next[gi],
-                    rows: [...next[gi].rows, emptyRow()],
-                  };
-                  return next;
-                })
-              }
-              className="w-full rounded-md py-1.5 text-xs font-semibold text-indigo-600 transition hover:bg-indigo-50 dark:text-indigo-300 dark:hover:bg-indigo-500/10 sm:w-auto sm:rounded-lg sm:py-2"
-            >
+            <button type="button" onClick={addTrip} className={addTripBtnCls}>
               + Add trip
             </button>
           </div>
@@ -872,6 +1257,7 @@ export function GuestBulkEntryPage() {
   const [blocks, setBlocks] = useState<GuestAgencyBlock[]>([emptyBlock()]);
   const [activeClientId, setActiveClientId] = useState("");
   const [isOwner, setIsOwner] = useState(false);
+  const [fleetPlates, setFleetPlates] = useState<string[]>([]);
 
   const [showCreateAgency, setShowCreateAgency] = useState(false);
   const [newName, setNewName] = useState("");
@@ -906,6 +1292,45 @@ export function GuestBulkEntryPage() {
       if (blurFlushTimerRef.current) clearTimeout(blurFlushTimerRef.current);
     };
   }, []);
+
+  const savedPlates = useMemo(() => collectSavedPlates(blocks), [blocks]);
+  const vehiclePickerPlates = useMemo(() => {
+    const seen = new Set<string>();
+    const out: string[] = [];
+    for (const p of [...savedPlates, ...fleetPlates]) {
+      const plate = String(p ?? "").trim();
+      if (!plate) continue;
+      const key = plate.toUpperCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push(plate);
+    }
+    return out;
+  }, [savedPlates, fleetPlates]);
+
+  useEffect(() => {
+    if (!isOwner) {
+      setFleetPlates([]);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetchVehicles({ page: 1, limit: 500 });
+        if (cancelled) return;
+        setFleetPlates(
+          res.items
+            .map((v) => String(v.vehicleNumber ?? "").trim())
+            .filter(Boolean),
+        );
+      } catch {
+        if (!cancelled) setFleetPlates([]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isOwner]);
 
   useEffect(() => {
     if (!token) {
@@ -1398,110 +1823,68 @@ export function GuestBulkEntryPage() {
         onFocusCapture={handleFormFocusIn}
         onBlurCapture={handleFormFocusOut}
       >
-        {isOwner && (
-          <div className="space-y-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-3 text-sm text-emerald-800 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300 sm:rounded-lg sm:px-4">
-            <p className="text-xs leading-relaxed sm:text-sm">
-              You are viewing this as the owner. Edits still autosave. Use{" "}
-              <strong>Approve</strong> to merge into Bulk Entry. You can open
-              this link anytime — even if revoked or expired.
-            </p>
-            {(invite.status === "revoked" || invite.expired) && (
-              <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300">
-                {invite.status === "revoked"
-                  ? "Revoked — drivers cannot open this link."
-                  : "Expired — drivers cannot open this link."}{" "}
-                Unrevoke / extend expiry to restore driver access.
-              </p>
-            )}
-            <label className="flex flex-col gap-1.5 text-xs text-emerald-900 dark:text-emerald-300 sm:flex-row sm:flex-wrap sm:items-center sm:gap-2">
-              <span className="font-semibold">Expires</span>
-              <input
-                type="datetime-local"
-                disabled={ownerBusy}
-                key={invite.expiresAt}
-                defaultValue={toLocalInputValue(invite.expiresAt)}
-                onBlur={(e) => {
-                  const next = e.target.value;
-                  const prev = toLocalInputValue(invite.expiresAt);
-                  if (next && next !== prev) void onOwnerExpiryChange(next);
-                }}
-                className="w-full rounded-lg border border-emerald-200 bg-[var(--bg-elevated)] px-2 py-2 text-xs text-slate-700 dark:border-emerald-500/30 dark:text-slate-200 sm:w-auto sm:py-1.5"
-              />
-            </label>
-          </div>
-        )}
-
         {approveError && (
           <div className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-3 text-sm text-rose-700 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-300 sm:px-4">
             {approveError}
           </div>
         )}
 
-        <GuestDriverSummary
-          name={driverName}
-          phone={driverPhone}
-          editing={editingDriver}
-          onEdit={() => setEditingDriver(true)}
-          onDone={() => setEditingDriver(false)}
-          onNameChange={setDriverName}
-          onPhoneChange={setDriverPhone}
-        />
+        <div className="flex flex-wrap items-center gap-3">
+          {isOwner && (
+            <div className="inline-flex flex-wrap items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50/80 px-3 py-2 dark:border-emerald-500/30 dark:bg-emerald-500/10">
+              <span className="rounded bg-emerald-600 px-1.5 py-0.5 text-[10px] font-bold uppercase text-white dark:bg-emerald-500">
+                Owner
+              </span>
+              {(invite.status === "revoked" || invite.expired) && (
+                <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-800 dark:bg-amber-500/20 dark:text-amber-200">
+                  {invite.status === "revoked" ? "Revoked" : "Expired"}
+                </span>
+              )}
+              <label className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-900 dark:text-emerald-200">
+                <span>Exp</span>
+                <input
+                  type="datetime-local"
+                  disabled={ownerBusy}
+                  key={invite.expiresAt}
+                  defaultValue={toLocalInputValue(invite.expiresAt)}
+                  onBlur={(e) => {
+                    const next = e.target.value;
+                    const prev = toLocalInputValue(invite.expiresAt);
+                    if (next && next !== prev) void onOwnerExpiryChange(next);
+                  }}
+                  className="w-[10.75rem] rounded border border-emerald-200 bg-[var(--bg-elevated)] px-1 py-0.5 text-[11px] text-slate-700 dark:border-emerald-500/30 dark:text-slate-200"
+                />
+              </label>
+            </div>
+          )}
+          <GuestDriverSummary
+            name={driverName}
+            phone={driverPhone}
+            editing={editingDriver}
+            onEdit={() => setEditingDriver(true)}
+            onDone={() => setEditingDriver(false)}
+            onNameChange={setDriverName}
+            onPhoneChange={setDriverPhone}
+          />
+        </div>
 
         {activeBlock && (() => {
           const showNewAgency =
             invite.allowCreateAgency && activeBlock.status !== "accepted";
           const showApproveBtn =
             isOwner && activeBlock.status !== "accepted";
-          const agencyOnly = !showNewAgency && !showApproveBtn;
           return (
           <section
-            className={`space-y-2 rounded-lg border p-2.5 sm:space-y-3 sm:rounded-xl sm:p-4 ${
+            className={`space-y-3 rounded-xl border p-3 sm:space-y-4 sm:p-4 ${
               activeBlock.status === "accepted"
                 ? "border-emerald-200 bg-emerald-50/40 dark:border-emerald-500/30 dark:bg-emerald-500/10"
                 : "border-slate-200 bg-[var(--bg-card)] shadow-sm dark:border-[#1e2638]"
             }`}
           >
-            <div className="grid grid-cols-2 gap-2 items-end">
-              <label
-                className={`min-w-0 ${agencyOnly ? "col-span-2" : "col-span-1"}`}
-              >
-                <span className={mobileLabelCls}>Agency *</span>
-                <GuestAgencyPicker
-                  agencies={agencies}
-                  value={activeBlock.agencyId ?? ""}
-                  fallbackName={activeBlock.agencyName}
-                  disabled={activeBlock.status === "accepted"}
-                  onChange={selectAgency}
-                />
-              </label>
-              {showNewAgency && (
-                <button
-                  type="button"
-                  onClick={() => setShowCreateAgency(true)}
-                  className={`${btnSolidCls} col-span-1 w-full bg-indigo-600 font-semibold text-white hover:bg-indigo-700 sm:text-sm dark:bg-indigo-500 dark:hover:bg-indigo-400`}
-                >
-                  <Plus className="h-3.5 w-3.5 sm:h-4 sm:w-4" /> New agency
-                </button>
-              )}
-              {showApproveBtn && (
-                <button
-                  type="button"
-                  disabled={Boolean(approving)}
-                  onClick={() => onApprove(activeBlock.clientId)}
-                  className={`${btnSolidCls} w-full bg-emerald-600 text-white hover:bg-emerald-700 dark:bg-emerald-500 sm:text-sm ${
-                    showNewAgency ? "col-span-2" : "col-span-1"
-                  }`}
-                >
-                  {approving === activeBlock.clientId ? "Approving…" : "Approve"}
-                </button>
-              )}
-            </div>
-
             {activeBlock.status === "accepted" && (
-              <p className="flex items-center gap-1.5 text-xs font-medium text-emerald-700 dark:text-emerald-300">
-                <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
-                Approved — trips for this agency are read-only. Choose another
-                agency to enter more.
+              <p className="flex items-center gap-1 text-[10px] font-medium text-emerald-700 dark:text-emerald-300">
+                <CheckCircle2 className="h-3 w-3 shrink-0" />
+                Approved — read-only
               </p>
             )}
 
@@ -1511,7 +1894,7 @@ export function GuestBulkEntryPage() {
                 (b.agencyName || b.agencyId),
             ) ||
               blocks.filter((b) => b.status === "open").length > 1) && (
-              <div className="flex flex-wrap gap-1.5">
+              <div className="flex flex-wrap gap-1">
                 {blocks
                   .filter(
                     (b) =>
@@ -1523,7 +1906,7 @@ export function GuestBulkEntryPage() {
                       key={b.clientId}
                       type="button"
                       onClick={() => setActiveClientId(b.clientId)}
-                      className={`inline-flex max-w-full items-center gap-1 rounded-full border px-2.5 py-1 text-[10px] font-semibold transition sm:text-[11px] ${
+                      className={`inline-flex max-w-full items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold transition ${
                         b.clientId === activeBlock.clientId
                           ? b.status === "accepted"
                             ? "border-emerald-300 bg-emerald-100 text-emerald-900 dark:border-emerald-500/40 dark:bg-emerald-500/20 dark:text-emerald-200"
@@ -1544,6 +1927,38 @@ export function GuestBulkEntryPage() {
             <VehicleGroupsEditor
               groups={activeBlock.driverGroups}
               readOnly={activeBlock.status === "accepted"}
+              extraPlates={vehiclePickerPlates}
+              toolbarStart={
+                <>
+                  <label className="min-w-0">
+                    <span className={mobileLabelCls}>Agency *</span>
+                    <div className="mt-0.5">
+                      <GuestAgencyPicker
+                        agencies={agencies}
+                        value={activeBlock.agencyId ?? ""}
+                        fallbackName={activeBlock.agencyName}
+                        disabled={activeBlock.status === "accepted"}
+                        onChange={selectAgency}
+                        onCreateNew={
+                          showNewAgency
+                            ? () => setShowCreateAgency(true)
+                            : undefined
+                        }
+                      />
+                    </div>
+                  </label>
+                  {showApproveBtn && (
+                    <button
+                      type="button"
+                      disabled={Boolean(approving)}
+                      onClick={() => onApprove(activeBlock.clientId)}
+                      className={`${btnSolidCls} shrink-0 self-end bg-emerald-600 px-2.5 text-white hover:bg-emerald-700 dark:bg-emerald-500`}
+                    >
+                      {approving === activeBlock.clientId ? "…" : "Approve"}
+                    </button>
+                  )}
+                </>
+              }
               onChange={(updater) => {
                 setBlocks((prev) =>
                   prev.map((b) => {

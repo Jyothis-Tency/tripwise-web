@@ -73,6 +73,11 @@ export function GuestInvitesPanel({
 
   if (!open) return null;
 
+  const pendingOnLinks = invites.reduce(
+    (n, inv) => n + (inv.pendingSubmissions ?? 0),
+    0,
+  );
+
   const openInNewTab = (inv: GuestBulkInvite) => {
     window.open(guestBulkShareUrl(inv.token), "_blank", "noopener,noreferrer");
   };
@@ -193,13 +198,18 @@ export function GuestInvitesPanel({
           <button
             type="button"
             onClick={() => setTab("invites")}
-            className={`px-3 py-2.5 text-sm font-semibold border-b-2 -mb-px transition ${
+            className={`relative px-3 py-2.5 text-sm font-semibold border-b-2 -mb-px transition ${
               tab === "invites"
                 ? "border-indigo-500 text-indigo-600 dark:border-indigo-400 dark:text-indigo-300"
                 : "border-transparent text-slate-400 dark:text-slate-500"
             }`}
           >
             Links
+            {pendingOnLinks > 0 && (
+              <span className="ml-1.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-orange-500 px-1 text-[10px] font-bold text-white align-middle">
+                {pendingOnLinks}
+              </span>
+            )}
           </button>
           <button
             type="button"
@@ -284,16 +294,31 @@ export function GuestInvitesPanel({
                       (inv.expiresAt &&
                         new Date(inv.expiresAt).getTime() < Date.now());
                     const revoked = inv.status === "revoked";
+                    const pending = inv.pendingSubmissions ?? 0;
                     return (
                       <li
                         key={inv.id}
-                        className="rounded-xl border border-slate-200 bg-[var(--bg-card)] p-3 space-y-2 dark:border-[#1e2638]"
+                        className={`rounded-xl border bg-[var(--bg-card)] p-3 space-y-2 dark:border-[#1e2638] ${
+                          pending > 0
+                            ? "border-orange-300 dark:border-orange-500/40"
+                            : "border-slate-200"
+                        }`}
                       >
                         <div className="flex items-start justify-between gap-2">
                           <div className="min-w-0">
-                            <p className="text-sm font-semibold text-slate-800 truncate dark:text-slate-100">
-                              {inv.driverName || inv.label}
-                            </p>
+                            <div className="flex items-center gap-2 min-w-0">
+                              <p className="text-sm font-semibold text-slate-800 truncate dark:text-slate-100">
+                                {inv.driverName || inv.label}
+                              </p>
+                              {pending > 0 && (
+                                <span
+                                  className="shrink-0 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-orange-500 px-1.5 text-[10px] font-bold text-white"
+                                  title={`${pending} pending — open link to Approve`}
+                                >
+                                  {pending}
+                                </span>
+                              )}
+                            </div>
                             <p className="text-xs text-slate-400 mt-0.5 dark:text-slate-500">
                               {inv.driverPhone
                                 ? `${inv.driverPhone} · `
@@ -305,6 +330,9 @@ export function GuestInvitesPanel({
                                   : "Active for drivers"}
                               {(inv.draft?.openRowCount ?? 0) > 0
                                 ? ` · ${inv.draft?.openRowCount} open rows`
+                                : ""}
+                              {pending > 0
+                                ? ` · ${pending} pending — open to Approve`
                                 : ""}
                             </p>
                           </div>

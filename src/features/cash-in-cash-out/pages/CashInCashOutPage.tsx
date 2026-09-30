@@ -776,7 +776,7 @@ function TableShell({
         </h4>
       </div>
       <div className="overflow-x-auto overscroll-x-contain [-webkit-overflow-scrolling:touch]">
-        {children}
+      {children}
       </div>
     </div>
   );
@@ -963,34 +963,34 @@ export function CashInCashOutPage() {
 
   const loadAgencyDetail = useCallback(
     async (agencyId: string, month: string) => {
-      setDetailLoading(true);
-      setDetailError(null);
-      try {
+    setDetailLoading(true);
+    setDetailError(null);
+    try {
         const d = await fetchCashInCashOutAgencyDetail(agencyId, month);
-        setAgencyDetail(d);
-      } catch {
-        setAgencyDetail(null);
-        setDetailError("Could not load agency details.");
-      } finally {
-        setDetailLoading(false);
-      }
+      setAgencyDetail(d);
+    } catch {
+      setAgencyDetail(null);
+      setDetailError("Could not load agency details.");
+    } finally {
+      setDetailLoading(false);
+    }
     },
     [],
   );
 
   const loadDriverDetail = useCallback(
     async (driverId: string, month: string) => {
-      setDetailLoading(true);
-      setDetailError(null);
-      try {
+    setDetailLoading(true);
+    setDetailError(null);
+    try {
         const d = await fetchCashInCashOutDriverDetail(driverId, month);
-        setDriverDetail(d);
-      } catch {
-        setDriverDetail(null);
-        setDetailError("Could not load driver details.");
-      } finally {
-        setDetailLoading(false);
-      }
+      setDriverDetail(d);
+    } catch {
+      setDriverDetail(null);
+      setDetailError("Could not load driver details.");
+    } finally {
+      setDetailLoading(false);
+    }
     },
     [],
   );
@@ -1248,12 +1248,12 @@ export function CashInCashOutPage() {
         }
         const pay = Math.min(left, bulkRemaining);
         await addDriverPayoutPayment(agencyId, {
-          driverName: driverDetail.driver.displayName,
+        driverName: driverDetail.driver.displayName,
           amount: pay,
-          paymentDate: payDate,
-          paymentMethod: payMethod,
-          notes: payNotes,
-        });
+        paymentDate: payDate,
+        paymentMethod: payMethod,
+        notes: payNotes,
+      });
         left -= pay;
       }
 
@@ -1370,7 +1370,7 @@ export function CashInCashOutPage() {
                               {a.phone}
                             </p>
                           ) : (
-                            <p className="text-xs text-slate-400">Agency</p>
+                          <p className="text-xs text-slate-400">Agency</p>
                           )}
                         </div>
                       </div>
@@ -1442,16 +1442,16 @@ export function CashInCashOutPage() {
                     {selectedAgencyMeta
                       ? formatAgencyLabel(selectedAgencyMeta)
                       : (agencyDetail?.agency.name ?? "…")}
-                  </h2>
+                    </h2>
                   <div className="ml-auto flex shrink-0">
-                    <button
-                      type="button"
+                  <button
+                    type="button"
                       onClick={openAgencyMarkPaymentModal}
                       disabled={!agencyDetail || detailLoading}
                       className="touch-manipulation rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50 sm:px-4 sm:py-2 sm:text-sm"
                     >
                       Mark Payment
-                    </button>
+                  </button>
                   </div>
                 </div>
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
@@ -1504,12 +1504,12 @@ export function CashInCashOutPage() {
                       <TableShell title="Trips (bulk & vehicle)">
                         <div>
                           <table className="min-w-[36rem] w-full text-left text-xs sm:min-w-full">
-                            <thead>
-                              <tr className="border-b border-slate-100 text-slate-500">
+                          <thead>
+                            <tr className="border-b border-slate-100 text-slate-500">
                                 <th className="px-3 py-2 font-medium">
                                   Source
                                 </th>
-                                <th className="px-3 py-2 font-medium">Date</th>
+                              <th className="px-3 py-2 font-medium">Date</th>
                                 <th className="px-3 py-2 font-medium">
                                   Trip / vehicle
                                 </th>
@@ -1528,9 +1528,9 @@ export function CashInCashOutPage() {
                                 <th className="px-3 py-2 font-medium">
                                   Status
                                 </th>
-                              </tr>
-                            </thead>
-                            <tbody>
+                            </tr>
+                          </thead>
+                          <tbody>
                               {agencyUnifiedTrips.length === 0 ? (
                                 <EmptyTableRow
                                   colSpan={8}
@@ -1540,8 +1540,8 @@ export function CashInCashOutPage() {
                                 agencyUnifiedTrips.map((r) => (
                                   <tr
                                     key={r.id}
-                                    className="border-b border-slate-50 text-slate-800"
-                                  >
+                                  className="border-b border-slate-50 text-slate-800"
+                                >
                                     <td className="whitespace-nowrap px-3 py-2">
                                       <span
                                         className={`inline-block rounded-md px-1.5 py-0.5 text-[10px] font-semibold ${sourceBadgeCls(r.source)}`}
@@ -1549,15 +1549,15 @@ export function CashInCashOutPage() {
                                         {r.source}
                                       </span>
                                     </td>
-                                    <td className="whitespace-nowrap px-3 py-2">
-                                      {formatDate(r.date)}
-                                    </td>
+                                  <td className="whitespace-nowrap px-3 py-2">
+                                    {formatDate(r.date)}
+                                  </td>
                                     <td className="whitespace-nowrap px-3 py-2 font-medium">
                                       {r.reference}
-                                    </td>
+                                  </td>
                                     <td className="max-w-[140px] truncate px-3 py-2">
                                       {r.details}
-                                    </td>
+                                  </td>
                                     <td className="px-3 py-2 text-right tabular-nums text-emerald-700">
                                       {r.cashIn != null
                                         ? fmtCurrency(r.cashIn)
@@ -1567,22 +1567,22 @@ export function CashInCashOutPage() {
                                       {r.cashOut != null
                                         ? fmtCurrency(r.cashOut)
                                         : "—"}
-                                    </td>
-                                    <td className="px-3 py-2 text-right tabular-nums text-slate-500">
+                                  </td>
+                                  <td className="px-3 py-2 text-right tabular-nums text-slate-500">
                                       {r.advance != null
                                         ? fmtCurrency(r.advance)
                                         : "—"}
-                                    </td>
-                                    <td className="px-3 py-2 capitalize text-slate-500">
-                                      {r.status}
-                                    </td>
-                                  </tr>
-                                ))
-                              )}
-                            </tbody>
-                          </table>
-                        </div>
-                      </TableShell>
+                                  </td>
+                                  <td className="px-3 py-2 capitalize text-slate-500">
+                                    {r.status}
+                                  </td>
+                                </tr>
+                              ))
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
+                    </TableShell>
                     )}
 
                     {agencyDetailTab === "cashHistory" && (
@@ -1590,8 +1590,8 @@ export function CashInCashOutPage() {
                         <TableShell title="Cash history (bulk & vehicle)">
                           <div>
                             <table className="min-w-[36rem] w-full text-left text-xs sm:min-w-full">
-                              <thead>
-                                <tr className="border-b border-slate-100 text-slate-500">
+                          <thead>
+                            <tr className="border-b border-slate-100 text-slate-500">
                                   <th className="px-3 py-2 font-medium">
                                     Type
                                   </th>
@@ -1607,9 +1607,9 @@ export function CashInCashOutPage() {
                                   <th className="px-3 py-2 font-medium">
                                     Notes
                                   </th>
-                                </tr>
-                              </thead>
-                              <tbody>
+                            </tr>
+                          </thead>
+                          <tbody>
                                 {agencyUnifiedCashHistory.length === 0 ? (
                                   <EmptyTableRow
                                     colSpan={5}
@@ -1619,45 +1619,45 @@ export function CashInCashOutPage() {
                                   agencyUnifiedCashHistory.map((r) => (
                                     <tr
                                       key={r.id}
-                                      className="border-b border-slate-50 text-slate-800"
-                                    >
-                                      <td className="whitespace-nowrap px-3 py-2">
+                                  className="border-b border-slate-50 text-slate-800"
+                                >
+                                  <td className="whitespace-nowrap px-3 py-2">
                                         <span
                                           className={`inline-block rounded-md px-1.5 py-0.5 text-[10px] font-semibold ${directionBadgeCls(r.direction)}`}
                                         >
                                           {r.direction}
                                         </span>
-                                      </td>
-                                      <td className="whitespace-nowrap px-3 py-2">
-                                        {formatDate(r.date)}
-                                      </td>
+                                  </td>
+                                  <td className="whitespace-nowrap px-3 py-2">
+                                    {formatDate(r.date)}
+                                  </td>
                                       <td
                                         className={`px-3 py-2 text-right font-medium tabular-nums ${cashAmountCls(r.direction)}`}
                                       >
-                                        {fmtCurrency(r.amount)}
-                                      </td>
+                                    {fmtCurrency(r.amount)}
+                                  </td>
                                       <td className="px-3 py-2">{r.method}</td>
-                                      <td className="max-w-[200px] truncate px-3 py-2 text-slate-500">
-                                        {r.notes || "—"}
-                                      </td>
-                                    </tr>
-                                  ))
-                                )}
-                              </tbody>
-                            </table>
-                          </div>
-                        </TableShell>
+                                  <td className="max-w-[200px] truncate px-3 py-2 text-slate-500">
+                                    {r.notes || "—"}
+                                  </td>
+                                </tr>
+                              ))
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
+                    </TableShell>
 
                         <p className="px-1 text-center text-[11px] leading-relaxed text-slate-400 sm:px-0">
-                          Main-trip agency receipts:{" "}
+                      Main-trip agency receipts:{" "}
                           <Link
                             to="/history/payout"
                             className="text-blue-600 hover:underline"
                           >
-                            History → Agency payout
-                          </Link>
-                        </p>
-                      </>
+                        History → Agency payout
+                      </Link>
+                    </p>
+                  </>
                     )}
                   </div>
                 ) : null}
@@ -1677,17 +1677,17 @@ export function CashInCashOutPage() {
                     <ArrowLeft className="h-5 w-5" />
                   </button>
                   <h2 className="min-w-0 truncate text-base font-bold text-slate-900 sm:text-lg">
-                    {driverDetail?.driver.displayName ?? "…"}
-                  </h2>
+                      {driverDetail?.driver.displayName ?? "…"}
+                    </h2>
                   <div className="ml-auto flex shrink-0">
-                    <button
-                      type="button"
+                  <button
+                    type="button"
                       onClick={openDriverMarkPaymentModal}
                       disabled={!driverDetail || detailLoading}
                       className="touch-manipulation rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50 sm:px-4 sm:py-2 sm:text-sm"
                     >
                       Cash out
-                    </button>
+                  </button>
                   </div>
                 </div>
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
@@ -1743,12 +1743,12 @@ export function CashInCashOutPage() {
                       <TableShell title="Trips (bulk & vehicle)">
                         <div>
                           <table className="min-w-[36rem] w-full text-left text-xs sm:min-w-full">
-                            <thead>
-                              <tr className="border-b border-slate-100 text-slate-500">
+                          <thead>
+                            <tr className="border-b border-slate-100 text-slate-500">
                                 <th className="px-3 py-2 font-medium">
                                   Source
                                 </th>
-                                <th className="px-3 py-2 font-medium">Date</th>
+                              <th className="px-3 py-2 font-medium">Date</th>
                                 <th className="px-3 py-2 font-medium">
                                   Trip / vehicle
                                 </th>
@@ -1764,9 +1764,9 @@ export function CashInCashOutPage() {
                                 <th className="px-3 py-2 font-medium">
                                   Status
                                 </th>
-                              </tr>
-                            </thead>
-                            <tbody>
+                            </tr>
+                          </thead>
+                          <tbody>
                               {driverUnifiedTrips.length === 0 ? (
                                 <EmptyTableRow
                                   colSpan={7}
@@ -1776,24 +1776,24 @@ export function CashInCashOutPage() {
                                 driverUnifiedTrips.map((r) => (
                                   <tr
                                     key={r.id}
-                                    className="border-b border-slate-50 text-slate-800"
-                                  >
-                                    <td className="whitespace-nowrap px-3 py-2">
+                                  className="border-b border-slate-50 text-slate-800"
+                                >
+                                  <td className="whitespace-nowrap px-3 py-2">
                                       <span
                                         className={`inline-block rounded-md px-1.5 py-0.5 text-[10px] font-semibold ${sourceBadgeCls(r.source)}`}
                                       >
                                         {r.source}
                                       </span>
-                                    </td>
-                                    <td className="whitespace-nowrap px-3 py-2">
-                                      {formatDate(r.date)}
-                                    </td>
+                                  </td>
+                                  <td className="whitespace-nowrap px-3 py-2">
+                                    {formatDate(r.date)}
+                                  </td>
                                     <td className="whitespace-nowrap px-3 py-2 font-medium">
                                       {r.reference}
-                                    </td>
+                                  </td>
                                     <td className="max-w-[140px] truncate px-3 py-2">
                                       {r.details}
-                                    </td>
+                                  </td>
                                     <td className="px-3 py-2 text-right tabular-nums text-amber-700">
                                       {fmtCurrency(r.cashOut)}
                                     </td>
@@ -1801,17 +1801,17 @@ export function CashInCashOutPage() {
                                       {r.grandTotal != null
                                         ? fmtCurrency(r.grandTotal)
                                         : "—"}
-                                    </td>
-                                    <td className="px-3 py-2 capitalize text-slate-500">
-                                      {r.status}
-                                    </td>
-                                  </tr>
-                                ))
-                              )}
-                            </tbody>
-                          </table>
-                        </div>
-                      </TableShell>
+                                  </td>
+                                  <td className="px-3 py-2 capitalize text-slate-500">
+                                    {r.status}
+                                  </td>
+                                </tr>
+                              ))
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
+                    </TableShell>
                     )}
 
                     {driverDetailTab === "cashHistory" && (
@@ -1819,8 +1819,8 @@ export function CashInCashOutPage() {
                         <TableShell title="Cash history (bulk & vehicle)">
                           <div>
                             <table className="min-w-[36rem] w-full text-left text-xs sm:min-w-full">
-                              <thead>
-                                <tr className="border-b border-slate-100 text-slate-500">
+                          <thead>
+                            <tr className="border-b border-slate-100 text-slate-500">
                                   <th className="px-3 py-2 font-medium">
                                     Type
                                   </th>
@@ -1836,9 +1836,9 @@ export function CashInCashOutPage() {
                                   <th className="px-3 py-2 font-medium">
                                     Notes
                                   </th>
-                                </tr>
-                              </thead>
-                              <tbody>
+                            </tr>
+                          </thead>
+                          <tbody>
                                 {driverUnifiedCashHistory.length === 0 ? (
                                   <EmptyTableRow
                                     colSpan={5}
@@ -1848,53 +1848,53 @@ export function CashInCashOutPage() {
                                   driverUnifiedCashHistory.map((r) => (
                                     <tr
                                       key={r.id}
-                                      className="border-b border-slate-50 text-slate-800"
-                                    >
+                                  className="border-b border-slate-50 text-slate-800"
+                                >
                                       <td className="whitespace-nowrap px-3 py-2">
                                         <span
                                           className={`inline-block rounded-md px-1.5 py-0.5 text-[10px] font-semibold ${driverCashKindBadgeCls(r.kind)}`}
                                         >
                                           {r.kind}
                                         </span>
-                                      </td>
-                                      <td className="whitespace-nowrap px-3 py-2">
+                                  </td>
+                                  <td className="whitespace-nowrap px-3 py-2">
                                         {formatDate(r.date)}
-                                      </td>
+                                  </td>
                                       <td
                                         className={`px-3 py-2 text-right font-medium tabular-nums ${cashAmountCls(r.direction)}`}
                                       >
-                                        {fmtCurrency(r.amount)}
-                                      </td>
+                                    {fmtCurrency(r.amount)}
+                                  </td>
                                       <td className="px-3 py-2">{r.method}</td>
                                       <td className="max-w-[200px] truncate px-3 py-2 text-slate-500">
-                                        {r.notes || "—"}
-                                      </td>
-                                    </tr>
-                                  ))
-                                )}
-                              </tbody>
-                            </table>
-                          </div>
-                        </TableShell>
+                                    {r.notes || "—"}
+                                  </td>
+                                </tr>
+                              ))
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
+                    </TableShell>
 
                         <p className="px-1 text-center text-[11px] leading-relaxed text-slate-400 sm:px-0">
-                          You can also manage salary from{" "}
+                      You can also manage salary from{" "}
                           <Link
                             to="/drivers"
                             className="text-blue-600 hover:underline"
                           >
-                            Drivers
-                          </Link>{" "}
-                          and bulk payouts from{" "}
+                        Drivers
+                      </Link>{" "}
+                      and bulk payouts from{" "}
                           <Link
                             to="/bulk-entry"
                             className="text-blue-600 hover:underline"
                           >
-                            Bulk Entry
-                          </Link>
-                          .
-                        </p>
-                      </>
+                        Bulk Entry
+                      </Link>
+                      .
+                    </p>
+                  </>
                     )}
                   </div>
                 ) : null}
@@ -1929,8 +1929,8 @@ export function CashInCashOutPage() {
           <fieldset className="block">
             <legend className="text-xs font-medium text-slate-600">Type</legend>
             <div className="mt-1.5 grid grid-cols-2 gap-1 rounded-xl border border-slate-200 bg-slate-50 p-1">
-              <button
-                type="button"
+            <button
+              type="button"
                 onClick={() => setAgencyPaymentKind("cash_in")}
                 className={`min-h-[40px] rounded-lg px-2 py-2 text-xs font-semibold sm:text-sm ${
                   agencyPaymentKind === "cash_in"
@@ -1939,9 +1939,9 @@ export function CashInCashOutPage() {
                 }`}
               >
                 Cash in
-              </button>
-              <button
-                type="button"
+            </button>
+            <button
+              type="button"
                 onClick={() => setAgencyPaymentKind("cash_out")}
                 className={`min-h-[40px] rounded-lg px-2 py-2 text-xs font-semibold sm:text-sm ${
                   agencyPaymentKind === "cash_out"
@@ -1950,8 +1950,8 @@ export function CashInCashOutPage() {
                 }`}
               >
                 Cash out
-              </button>
-            </div>
+            </button>
+          </div>
           </fieldset>
           <label className="mt-3 block text-xs font-medium text-slate-600">
             Amount (₹)
@@ -2051,8 +2051,8 @@ export function CashInCashOutPage() {
           <fieldset className="block">
             <legend className="text-xs font-medium text-slate-600">Type</legend>
             <div className="mt-1.5 grid grid-cols-2 gap-1 rounded-xl border border-slate-200 bg-slate-50 p-1">
-              <button
-                type="button"
+            <button
+              type="button"
                 onClick={() => setDriverPaymentKind("cash_out")}
                 className={`min-h-[40px] rounded-lg px-2 py-2 text-xs font-semibold sm:text-sm ${
                   driverPaymentKind === "cash_out"
@@ -2061,9 +2061,9 @@ export function CashInCashOutPage() {
                 }`}
               >
                 Cash out
-              </button>
-              <button
-                type="button"
+            </button>
+            <button
+              type="button"
                 onClick={() => setDriverPaymentKind("advance")}
                 className={`min-h-[40px] rounded-lg px-2 py-2 text-xs font-semibold sm:text-sm ${
                   driverPaymentKind === "advance"
@@ -2072,8 +2072,8 @@ export function CashInCashOutPage() {
                 }`}
               >
                 Advance
-              </button>
-            </div>
+            </button>
+          </div>
           </fieldset>
           <label className="mt-3 block text-xs font-medium text-slate-600">
             Amount (₹)
@@ -2095,20 +2095,20 @@ export function CashInCashOutPage() {
             />
           </label>
           {driverPaymentKind === "cash_out" && (
-            <label className="mt-3 block text-xs font-medium text-slate-600">
-              Method
-              <select
-                className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
-                value={payMethod}
-                onChange={(e) => setPayMethod(e.target.value)}
-              >
-                {PAYMENT_METHODS.map((m) => (
-                  <option key={m} value={m}>
-                    {m}
-                  </option>
-                ))}
-              </select>
-            </label>
+          <label className="mt-3 block text-xs font-medium text-slate-600">
+            Method
+            <select
+              className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+              value={payMethod}
+              onChange={(e) => setPayMethod(e.target.value)}
+            >
+              {PAYMENT_METHODS.map((m) => (
+                <option key={m} value={m}>
+                  {m}
+                </option>
+              ))}
+            </select>
+          </label>
           )}
           <label className="mt-3 block text-xs font-medium text-slate-600">
             Notes

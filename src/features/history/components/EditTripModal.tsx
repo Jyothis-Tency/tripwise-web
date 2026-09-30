@@ -237,7 +237,7 @@ export function EditTripModal({
         if (v === "") continue;
         if (NUMERIC_KEYS.has(key)) {
           payload[key] = parseFloat(v);
-        } else {
+          } else {
           payload[key] = v;
         }
       }
@@ -312,7 +312,7 @@ export function EditTripModal({
                 />
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-                  <div>
+              <div>
                     <label className="block text-sm text-slate-600 mb-1">
                       Start Date
                     </label>
@@ -324,8 +324,8 @@ export function EditTripModal({
                       }
                       className={inputCls}
                     />
-                  </div>
-                  <div>
+              </div>
+              <div>
                     <label className="block text-sm text-slate-600 mb-1">
                       End Date
                     </label>
@@ -337,8 +337,8 @@ export function EditTripModal({
                       }
                       className={inputCls}
                     />
-                  </div>
-                  <div>
+              </div>
+              <div>
                     <label className="block text-sm text-slate-600 mb-1">
                       Start Time
                     </label>
@@ -350,8 +350,8 @@ export function EditTripModal({
                       }
                       className="w-full"
                     />
-                  </div>
-                  <div>
+              </div>
+              <div>
                     <label className="block text-sm text-slate-600 mb-1">
                       End Time
                     </label>
@@ -363,8 +363,8 @@ export function EditTripModal({
                       }
                       className="w-full"
                     />
-                  </div>
-                </div>
+              </div>
+            </div>
 
                 <ReadOnlyRow
                   label="Trip duration"
@@ -432,7 +432,7 @@ export function EditTripModal({
                       className={inputCls}
                     />
                   </div>
-                  <div>
+              <div>
                     <label className="block text-sm text-slate-600 mb-1">
                       End KM
                     </label>
@@ -446,7 +446,7 @@ export function EditTripModal({
                       className={inputCls}
                     />
                   </div>
-                </div>
+              </div>
 
                 {travelledKm != null && (
                   <ReadOnlyRow
@@ -457,7 +457,7 @@ export function EditTripModal({
                 )}
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
+                <div>
                     <label className="block text-sm text-slate-600 mb-1">
                       Customer
                     </label>
@@ -518,7 +518,7 @@ export function EditTripModal({
                   Financial Details
                 </h4>
                 <div className="space-y-3">
-                  <div>
+              <div>
                     <label className="block text-sm text-slate-600 mb-1">
                       Agency Cost
                     </label>
@@ -535,8 +535,8 @@ export function EditTripModal({
                         className="flex-1 w-full min-w-0 px-3 py-2 text-sm outline-none"
                       />
                     </div>
-                  </div>
-                  <div>
+              </div>
+              <div>
                     <label className="block text-sm text-slate-600 mb-1">
                       Cab Cost
                     </label>
@@ -552,8 +552,8 @@ export function EditTripModal({
                         }
                         className="flex-1 w-full min-w-0 px-3 py-2 text-sm outline-none"
                       />
-                    </div>
-                  </div>
+              </div>
+            </div>
                 </div>
                 <div className="my-3 rounded-lg border border-emerald-100 bg-emerald-50/30 px-4 py-3 dark:border-emerald-500/20 dark:bg-emerald-500/10">
                   <ReadOnlyRow
@@ -587,9 +587,9 @@ export function EditTripModal({
                         }
                         className="flex-1 w-full min-w-0 px-3 py-2 text-sm outline-none"
                       />
-                    </div>
-                  </div>
-                  <div>
+                </div>
+              </div>
+              <div>
                     <label className="block text-sm text-slate-600 mb-1">
                       Advance
                     </label>
@@ -605,8 +605,8 @@ export function EditTripModal({
                         }
                         className="flex-1 w-full min-w-0 px-3 py-2 text-sm outline-none"
                       />
-                    </div>
-                  </div>
+                </div>
+              </div>
                   <ReadOnlyRow
                     label="Agency profit"
                     value={fmtCurrency(agencyProfit)}
@@ -662,7 +662,7 @@ export function EditTripModal({
                       value={fmtCurrency(remaining)}
                       highlight
                     />
-                  </div>
+              </div>
                 )}
               </section>
             </div>

@@ -1,4 +1,5 @@
 import {
+  useCallback,
   useEffect,
   useMemo,
   useRef,
@@ -807,17 +808,144 @@ function blockHasTripData(block: GuestAgencyBlock) {
   );
 }
 
+function rowReadyForGuestApprove(row: BulkTripRow): boolean {
+  const dateFallback = (row as BulkTripRow & { date?: string }).date;
+  const hasDate = Boolean(
+    String(row.startDate ?? "").trim() ||
+      String(row.endDate ?? "").trim() ||
+      String(dateFallback ?? "").trim(),
+  );
+  const hasTotal = Number(row.grandTotal) > 0;
+  return hasDate && hasTotal;
+}
+
+function blockHasApproveReadyTrips(block: GuestAgencyBlock): boolean {
+  return block.driverGroups.some(
+    (g) =>
+      String(g.driverName ?? "").trim() &&
+      (g.rows ?? []).some(rowReadyForGuestApprove),
+  );
+}
+
+/** Open block with agency + at least one trip (date + grand total) — matches server. */
+function blockPendingOwnerApproval(block: GuestAgencyBlock) {
+  if (block.status === "accepted") return false;
+  if (!block.agencyId && !String(block.agencyName ?? "").trim()) return false;
+  return blockHasApproveReadyTrips(block);
+}
+
+function guestApproveBlockError(block: GuestAgencyBlock): string | null {
+  if (block.status === "accepted") return null;
+  if (!block.agencyId && !String(block.agencyName ?? "").trim()) {
+    return "Select an agency before Approve.";
+  }
+  if (!blockHasApproveReadyTrips(block)) {
+    const name = block.agencyName?.trim() || "this agency";
+    return `Add at least one trip with a date and grand total before Approve (${name}).`;
+  }
+  return null;
+}
+
+/** Approved history + open drafts (agency chosen or trip data). */
+function blockShowsAgencyPill(block: GuestAgencyBlock) {
+  if (!block.agencyId && !String(block.agencyName ?? "").trim()) return false;
+  if (block.status === "accepted") return true;
+  return blockHasTripData(block) || Boolean(block.agencyId || block.agencyName?.trim());
+}
+
+function guestAgencyBlockKey(block: GuestAgencyBlock): string {
+  if (block.agencyId) return `id:${block.agencyId}`;
+  const name = String(block.agencyName ?? "").trim().toLowerCase();
+  return name ? `name:${name}` : "";
+}
+
+/** Keep an open block for new entry when everything else is already approved. */
+function ensureEditableWorkspace(
+  blocks: GuestAgencyBlock[],
+): GuestAgencyBlock[] {
+  if (blocks.some((b) => b.status !== "accepted")) return blocks;
+  return [...blocks, emptyBlock()];
+}
+
 function pickActiveBlockId(blocks: GuestAgencyBlock[]): string {
   const open = blocks.filter((b) => b.status !== "accepted");
+  const pendingApprove = open.find((b) => blockPendingOwnerApproval(b));
   const withAgency = open.find((b) => b.agencyId || b.agencyName?.trim());
   const withTrips = open.find((b) => blockHasTripData(b));
+  const emptyOpen = open.find((b) => !blockHasTripData(b));
   return (
+    pendingApprove?.clientId ??
     withAgency?.clientId ??
     withTrips?.clientId ??
+    emptyOpen?.clientId ??
     open[0]?.clientId ??
     blocks[0]?.clientId ??
     ""
   );
+}
+
+/** After closing an approved view, focus an open block ready for new trips. */
+function focusNextEntryWorkspace(
+  blocks: GuestAgencyBlock[],
+  fromApproved?: GuestAgencyBlock,
+): { blocks: GuestAgencyBlock[]; activeId: string } {
+  const key = fromApproved ? guestAgencyBlockKey(fromApproved) : "";
+  if (key) {
+    const sameAgencyOpen = blocks.find(
+      (b) => b.status !== "accepted" && guestAgencyBlockKey(b) === key,
+    );
+    if (sameAgencyOpen) {
+      return { blocks, activeId: sameAgencyOpen.clientId };
+    }
+  }
+
+  const emptyOpen = blocks.find(
+    (b) => b.status !== "accepted" && !blockHasTripData(b),
+  );
+  if (emptyOpen) {
+    if (
+      fromApproved &&
+      !emptyOpen.agencyId &&
+      !String(emptyOpen.agencyName ?? "").trim()
+    ) {
+      const next = blocks.map((b) =>
+        b.clientId === emptyOpen.clientId
+          ? {
+              ...b,
+              agencyId: fromApproved.agencyId ?? null,
+              agencyName: fromApproved.agencyName ?? "",
+            }
+          : b,
+      );
+      return { blocks: next, activeId: emptyOpen.clientId };
+    }
+    return { blocks, activeId: emptyOpen.clientId };
+  }
+
+  const nb = emptyBlock();
+  if (fromApproved) {
+    nb.agencyId = fromApproved.agencyId ?? null;
+    nb.agencyName = fromApproved.agencyName ?? "";
+  }
+  return { blocks: [...blocks, nb], activeId: nb.clientId };
+}
+
+/**
+ * Open pills → select that draft.
+ * Approved pills → first click shows read-only history; second click (same pill) closes and opens entry.
+ */
+function activateAgencyPill(
+  blocks: GuestAgencyBlock[],
+  pill: GuestAgencyBlock,
+  activeClientId: string,
+): { blocks: GuestAgencyBlock[]; activeId: string } {
+  if (pill.status !== "accepted") {
+    return { blocks, activeId: pill.clientId };
+  }
+  if (pill.clientId === activeClientId) {
+    return focusNextEntryWorkspace(blocks, pill);
+  }
+  return { blocks, activeId: pill.clientId };
 }
 
 function quickHash(s: string) {
@@ -1350,8 +1478,10 @@ export function GuestBulkEntryPage() {
         setAgencies(data.agencies ?? []);
         setDriverName(data.driverName || "");
         setDriverPhone(data.driverPhone || "");
-        const loaded = normalizeGuestBlocks(
-          data.draft?.blocks?.length ? data.draft.blocks : [emptyBlock()],
+        const loaded = ensureEditableWorkspace(
+          normalizeGuestBlocks(
+            data.draft?.blocks?.length ? data.draft.blocks : [emptyBlock()],
+          ),
         );
         setBlocks(loaded);
         setActiveClientId(pickActiveBlockId(loaded));
@@ -1414,6 +1544,57 @@ export function GuestBulkEntryPage() {
 
   syncPayloadRef.current = syncPayload;
 
+  const persistGuestDraft = useCallback(async () => {
+    if (!token || !invite) return;
+    const payload = syncPayloadRef.current;
+    const hash = quickHash(JSON.stringify(payload));
+    if (hash === lastBackendHash.current) return;
+
+    const gen = ++syncGenerationRef.current;
+    setSyncStatus("saving");
+    try {
+      const openBlocks = payload.blocks
+        .filter((b) => b.status !== "accepted")
+        .map((b) => ({
+          clientId: b.clientId,
+          agencyId: b.agencyId,
+          agencyName: b.agencyName,
+          driverGroups: b.driverGroups,
+        }));
+      const accepted = payload.blocks.filter((b) => b.status === "accepted");
+      const data = await syncGuestBulk(token, {
+        driverName: payload.driverName,
+        driverPhone: payload.driverPhone,
+        blocks: [
+          ...openBlocks,
+          ...accepted.map((b) => ({
+            clientId: b.clientId,
+            agencyId: b.agencyId,
+            agencyName: b.agencyName,
+            driverGroups: b.driverGroups,
+          })),
+        ],
+      });
+      if (!mountedRef.current || gen !== syncGenerationRef.current) return;
+      lastBackendHash.current = quickHash(JSON.stringify(syncPayloadRef.current));
+      setSyncStatus("saved");
+      if (data.draft?.blocks) {
+        if (editingDepthRef.current > 0) {
+          pendingAcceptedDraftRef.current = data.draft.blocks;
+        } else {
+          setBlocks((prev) =>
+            mergeAcceptedBlocksFromServer(prev, data.draft!.blocks),
+          );
+        }
+      }
+      setTimeout(() => {
+        if (mountedRef.current) setSyncStatus("idle");
+      }, 2000);
+    } catch {
+      if (mountedRef.current) setSyncStatus("error");
+    }
+  }, [token, invite]);
+
   const flushPendingAcceptedMerge = () => {
     const pending = pendingAcceptedDraftRef.current;
     if (!pending) return;
@@ -1450,58 +1631,30 @@ export function GuestBulkEntryPage() {
     if (hash === lastBackendHash.current) return;
 
     if (timerRef.current) clearTimeout(timerRef.current);
-    timerRef.current = setTimeout(async () => {
-      if (!mountedRef.current) return;
-      const payload = syncPayloadRef.current;
-      const gen = ++syncGenerationRef.current;
-      setSyncStatus("saving");
-      try {
-        const openBlocks = payload.blocks
-          .filter((b) => b.status !== "accepted")
-          .map((b) => ({
-            clientId: b.clientId,
-            agencyId: b.agencyId,
-            agencyName: b.agencyName,
-            driverGroups: b.driverGroups,
-          }));
-        const accepted = payload.blocks.filter((b) => b.status === "accepted");
-        const data = await syncGuestBulk(token, {
-          driverName: payload.driverName,
-          driverPhone: payload.driverPhone,
-          blocks: [
-            ...openBlocks,
-            ...accepted.map((b) => ({
-              clientId: b.clientId,
-              agencyId: b.agencyId,
-              agencyName: b.agencyName,
-              driverGroups: b.driverGroups,
-            })),
-          ],
-        });
-        if (!mountedRef.current || gen !== syncGenerationRef.current) return;
-        lastBackendHash.current = quickHash(JSON.stringify(syncPayloadRef.current));
-        setSyncStatus("saved");
-        if (data.draft?.blocks) {
-          if (editingDepthRef.current > 0) {
-            pendingAcceptedDraftRef.current = data.draft.blocks;
-          } else {
-            setBlocks((prev) =>
-              mergeAcceptedBlocksFromServer(prev, data.draft!.blocks),
-            );
-          }
-        }
-        setTimeout(() => {
-          if (mountedRef.current) setSyncStatus("idle");
-        }, 2000);
-      } catch {
-        if (mountedRef.current) setSyncStatus("error");
-      }
+    timerRef.current = setTimeout(() => {
+      void persistGuestDraft();
     }, AUTOSAVE_DELAY);
 
     return () => {
       if (timerRef.current) clearTimeout(timerRef.current);
     };
-  }, [token, invite, loading, syncPayload]);
+  }, [token, invite, loading, syncPayload, persistGuestDraft]);
+
+  useEffect(() => {
+    const flushOnHide = () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+      void persistGuestDraft();
+    };
+    window.addEventListener("pagehide", flushOnHide);
+    const onVis = () => {
+      if (document.visibilityState === "hidden") flushOnHide();
+    };
+    document.addEventListener("visibilitychange", onVis);
+    return () => {
+      window.removeEventListener("pagehide", flushOnHide);
+      document.removeEventListener("visibilitychange", onVis);
+    };
+  }, [persistGuestDraft]);
 
   const selectAgency = (agencyId: string) => {
     const agency = agencies.find((x) => (x._id ?? x.id) === agencyId);
@@ -1587,6 +1740,20 @@ export function GuestBulkEntryPage() {
   const onApprove = async (clientId?: string) => {
     if (!token) return;
     setApproveError(null);
+    const targets = clientId
+      ? blocks.filter((b) => b.clientId === clientId && b.status !== "accepted")
+      : blocks.filter((b) => b.status !== "accepted");
+    for (const b of targets) {
+      const err = guestApproveBlockError(b);
+      if (err) {
+        setApproveError(err);
+        return;
+      }
+    }
+    if (!targets.length) {
+      setApproveError("No open agency block to approve.");
+      return;
+    }
     setApproving(clientId ?? "__all__");
     try {
       const data = await approveGuestBulk(
@@ -1595,7 +1762,9 @@ export function GuestBulkEntryPage() {
       );
       skipNextSync.current = true;
       if (data.draft?.blocks) {
-        const next = normalizeGuestBlocks(data.draft.blocks);
+        const next = ensureEditableWorkspace(
+          normalizeGuestBlocks(data.draft.blocks),
+        );
         setBlocks(next);
         setActiveClientId(pickActiveBlockId(next));
       }
@@ -1655,13 +1824,16 @@ export function GuestBulkEntryPage() {
   };
 
   const onOwnerExpiryChange = async (localValue: string) => {
-    if (!invite?.id || !localValue) return;
+    if (!invite?.id) return;
     setOwnerBusy(true);
     setApproveError(null);
     try {
-      const data = await updateGuestBulkInvite(invite.id, {
-        expiresAt: new Date(localValue).toISOString(),
-      });
+      const data = await updateGuestBulkInvite(
+        invite.id,
+        localValue
+          ? { expiresAt: new Date(localValue).toISOString() }
+          : { expiresAt: null },
+      );
       applyInviteUpdate(data);
     } catch (e: unknown) {
       const msg =
@@ -1677,7 +1849,7 @@ export function GuestBulkEntryPage() {
     }
   };
 
-  const toLocalInputValue = (iso?: string) => {
+  const toLocalInputValue = (iso?: string | null) => {
     if (!iso) return "";
     const d = new Date(iso);
     if (Number.isNaN(d.getTime())) return "";
@@ -1686,13 +1858,7 @@ export function GuestBulkEntryPage() {
   };
 
   const openBlocks = blocks.filter((b) => b.status !== "accepted");
-  const canApproveAll = openBlocks.some(
-    (b) =>
-      (b.agencyId || b.agencyName) &&
-      b.driverGroups.some(
-        (g) => g.vehicleNumber.trim() && (g.rows?.length ?? 0) > 0,
-      ),
-  );
+  const canApproveAll = openBlocks.some((b) => blockPendingOwnerApproval(b));
 
   if (loading) {
     return (
@@ -1807,9 +1973,9 @@ export function GuestBulkEntryPage() {
             {isOwner && canApproveAll && (
               <button
                 type="button"
-                disabled={Boolean(approving)}
+                disabled={Boolean(approving) || !canApproveAll}
                 onClick={() => onApprove()}
-                className={`${btnSolidCls} flex-1 bg-emerald-600 text-white shadow-sm hover:bg-emerald-700 dark:bg-emerald-500 dark:hover:bg-emerald-400 sm:flex-none sm:text-sm`}
+                className={`${btnSolidCls} flex-1 bg-emerald-600 text-white shadow-sm hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-emerald-500 dark:hover:bg-emerald-400 sm:flex-none sm:text-sm`}
               >
                 {approving === "__all__" ? "Approving…" : "Approve all"}
               </button>
@@ -1845,12 +2011,12 @@ export function GuestBulkEntryPage() {
                 <input
                   type="datetime-local"
                   disabled={ownerBusy}
-                  key={invite.expiresAt}
+                  key={`${invite.id}-${invite.expiresAt ?? "none"}`}
                   defaultValue={toLocalInputValue(invite.expiresAt)}
                   onBlur={(e) => {
                     const next = e.target.value;
                     const prev = toLocalInputValue(invite.expiresAt);
-                    if (next && next !== prev) void onOwnerExpiryChange(next);
+                    if (next !== prev) void onOwnerExpiryChange(next);
                   }}
                   className="w-[10.75rem] rounded border border-emerald-200 bg-[var(--bg-elevated)] px-1 py-0.5 text-[11px] text-slate-700 dark:border-emerald-500/30 dark:text-slate-200"
                 />
@@ -1873,6 +2039,8 @@ export function GuestBulkEntryPage() {
             invite.allowCreateAgency && activeBlock.status !== "accepted";
           const showApproveBtn =
             isOwner && activeBlock.status !== "accepted";
+          const activeApproveReady = blockPendingOwnerApproval(activeBlock);
+          const activeApproveHint = guestApproveBlockError(activeBlock);
           return (
           <section
             className={`space-y-3 rounded-xl border p-3 sm:space-y-4 sm:p-4 ${
@@ -1888,39 +2056,55 @@ export function GuestBulkEntryPage() {
               </p>
             )}
 
-            {(blocks.some(
-              (b) =>
-                (b.status === "accepted" || blockHasTripData(b)) &&
-                (b.agencyName || b.agencyId),
-            ) ||
-              blocks.filter((b) => b.status === "open").length > 1) && (
+            {blocks.some(blockShowsAgencyPill) && (
               <div className="flex flex-wrap gap-1">
-                {blocks
-                  .filter(
-                    (b) =>
-                      (b.agencyName || b.agencyId) &&
-                      (b.status === "accepted" || blockHasTripData(b)),
-                  )
-                  .map((b) => (
+                {blocks.filter(blockShowsAgencyPill).map((b) => {
+                  const pending = blockPendingOwnerApproval(b);
+                  const active = b.clientId === activeBlock.clientId;
+                  return (
                     <button
                       key={b.clientId}
                       type="button"
-                      onClick={() => setActiveClientId(b.clientId)}
+                      title={
+                        b.status === "accepted"
+                          ? active
+                            ? "Click again to enter new trips"
+                            : "View approved batch"
+                          : undefined
+                      }
+                      onClick={() => {
+                        const { blocks: next, activeId } = activateAgencyPill(
+                          blocks,
+                          b,
+                          activeClientId,
+                        );
+                        if (next !== blocks) setBlocks(next);
+                        setActiveClientId(activeId);
+                      }}
                       className={`inline-flex max-w-full items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold transition ${
-                        b.clientId === activeBlock.clientId
+                        active
                           ? b.status === "accepted"
                             ? "border-emerald-300 bg-emerald-100 text-emerald-900 dark:border-emerald-500/40 dark:bg-emerald-500/20 dark:text-emerald-200"
-                            : "border-indigo-200 bg-indigo-50 text-indigo-800 dark:border-indigo-500/30 dark:bg-indigo-500/15 dark:text-indigo-200"
-                          : "border-transparent bg-slate-100 text-slate-600 hover:border-slate-200 dark:bg-white/10 dark:text-slate-300 dark:hover:border-white/10"
+                            : pending
+                              ? "border-amber-300 bg-amber-50 text-amber-900 dark:border-amber-500/40 dark:bg-amber-500/15 dark:text-amber-100"
+                              : "border-indigo-200 bg-indigo-50 text-indigo-800 dark:border-indigo-500/30 dark:bg-indigo-500/15 dark:text-indigo-200"
+                          : pending
+                            ? "border-amber-200/80 bg-amber-50/50 text-amber-800 hover:border-amber-300 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200"
+                            : "border-transparent bg-slate-100 text-slate-600 hover:border-slate-200 dark:bg-white/10 dark:text-slate-300 dark:hover:border-white/10"
                       }`}
                     >
                       <Building2 className="h-3 w-3 shrink-0 opacity-70" />
                       <span className="truncate">{b.agencyName || "Agency"}</span>
                       {b.status === "accepted" ? (
                         <CheckCircle2 className="h-3 w-3 shrink-0 text-emerald-600 dark:text-emerald-400" />
+                      ) : pending ? (
+                        <span className="shrink-0 rounded bg-amber-500 px-1 py-px text-[8px] font-bold uppercase text-white dark:bg-amber-600">
+                          Approve
+                        </span>
                       ) : null}
                     </button>
-                  ))}
+                  );
+                })}
               </div>
             )}
 
@@ -1950,9 +2134,10 @@ export function GuestBulkEntryPage() {
                   {showApproveBtn && (
                     <button
                       type="button"
-                      disabled={Boolean(approving)}
+                      disabled={Boolean(approving) || !activeApproveReady}
+                      title={activeApproveHint ?? undefined}
                       onClick={() => onApprove(activeBlock.clientId)}
-                      className={`${btnSolidCls} shrink-0 self-end bg-emerald-600 px-2.5 text-white hover:bg-emerald-700 dark:bg-emerald-500`}
+                      className={`${btnSolidCls} shrink-0 self-end bg-emerald-600 px-2.5 text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-emerald-500`}
                     >
                       {approving === activeBlock.clientId ? "…" : "Approve"}
                     </button>

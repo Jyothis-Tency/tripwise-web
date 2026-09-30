@@ -21,7 +21,7 @@ export interface GuestBulkInvite {
   token: string;
   label: string;
   status: "active" | "revoked";
-  expiresAt: string;
+  expiresAt?: string | null;
   expired?: boolean;
   guestAccessAllowed?: boolean;
   driverName: string;
@@ -181,7 +181,7 @@ export async function unrevokeGuestBulkInvite(
 export async function updateGuestBulkInvite(
   id: string,
   body: {
-    expiresAt?: string;
+    expiresAt?: string | null;
     expiresInDays?: number;
     status?: "active" | "revoked";
     driverName?: string;

@@ -21,7 +21,7 @@ import {
   type GuestBulkSubmission,
 } from "../api";
 
-function toLocalInputValue(iso?: string) {
+function toLocalInputValue(iso?: string | null) {
   if (!iso) return "";
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return "";
@@ -46,7 +46,7 @@ export function GuestInvitesPanel({
 
   const [driverName, setDriverName] = useState("");
   const [driverPhone, setDriverPhone] = useState("");
-  const [expiresInDays, setExpiresInDays] = useState(7);
+  const [expiresInDays, setExpiresInDays] = useState(0);
   const [creating, setCreating] = useState(false);
   const [actionId, setActionId] = useState<string | null>(null);
 
@@ -89,7 +89,7 @@ export function GuestInvitesPanel({
       const inv = await createGuestBulkInvite({
         driverName: driverName.trim(),
         driverPhone: driverPhone.trim(),
-        expiresInDays,
+        ...(expiresInDays > 0 ? { expiresInDays } : {}),
       });
       setDriverName("");
       setDriverPhone("");
@@ -150,12 +150,15 @@ export function GuestInvitesPanel({
   };
 
   const onExpiryChange = async (id: string, localValue: string) => {
-    if (!localValue) return;
     setActionId(id);
     setError(null);
     try {
-      const iso = new Date(localValue).toISOString();
-      await updateGuestBulkInvite(id, { expiresAt: iso });
+      await updateGuestBulkInvite(
+        id,
+        localValue
+          ? { expiresAt: new Date(localValue).toISOString() }
+          : { expiresAt: null },
+      );
       await refresh();
     } catch (e: unknown) {
       const msg =
@@ -260,12 +263,13 @@ export function GuestInvitesPanel({
                   className="w-full rounded-lg border border-slate-200 bg-[var(--bg-elevated)] px-3 py-2 text-sm outline-none focus:border-indigo-400 dark:border-[#1e2638] dark:text-slate-100 dark:placeholder:text-slate-500"
                 />
                 <label className="text-sm text-slate-600 flex items-center gap-2 dark:text-slate-300">
-                  Expires
+                  Expires (optional)
                   <select
                     value={expiresInDays}
                     onChange={(e) => setExpiresInDays(Number(e.target.value))}
                     className="rounded-lg border border-slate-200 bg-[var(--bg-elevated)] px-2 py-1.5 text-sm dark:border-[#1e2638] dark:text-slate-100"
                   >
+                    <option value={0}>No expiry</option>
                     <option value={1}>1 day</option>
                     <option value={3}>3 days</option>
                     <option value={7}>7 days</option>
@@ -328,11 +332,8 @@ export function GuestInvitesPanel({
                                 : expired
                                   ? "Expired (drivers blocked)"
                                   : "Active for drivers"}
-                              {(inv.draft?.openRowCount ?? 0) > 0
-                                ? ` · ${inv.draft?.openRowCount} open rows`
-                                : ""}
                               {pending > 0
-                                ? ` · ${pending} pending — open to Approve`
+                                ? ` · ${pending} with trips to Approve`
                                 : ""}
                             </p>
                           </div>
@@ -386,11 +387,11 @@ export function GuestInvitesPanel({
                             type="datetime-local"
                             disabled={actionId === inv.id}
                             defaultValue={toLocalInputValue(inv.expiresAt)}
-                            key={`${inv.id}-${inv.expiresAt}`}
+                            key={`${inv.id}-${inv.expiresAt ?? "none"}`}
                             onBlur={(e) => {
                               const next = e.target.value;
                               const prev = toLocalInputValue(inv.expiresAt);
-                              if (next && next !== prev) {
+                              if (next !== prev) {
                                 void onExpiryChange(inv.id, next);
                               }
                             }}

@@ -433,6 +433,37 @@ function normalizeGuestPlate(raw: string): string {
   return String(raw ?? "").trim().toUpperCase();
 }
 
+const MS_24H = 24 * 60 * 60 * 1000;
+
+function formatGuestPillTimeline(iso?: string | null): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const format12h = (date: Date) => {
+    let h = date.getHours();
+    const m = date.getMinutes();
+    const ampm = h >= 12 ? "PM" : "AM";
+    h = h % 12 || 12;
+    return `${h}:${pad(m)} ${ampm}`;
+  };
+  const age = Date.now() - d.getTime();
+  if (age >= 0 && age < MS_24H) {
+    return format12h(d);
+  }
+  const dd = pad(d.getDate());
+  const mm = pad(d.getMonth() + 1);
+  const yyyy = d.getFullYear();
+  return `${dd}/${mm}/${yyyy} ${format12h(d)}`;
+}
+
+function guestBlockTimelineIso(block: GuestAgencyBlock): string | null {
+  if (block.status === "accepted" && block.acceptedAt) {
+    return block.acceptedAt;
+  }
+  return block.activityAt ?? null;
+}
+
 /** Last plate on open drafts only — never reuse plates from approved (read-only) history. */
 function guestSessionVehiclePlate(blocks: GuestAgencyBlock[]): string {
   let last = "";
@@ -521,6 +552,7 @@ function emptyBlock(sessionPlate = ""): GuestAgencyBlock {
     agencyName: "",
     driverGroups: [emptyVehicleGroup(sessionPlate)],
     status: "open",
+    activityAt: new Date().toISOString(),
   };
 }
 
@@ -733,6 +765,13 @@ function mergeAcceptedBlocksFromServer(
   return prev.map((b) => {
     const s = serverMap.get(b.clientId);
     if (s?.status === "accepted") return s;
+    if (s) {
+      return {
+        ...b,
+        activityAt: s.activityAt ?? b.activityAt,
+        acceptedAt: s.acceptedAt ?? b.acceptedAt,
+      };
+    }
     return b;
   });
 }
@@ -1861,6 +1900,9 @@ export function GuestBulkEntryPage() {
                     guestDriverPhone,
                   );
                   const active = b.clientId === activeBlock.clientId;
+                  const timelineLabel = formatGuestPillTimeline(
+                    guestBlockTimelineIso(b),
+                  );
                   return (
                     <button
                       key={b.clientId}
@@ -1881,7 +1923,7 @@ export function GuestBulkEntryPage() {
                         if (next !== blocks) setBlocks(next);
                         setActiveClientId(activeId);
                       }}
-                      className={`inline-flex max-w-full items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold transition ${
+                      className={`inline-flex max-w-[11rem] flex-col items-start gap-0.5 rounded-xl border px-2 py-1 text-left text-[10px] font-semibold transition sm:max-w-[12.5rem] ${
                         active
                           ? b.status === "accepted"
                             ? "border-emerald-300 bg-emerald-100 text-emerald-900 dark:border-emerald-500/40 dark:bg-emerald-500/20 dark:text-emerald-200"
@@ -1893,13 +1935,24 @@ export function GuestBulkEntryPage() {
                             : "border-transparent bg-slate-100 text-slate-600 hover:border-slate-200 dark:bg-white/10 dark:text-slate-300 dark:hover:border-white/10"
                       }`}
                     >
-                      <Building2 className="h-3 w-3 shrink-0 opacity-70" />
-                      <span className="truncate">{b.agencyName || "Agency"}</span>
-                      {b.status === "accepted" ? (
-                        <CheckCircle2 className="h-3 w-3 shrink-0 text-emerald-600 dark:text-emerald-400" />
-                      ) : pending ? (
-                        <span className="shrink-0 rounded bg-amber-500 px-1 py-px text-[8px] font-bold uppercase text-white dark:bg-amber-600">
-                          Approve
+                      <span className="flex w-full min-w-0 items-center gap-1">
+                        <Building2 className="h-3 w-3 shrink-0 opacity-70" />
+                        <span className="min-w-0 flex-1 truncate">
+                          {b.agencyName || "Agency"}
+                        </span>
+                        {b.status === "accepted" ? (
+                          <CheckCircle2 className="h-3 w-3 shrink-0 text-emerald-600 dark:text-emerald-400" />
+                        ) : pending ? (
+                          <span className="shrink-0 rounded bg-amber-500 px-1 py-px text-[8px] font-bold uppercase text-white dark:bg-amber-600">
+                            Approve
+                          </span>
+                        ) : null}
+                      </span>
+                      {timelineLabel ? (
+                        <span
+                          className="w-full pl-4 text-[9px] font-normal leading-tight opacity-75"
+                        >
+                          {timelineLabel}
                         </span>
                       ) : null}
                     </button>
@@ -1957,7 +2010,14 @@ export function GuestBulkEntryPage() {
                       typeof updater === "function"
                         ? updater(b.driverGroups)
                         : updater;
-                    return { ...b, driverGroups: nextGroups };
+                    if (b.status === "accepted") {
+                      return { ...b, driverGroups: nextGroups };
+                    }
+                    return {
+                      ...b,
+                      driverGroups: nextGroups,
+                      activityAt: new Date().toISOString(),
+                    };
                   }),
                 );
               }}

@@ -12,6 +12,7 @@ export interface GuestAgencyBlock {
   driverGroups: DriverGroup[];
   status: "open" | "accepted";
   acceptedAt?: string | null;
+  activityAt?: string | null;
   rowCount?: number;
   syncResult?: unknown;
 }

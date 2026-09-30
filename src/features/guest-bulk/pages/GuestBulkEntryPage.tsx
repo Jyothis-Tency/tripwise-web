@@ -26,7 +26,6 @@ import {
   ChevronDown,
   X,
   Building2,
-  Car,
   Pencil,
   User,
 } from "lucide-react";
@@ -49,7 +48,6 @@ import { TimePicker12h } from "../../../components/ui/TimePicker12h";
 import { normalizeHHmm } from "../../../lib/timePickerUtils";
 import { useTheme } from "../../../hooks/useTheme";
 import { TripwiseLogo } from "../../../components/brand/TripwiseLogo";
-import { fetchVehicles } from "../../vehicles/api";
 
 type SyncStatus = "idle" | "saving" | "saved" | "error";
 const AUTOSAVE_DELAY = 800;
@@ -118,78 +116,6 @@ function GuestComboboxClearButton({
       <X className="h-3.5 w-3.5" />
     </button>
   );
-}
-
-function vehicleOptionLabel(
-  vg: DriverGroup,
-  index: number,
-  livePlate?: string,
-): string {
-  const plate = (livePlate ?? vg.vehicleNumber).trim();
-  if (plate) return plate;
-  return `Vehicle ${index + 1} — add plate`;
-}
-
-function collectSavedPlates(blocks: GuestAgencyBlock[]): string[] {
-  const seen = new Set<string>();
-  const out: string[] = [];
-  for (const block of blocks) {
-    for (const g of block.driverGroups ?? []) {
-      const plate = String(g.vehicleNumber ?? "").trim();
-      if (!plate) continue;
-      const key = plate.toUpperCase();
-      if (seen.has(key)) continue;
-      seen.add(key);
-      out.push(plate);
-    }
-  }
-  return out;
-}
-
-type VehiclePickerOption =
-  | {
-      kind: "group";
-      key: string;
-      groupId: string;
-      plate: string;
-      index: number;
-      label: string;
-    }
-  | { kind: "saved"; key: string; plate: string };
-
-function buildVehiclePickerOptions(
-  groups: DriverGroup[],
-  extraPlates: string[],
-): VehiclePickerOption[] {
-  const options: VehiclePickerOption[] = groups.map((vg, i) => {
-    const groupId = String(vg.clientGroupId ?? "").trim() || `idx-${i}`;
-    const plate = String(vg.vehicleNumber ?? "").trim();
-    return {
-      kind: "group",
-      key: `g:${groupId}`,
-      groupId,
-      plate,
-      index: i,
-      label: vehicleOptionLabel(vg, i),
-    };
-  });
-
-  const inGroups = new Set(
-    options.map((o) => o.plate.toUpperCase()).filter(Boolean),
-  );
-  for (const plate of extraPlates) {
-    const p = String(plate ?? "").trim();
-    if (!p) continue;
-    const key = p.toUpperCase();
-    if (inGroups.has(key)) continue;
-    inGroups.add(key);
-    options.push({
-      kind: "saved",
-      key: `p:${key}`,
-      plate: p,
-    });
-  }
-  return options;
 }
 
 const guestPenBtnCls =
@@ -480,246 +406,6 @@ function GuestAgencyPicker({
   );
 }
 
-function GuestVehiclePicker({
-  groups,
-  activeGroupId,
-  plate,
-  extraPlates,
-  disabled,
-  onSelect,
-  onPlateChange,
-  onAdd,
-}: {
-  groups: DriverGroup[];
-  activeGroupId: string;
-  plate: string;
-  extraPlates?: string[];
-  disabled?: boolean;
-  onSelect: (groupId: string) => void;
-  onPlateChange: (plate: string) => void;
-  onAdd: () => void;
-}) {
-  const [open, setOpen] = useState(false);
-  const [query, setQuery] = useState("");
-  const rootRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
-
-  const selectedLabel = plate.trim();
-  const allOptions = useMemo(
-    () => buildVehiclePickerOptions(groups, extraPlates ?? []),
-    [groups, extraPlates],
-  );
-
-  useEffect(() => {
-    if (!open) setQuery(selectedLabel);
-  }, [selectedLabel, open]);
-
-  useEffect(() => {
-    if (!open) return;
-    const onDoc = (e: MouseEvent) => {
-      if (rootRef.current?.contains(e.target as Node)) return;
-      setOpen(false);
-      setQuery(selectedLabel);
-    };
-    document.addEventListener("mousedown", onDoc);
-    return () => document.removeEventListener("mousedown", onDoc);
-  }, [open, selectedLabel]);
-
-  const q = query.trim().toLowerCase();
-  const filtered = !open
-    ? allOptions
-    : allOptions.filter((opt) => {
-        if (!q) return true;
-        if (opt.kind === "saved") {
-          return opt.plate.toLowerCase().includes(q);
-        }
-        const plateText = opt.plate.toLowerCase();
-        const label = opt.label.toLowerCase();
-        return plateText.includes(q) || label.includes(q);
-      });
-
-  const labelForOption = (opt: VehiclePickerOption) => {
-    if (opt.kind === "saved") return opt.plate;
-    return opt.plate.trim() ? opt.plate : opt.label;
-  };
-
-  const pick = (opt: VehiclePickerOption) => {
-    if (opt.kind === "group") {
-      const id = opt.groupId;
-      if (id.startsWith("idx-")) {
-        const index = Number(id.slice(4));
-        const fallbackId = groups[index]?.clientGroupId;
-        onSelect(fallbackId ?? id);
-      } else {
-        onSelect(id);
-      }
-    } else {
-      const existing = groups.find(
-        (g) =>
-          String(g.vehicleNumber ?? "")
-            .trim()
-            .toUpperCase() === opt.plate.toUpperCase(),
-      );
-      if (existing?.clientGroupId) {
-        onSelect(existing.clientGroupId);
-      } else {
-        onPlateChange(opt.plate);
-      }
-    }
-    setOpen(false);
-    setQuery(labelForOption(opt));
-  };
-
-  const showClear = comboboxShowClear(
-    disabled,
-    open,
-    query,
-    selectedLabel,
-    plate,
-  );
-
-  const clear = () => {
-    onPlateChange("");
-    setQuery("");
-    setOpen(false);
-    queueMicrotask(() => inputRef.current?.focus());
-  };
-
-  return (
-    <div ref={rootRef} className="relative w-[13.5rem] max-w-full sm:w-[15rem]">
-      <div
-        className={`${selectTriggerCls} ${fieldMinHCls} gap-1.5 py-1 pl-2 pr-1 sm:py-1.5`}
-      >
-        <Car className="h-3.5 w-3.5 shrink-0 text-indigo-500 dark:text-indigo-400" />
-        <input
-          ref={inputRef}
-          value={open ? query : selectedLabel}
-          disabled={disabled}
-          placeholder="Search vehicle…"
-          aria-label="Vehicle"
-          aria-expanded={open}
-          aria-autocomplete="list"
-          onFocus={() => {
-            if (disabled) return;
-            setOpen(true);
-            setQuery(selectedLabel);
-          }}
-          onChange={(e) => {
-            setQuery(e.target.value);
-            setOpen(true);
-          }}
-          onKeyDown={(e) => {
-            if (e.key === "Escape") {
-              setOpen(false);
-              setQuery(selectedLabel);
-            }
-            if (e.key === "Enter") {
-              if (filtered.length === 1) {
-                e.preventDefault();
-                pick(filtered[0]);
-              } else if (query.trim() && filtered.length === 0) {
-                e.preventDefault();
-                onPlateChange(query.trim());
-                setOpen(false);
-                setQuery(query.trim());
-              }
-            }
-          }}
-          className="min-w-0 flex-1 border-0 bg-transparent p-0 text-sm font-medium text-slate-800 outline-none placeholder:font-normal placeholder:text-slate-400 focus:ring-0 disabled:cursor-not-allowed disabled:opacity-60 dark:text-slate-100"
-        />
-        <GuestComboboxClearButton
-          show={showClear}
-          disabled={disabled}
-          label="Clear vehicle"
-          onClear={clear}
-        />
-        <button
-          type="button"
-          disabled={disabled}
-          aria-label="Toggle vehicle list"
-          onClick={() => {
-            if (disabled) return;
-            setOpen((o) => {
-              const next = !o;
-              if (next) {
-                setQuery(selectedLabel);
-                queueMicrotask(() => inputRef.current?.focus());
-              } else setQuery(selectedLabel);
-              return next;
-            });
-          }}
-          className={comboIconBtnCls}
-        >
-          <ChevronDown
-            className={`h-4 w-4 transition-transform ${open ? "rotate-180" : ""}`}
-          />
-        </button>
-      </div>
-      {open && !disabled && (
-        <div className="absolute left-0 z-40 mt-1 w-[min(100vw-2rem,18rem)] overflow-hidden rounded-lg border border-slate-200 bg-[var(--bg-card)] shadow-lg dark:border-[#1e2638]">
-          <button
-            type="button"
-            onClick={() => {
-              setOpen(false);
-              onAdd();
-            }}
-            className="flex w-full items-center gap-1.5 border-b border-slate-100 px-3 py-2 text-left text-xs font-semibold text-indigo-600 hover:bg-indigo-50 dark:border-[#1e2638] dark:text-indigo-300 dark:hover:bg-indigo-500/10"
-          >
-            <Plus className="h-3.5 w-3.5" /> Add vehicle
-          </button>
-          <ul role="listbox" className="max-h-48 overflow-y-auto py-1">
-            {filtered.length === 0 ? (
-              <li className="px-3 py-2.5 text-xs text-slate-500 dark:text-slate-400">
-                No match
-              </li>
-            ) : (
-              filtered.map((opt) => {
-                const active =
-                  opt.kind === "group"
-                    ? opt.groupId === activeGroupId
-                    : selectedLabel.toUpperCase() === opt.plate.toUpperCase();
-                const primary =
-                  opt.kind === "saved"
-                    ? opt.plate
-                    : opt.plate.trim()
-                      ? opt.plate
-                      : `Vehicle ${opt.index + 1}`;
-                const secondary =
-                  opt.kind === "saved" ? "Fleet / other entry" : undefined;
-                return (
-                  <li key={opt.key}>
-                    <button
-                      type="button"
-                      role="option"
-                      aria-selected={active}
-                      onMouseDown={(e) => e.preventDefault()}
-                      onClick={() => pick(opt)}
-                      className={`w-full px-3 py-2 text-left transition ${
-                        active
-                          ? "bg-indigo-50 text-indigo-800 dark:bg-indigo-500/15 dark:text-indigo-200"
-                          : "text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-white/5"
-                      }`}
-                    >
-                      <span className="block truncate text-sm font-medium">
-                        {primary}
-                      </span>
-                      {secondary ? (
-                        <span className="mt-0.5 block truncate font-mono text-[11px] text-slate-500 dark:text-slate-400">
-                          {secondary}
-                        </span>
-                      ) : null}
-                    </button>
-                  </li>
-                );
-              })
-            )}
-          </ul>
-        </div>
-      )}
-    </div>
-  );
-}
-
 let _rowCounter = 0;
 function nextRowId() {
   return `r_${Date.now()}_${++_rowCounter}`;
@@ -743,12 +429,58 @@ function emptyRow(): BulkTripRow {
   };
 }
 
-function emptyVehicleGroup(): DriverGroup {
+function normalizeGuestPlate(raw: string): string {
+  return String(raw ?? "").trim().toUpperCase();
+}
+
+/** Last plate on open drafts only — never reuse plates from approved (read-only) history. */
+function guestSessionVehiclePlate(blocks: GuestAgencyBlock[]): string {
+  let last = "";
+  for (const b of blocks) {
+    if (b.status === "accepted") continue;
+    for (const g of b.driverGroups ?? []) {
+      const p = normalizeGuestPlate(g.vehicleNumber ?? "");
+      if (p) last = p;
+    }
+  }
+  return last;
+}
+
+/** Driver’s last chosen plate wins over scanning drafts (updates when plate field changes). */
+function resolveGuestSessionPlate(
+  blocks: GuestAgencyBlock[],
+  preferredPlate = "",
+): string {
+  const preferred = normalizeGuestPlate(preferredPlate);
+  if (preferred) return preferred;
+  return guestSessionVehiclePlate(blocks);
+}
+
+function effectiveGuestDriverName(
+  group: DriverGroup,
+  guestDriverName: string,
+): string {
+  return (
+    String(group.driverName ?? "").trim() ||
+    String(guestDriverName ?? "").trim()
+  );
+}
+
+function plateFromBlock(block?: GuestAgencyBlock | null): string {
+  if (!block) return "";
+  for (const g of block.driverGroups ?? []) {
+    const p = normalizeGuestPlate(g.vehicleNumber ?? "");
+    if (p) return p;
+  }
+  return "";
+}
+
+function emptyVehicleGroup(sessionPlate = ""): DriverGroup {
   return {
     clientGroupId: `g_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
     driverName: "",
     driverPhone: "",
-    vehicleNumber: "",
+    vehicleNumber: normalizeGuestPlate(sessionPlate),
     rows: [emptyRow()],
     groupCreatedAt: new Date().toISOString(),
   };
@@ -782,12 +514,12 @@ function normalizeGuestBlocks(blocks: GuestAgencyBlock[]): GuestAgencyBlock[] {
   }));
 }
 
-function emptyBlock(): GuestAgencyBlock {
+function emptyBlock(sessionPlate = ""): GuestAgencyBlock {
   return {
     clientId: newBlockClientId(),
     agencyId: null,
     agencyName: "",
-    driverGroups: [emptyVehicleGroup()],
+    driverGroups: [emptyVehicleGroup(sessionPlate)],
     status: "open",
   };
 }
@@ -810,38 +542,63 @@ function blockHasTripData(block: GuestAgencyBlock) {
 
 function rowReadyForGuestApprove(row: BulkTripRow): boolean {
   const dateFallback = (row as BulkTripRow & { date?: string }).date;
-  const hasDate = Boolean(
-    String(row.startDate ?? "").trim() ||
-      String(row.endDate ?? "").trim() ||
-      String(dateFallback ?? "").trim(),
+  const hasStart = Boolean(
+    String(row.startDate ?? "").trim() || String(dateFallback ?? "").trim(),
   );
-  const hasTotal = Number(row.grandTotal) > 0;
-  return hasDate && hasTotal;
+  const hasEnd = Boolean(String(row.endDate ?? "").trim());
+  return hasStart && hasEnd;
 }
 
-function blockHasApproveReadyTrips(block: GuestAgencyBlock): boolean {
+function blockHasApproveReadyTrips(
+  block: GuestAgencyBlock,
+  guestDriverName: string,
+  guestDriverPhone: string,
+): boolean {
+  if (!String(guestDriverName ?? "").trim()) return false;
+  if (!String(guestDriverPhone ?? "").trim()) return false;
   return block.driverGroups.some(
     (g) =>
-      String(g.driverName ?? "").trim() &&
+      normalizeGuestPlate(g.vehicleNumber ?? "") &&
+      effectiveGuestDriverName(g, guestDriverName) &&
       (g.rows ?? []).some(rowReadyForGuestApprove),
   );
 }
 
-/** Open block with agency + at least one trip (date + grand total) — matches server. */
-function blockPendingOwnerApproval(block: GuestAgencyBlock) {
+/** Open block with agency + at least one approve-ready trip — matches server. */
+function blockPendingOwnerApproval(
+  block: GuestAgencyBlock,
+  guestDriverName: string,
+  guestDriverPhone: string,
+) {
   if (block.status === "accepted") return false;
   if (!block.agencyId && !String(block.agencyName ?? "").trim()) return false;
-  return blockHasApproveReadyTrips(block);
+  return blockHasApproveReadyTrips(block, guestDriverName, guestDriverPhone);
 }
 
-function guestApproveBlockError(block: GuestAgencyBlock): string | null {
+function guestApproveBlockError(
+  block: GuestAgencyBlock,
+  guestDriverName: string,
+  guestDriverPhone: string,
+): string | null {
   if (block.status === "accepted") return null;
   if (!block.agencyId && !String(block.agencyName ?? "").trim()) {
     return "Select an agency before Approve.";
   }
-  if (!blockHasApproveReadyTrips(block)) {
-    const name = block.agencyName?.trim() || "this agency";
-    return `Add at least one trip with a date and grand total before Approve (${name}).`;
+  const agencyLabel = block.agencyName?.trim() || "this agency";
+  if (!String(guestDriverName ?? "").trim()) {
+    return "Enter driver name before Approve.";
+  }
+  if (!String(guestDriverPhone ?? "").trim()) {
+    return "Enter driver phone before Approve.";
+  }
+  for (const g of block.driverGroups) {
+    const ready = (g.rows ?? []).some(rowReadyForGuestApprove);
+    if (ready && !normalizeGuestPlate(g.vehicleNumber ?? "")) {
+      return `Enter vehicle plate before Approve (${agencyLabel}).`;
+    }
+  }
+  if (!blockHasApproveReadyTrips(block, guestDriverName, guestDriverPhone)) {
+    return `Add at least one trip with start and end dates before Approve (${agencyLabel}).`;
   }
   return null;
 }
@@ -864,12 +621,18 @@ function ensureEditableWorkspace(
   blocks: GuestAgencyBlock[],
 ): GuestAgencyBlock[] {
   if (blocks.some((b) => b.status !== "accepted")) return blocks;
-  return [...blocks, emptyBlock()];
+  return [...blocks, emptyBlock(guestSessionVehiclePlate(blocks))];
 }
 
-function pickActiveBlockId(blocks: GuestAgencyBlock[]): string {
+function pickActiveBlockId(
+  blocks: GuestAgencyBlock[],
+  guestDriverName = "",
+  guestDriverPhone = "",
+): string {
   const open = blocks.filter((b) => b.status !== "accepted");
-  const pendingApprove = open.find((b) => blockPendingOwnerApproval(b));
+  const pendingApprove = open.find((b) =>
+    blockPendingOwnerApproval(b, guestDriverName, guestDriverPhone),
+  );
   const withAgency = open.find((b) => b.agencyId || b.agencyName?.trim());
   const withTrips = open.find((b) => blockHasTripData(b));
   const emptyOpen = open.find((b) => !blockHasTripData(b));
@@ -922,7 +685,9 @@ function focusNextEntryWorkspace(
     return { blocks, activeId: emptyOpen.clientId };
   }
 
-  const nb = emptyBlock();
+  const sessionPlate =
+    guestSessionVehiclePlate(blocks) || plateFromBlock(fromApproved);
+  const nb = emptyBlock(sessionPlate); // preferred plate applied at page level for new blocks
   if (fromApproved) {
     nb.agencyId = fromApproved.agencyId ?? null;
     nb.agencyName = fromApproved.agencyName ?? "";
@@ -1017,13 +782,16 @@ function VehicleGroupsEditor({
   onChange,
   readOnly,
   toolbarStart,
-  extraPlates,
+  sessionPlate = "",
+  onSessionPlateChange,
 }: {
   groups: DriverGroup[];
   onChange: Dispatch<SetStateAction<DriverGroup[]>>;
   readOnly?: boolean;
   toolbarStart?: ReactNode;
-  extraPlates?: string[];
+  /** Pre-fill plate from another block on the same guest link */
+  sessionPlate?: string;
+  onSessionPlateChange?: (plate: string) => void;
 }) {
   const [activeGroupId, setActiveGroupId] = useState(() =>
     pickActiveVehicleGroupId(groups),
@@ -1045,15 +813,28 @@ function VehicleGroupsEditor({
     return null;
   }
 
-  const selectVehicle = (value: string) => {
-    if (value === "__new__") {
-      const ng = emptyVehicleGroup();
-      onChange((prev) => [...prev, ng]);
-      setActiveGroupId(ng.clientGroupId ?? pickActiveVehicleGroupId([ng]));
-      return;
-    }
-    setActiveGroupId(value);
-  };
+  const sessionPlateNorm = normalizeGuestPlate(sessionPlate);
+  const groupPlateNorm = normalizeGuestPlate(g.vehicleNumber ?? "");
+
+  useEffect(() => {
+    if (readOnly || !sessionPlateNorm || groupPlateNorm) return;
+    onChange((prev) => {
+      const next = [...prev];
+      const idx = Math.max(
+        0,
+        next.findIndex((x) => x.clientGroupId === g.clientGroupId),
+      );
+      if (normalizeGuestPlate(next[idx]?.vehicleNumber ?? "")) return prev;
+      next[idx] = { ...next[idx], vehicleNumber: sessionPlateNorm };
+      return next;
+    });
+  }, [
+    sessionPlateNorm,
+    groupPlateNorm,
+    g.clientGroupId,
+    readOnly,
+    onChange,
+  ]);
 
   const addTripBtnCls =
     "w-full rounded-md py-1.5 text-xs font-semibold text-indigo-600 transition hover:bg-indigo-50 dark:text-indigo-300 dark:hover:bg-indigo-500/10 sm:w-auto sm:rounded-lg sm:py-2";
@@ -1096,8 +877,6 @@ function VehicleGroupsEditor({
     ["startTime", "time"],
     ["endTime", "time"],
     ["toll", "number"],
-    ["advancePaid", "number"],
-    ["grandTotal", "number"],
     ["notes", "text"],
   ] as const;
 
@@ -1148,26 +927,49 @@ function VehicleGroupsEditor({
     <div className="space-y-2">
       <div className="flex flex-wrap items-end gap-3 sm:gap-4">
         {toolbarStart}
-        <label className="min-w-0">
+        <label className="min-w-0 flex-1 sm:max-w-[11rem]">
           <span className={mobileLabelCls}>Plate *</span>
-          <div className="mt-0.5">
-            <GuestVehiclePicker
-              groups={groups}
-              activeGroupId={g.clientGroupId ?? ""}
-              plate={g.vehicleNumber}
-              extraPlates={extraPlates}
-              disabled={readOnly}
-              onSelect={(id) => selectVehicle(id)}
-              onPlateChange={(v) => {
-                onChange((prev) => {
-                  const next = [...prev];
-                  next[gi] = { ...next[gi], vehicleNumber: v };
-                  return next;
-                });
-              }}
-              onAdd={() => selectVehicle("__new__")}
-            />
-          </div>
+          <input
+            type="text"
+            disabled={readOnly}
+            value={groupPlateNorm}
+            placeholder={
+              sessionPlateNorm
+                ? `Last used: ${sessionPlateNorm}`
+                : "Vehicle number"
+            }
+            autoCapitalize="characters"
+            spellCheck={false}
+            onChange={(e) => {
+              const v = normalizeGuestPlate(e.target.value);
+              onSessionPlateChange?.(v);
+              onChange((prev) => {
+                const next = [...prev];
+                next[gi] = { ...next[gi], vehicleNumber: v };
+                return next;
+              });
+            }}
+            onBlur={() => {
+              if (readOnly || groupPlateNorm || !sessionPlateNorm) return;
+              onSessionPlateChange?.(sessionPlateNorm);
+              onChange((prev) => {
+                const next = [...prev];
+                const idx = Math.max(
+                  0,
+                  next.findIndex((x) => x.clientGroupId === g.clientGroupId),
+                );
+                if (normalizeGuestPlate(next[idx]?.vehicleNumber ?? "")) {
+                  return prev;
+                }
+                next[idx] = {
+                  ...next[idx],
+                  vehicleNumber: sessionPlateNorm,
+                };
+                return next;
+              });
+            }}
+            className={`mt-0.5 min-w-0 ${inputCls}`}
+          />
         </label>
       </div>
 
@@ -1235,14 +1037,6 @@ function VehicleGroupsEditor({
                   <span className={mobileLabelCls}>Toll</span>
                   {tripControl(gi, ri, r, "toll", "number")}
                 </label>
-                <label className="block min-w-0">
-                  <span className={mobileLabelCls}>Advance</span>
-                  {tripControl(gi, ri, r, "advancePaid", "number")}
-                </label>
-                <label className="block min-w-0">
-                  <span className={mobileLabelCls}>Total</span>
-                  {tripControl(gi, ri, r, "grandTotal", "number")}
-                </label>
                 <label className="col-span-2 block min-w-0">
                   <span className={mobileLabelCls}>Notes</span>
                   {tripControl(gi, ri, r, "notes", "text")}
@@ -1253,7 +1047,7 @@ function VehicleGroupsEditor({
         </div>
 
         <div className="hidden overflow-x-auto md:block">
-            <table className="w-full min-w-[900px] text-sm">
+            <table className="w-full min-w-[720px] text-sm">
               <thead>
                 <tr className="border-b border-slate-100 bg-slate-50/90 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:border-[#1e2638] dark:bg-white/[0.03] dark:text-slate-400">
                   <th className="px-2 py-2.5">Start</th>
@@ -1262,8 +1056,6 @@ function VehicleGroupsEditor({
                   <th className="px-2 py-2.5">End KM</th>
                   <th className="min-w-[160px] px-2 py-2.5">Time (Start/End)</th>
                   <th className="px-2 py-2.5">Toll</th>
-                  <th className="px-2 py-2.5">Advance</th>
-                  <th className="px-2 py-2.5">Total</th>
                   <th className="px-2 py-2.5">Notes</th>
                   <th className="w-8 px-2 py-2.5" />
                 </tr>
@@ -1382,10 +1174,10 @@ export function GuestBulkEntryPage() {
   const [agencies, setAgencies] = useState<Agency[]>([]);
   const [driverName, setDriverName] = useState("");
   const [driverPhone, setDriverPhone] = useState("");
+  const [preferredGuestPlate, setPreferredGuestPlate] = useState("");
   const [blocks, setBlocks] = useState<GuestAgencyBlock[]>([emptyBlock()]);
   const [activeClientId, setActiveClientId] = useState("");
   const [isOwner, setIsOwner] = useState(false);
-  const [fleetPlates, setFleetPlates] = useState<string[]>([]);
 
   const [showCreateAgency, setShowCreateAgency] = useState(false);
   const [newName, setNewName] = useState("");
@@ -1421,45 +1213,6 @@ export function GuestBulkEntryPage() {
     };
   }, []);
 
-  const savedPlates = useMemo(() => collectSavedPlates(blocks), [blocks]);
-  const vehiclePickerPlates = useMemo(() => {
-    const seen = new Set<string>();
-    const out: string[] = [];
-    for (const p of [...savedPlates, ...fleetPlates]) {
-      const plate = String(p ?? "").trim();
-      if (!plate) continue;
-      const key = plate.toUpperCase();
-      if (seen.has(key)) continue;
-      seen.add(key);
-      out.push(plate);
-    }
-    return out;
-  }, [savedPlates, fleetPlates]);
-
-  useEffect(() => {
-    if (!isOwner) {
-      setFleetPlates([]);
-      return;
-    }
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await fetchVehicles({ page: 1, limit: 500 });
-        if (cancelled) return;
-        setFleetPlates(
-          res.items
-            .map((v) => String(v.vehicleNumber ?? "").trim())
-            .filter(Boolean),
-        );
-      } catch {
-        if (!cancelled) setFleetPlates([]);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [isOwner]);
-
   useEffect(() => {
     if (!token) {
       setLoadError("Invalid invite link");
@@ -1484,7 +1237,14 @@ export function GuestBulkEntryPage() {
           ),
         );
         setBlocks(loaded);
-        setActiveClientId(pickActiveBlockId(loaded));
+        setPreferredGuestPlate(guestSessionVehiclePlate(loaded));
+        setActiveClientId(
+          pickActiveBlockId(
+            loaded,
+            data.driverName || "",
+            data.driverPhone || "",
+          ),
+        );
         skipNextSync.current = true;
         lastBackendHash.current = quickHash(
           JSON.stringify({
@@ -1510,13 +1270,17 @@ export function GuestBulkEntryPage() {
 
   useEffect(() => {
     if (!activeClientId && blocks.length > 0) {
-      setActiveClientId(pickActiveBlockId(blocks));
+      setActiveClientId(
+        pickActiveBlockId(blocks, driverName, driverPhone),
+      );
       return;
     }
     if (activeClientId && !blocks.some((b) => b.clientId === activeClientId)) {
-      setActiveClientId(pickActiveBlockId(blocks));
+      setActiveClientId(
+        pickActiveBlockId(blocks, driverName, driverPhone),
+      );
     }
-  }, [blocks, activeClientId]);
+  }, [blocks, activeClientId, driverName, driverPhone]);
 
   const activeBlock = useMemo(() => {
     if (!blocks.length) return null;
@@ -1526,6 +1290,18 @@ export function GuestBulkEntryPage() {
       blocks[0]
     );
   }, [blocks, activeClientId]);
+
+  const sessionVehiclePlate = useMemo(
+    () => resolveGuestSessionPlate(blocks, preferredGuestPlate),
+    [blocks, preferredGuestPlate],
+  );
+
+  const guestDriverName = driverName.trim();
+  const guestDriverPhone = driverPhone.trim();
+
+  const handleSessionPlateChange = useCallback((plate: string) => {
+    setPreferredGuestPlate(normalizeGuestPlate(plate));
+  }, []);
 
   const syncPayload = useMemo(
     () => ({
@@ -1688,7 +1464,9 @@ export function GuestBulkEntryPage() {
         prev.find((b) => b.status === "open");
 
       if (active?.status === "accepted") {
-        const nb = emptyBlock();
+        const nb = emptyBlock(
+          resolveGuestSessionPlate(prev, preferredGuestPlate),
+        );
         nb.agencyId = agencyId || null;
         nb.agencyName = agencyName;
         setActiveClientId(nb.clientId);
@@ -1708,7 +1486,9 @@ export function GuestBulkEntryPage() {
         );
       }
 
-      const nb = emptyBlock();
+      const nb = emptyBlock(
+        resolveGuestSessionPlate(prev, preferredGuestPlate),
+      );
       nb.agencyId = agencyId || null;
       nb.agencyName = agencyName;
       setActiveClientId(nb.clientId);
@@ -1744,7 +1524,11 @@ export function GuestBulkEntryPage() {
       ? blocks.filter((b) => b.clientId === clientId && b.status !== "accepted")
       : blocks.filter((b) => b.status !== "accepted");
     for (const b of targets) {
-      const err = guestApproveBlockError(b);
+      const err = guestApproveBlockError(
+        b,
+        guestDriverName,
+        guestDriverPhone,
+      );
       if (err) {
         setApproveError(err);
         return;
@@ -1766,7 +1550,9 @@ export function GuestBulkEntryPage() {
           normalizeGuestBlocks(data.draft.blocks),
         );
         setBlocks(next);
-        setActiveClientId(pickActiveBlockId(next));
+        setActiveClientId(
+          pickActiveBlockId(next, guestDriverName, guestDriverPhone),
+        );
       }
       setInvite((prev) => (prev ? { ...prev, ...data } : data));
       lastBackendHash.current = quickHash(
@@ -1858,7 +1644,9 @@ export function GuestBulkEntryPage() {
   };
 
   const openBlocks = blocks.filter((b) => b.status !== "accepted");
-  const canApproveAll = openBlocks.some((b) => blockPendingOwnerApproval(b));
+  const canApproveAll = openBlocks.some((b) =>
+    blockPendingOwnerApproval(b, guestDriverName, guestDriverPhone),
+  );
 
   if (loading) {
     return (
@@ -2039,8 +1827,16 @@ export function GuestBulkEntryPage() {
             invite.allowCreateAgency && activeBlock.status !== "accepted";
           const showApproveBtn =
             isOwner && activeBlock.status !== "accepted";
-          const activeApproveReady = blockPendingOwnerApproval(activeBlock);
-          const activeApproveHint = guestApproveBlockError(activeBlock);
+          const activeApproveReady = blockPendingOwnerApproval(
+            activeBlock,
+            guestDriverName,
+            guestDriverPhone,
+          );
+          const activeApproveHint = guestApproveBlockError(
+            activeBlock,
+            guestDriverName,
+            guestDriverPhone,
+          );
           return (
           <section
             className={`space-y-3 rounded-xl border p-3 sm:space-y-4 sm:p-4 ${
@@ -2059,7 +1855,11 @@ export function GuestBulkEntryPage() {
             {blocks.some(blockShowsAgencyPill) && (
               <div className="flex flex-wrap gap-1">
                 {blocks.filter(blockShowsAgencyPill).map((b) => {
-                  const pending = blockPendingOwnerApproval(b);
+                  const pending = blockPendingOwnerApproval(
+                    b,
+                    guestDriverName,
+                    guestDriverPhone,
+                  );
                   const active = b.clientId === activeBlock.clientId;
                   return (
                     <button
@@ -2111,7 +1911,8 @@ export function GuestBulkEntryPage() {
             <VehicleGroupsEditor
               groups={activeBlock.driverGroups}
               readOnly={activeBlock.status === "accepted"}
-              extraPlates={vehiclePickerPlates}
+              sessionPlate={sessionVehiclePlate}
+              onSessionPlateChange={handleSessionPlateChange}
               toolbarStart={
                 <>
                   <label className="min-w-0">
@@ -2137,7 +1938,11 @@ export function GuestBulkEntryPage() {
                       disabled={Boolean(approving) || !activeApproveReady}
                       title={activeApproveHint ?? undefined}
                       onClick={() => onApprove(activeBlock.clientId)}
-                      className={`${btnSolidCls} shrink-0 self-end bg-emerald-600 px-2.5 text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-emerald-500`}
+                      className={`${btnSolidCls} shrink-0 self-end px-2.5 text-white transition disabled:cursor-not-allowed dark:bg-emerald-500 ${
+                        activeApproveReady
+                          ? "bg-emerald-600 shadow-sm ring-2 ring-emerald-400/50 hover:bg-emerald-700 dark:ring-emerald-400/40"
+                          : "bg-emerald-600/50 opacity-70"
+                      }`}
                     >
                       {approving === activeBlock.clientId ? "…" : "Approve"}
                     </button>

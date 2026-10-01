@@ -97,7 +97,7 @@ function verifyAgencyCashMath(detail: AgencyCashInCashOutDetail): string[] {
       (r) => Number((r as any).advancePaid) || 0,
     ),
   );
-  const vehicleTable = sumMoney(
+  const vehicleProfitTable = sumMoney(
     detail.tables.vehicleTripsAgencyProfit.map((r) => r.agencyProfit),
   );
   const receiptsTable = sumMoney(
@@ -118,9 +118,11 @@ function verifyAgencyCashMath(detail: AgencyCashInCashOutDetail): string[] {
       `Bulk advances (₹${advances}) ≠ sum of bulk trip Advance column (₹${bulkAdvancesTable}).`,
     );
   }
-  if (!moneyEq(vehicleTable, detail.summary.cashOutAgencyProfit.fromTrips)) {
+  if (
+    !moneyEq(vehicleProfitTable, detail.summary.cashOutAgencyProfit.fromTrips)
+  ) {
     issues.push(
-      `Vehicle card (₹${detail.summary.cashOutAgencyProfit.fromTrips}) ≠ sum of vehicle trip Cash out column (₹${vehicleTable}).`,
+      `Vehicle cash out (₹${detail.summary.cashOutAgencyProfit.fromTrips}) ≠ sum of vehicle (agency − cab) (₹${vehicleProfitTable}).`,
     );
   }
   if (!moneyEq(receiptsTable, detail.summary.cashInBulk.received)) {
@@ -153,7 +155,7 @@ function verifyAgencyCashMath(detail: AgencyCashInCashOutDetail): string[] {
   ]);
   if (!moneyEq(netCard, netCalc)) {
     issues.push(
-      "Net remaining card does not match bulk remaining − vehicle remaining.",
+      "Net remaining does not match bulk remaining − vehicle cash out remaining.",
     );
   }
   return issues;
@@ -187,30 +189,49 @@ function verifyDriverCashMath(detail: DriverCashInCashOutDetail): string[] {
       `Bulk card (₹${detail.summary.bulkAdvance.fromTrips}) ≠ sum of bulk trip Cash out column (₹${bulkTable}).`,
     );
   }
-  if (!moneyEq(salaryTable, detail.summary.vehicleBata.paid)) {
-    issues.push("Bata paid does not match salary payment rows.");
-  }
-  if (!moneyEq(bulkPayTable, detail.summary.bulkAdvance.paid)) {
-    issues.push("Bulk advance paid does not match bulk payout rows.");
-  }
-  const bataRemainingCalc = sumMoney([
+  const salaryPaidRows = salaryTable;
+  const advanceToBata = Math.min(
+    advanceTable,
     detail.summary.vehicleBata.totalOwed,
-    -advanceTable,
-    -detail.summary.vehicleBata.paid,
-  ]);
-  const bataRemainingClamped = Math.max(bataRemainingCalc, 0);
-  if (!moneyEq(bataRemainingClamped, detail.summary.vehicleBata.remaining)) {
+  );
+  const advanceToBulk = Math.max(0, advanceTable - advanceToBata);
+  const bataPaidEffective = sumMoney([salaryPaidRows, advanceToBata]);
+  const bulkPaidEffective = sumMoney([bulkPayTable, advanceToBulk]);
+  if (!moneyEq(bataPaidEffective, detail.summary.vehicleBata.paid)) {
     issues.push(
-      "Bata remaining ≠ trip bata + manual extra − advances − salary paid (clamped at 0).",
+      "Bata paid does not match salary payments + advances applied to bata.",
     );
   }
-  const bulkRemainingCalc = sumMoney([
-    detail.summary.bulkAdvance.totalOwed,
-    -detail.summary.bulkAdvance.paid,
-  ]);
-  const bulkRemainingClamped = Math.max(bulkRemainingCalc, 0);
+  if (!moneyEq(bulkPaidEffective, detail.summary.bulkAdvance.paid)) {
+    issues.push(
+      "Bulk advance paid does not match bulk payouts + advances applied to bulk.",
+    );
+  }
+  const bataRemainingClamped = Math.max(
+    sumMoney([
+      detail.summary.vehicleBata.totalOwed,
+      -advanceToBata,
+      -salaryPaidRows,
+    ]),
+    0,
+  );
+  if (!moneyEq(bataRemainingClamped, detail.summary.vehicleBata.remaining)) {
+    issues.push(
+      "Bata remaining ≠ total owed − advances (bata) − salary paid (clamped at 0).",
+    );
+  }
+  const bulkRemainingClamped = Math.max(
+    sumMoney([
+      detail.summary.bulkAdvance.totalOwed,
+      -bulkPayTable,
+      -advanceToBulk,
+    ]),
+    0,
+  );
   if (!moneyEq(bulkRemainingClamped, detail.summary.bulkAdvance.remaining)) {
-    issues.push("Bulk advance remaining ≠ total owed − paid (clamped at 0).");
+    issues.push(
+      "Bulk advance remaining ≠ total owed − payouts − advances (bulk) (clamped at 0).",
+    );
   }
   const totalRemainingCalc = sumMoney([
     detail.summary.vehicleBata.remaining,
@@ -250,11 +271,17 @@ type EntitySummaryMetrics = {
 function buildAgencySummaryMetrics(
   detail: AgencyCashInCashOutDetail,
 ): EntitySummaryMetrics {
+  const bulkFromTrips = sumMoney(
+    detail.tables.bulkTripsCashIn.map((r) => r.grandTotal),
+  );
+  const vehicleFromTrips = sumMoney(
+    detail.tables.vehicleTripsAgencyProfit.map((r) => r.agencyProfit),
+  );
   return {
     moneyGiven: 0,
     moneyGot: 0,
-    bulkTrips: detail.summary.cashInBulk.fromTrips,
-    vehicleTrips: detail.summary.cashOutAgencyProfit.fromTrips,
+    bulkTrips: bulkFromTrips,
+    vehicleTrips: vehicleFromTrips,
     remainingToGet: agencyTotalRemaining(detail),
   };
 }

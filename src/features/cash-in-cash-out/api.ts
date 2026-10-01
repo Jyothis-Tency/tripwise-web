@@ -127,7 +127,10 @@ export interface AgencyCashInCashOutDetail {
       to: string;
       date: string | null;
       status: string;
+      agencyCost?: number;
+      cabCost?: number;
       agencyProfit: number;
+      advancePaid?: number;
     }>;
     agencyProfitPayoutPayments: Array<{
       _id: string;

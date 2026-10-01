@@ -280,24 +280,29 @@ export function TransactionPage() {
       try {
         if (type === "agency") {
           const detail = await fetchCashInCashOutAgencyDetail(id, "all_time");
-          const bulk = Number(detail.summary.cashInBulk.fromTrips) || 0;
+          const cashIn = detail.summary.cashInBulk;
+          const cashOut = detail.summary.cashOutAgencyProfit;
+          const bulk = Number(cashIn.totalOwed) || Number(cashIn.fromTrips) || 0;
           const vehicle =
-            Number(detail.summary.cashOutAgencyProfit.fromTrips) || 0;
-          const gt = bulk - vehicle;
-          const received = Number(detail.summary.cashInBulk.received) || 0;
-          setGrandTotal(gt);
-          // Remaining vs grand total after cash-in — not bulk-entry (GT − advance) balance
-          setRemaining(gt - received);
+            Number(cashOut.totalOwed) || Number(cashOut.fromTrips) || 0;
+          setGrandTotal(bulk - vehicle);
+          setRemaining(
+            (Number(cashIn.remaining) || 0) - (Number(cashOut.remaining) || 0),
+          );
         } else {
           const detail = await fetchCashInCashOutDriverDetail(id, "all_time");
           const gt =
-            (Number(detail.summary.bulkAdvance.fromTrips) || 0) +
-            (Number(detail.summary.vehicleBata.fromTrips) || 0);
-          const paid =
-            (Number(detail.summary.vehicleBata.paid) || 0) +
-            (Number(detail.summary.bulkAdvance.paid) || 0);
+            (Number(detail.summary.bulkAdvance.totalOwed) ||
+              Number(detail.summary.bulkAdvance.fromTrips) ||
+              0) +
+            (Number(detail.summary.vehicleBata.totalOwed) ||
+              Number(detail.summary.vehicleBata.fromTrips) ||
+              0);
+          const remaining =
+            (Number(detail.summary.vehicleBata.remaining) || 0) +
+            (Number(detail.summary.bulkAdvance.remaining) || 0);
           setGrandTotal(gt);
-          setRemaining(gt - paid);
+          setRemaining(remaining);
         }
       } catch {
         setGrandTotal(null);

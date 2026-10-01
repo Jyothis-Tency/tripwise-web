@@ -69,11 +69,6 @@ function fmtSignedCurrency(n: number) {
   return `${sign}${fmtCurrency(n)}`;
 }
 
-/** Still to collect from agency against net grand total (not bulk-entry balance after advances). */
-function agencyCollectRemaining(grandTotal: number, received: number): number {
-  return grandTotal - received;
-}
-
 function mongoIdTime(id?: string) {
   if (!id || !/^[a-f0-9]{24}$/i.test(id)) return 0;
   return parseInt(id.slice(0, 8), 16) * 1000;
@@ -165,23 +160,24 @@ function buildAgencyTxRows(detail: AgencyCashInCashOutDetail): TxRow[] {
     sortTime: sortTime(r.paymentDate, r._id),
   }));
 
-  const profitTrips = (tables.vehicleTripsAgencyProfit ?? [])
-    .filter(
-      (t) =>
-        String(t.status || "").toLowerCase() === "completed" &&
-        Number(t.agencyProfit) > 0,
-    )
+  const vehicleCashOut = (tables.vehicleTripsAgencyProfit ?? [])
+    .filter((t) => String(t.status || "").toLowerCase() === "completed")
     .map((t) => {
+      const amount = Number(t.agencyProfit) || 0;
       const route = [t.from, t.to].filter(Boolean).join(" → ");
       const tripLabel = t.tripNumber ? `Trip ${t.tripNumber}` : "Vehicle trip";
+      const costNote =
+        t.agencyCost != null || t.cabCost != null
+          ? `Agency ₹${Number(t.agencyCost) || 0} − Cab ₹${Number(t.cabCost) || 0}`
+          : "";
       return {
-        id: `profit-${t._id}`,
+        id: `vehicle-${t._id}`,
         date: t.date,
-        amount: Number(t.agencyProfit) || 0,
+        amount,
         type: "Cash out" as const,
         flow: "out" as const,
         method: "—",
-        notes: [tripLabel, route, "Agency profit"].filter(Boolean).join(" · "),
+        notes: [tripLabel, route, costNote].filter(Boolean).join(" · "),
         sortTime: sortTime(t.date, t._id),
       };
     });
@@ -197,7 +193,7 @@ function buildAgencyTxRows(detail: AgencyCashInCashOutDetail): TxRow[] {
     sortTime: sortTime(r.paymentDate, r._id),
   }));
 
-  return [...receipts, ...profitTrips, ...payouts];
+  return [...receipts, ...vehicleCashOut, ...payouts];
 }
 
 function buildDriverTxRows(detail: DriverCashInCashOutDetail): TxRow[] {
@@ -533,7 +529,8 @@ export function TransactionHistoryPage() {
     const vehicleOut = Number(profit.fromTrips) || 0;
     const grandTotal = bulkTotal - vehicleOut;
     const received = Number(bulk.received) || 0;
-    const remaining = agencyCollectRemaining(grandTotal, received);
+    const remaining =
+      (Number(bulk.remaining) || 0) - (Number(profit.remaining) || 0);
     return { grandTotal, received, remaining, bulkTotal, vehicleOut };
   }, [agencyDetail]);
 
@@ -922,7 +919,7 @@ export function TransactionHistoryPage() {
                       Remaining
                     </span>
                     <small className="text-xs text-slate-500 dark:text-[#8d94b8]">
-                      All time · Still to collect (grand total − received)
+                      All time · Still to settle (can be negative)
                     </small>
                     <b className="mt-2 block text-[28px] font-extrabold tracking-tight text-indigo-600 dark:text-[#a5b4fc]">
                       {fmtSignedCurrency(agencyCards.remaining)}

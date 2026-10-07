@@ -37,6 +37,11 @@ export interface PLRoute {
   profit?: number;
   driverName?: string;
   vehicleName?: string;
+  id?: string;
+  tripNumber?: string;
+  agencyName?: string | null;
+  tripDate?: string | null;
+  status?: string;
 }
 
 export interface PLDataResponse {
@@ -45,6 +50,7 @@ export interface PLDataResponse {
   summary: PLSummary;
   trips: PLTrips;
   topRoutes: PLRoute[];
+  recentRoutes?: PLRoute[];
   vehicles?: any;
   drivers?: any;
 }

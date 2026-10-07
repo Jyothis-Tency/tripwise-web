@@ -1,26 +1,38 @@
 import React, { useCallback, useEffect, useState } from "react";
 import {
-  Wallet,
   Briefcase,
-  Truck,
   Plus,
   History,
   Loader2,
   X,
   BadgePercent,
 } from "lucide-react";
-import type { PLRevenue, PLSummary, ExtraCommissionEntry } from "../api";
+import type { PLRevenue, ExtraCommissionEntry } from "../api";
 import { addExtraCommission, fetchExtraCommissions } from "../api";
 import { DatePicker } from "../../../components/ui/DatePicker";
+import { fetchAllAgencies } from "../../bulk-entry/api";
+import { fetchCashInCashOutAgencyDetail } from "../../cash-in-cash-out/api";
+import {
+  aggregateAgencyLedgerFromSummaries,
+  type AggregatedAgencyLedger,
+  type AgencyCashInSummary,
+  type AgencyCashOutSummary,
+} from "../../transactions/agencyLedgerMetrics";
 
 interface RevenueBreakdownProps {
   revenue: PLRevenue;
-  summary?: PLSummary;
   onRefresh?: () => void | Promise<void>;
 }
 
 function fmtCurrency(n: number) {
-  return `₹${Math.round(Number(n) || 0).toLocaleString("en-IN")}`;
+  return `₹${Math.abs(n).toLocaleString("en-IN", {
+    maximumFractionDigits: 0,
+  })}`;
+}
+
+function fmtSignedCurrency(n: number) {
+  const sign = n < 0 ? "−" : n > 0 ? "+" : "";
+  return `${sign}${fmtCurrency(n)}`;
 }
 
 function formatDate(d?: string | null) {
@@ -83,16 +95,22 @@ const cardBase =
 
 export const RevenueBreakdown: React.FC<RevenueBreakdownProps> = ({
   revenue,
-  summary,
   onRefresh,
 }) => {
-  const commission =
-    revenue.commission ||
-    revenue.commissionRevenue ||
-    revenue.ownerRevenue ||
-    0;
-  const tripRevenue = revenue.tripRevenue ?? revenue.billedRevenue ?? 0;
   const extraCommission = Number(revenue.extraCommission) || 0;
+  const commissionProfit =
+    revenue.commissionFromBulk ??
+    Math.max(
+      0,
+      (revenue.commission ||
+        revenue.commissionRevenue ||
+        revenue.ownerRevenue ||
+        0) - extraCommission,
+    );
+
+  const [agencyLedger, setAgencyLedger] =
+    useState<AggregatedAgencyLedger | null>(null);
+  const [agencyLedgerLoading, setAgencyLedgerLoading] = useState(true);
 
   const [modal, setModal] = useState<"add" | "history" | null>(null);
   const [amount, setAmount] = useState("");
@@ -103,6 +121,38 @@ export const RevenueBreakdown: React.FC<RevenueBreakdownProps> = ({
   const [history, setHistory] = useState<ExtraCommissionEntry[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historyError, setHistoryError] = useState<string | null>(null);
+
+  const loadAgencyLedger = useCallback(async () => {
+    setAgencyLedgerLoading(true);
+    try {
+      const { agencies } = await fetchAllAgencies();
+      const details = await Promise.all(
+        agencies.map(async (a) => {
+          const id = a._id ?? a.id;
+          if (!id) return null;
+          try {
+            const detail = await fetchCashInCashOutAgencyDetail(id, "all_time");
+            return detail.summary;
+          } catch {
+            return null;
+          }
+        }),
+      );
+      const summaries = details.filter(Boolean) as {
+        cashInBulk?: AgencyCashInSummary;
+        cashOutAgencyProfit?: AgencyCashOutSummary;
+      }[];
+      setAgencyLedger(aggregateAgencyLedgerFromSummaries(summaries));
+    } catch {
+      setAgencyLedger(null);
+    } finally {
+      setAgencyLedgerLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadAgencyLedger();
+  }, [loadAgencyLedger, revenue]);
 
   const loadHistory = useCallback(async () => {
     setHistoryLoading(true);
@@ -147,6 +197,7 @@ export const RevenueBreakdown: React.FC<RevenueBreakdownProps> = ({
       });
       setModal(null);
       await onRefresh?.();
+      await loadAgencyLedger();
     } catch (err: any) {
       setSaveError(
         err?.response?.data?.message ||
@@ -158,62 +209,90 @@ export const RevenueBreakdown: React.FC<RevenueBreakdownProps> = ({
     }
   };
 
+  const receivedPct =
+    agencyLedger && agencyLedger.grandTotal
+      ? Math.min(
+          100,
+          Math.round(
+            (agencyLedger.received / Math.abs(agencyLedger.grandTotal)) * 100,
+          ),
+        )
+      : 0;
+
   const fieldCls =
     "w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-400 dark:border-white/10 dark:bg-white/5 dark:text-slate-100";
 
   return (
-    <div className="space-y-4 sm:space-y-6">
-      <div className="grid gap-4 sm:gap-5 md:grid-cols-2 lg:grid-cols-4">
-        {/* Total Revenue */}
-        <div className="relative flex flex-col justify-between overflow-hidden rounded-2xl border border-indigo-500/20 bg-indigo-600 p-5 shadow-lg shadow-indigo-600/25 sm:p-6 md:col-span-2 lg:col-span-1 dark:bg-gradient-to-br dark:from-indigo-600 dark:to-indigo-700">
-          <div className="absolute -right-6 -top-6 h-32 w-32 rounded-full bg-white/10 blur-2xl" />
-          <div className="absolute -bottom-6 -left-6 h-32 w-32 rounded-full bg-indigo-500/40 blur-2xl" />
-
-          <div className="relative z-10 flex items-start gap-4">
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-white/20 bg-white/20 text-white shadow-inner backdrop-blur-sm sm:h-14 sm:w-14">
-              <Wallet className="h-6 w-6 sm:h-7 sm:w-7" />
-            </div>
-            <div>
-              <p className="text-xs font-medium text-indigo-100 sm:text-sm">
-                Total Revenue
-              </p>
-              <h3 className="mt-0.5 font-mono text-2xl font-black tracking-tight text-white metric-tabular sm:text-3xl">
-                {fmtCurrency(revenue.total)}
-              </h3>
-              <p className="mt-1 text-[11px] text-indigo-200 sm:text-xs">
-                Combined revenue from all sources
-              </p>
-            </div>
-          </div>
-
-          <div className="relative z-10 mt-6 border-t border-white/20 pt-4">
-            <h4 className="mb-3 text-[10px] font-bold uppercase tracking-widest text-white/60 sm:text-[11px]">
-              Additional Metrics
-            </h4>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <p className="text-[10px] font-semibold uppercase tracking-wider text-indigo-200 sm:text-[11px]">
-                  Driver Salary
-                </p>
-                <p className="mt-0.5 font-mono text-sm font-bold text-white metric-tabular sm:text-base">
-                  {fmtCurrency(revenue.driverSalary || 0)}
-                </p>
-              </div>
-              {summary && (
-                <div>
-                  <p className="text-[10px] font-semibold uppercase tracking-wider text-indigo-200 sm:text-[11px]">
-                    Avg / Trip
-                  </p>
-                  <p className="mt-0.5 font-mono text-sm font-bold text-white metric-tabular sm:text-base">
-                    {fmtCurrency(summary.avgRevenuePerTrip || 0)}
-                  </p>
-                </div>
-              )}
-            </div>
-          </div>
+    <div className="space-y-4 sm:space-y-5">
+      {/* Row 1 — agency ledger (matches Transaction History agency KPIs, all agencies) */}
+      <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-3">
+        <div className="rounded-[18px] bg-gradient-to-br from-indigo-900 to-violet-700 px-5 py-[18px] text-white">
+          <span className="block text-[13px] font-bold">Grand total</span>
+          <small className="text-xs text-white/75">
+            {agencyLedgerLoading
+              ? "Loading agencies…"
+              : agencyLedger
+                ? `All time · ${agencyLedger.agencyCount} agencies · Bulk +${fmtCurrency(agencyLedger.bulkTotal)} · Vehicle −${fmtCurrency(agencyLedger.vehicleOut)}`
+                : "All time · Could not load agency totals"}
+          </small>
+          <b className="mt-2 block text-[28px] font-extrabold tracking-tight">
+            {agencyLedgerLoading ? (
+              <Loader2 className="h-7 w-7 animate-spin opacity-80" />
+            ) : agencyLedger ? (
+              fmtSignedCurrency(agencyLedger.grandTotal)
+            ) : (
+              "—"
+            )}
+          </b>
         </div>
 
-        {/* Commission Profit */}
+        <div className="rounded-[18px] border border-slate-200 bg-[var(--bg-card)] px-5 py-[18px] dark:border-[#252c4d]">
+          <span className="block text-[13px] font-bold text-slate-800 dark:text-[#eef0ff]">
+            Total paid
+          </span>
+          <small className="text-xs text-slate-500 dark:text-[#8d94b8]">
+            All time · Cash in from agencies
+          </small>
+          <b className="mt-2 block text-[28px] font-extrabold tracking-tight text-emerald-600 dark:text-[#34d399]">
+            {agencyLedgerLoading ? (
+              <Loader2 className="h-7 w-7 animate-spin text-emerald-500" />
+            ) : agencyLedger ? (
+              fmtCurrency(agencyLedger.received)
+            ) : (
+              "—"
+            )}
+          </b>
+          {!agencyLedgerLoading && agencyLedger && (
+            <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-slate-200 dark:bg-[#252c4d]">
+              <div
+                className="h-full min-w-[3px] rounded-full bg-emerald-500"
+                style={{ width: `${receivedPct}%` }}
+              />
+            </div>
+          )}
+        </div>
+
+        <div className="rounded-[18px] border border-slate-200 bg-[var(--bg-card)] px-5 py-[18px] dark:border-[#252c4d]">
+          <span className="block text-[13px] font-bold text-slate-800 dark:text-[#eef0ff]">
+            Total remaining
+          </span>
+          <small className="text-xs text-slate-500 dark:text-[#8d94b8]">
+            All time · Still to settle (can be negative)
+          </small>
+          <b className="mt-2 block text-[28px] font-extrabold tracking-tight text-indigo-600 dark:text-[#a5b4fc]">
+            {agencyLedgerLoading ? (
+              <Loader2 className="h-7 w-7 animate-spin text-indigo-500" />
+            ) : agencyLedger ? (
+              fmtSignedCurrency(agencyLedger.remaining)
+            ) : (
+              "—"
+            )}
+          </b>
+        </div>
+      </div>
+
+      {/* Row 2 — commission (respects P&L date filter via analytics API) */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div
           className={`${cardBase} border-emerald-100 dark:border-emerald-500/20`}
         >
@@ -223,44 +302,18 @@ export const RevenueBreakdown: React.FC<RevenueBreakdownProps> = ({
             </div>
             <div>
               <p className="text-xs font-medium text-slate-500 sm:text-sm dark:text-slate-400">
-                Commission Profit
+                Commission profit
               </p>
               <h3 className="font-mono text-lg font-bold text-slate-900 metric-tabular sm:text-xl dark:text-white">
-                {fmtCurrency(commission)}
+                {fmtCurrency(commissionProfit)}
               </h3>
             </div>
           </div>
           <p className="mt-4 text-xs text-slate-400">
-            Bulk entries &amp; agencies
-            {extraCommission > 0
-              ? ` · includes ${fmtCurrency(extraCommission)} extra`
-              : ""}
+            Bulk entry commission (all time)
           </p>
         </div>
 
-        {/* Trip Revenue */}
-        <div
-          className={`${cardBase} border-indigo-100 dark:border-indigo-500/20`}
-        >
-          <div className="flex items-center gap-3 sm:gap-4">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600 sm:h-12 sm:w-12 dark:bg-indigo-500/15 dark:text-indigo-300">
-              <Truck className="h-5 w-5 sm:h-6 sm:w-6" />
-            </div>
-            <div>
-              <p className="text-xs font-medium text-slate-500 sm:text-sm dark:text-slate-400">
-                Trip Revenue
-              </p>
-              <h3 className="font-mono text-lg font-bold text-slate-900 metric-tabular sm:text-xl dark:text-white">
-                {fmtCurrency(tripRevenue)}
-              </h3>
-            </div>
-          </div>
-          <p className="mt-4 text-xs text-slate-400">
-            From owner&apos;s own trips
-          </p>
-        </div>
-
-        {/* Extra Commission */}
         <div
           className={`${cardBase} border-amber-100 dark:border-amber-500/20`}
         >
@@ -271,7 +324,7 @@ export const RevenueBreakdown: React.FC<RevenueBreakdownProps> = ({
               </div>
               <div className="min-w-0">
                 <p className="text-xs font-medium text-slate-500 sm:text-sm dark:text-slate-400">
-                  Extra Commission
+                  Extra commission
                 </p>
                 <h3 className="font-mono text-lg font-bold text-slate-900 metric-tabular sm:text-xl dark:text-white">
                   {fmtCurrency(extraCommission)}
@@ -298,7 +351,7 @@ export const RevenueBreakdown: React.FC<RevenueBreakdownProps> = ({
             </div>
           </div>
           <p className="mt-4 text-xs text-slate-400">
-            Manual add-ins · included in Commission Profit &amp; Total Revenue
+            Manual add-ins (all time)
           </p>
         </div>
       </div>
@@ -327,10 +380,10 @@ export const RevenueBreakdown: React.FC<RevenueBreakdownProps> = ({
                 Date
               </label>
               <DatePicker
-              value={date}
-              onChange={setDate}
-              className={fieldCls}
-            />
+                value={date}
+                onChange={setDate}
+                className={fieldCls}
+              />
             </div>
             <div>
               <label className="mb-1 block text-xs font-semibold text-slate-600 dark:text-slate-400">

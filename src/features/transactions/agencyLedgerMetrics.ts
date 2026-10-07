@@ -51,3 +51,48 @@ export function agencyNetRemaining(
   const paid = Number(cashOut.paid) || 0;
   return agencyNetGrandTotal(cashIn, cashOut) - received - paid;
 }
+
+export type AggregatedAgencyLedger = {
+  grandTotal: number;
+  received: number;
+  remaining: number;
+  bulkTotal: number;
+  vehicleOut: number;
+  agencyCount: number;
+};
+
+/** Sum agency ledger KPIs (same math as Transaction History agency cards). */
+export function aggregateAgencyLedgerFromSummaries(
+  summaries: {
+    cashInBulk?: AgencyCashInSummary;
+    cashOutAgencyProfit?: AgencyCashOutSummary;
+  }[],
+): AggregatedAgencyLedger {
+  let grandTotal = 0;
+  let received = 0;
+  let remaining = 0;
+  let bulkTotal = 0;
+  let vehicleOut = 0;
+  let agencyCount = 0;
+
+  for (const s of summaries) {
+    const bulk = s.cashInBulk;
+    const profit = s.cashOutAgencyProfit;
+    if (!bulk || !profit) continue;
+    agencyCount += 1;
+    bulkTotal += Number(bulk.fromTrips) || 0;
+    vehicleOut += Number(profit.fromTrips) || 0;
+    grandTotal += agencyNetGrandTotal(bulk, profit);
+    received += Number(bulk.received) || 0;
+    remaining += agencyNetRemaining(bulk, profit);
+  }
+
+  return {
+    grandTotal,
+    received,
+    remaining,
+    bulkTotal,
+    vehicleOut,
+    agencyCount,
+  };
+}

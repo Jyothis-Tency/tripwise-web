@@ -27,11 +27,19 @@ import {
   type CashInCashOutTabId,
 } from "../../cash-in-cash-out/cashInCashOutUiStorage";
 import { formatAgencyLabel } from "../../../lib/agencyDisplay";
+import {
+  agencyNetGrandTotal,
+  agencyNetRemaining,
+} from "../agencyLedgerMetrics";
+import {
+  buildAgencyTxRows,
+  type AgencyTxType,
+} from "../agencyTxRows";
 
 type EntityTab = CashInCashOutTabId;
 type DetailTabId = CashInCashOutDetailTabId;
 type SortDir = "desc" | "asc";
-type AgencyTypeFilter = "all" | "Cash in" | "Cash out";
+type AgencyTypeFilter = "all" | AgencyTxType;
 type DriverTypeFilter = "all" | "Salary" | "Advance";
 type TypeFilter = AgencyTypeFilter | DriverTypeFilter;
 
@@ -40,13 +48,28 @@ type TxRow = {
   date: string | null;
   amount: number;
   /** Display label in Type column */
-  type: "Cash in" | "Cash out" | "Salary" | "Advance";
+  type: AgencyTxType | "Salary" | "Advance";
   /** Controls +/- amount color (money toward vs away from entity books) */
   flow: "in" | "out";
   method: string;
   notes: string;
   sortTime: number;
 };
+
+function agencyTypeBadgeClass(type: AgencyTxType): string {
+  switch (type) {
+    case "Bulk":
+      return "bg-indigo-50 text-indigo-700 dark:bg-[#242a57] dark:text-[#a5b4fc]";
+    case "Vehicle":
+      return "bg-rose-50 text-rose-600 dark:bg-[#3a1a1e] dark:text-[#fda4af]";
+    case "Cash in":
+      return "bg-emerald-50 text-emerald-700 dark:bg-[#0d3325] dark:text-[#34d399]";
+    case "Cash out":
+      return "bg-amber-50 text-amber-800 dark:bg-[#3d2e12] dark:text-[#fcd34d]";
+    default:
+      return "bg-slate-100 text-slate-600";
+  }
+}
 
 const AVATAR_COLORS = [
   "#4f46e5",
@@ -145,57 +168,6 @@ function avatarColor(index: number) {
   return AVATAR_COLORS[Math.abs(index) % AVATAR_COLORS.length];
 }
 
-function buildAgencyTxRows(detail: AgencyCashInCashOutDetail): TxRow[] {
-  const tables = detail?.tables;
-  if (!tables) return [];
-
-  const receipts = (tables.bulkReceiptPayments ?? []).map((r) => ({
-    id: `in-${r._id}`,
-    date: r.paymentDate,
-    amount: r.amount,
-    type: "Cash in" as const,
-    flow: "in" as const,
-    method: r.paymentMethod || "—",
-    notes: r.notes || "",
-    sortTime: sortTime(r.paymentDate, r._id),
-  }));
-
-  const vehicleCashOut = (tables.vehicleTripsAgencyProfit ?? [])
-    .filter((t) => String(t.status || "").toLowerCase() === "completed")
-    .map((t) => {
-      const amount = Number(t.agencyProfit) || 0;
-      const route = [t.from, t.to].filter(Boolean).join(" → ");
-      const tripLabel = t.tripNumber ? `Trip ${t.tripNumber}` : "Vehicle trip";
-      const costNote =
-        t.agencyCost != null || t.cabCost != null
-          ? `Agency ₹${Number(t.agencyCost) || 0} − Cab ₹${Number(t.cabCost) || 0}`
-          : "";
-      return {
-        id: `vehicle-${t._id}`,
-        date: t.date,
-        amount,
-        type: "Cash out" as const,
-        flow: "out" as const,
-        method: "—",
-        notes: [tripLabel, route, costNote].filter(Boolean).join(" · "),
-        sortTime: sortTime(t.date, t._id),
-      };
-    });
-
-  const payouts = (tables.agencyProfitPayoutPayments ?? []).map((r) => ({
-    id: `out-${r._id}`,
-    date: r.paymentDate,
-    amount: r.amount,
-    type: "Cash out" as const,
-    flow: "out" as const,
-    method: r.paymentMethod || "—",
-    notes: r.notes || "Profit payout",
-    sortTime: sortTime(r.paymentDate, r._id),
-  }));
-
-  return [...receipts, ...vehicleCashOut, ...payouts];
-}
-
 function buildDriverTxRows(detail: DriverCashInCashOutDetail): TxRow[] {
   const tables = detail?.tables;
   if (!tables) return [];
@@ -268,14 +240,77 @@ function inDateRange(date: string | null, from: string, to: string) {
   return true;
 }
 
+function monthKeyFromTripDate(date: string | null): string | null {
+  if (!date) return null;
+  const s = String(date).trim();
+  const iso = s.match(/^(\d{4})-(\d{2})-\d{2}/);
+  if (iso) return `${iso[1]}-${iso[2]}`;
+  const dmy = s.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})/);
+  if (dmy) {
+    return `${dmy[3]}-${String(Number(dmy[2])).padStart(2, "0")}`;
+  }
+  const d = new Date(s);
+  if (Number.isNaN(d.getTime())) return null;
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+}
+
 /** Month filter for the transactions table only (`YYYY-MM` or all_time). */
 function inDetailMonth(date: string | null, month: string) {
   if (!month || month === "all_time") return true;
-  if (!date) return false;
-  const d = new Date(date);
-  if (Number.isNaN(d.getTime())) return false;
-  const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-  return key === month;
+  return monthKeyFromTripDate(date) === month;
+}
+
+function NotesPreviewDialog({
+  title,
+  body,
+  onClose,
+}: {
+  title: string;
+  body: string;
+  onClose: () => void;
+}) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  return (
+    <div
+      className="fixed inset-0 z-[80] flex items-center justify-center bg-black/45 p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="notes-preview-title"
+      onClick={onClose}
+    >
+      <div
+        className="max-h-[min(70vh,420px)] w-full max-w-md overflow-hidden rounded-2xl border border-slate-200 bg-[var(--bg-card)] shadow-xl dark:border-[#252c4d]"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3 dark:border-[#252c4d]">
+          <h3
+            id="notes-preview-title"
+            className="text-sm font-bold text-slate-800 dark:text-[#eef0ff]"
+          >
+            {title}
+          </h3>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-lg p-1 text-slate-500 hover:bg-slate-100 dark:hover:bg-[#252c4d]"
+            aria-label="Close"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+        <div className="max-h-[min(60vh,360px)] overflow-y-auto px-4 py-3 text-sm leading-relaxed whitespace-pre-wrap text-slate-700 dark:text-[#c8cce8]">
+          {body}
+        </div>
+      </div>
+    </div>
+  );
 }
 
 const fieldCls =
@@ -320,6 +355,10 @@ export function TransactionHistoryPage() {
   const [dateTo, setDateTo] = useState("");
   const [tableSearch, setTableSearch] = useState("");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
+  const [notesPreview, setNotesPreview] = useState<{
+    title: string;
+    body: string;
+  } | null>(null);
   const [typeFilter, setTypeFilter] = useState<TypeFilter>("all");
   const [filtersOpen, setFiltersOpen] = useState(false);
 
@@ -527,10 +566,9 @@ export function TransactionHistoryPage() {
     if (!bulk || !profit) return null;
     const bulkTotal = Number(bulk.fromTrips) || 0;
     const vehicleOut = Number(profit.fromTrips) || 0;
-    const grandTotal = bulkTotal - vehicleOut;
+    const grandTotal = agencyNetGrandTotal(bulk, profit);
     const received = Number(bulk.received) || 0;
-    const remaining =
-      (Number(bulk.remaining) || 0) - (Number(profit.remaining) || 0);
+    const remaining = agencyNetRemaining(bulk, profit);
     return { grandTotal, received, remaining, bulkTotal, vehicleOut };
   }, [agencyDetail]);
 
@@ -561,7 +599,7 @@ export function TransactionHistoryPage() {
     const raw =
       tab === "agencies"
         ? agencyDetail
-          ? buildAgencyTxRows(agencyDetail)
+          ? (buildAgencyTxRows(agencyDetail) as TxRow[])
           : []
         : driverDetail
           ? buildDriverTxRows(driverDetail)
@@ -1101,6 +1139,8 @@ export function TransactionHistoryPage() {
                             ] as const)
                           : ([
                               ["all", "All"],
+                              ["Bulk", "Bulk"],
+                              ["Vehicle", "Vehicle"],
                               ["Cash in", "Cash in"],
                               ["Cash out", "Cash out"],
                             ] as const)
@@ -1162,6 +1202,14 @@ export function TransactionHistoryPage() {
                         {txRows.map((r) => {
                           const isIn = r.flow === "in";
                           const isSalary = r.type === "Salary";
+                          const agencyBadge =
+                            tab === "agencies" &&
+                            (r.type === "Bulk" ||
+                              r.type === "Vehicle" ||
+                              r.type === "Cash in" ||
+                              r.type === "Cash out")
+                              ? agencyTypeBadgeClass(r.type as AgencyTxType)
+                              : null;
                           return (
                             <tr
                               key={r.id}
@@ -1179,13 +1227,15 @@ export function TransactionHistoryPage() {
                               <td className="px-[18px] py-3.5">
                                 <span
                                   className={`rounded-full px-2.5 py-0.5 text-[11px] font-bold ${
-                                    tab === "drivers"
-                                      ? isSalary
-                                        ? "bg-emerald-50 text-emerald-700 dark:bg-[#0d3325] dark:text-[#34d399]"
-                                        : "bg-indigo-50 text-indigo-700 dark:bg-[#242a57] dark:text-[#a5b4fc]"
-                                      : isIn
-                                        ? "bg-emerald-50 text-emerald-700 dark:bg-[#0d3325] dark:text-[#34d399]"
-                                        : "bg-rose-50 text-rose-600 dark:bg-[#3a1a1e] dark:text-[#fda4af]"
+                                    agencyBadge
+                                      ? agencyBadge
+                                      : tab === "drivers"
+                                        ? isSalary
+                                          ? "bg-emerald-50 text-emerald-700 dark:bg-[#0d3325] dark:text-[#34d399]"
+                                          : "bg-indigo-50 text-indigo-700 dark:bg-[#242a57] dark:text-[#a5b4fc]"
+                                        : isIn
+                                          ? "bg-emerald-50 text-emerald-700 dark:bg-[#0d3325] dark:text-[#34d399]"
+                                          : "bg-rose-50 text-rose-600 dark:bg-[#3a1a1e] dark:text-[#fda4af]"
                                   }`}
                                 >
                                   {r.type}
@@ -1194,8 +1244,24 @@ export function TransactionHistoryPage() {
                               <td className="px-[18px] py-3.5 capitalize text-slate-600 dark:text-[#8d94b8]">
                                 {String(r.method).replace(/_/g, " ")}
                               </td>
-                              <td className="max-w-[200px] truncate px-[18px] py-3.5 text-slate-500 dark:text-[#8d94b8]">
-                                {r.notes || "—"}
+                              <td className="max-w-[220px] px-[18px] py-3.5 text-slate-500 dark:text-[#8d94b8]">
+                                {r.notes ? (
+                                  <button
+                                    type="button"
+                                    title="View full notes"
+                                    onClick={() =>
+                                      setNotesPreview({
+                                        title: `${r.type} · Notes`,
+                                        body: r.notes,
+                                      })
+                                    }
+                                    className="block w-full truncate text-left text-slate-500 underline-offset-2 hover:text-indigo-600 hover:underline dark:text-[#8d94b8] dark:hover:text-[#a5b4fc]"
+                                  >
+                                    {r.notes}
+                                  </button>
+                                ) : (
+                                  "—"
+                                )}
                               </td>
                               <td
                                 className={`whitespace-nowrap px-[18px] py-3.5 text-right font-extrabold tabular-nums ${
@@ -1219,6 +1285,13 @@ export function TransactionHistoryPage() {
           )}
         </section>
       </div>
+      {notesPreview && (
+        <NotesPreviewDialog
+          title={notesPreview.title}
+          body={notesPreview.body}
+          onClose={() => setNotesPreview(null)}
+        />
+      )}
     </div>
   );
 }

@@ -1456,7 +1456,7 @@ export function AgencyPayoutTab({
   };
 
   if (loading)
-    return (
+  return (
       <div className="flex items-center justify-center py-16">
         <Loader2 className="h-6 w-6 animate-spin text-indigo-400" />
       </div>
@@ -1867,7 +1867,7 @@ export function DriverPayoutPanel({
       </div>
 
       {/* Add payment */}
-      {err && <p className="text-xs text-red-600">{err}</p>}
+          {err && <p className="text-xs text-red-600">{err}</p>}
       <div className="flex flex-wrap gap-2">
         <input
           type="number"
@@ -1908,7 +1908,7 @@ export function DriverPayoutPanel({
           <Plus className="h-3.5 w-3.5" />
           {saving ? "…" : "Pay"}
         </button>
-      </div>
+        </div>
 
       {/* History */}
       {(data?.payments?.length ?? 0) > 0 && (
@@ -1932,10 +1932,10 @@ export function DriverPayoutPanel({
                 className="text-red-400 hover:text-red-600"
               >
                 <Trash2 className="h-3.5 w-3.5" />
-              </button>
-            </div>
-          ))}
+          </button>
         </div>
+          ))}
+      </div>
       )}
 
       {/* Download PDF */}
@@ -1986,7 +1986,7 @@ const CellInput = memo(function CellInput({
 
   if (type === "time") {
     const timeVal = String(localVal ?? "");
-    return (
+  return (
       <TimePicker12h
         value={timeVal}
         allowEmpty
@@ -2037,7 +2037,7 @@ export type BulkEntryTableHandle = {
 const BulkEntryTable = forwardRef<
   BulkEntryTableHandle,
   {
-    groups: DriverGroup[];
+  groups: DriverGroup[];
     onChange: Dispatch<SetStateAction<DriverGroup[]>>;
     onDeleteTrip: (id: string) => Promise<void> | void;
     onDeleteTrips?: (ids: string[]) => Promise<void> | void;
@@ -2355,10 +2355,10 @@ const BulkEntryTable = forwardRef<
   const updateGroupField = useCallback(
     (gi: number, field: keyof DriverGroup, val: any) => {
       onChange((prev) => {
-        const next = [...prev];
+      const next = [...prev];
         next[gi] = { ...next[gi], [field]: val };
-        return next;
-      });
+      return next;
+    });
     },
     [onChange],
   );
@@ -2366,7 +2366,7 @@ const BulkEntryTable = forwardRef<
   const toggleComplete = useCallback(
     (gi: number, ri: number) => {
       onChange((prev) => {
-        const next = [...prev];
+      const next = [...prev];
         next[gi] = { ...next[gi], rows: [...next[gi].rows] };
         next[gi].rows[ri] = {
           ...next[gi].rows[ri],
@@ -2385,25 +2385,25 @@ const BulkEntryTable = forwardRef<
         next[gi] = { ...next[gi], rows: [...next[gi].rows] };
         const row = { ...next[gi].rows[ri], [field]: val };
 
-        // Auto-calculate distance
+      // Auto-calculate distance
         if (field === "startKm" || field === "endKm") {
-          const skm = Number(row.startKm) || 0;
-          const ekm = Number(row.endKm) || 0;
-          row.distance = ekm > skm ? ekm - skm : 0;
-        }
+        const skm = Number(row.startKm) || 0;
+        const ekm = Number(row.endKm) || 0;
+        row.distance = ekm > skm ? ekm - skm : 0;
+      }
 
-        // Auto-calculate hours
+      // Auto-calculate hours
         if (field === "startTime" || field === "endTime") {
           const [sh, sm] = (row.startTime || "00:00").split(":").map(Number);
           const [eh, em] = (row.endTime || "00:00").split(":").map(Number);
-          if (!isNaN(sh) && !isNaN(sm) && !isNaN(eh) && !isNaN(em)) {
+        if (!isNaN(sh) && !isNaN(sm) && !isNaN(eh) && !isNaN(em)) {
             let mins = eh * 60 + em - (sh * 60 + sm);
-            if (mins < 0) mins += 24 * 60; // handle overnight trips
-            row.hours = Number((mins / 60).toFixed(2));
-          } else {
-            row.hours = 0;
-          }
+          if (mins < 0) mins += 24 * 60; // handle overnight trips
+          row.hours = Number((mins / 60).toFixed(2));
+        } else {
+          row.hours = 0;
         }
+      }
 
         next[gi].rows[ri] = row;
 
@@ -2423,8 +2423,8 @@ const BulkEntryTable = forwardRef<
           });
         }
 
-        return next;
-      });
+      return next;
+    });
     },
     [onChange],
   );
@@ -2432,10 +2432,10 @@ const BulkEntryTable = forwardRef<
   const addRow = useCallback(
     (gi: number) => {
       onChange((prev) => {
-        const next = [...prev];
-        next[gi] = { ...next[gi], rows: [...next[gi].rows, emptyBulkRow()] };
-        return next;
-      });
+      const next = [...prev];
+      next[gi] = { ...next[gi], rows: [...next[gi].rows, emptyBulkRow()] };
+      return next;
+    });
     },
     [onChange],
   );
@@ -2443,7 +2443,7 @@ const BulkEntryTable = forwardRef<
   const removeRow = useCallback(
     (gi: number, rowId: string) => {
       onChange((prev) => {
-        const next = [...prev];
+      const next = [...prev];
         if (next[gi].rows.length <= 1) {
           next[gi] = { ...next[gi], rows: [emptyBulkRow()] };
           return next;
@@ -2452,8 +2452,8 @@ const BulkEntryTable = forwardRef<
           ...next[gi],
           rows: next[gi].rows.filter((r) => r.clientRowId !== rowId),
         };
-        return next;
-      });
+      return next;
+    });
     },
     [onChange],
   );
@@ -2888,7 +2888,7 @@ const BulkEntryTable = forwardRef<
                 <Trash2 className="h-4 w-4" />
               </button>
             </div>
-          </div>
+            </div>
 
           {/* Trip rows — MOBILE CARD VIEW (below md) */}
           <div className="divide-y divide-slate-100 dark:divide-[#1e2638]">
@@ -3424,7 +3424,7 @@ const BulkEntryTable = forwardRef<
                   driverName={g.driverName}
                 />
               )}
-            </div>
+        </div>
           )}
           */}
         </div>
@@ -3441,7 +3441,7 @@ const BulkEntryTable = forwardRef<
           className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-indigo-300 px-3 py-2.5 text-xs font-medium text-indigo-600 transition hover:bg-indigo-50/50 hover:text-indigo-700 sm:gap-2 sm:rounded-xl sm:px-4 sm:py-3.5 sm:text-sm dark:border-indigo-500/40 dark:text-indigo-300 dark:hover:bg-indigo-500/10"
         >
           <Plus className="h-4 w-4 sm:h-5 sm:w-5" /> Add Driver / Vehicle
-        </button>
+      </button>
       </div>
     </div>
   );
@@ -3934,7 +3934,7 @@ function NormalEntryTable({
                         {displayIdx + 1}
                       </span>
                     </td>
-                    <td className="px-2 py-1.5">
+                  <td className="px-2 py-1.5">
                       <CellInput
                         value={e.date}
                         onChange={(v) => update(i, "date", v)}
@@ -4011,23 +4011,23 @@ function NormalEntryTable({
                     </td>
                     <td className="px-2 py-1.5">
                       <input
-                        value={e.notes}
+                      value={e.notes}
                         onChange={(ev) => update(i, "notes", ev.target.value)}
-                        placeholder="Add note…"
+                      placeholder="Add note…"
                         className="w-full min-w-[120px] rounded-md border border-slate-200 bg-[var(--bg-elevated)] px-2 py-1.5 text-xs outline-none transition focus:border-indigo-400 focus:ring-1 focus:ring-indigo-200 dark:border-[#1e2638] dark:text-slate-100 dark:placeholder:text-slate-500"
-                      />
-                    </td>
-                    <td className="px-2 py-1.5">
+                    />
+                  </td>
+                  <td className="px-2 py-1.5">
                       <div className="flex justify-end">{rowActions(e, i, true)}</div>
-                    </td>
-                  </tr>
+                  </td>
+                </tr>
                 );
                 })
               )}
             </tbody>
           </table>
         </div>
-      </div>
+        </div>
       </div>
 
       <div className="shrink-0 border-t border-slate-200 bg-[var(--bg-main)]/95 pt-3 backdrop-blur-sm dark:border-[#1e2638]">
@@ -4190,7 +4190,7 @@ export function BulkEntryPage() {
   // ── Backend sync callbacks (stable refs) ──
   const syncBulkToBackend = useCallback(
     async (groups: DriverGroup[]) => {
-      if (!selectedAgency) return;
+    if (!selectedAgency) return;
       // Persist named driver/vehicle groups even with no trip fields yet
       // (one draft placeholder row). Skip completely blank shells.
       const validGroups = groups
@@ -4216,7 +4216,7 @@ export function BulkEntryPage() {
         })
         .filter(Boolean) as DriverGroup[];
 
-      if (validGroups.length === 0) return;
+    if (validGroups.length === 0) return;
       const res = await syncBulkEntry({
         agencyId: selectedAgency._id ?? selectedAgency.id,
         agencyName: selectedAgency.name,
@@ -4246,11 +4246,11 @@ export function BulkEntryPage() {
 
   const syncNormalToBackend = useCallback(
     async (entries: NormalEntryRow[]) => {
-      if (!selectedAgency) return;
+    if (!selectedAgency) return;
       const validEntries = entries.filter(
         (e) => e.driverName.trim() && e.vehicleNumber.trim(),
       );
-      if (validEntries.length === 0) return;
+    if (validEntries.length === 0) return;
       const res = await syncNormalEntry({
         agencyId: selectedAgency._id ?? selectedAgency.id,
         agencyName: selectedAgency.name,
@@ -4416,12 +4416,12 @@ export function BulkEntryPage() {
           );
         }
         // Convert server trips into editable DriverGroup[] format
-        const grouped: Record<string, typeof trips> = {};
-        for (const t of trips) {
+          const grouped: Record<string, typeof trips> = {};
+          for (const t of trips) {
           const key = `${(t.driverName || "").trim()}|||${(t.vehicleNumber || "").trim().toUpperCase()}`;
-          if (!grouped[key]) grouped[key] = [];
-          grouped[key].push(t);
-        }
+            if (!grouped[key]) grouped[key] = [];
+            grouped[key].push(t);
+          }
         const serverGroups: DriverGroup[] = Object.values(grouped).map(
           (grp) => {
             const first = grp[0];
@@ -4639,7 +4639,7 @@ export function BulkEntryPage() {
           );
         }
         const serverEntries: NormalEntryRow[] = trips.map((t) => ({
-          _id: t._id ?? t.id,
+            _id: t._id ?? t.id,
           clientRowId:
             String((t as any).clientRowId || "").trim() || nextRowId(),
           date: t.date ? t.date.split("T")[0] : "",

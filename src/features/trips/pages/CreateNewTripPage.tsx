@@ -272,6 +272,16 @@ export function CreateNewTripPage() {
       setError("Agency name is required");
       return;
     }
+    const agencyCostNum = Number(form.agencyCost);
+    const cabCostNum = Number(form.cabCost);
+    if (!form.agencyCost.trim() || !Number.isFinite(agencyCostNum) || agencyCostNum <= 0) {
+      setError("Agency cost must be greater than 0");
+      return;
+    }
+    if (!form.cabCost.trim() || !Number.isFinite(cabCostNum) || cabCostNum <= 0) {
+      setError("Cab cost must be greater than 0");
+      return;
+    }
     if (
       form.startDate &&
       form.expectedEndDate &&
@@ -294,8 +304,8 @@ export function CreateNewTripPage() {
         customer: form.customer.trim() || undefined,
         agencyName: form.agencyName.trim(),
         ...(agencyId ? { agencyId } : {}),
-        agencyCost: form.agencyCost ? parseFloat(form.agencyCost) : undefined,
-        cabCost: form.cabCost ? parseFloat(form.cabCost) : undefined,
+        agencyCost: agencyCostNum,
+        cabCost: cabCostNum,
         advance: form.advance ? parseFloat(form.advance) : undefined,
         amount: form.agencyCost ? parseFloat(form.agencyCost) : undefined,
         notes: form.notes.trim() || undefined,

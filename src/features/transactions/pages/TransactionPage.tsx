@@ -1,4 +1,11 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import {
   ArrowDownLeft,
@@ -26,6 +33,10 @@ import {
   type DriverCashInCashOutDetail,
 } from "../api";
 import { FilterLabel, SearchInput } from "../components/FilterControls";
+import {
+  agencyNetGrandTotal,
+  agencyNetRemaining,
+} from "../agencyLedgerMetrics";
 
 type EntityType = "agency" | "driver";
 type CashKind = "cash_in" | "cash_out";
@@ -157,7 +168,9 @@ export function TransactionPage() {
   const prefillId = searchParams.get("id")?.trim() || "";
   const returnTo = searchParams.get("returnTo")?.trim() || "";
   const skipEntityClearRef = useRef(
-    Boolean(prefillId && (prefillEntity === "driver" || prefillEntity === "agency")),
+    Boolean(
+      prefillId && (prefillEntity === "driver" || prefillEntity === "agency"),
+    ),
   );
 
   const [entityType, setEntityType] = useState<EntityType>(
@@ -189,8 +202,7 @@ export function TransactionPage() {
   );
   const [returnPromptOpen, setReturnPromptOpen] = useState(false);
 
-  const recentIds =
-    entityType === "agency" ? recentAgencyIds : recentDriverIds;
+  const recentIds = entityType === "agency" ? recentAgencyIds : recentDriverIds;
 
   const selectParty = useCallback(
     (id: string) => {
@@ -250,9 +262,7 @@ export function TransactionPage() {
         setRecentDriverIds(pushRecentId(LS_RECENT_DRIVERS, prefillId));
       }
     } else {
-      const exists = agencies.some(
-        (a) => (a._id ?? a.id ?? "") === prefillId,
-      );
+      const exists = agencies.some((a) => (a._id ?? a.id ?? "") === prefillId);
       if (exists) {
         setSelectedId(prefillId);
         setRecentAgencyIds(pushRecentId(LS_RECENT_AGENCIES, prefillId));
@@ -269,50 +279,42 @@ export function TransactionPage() {
     return () => document.removeEventListener("keydown", onKey);
   }, [returnPromptOpen]);
 
-  const loadBalance = useCallback(
-    async (id: string, type: EntityType) => {
-      if (!id) {
-        setGrandTotal(null);
-        setRemaining(null);
-        return;
+  const loadBalance = useCallback(async (id: string, type: EntityType) => {
+    if (!id) {
+      setGrandTotal(null);
+      setRemaining(null);
+      return;
+    }
+    setBalanceLoading(true);
+    try {
+      if (type === "agency") {
+        const detail = await fetchCashInCashOutAgencyDetail(id, "all_time");
+        const cashIn = detail.summary.cashInBulk;
+        const cashOut = detail.summary.cashOutAgencyProfit;
+        setGrandTotal(agencyNetGrandTotal(cashIn, cashOut));
+        setRemaining(agencyNetRemaining(cashIn, cashOut));
+      } else {
+        const detail = await fetchCashInCashOutDriverDetail(id, "all_time");
+        const gt =
+          (Number(detail.summary.bulkAdvance.totalOwed) ||
+            Number(detail.summary.bulkAdvance.fromTrips) ||
+            0) +
+          (Number(detail.summary.vehicleBata.totalOwed) ||
+            Number(detail.summary.vehicleBata.fromTrips) ||
+            0);
+        const remaining =
+          (Number(detail.summary.vehicleBata.remaining) || 0) +
+          (Number(detail.summary.bulkAdvance.remaining) || 0);
+        setGrandTotal(gt);
+        setRemaining(remaining);
       }
-      setBalanceLoading(true);
-      try {
-        if (type === "agency") {
-          const detail = await fetchCashInCashOutAgencyDetail(id, "all_time");
-          const cashIn = detail.summary.cashInBulk;
-          const cashOut = detail.summary.cashOutAgencyProfit;
-          const bulk = Number(cashIn.totalOwed) || Number(cashIn.fromTrips) || 0;
-          const vehicle =
-            Number(cashOut.totalOwed) || Number(cashOut.fromTrips) || 0;
-          setGrandTotal(bulk - vehicle);
-          setRemaining(
-            (Number(cashIn.remaining) || 0) - (Number(cashOut.remaining) || 0),
-          );
-        } else {
-          const detail = await fetchCashInCashOutDriverDetail(id, "all_time");
-          const gt =
-            (Number(detail.summary.bulkAdvance.totalOwed) ||
-              Number(detail.summary.bulkAdvance.fromTrips) ||
-              0) +
-            (Number(detail.summary.vehicleBata.totalOwed) ||
-              Number(detail.summary.vehicleBata.fromTrips) ||
-              0);
-          const remaining =
-            (Number(detail.summary.vehicleBata.remaining) || 0) +
-            (Number(detail.summary.bulkAdvance.remaining) || 0);
-          setGrandTotal(gt);
-          setRemaining(remaining);
-        }
-      } catch {
-        setGrandTotal(null);
-        setRemaining(null);
-      } finally {
-        setBalanceLoading(false);
-      }
-    },
-    [],
-  );
+    } catch {
+      setGrandTotal(null);
+      setRemaining(null);
+    } finally {
+      setBalanceLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
     if (!selectedId) {
@@ -649,7 +651,10 @@ export function TransactionPage() {
                             )}
                             {showRestHeader && (
                               <p className="px-2 pb-1 pt-2 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
-                                All {entityType === "agency" ? "agencies" : "drivers"}
+                                All{" "}
+                                {entityType === "agency"
+                                  ? "agencies"
+                                  : "drivers"}
                               </p>
                             )}
                             <button

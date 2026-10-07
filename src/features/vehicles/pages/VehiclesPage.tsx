@@ -695,6 +695,26 @@ export function TripFormModal({
       setError("Agency name is required");
       return;
     }
+    if (!isUpdate) {
+      const agencyCostNum = Number(form.agencyCost);
+      const cabCostNum = Number(form.cabCost);
+      if (
+        !form.agencyCost.trim() ||
+        !Number.isFinite(agencyCostNum) ||
+        agencyCostNum <= 0
+      ) {
+        setError("Agency cost must be greater than 0");
+        return;
+      }
+      if (
+        !form.cabCost.trim() ||
+        !Number.isFinite(cabCostNum) ||
+        cabCostNum <= 0
+      ) {
+        setError("Cab cost must be greater than 0");
+        return;
+      }
+    }
     setSaving(true);
     setError(null);
     try {
@@ -708,7 +728,9 @@ export function TripFormModal({
         customer: form.customer.trim() || undefined,
         agencyName: form.agencyName.trim(),
         ...(agencyId ? { agencyId } : {}),
-        agencyCost: form.agencyCost ? parseFloat(form.agencyCost) : undefined,
+        agencyCost: form.agencyCost
+          ? parseFloat(form.agencyCost)
+          : undefined,
         cabCost: form.cabCost ? parseFloat(form.cabCost) : undefined,
         advance: form.advance ? parseFloat(form.advance) : undefined,
         amount: form.agencyCost ? parseFloat(form.agencyCost) : undefined, // Fallback

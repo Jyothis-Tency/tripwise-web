@@ -134,10 +134,9 @@ function verifyAgencyCashMath(detail: AgencyCashInCashOutDetail): string[] {
   const bulkRemainingCalc = sumMoney([
     detail.summary.cashInBulk.totalOwed,
     -detail.summary.cashInBulk.received,
-    -advances,
   ]);
   if (!moneyEq(bulkRemainingCalc, detail.summary.cashInBulk.remaining)) {
-    issues.push("Bulk remaining ≠ total owed − received − advances.");
+    issues.push("Bulk remaining ≠ total owed − received.");
   }
   const vehicleRemainingCalc = sumMoney([
     detail.summary.cashOutAgencyProfit.totalOwed,
@@ -245,12 +244,20 @@ function verifyDriverCashMath(detail: DriverCashInCashOutDetail): string[] {
   return issues;
 }
 
-/** Bulk remaining (to receive) minus vehicle remaining (to pay). */
+/** Net still to settle with agency (bulk − vehicle − receipts − payouts). */
 function agencyTotalRemaining(detail: AgencyCashInCashOutDetail): number {
-  return (
-    detail.summary.cashInBulk.remaining -
-    detail.summary.cashOutAgencyProfit.remaining
-  );
+  const bulk = detail.summary.cashInBulk;
+  const vehicle = detail.summary.cashOutAgencyProfit;
+  const owedIn = bulk.totalOwed ?? (bulk.fromTrips || 0) + (bulk.manualExtra || 0);
+  const owedOut =
+    vehicle.totalOwed ??
+    (vehicle.fromTrips || 0) + (vehicle.manualExtra || 0);
+  return sumMoney([
+    owedIn,
+    -owedOut,
+    -(bulk.received || 0),
+    -(vehicle.paid || 0),
+  ]);
 }
 
 /** Trip bata + bulk advance still owed to the driver (cash out). */

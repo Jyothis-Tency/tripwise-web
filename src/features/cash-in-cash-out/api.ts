@@ -106,6 +106,10 @@ export interface AgencyCashInCashOutDetail {
     bulkTripsCashIn: Array<{
       _id: string;
       date: string | null;
+      startDate?: string | null;
+      endDate?: string | null;
+      createdAt?: string | null;
+      clientGroupId?: string;
       driverName: string;
       vehicleNumber: string;
       grandTotal: number;
@@ -129,6 +133,8 @@ export interface AgencyCashInCashOutDetail {
       status: string;
       agencyCost?: number;
       cabCost?: number;
+      extraExpenses?: number;
+      totalCabCost?: number;
       agencyProfit: number;
       advancePaid?: number;
     }>;

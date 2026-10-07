@@ -56,6 +56,8 @@ export interface AgencyTrip {
   notes?: string;
   isCompleted?: boolean;
   createdAt?: string;
+  /** Bulk entry card id — groups trips on the same driver/vehicle card. */
+  clientGroupId?: string;
 }
 
 // ─── Bulk Entry Row (local UI model) ─────────────────────────────────────────

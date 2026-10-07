@@ -4,7 +4,6 @@ import { fetchPLData } from "../api";
 import type { PLDataResponse } from "../api";
 import { RevenueBreakdown } from "../components/RevenueBreakdown";
 import { TripStatistics } from "../components/TripStatistics";
-import { RecentRoutesTable } from "../components/RecentRoutesTable";
 
 export const PLPage: React.FC = () => {
   const [data, setData] = useState<PLDataResponse | null>(null);
@@ -103,9 +102,6 @@ export const PLPage: React.FC = () => {
             onRefresh={() => loadData(true)}
           />
           <TripStatistics trips={data.trips} />
-          <RecentRoutesTable
-            routes={data.recentRoutes ?? data.topRoutes ?? []}
-          />
         </div>
       )}
     </div>

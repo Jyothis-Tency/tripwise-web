@@ -6,6 +6,7 @@ import {
   Loader2,
   X,
   BadgePercent,
+  Coins,
 } from "lucide-react";
 import type { PLRevenue, ExtraCommissionEntry } from "../api";
 import { addExtraCommission, fetchExtraCommissions } from "../api";
@@ -98,7 +99,7 @@ export const RevenueBreakdown: React.FC<RevenueBreakdownProps> = ({
   onRefresh,
 }) => {
   const extraCommission = Number(revenue.extraCommission) || 0;
-  const commissionProfit =
+  const commissionRevenue =
     revenue.commissionFromBulk ??
     Math.max(
       0,
@@ -107,6 +108,7 @@ export const RevenueBreakdown: React.FC<RevenueBreakdownProps> = ({
         revenue.ownerRevenue ||
         0) - extraCommission,
     );
+  const totalCommission = commissionRevenue + extraCommission;
 
   const [agencyLedger, setAgencyLedger] =
     useState<AggregatedAgencyLedger | null>(null);
@@ -291,8 +293,8 @@ export const RevenueBreakdown: React.FC<RevenueBreakdownProps> = ({
         </div>
       </div>
 
-      {/* Row 2 — commission (respects P&L date filter via analytics API) */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+      {/* Row 2 — commission */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <div
           className={`${cardBase} border-emerald-100 dark:border-emerald-500/20`}
         >
@@ -302,10 +304,10 @@ export const RevenueBreakdown: React.FC<RevenueBreakdownProps> = ({
             </div>
             <div>
               <p className="text-xs font-medium text-slate-500 sm:text-sm dark:text-slate-400">
-                Commission profit
+                Commission revenue
               </p>
               <h3 className="font-mono text-lg font-bold text-slate-900 metric-tabular sm:text-xl dark:text-white">
-                {fmtCurrency(commissionProfit)}
+                {fmtCurrency(commissionRevenue)}
               </h3>
             </div>
           </div>
@@ -352,6 +354,27 @@ export const RevenueBreakdown: React.FC<RevenueBreakdownProps> = ({
           </div>
           <p className="mt-4 text-xs text-slate-400">
             Manual add-ins (all time)
+          </p>
+        </div>
+
+        <div
+          className={`${cardBase} border-indigo-100 dark:border-indigo-500/25`}
+        >
+          <div className="flex items-center gap-3 sm:gap-4">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600 sm:h-12 sm:w-12 dark:bg-indigo-500/15 dark:text-indigo-300">
+              <Coins className="h-5 w-5 sm:h-6 sm:w-6" />
+            </div>
+            <div>
+              <p className="text-xs font-medium text-slate-500 sm:text-sm dark:text-slate-400">
+                Total commission
+              </p>
+              <h3 className="font-mono text-lg font-bold text-indigo-700 metric-tabular sm:text-xl dark:text-indigo-300">
+                {fmtCurrency(totalCommission)}
+              </h3>
+            </div>
+          </div>
+          <p className="mt-4 text-xs text-slate-400">
+            Commission revenue + extra commission
           </p>
         </div>
       </div>

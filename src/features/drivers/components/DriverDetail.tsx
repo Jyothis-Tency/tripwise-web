@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Phone,
@@ -13,8 +13,7 @@ import {
   DollarSign,
   ArrowRightLeft,
   Search,
-  Settings2,
-  X,
+  Calendar,
   User,
   Mail,
   Copy,
@@ -41,6 +40,7 @@ import {
   driverInitials,
 } from "./DriverCard";
 import { useAuth } from "../../../hooks/useAuth";
+import { DatePicker } from "../../../components/ui/DatePicker";
 
 function fmtCurrency(v: number | undefined | null): string {
   const n = v ?? 0;
@@ -72,6 +72,56 @@ function txInMonth(date: string | null | undefined, month: string) {
   if (Number.isNaN(d.getTime())) return false;
   const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
   return key === month;
+}
+
+function txInPeriod(
+  date: string | null | undefined,
+  period: string,
+  dateFrom: string,
+  dateTo: string,
+) {
+  if (!period || period === "all_time") return true;
+  if (period === "custom") {
+    if (!dateFrom && !dateTo) return true;
+    if (!date) return false;
+    const t = new Date(date).getTime();
+    if (Number.isNaN(t)) return false;
+    if (dateFrom) {
+      const start = new Date(`${dateFrom}T00:00:00`).getTime();
+      if (!Number.isNaN(start) && t < start) return false;
+    }
+    if (dateTo) {
+      const end = new Date(`${dateTo}T23:59:59`).getTime();
+      if (!Number.isNaN(end) && t > end) return false;
+    }
+    return true;
+  }
+  return txInMonth(date, period);
+}
+
+function formatPeriodButtonLabel(
+  period: string,
+  dateFrom: string,
+  dateTo: string,
+): string {
+  if (!period || period === "all_time") return "All time";
+  if (period === "custom") {
+    const fmt = (iso: string) => {
+      const d = new Date(`${iso}T00:00:00`);
+      if (Number.isNaN(d.getTime())) return iso;
+      return d.toLocaleDateString("en-IN", {
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+      });
+    };
+    if (dateFrom && dateTo) return `${fmt(dateFrom)} – ${fmt(dateTo)}`;
+    if (dateFrom) return `From ${fmt(dateFrom)}`;
+    if (dateTo) return `Until ${fmt(dateTo)}`;
+    return "Custom range";
+  }
+  const opt = MONTH_OPTIONS.find((o) => o.value === period);
+  return opt?.label ?? period;
 }
 
 function txSortTime(tx: { date?: string | null; createdAt?: string | null }) {
@@ -147,112 +197,240 @@ function paymentKindLabel(kind: PaymentRow["kind"]): string {
   return kind === "salary" ? "Salary" : "Advance";
 }
 
-function TableToolbar({
+function SalaryTableToolbar({
   search,
   onSearch,
   sortDir,
-  onToggleSort,
-  filtersOpen,
-  onToggleFilters,
-  month,
-  onMonth,
+  onSortDir,
   typeFilter,
   onTypeFilter,
-  filterCount,
-  onClear,
-  searchPlaceholder = "Search…",
 }: {
   search: string;
   onSearch: (v: string) => void;
   sortDir: SortDir;
-  onToggleSort: () => void;
-  filtersOpen: boolean;
-  onToggleFilters: () => void;
-  month: string;
-  onMonth: (v: string) => void;
-  typeFilter?: TxTypeFilter;
-  onTypeFilter?: (v: TxTypeFilter) => void;
-  filterCount: number;
-  onClear: () => void;
-  searchPlaceholder?: string;
+  onSortDir: (d: SortDir) => void;
+  typeFilter: TxTypeFilter;
+  onTypeFilter: (v: TxTypeFilter) => void;
 }) {
+  const sortRef = useRef<HTMLDivElement>(null);
+  const [sortOpen, setSortOpen] = useState(false);
+
+  useEffect(() => {
+    const onDoc = (e: MouseEvent) => {
+      if (!sortRef.current?.contains(e.target as Node)) setSortOpen(false);
+    };
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, []);
+
   return (
-    <div className="mb-3 space-y-2">
-      <div className="flex flex-wrap items-center gap-2">
-        <label className="flex min-w-[140px] flex-1 items-center gap-2 rounded-xl border border-slate-200 bg-[var(--bg-main)] px-2.5 dark:border-[#252c4d]">
-          <Search className="h-3.5 w-3.5 shrink-0 text-slate-400" />
-          <input
-            value={search}
-            onChange={(e) => onSearch(e.target.value)}
-            placeholder={searchPlaceholder}
-            className="w-full min-w-0 border-0 bg-transparent py-2 text-sm outline-none dark:text-[#eef0ff]"
-          />
-        </label>
+    <div className="mb-3 flex flex-wrap items-center gap-2">
+      <label
+        className="flex w-full max-w-[11rem] items-center gap-2 rounded-xl border border-slate-200 bg-[var(--bg-main)] px-2.5 dark:border-[#252c4d] sm:max-w-[12.5rem]"
+      >
+        <Search className="h-3.5 w-3.5 shrink-0 text-slate-400" />
+        <input
+          value={search}
+          onChange={(e) => onSearch(e.target.value)}
+          placeholder="Search…"
+          className="w-full min-w-0 border-0 bg-transparent py-2 text-sm outline-none dark:text-[#eef0ff]"
+        />
+      </label>
+      <select
+        value={typeFilter}
+        onChange={(e) => onTypeFilter(e.target.value as TxTypeFilter)}
+        aria-label="Transaction type"
+        className="rounded-[10px] border border-slate-200 bg-[var(--bg-main)] px-2.5 py-2 text-xs font-semibold text-slate-700 outline-none dark:border-[#252c4d] dark:text-[#eef0ff]"
+      >
+        <option value="all">All types</option>
+        <option value="salary">Salary</option>
+        <option value="advance">Advance</option>
+      </select>
+      <div ref={sortRef} className="relative">
         <button
           type="button"
-          onClick={onToggleSort}
-          className="rounded-[10px] border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-500 transition hover:bg-[var(--bg-main)] dark:border-[#252c4d] dark:text-[#8d94b8]"
-        >
-          {sortDir === "desc" ? "↓ Newest" : "↑ Oldest"}
-        </button>
-        <button
-          type="button"
-          onClick={onToggleFilters}
-          className={`inline-flex items-center gap-1.5 rounded-[10px] border px-3 py-2 text-xs font-semibold transition ${
-            filtersOpen || filterCount > 0
+          onClick={() => setSortOpen((o) => !o)}
+          className={`rounded-[10px] border px-3 py-2 text-xs font-semibold transition ${
+            sortOpen
               ? "border-indigo-300 bg-indigo-50 text-indigo-700 dark:border-indigo-500/40 dark:bg-[#242a57] dark:text-[#a5b4fc]"
               : "border-slate-200 text-slate-500 hover:bg-[var(--bg-main)] dark:border-[#252c4d] dark:text-[#8d94b8]"
           }`}
         >
-          <Settings2 className="h-3.5 w-3.5" />
-          Filters
-          {filterCount > 0 && (
-            <span className="rounded-full bg-indigo-600 px-1.5 text-[10px] text-white">
-              {filterCount}
-            </span>
-          )}
+          {sortDir === "desc" ? "↓ Newest" : "↑ Oldest"}
         </button>
-        {filterCount > 0 && (
-          <button
-            type="button"
-            onClick={onClear}
-            className="inline-flex items-center gap-1 rounded-[10px] px-2 py-2 text-xs font-semibold text-slate-500 hover:text-rose-500 dark:text-[#8d94b8]"
+        {sortOpen && (
+          <div
+            className="absolute left-0 top-full z-30 mt-1 min-w-[9.5rem] overflow-hidden rounded-xl border border-slate-200 bg-[var(--bg-card)] py-1 shadow-lg dark:border-[#252c4d]"
           >
-            <X className="h-3.5 w-3.5" />
-            Clear
-          </button>
+            <button
+              type="button"
+              onClick={() => {
+                onSortDir("desc");
+                setSortOpen(false);
+              }}
+              className={`block w-full px-3 py-2 text-left text-xs font-semibold hover:bg-[var(--bg-main)] ${
+                sortDir === "desc"
+                  ? "text-indigo-600 dark:text-[#a5b4fc]"
+                  : "text-slate-600 dark:text-[#8d94b8]"
+              }`}
+            >
+              ↓ Newest first
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                onSortDir("asc");
+                setSortOpen(false);
+              }}
+              className={`block w-full px-3 py-2 text-left text-xs font-semibold hover:bg-[var(--bg-main)] ${
+                sortDir === "asc"
+                  ? "text-indigo-600 dark:text-[#a5b4fc]"
+                  : "text-slate-600 dark:text-[#8d94b8]"
+              }`}
+            >
+              ↑ Oldest first
+            </button>
+          </div>
         )}
       </div>
-      {filtersOpen && (
-        <div className="flex flex-wrap gap-2 rounded-xl border border-slate-200 bg-[var(--bg-main)] p-2.5 dark:border-[#252c4d]">
-          <label className="flex flex-col gap-1 text-[11px] font-semibold text-slate-500 dark:text-[#8d94b8]">
-            Month
-            <select
-              value={month}
-              onChange={(e) => onMonth(e.target.value)}
-              className="rounded-[10px] border border-slate-200 bg-[var(--bg-card)] px-2.5 py-1.5 text-sm text-slate-800 outline-none dark:border-[#252c4d] dark:text-[#eef0ff]"
+    </div>
+  );
+}
+
+function SalaryPeriodMenu({
+  period,
+  onPeriod,
+  dateFrom,
+  dateTo,
+  onDateFrom,
+  onDateTo,
+  menuOpen,
+  onMenuOpen,
+}: {
+  period: string;
+  onPeriod: (v: string) => void;
+  dateFrom: string;
+  dateTo: string;
+  onDateFrom: (v: string) => void;
+  onDateTo: (v: string) => void;
+  menuOpen: boolean;
+  onMenuOpen: (open: boolean) => void;
+}) {
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const [draftFrom, setDraftFrom] = useState(dateFrom);
+  const [draftTo, setDraftTo] = useState(dateTo);
+
+  useEffect(() => {
+    if (menuOpen) {
+      setDraftFrom(dateFrom);
+      setDraftTo(dateTo);
+    }
+  }, [menuOpen, dateFrom, dateTo]);
+
+  useEffect(() => {
+    const onDoc = (e: MouseEvent) => {
+      if (!wrapRef.current?.contains(e.target as Node)) onMenuOpen(false);
+    };
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, [onMenuOpen]);
+
+  const label = formatPeriodButtonLabel(period, dateFrom, dateTo);
+  const periodActive = period !== "all_time";
+
+  return (
+    <div ref={wrapRef} className="relative max-w-[min(100%,16rem)]">
+      <button
+        type="button"
+        onClick={() => onMenuOpen(!menuOpen)}
+        className={`inline-flex max-w-full items-center gap-1.5 truncate rounded-[10px] border px-3 py-2 text-xs font-semibold transition ${
+          menuOpen || periodActive
+            ? "border-indigo-300 bg-indigo-50 text-indigo-700 dark:border-indigo-500/40 dark:bg-[#242a57] dark:text-[#a5b4fc]"
+            : "border-slate-200 text-slate-600 hover:bg-[var(--bg-main)] dark:border-[#252c4d] dark:text-[#8d94b8]"
+        }`}
+      >
+        <Calendar className="h-3.5 w-3.5 shrink-0 opacity-80" />
+        <span className="truncate">{label}</span>
+      </button>
+      {menuOpen && (
+        <div
+          className="absolute right-0 top-full z-30 mt-1 flex w-[min(100vw-2rem,17rem)] max-h-[min(70vh,22rem)] flex-col overflow-hidden rounded-xl border border-slate-200 bg-[var(--bg-card)] shadow-lg dark:border-[#252c4d]"
+        >
+          <div className="overflow-y-auto p-2">
+            <button
+              type="button"
+              onClick={() => {
+                onPeriod("all_time");
+                onDateFrom("");
+                onDateTo("");
+                onMenuOpen(false);
+              }}
+              className={`mb-1 w-full rounded-lg px-3 py-2 text-left text-xs font-semibold hover:bg-[var(--bg-main)] ${
+                period === "all_time"
+                  ? "text-indigo-600 dark:text-[#a5b4fc]"
+                  : "text-slate-700 dark:text-[#eef0ff]"
+              }`}
             >
-              {MONTH_OPTIONS.map((o) => (
-                <option key={o.value} value={o.value}>
-                  {o.label}
-                </option>
-              ))}
-            </select>
-          </label>
-          {onTypeFilter && typeFilter !== undefined && (
-            <label className="flex flex-col gap-1 text-[11px] font-semibold text-slate-500 dark:text-[#8d94b8]">
-              Type
-              <select
-                value={typeFilter}
-                onChange={(e) => onTypeFilter(e.target.value as TxTypeFilter)}
-                className="rounded-[10px] border border-slate-200 bg-[var(--bg-card)] px-2.5 py-1.5 text-sm text-slate-800 outline-none dark:border-[#252c4d] dark:text-[#eef0ff]"
+              All time
+            </button>
+            <p className="px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-slate-400">
+              Month
+            </p>
+            {MONTH_OPTIONS.map((o) => (
+              <button
+                key={o.value}
+                type="button"
+                onClick={() => {
+                  onPeriod(o.value);
+                  onDateFrom("");
+                  onDateTo("");
+                  onMenuOpen(false);
+                }}
+                className={`w-full rounded-lg px-3 py-2 text-left text-xs font-semibold hover:bg-[var(--bg-main)] ${
+                  period === o.value
+                    ? "text-indigo-600 dark:text-[#a5b4fc]"
+                    : "text-slate-700 dark:text-[#eef0ff]"
+                }`}
               >
-                <option value="all">All</option>
-                <option value="salary">Salary</option>
-                <option value="advance">Advance</option>
-              </select>
-            </label>
-          )}
+                {o.label}
+              </button>
+            ))}
+          </div>
+          <div className="border-t border-slate-200 p-3 dark:border-[#252c4d]">
+            <p className="mb-2 text-[10px] font-bold uppercase tracking-wide text-slate-400">
+              Custom range
+            </p>
+            <div className="flex flex-col gap-2">
+              <label className="flex flex-col gap-0.5 text-[10px] font-semibold text-slate-500">
+                From
+                <DatePicker
+              value={draftFrom}
+              onChange={setDraftFrom}
+              className="rounded-[10px] border border-slate-200 bg-[var(--bg-main)] px-2 py-1.5 text-xs text-slate-800 dark:border-[#252c4d] dark:text-[#eef0ff]"
+            />
+              </label>
+              <label className="flex flex-col gap-0.5 text-[10px] font-semibold text-slate-500">
+                To
+                <DatePicker
+              value={draftTo}
+              onChange={setDraftTo}
+              className="rounded-[10px] border border-slate-200 bg-[var(--bg-main)] px-2 py-1.5 text-xs text-slate-800 dark:border-[#252c4d] dark:text-[#eef0ff]"
+            />
+              </label>
+              <button
+                type="button"
+                onClick={() => {
+                  onPeriod("custom");
+                  onDateFrom(draftFrom);
+                  onDateTo(draftTo);
+                  onMenuOpen(false);
+                }}
+                className="rounded-[10px] bg-indigo-600 py-2 text-xs font-bold text-white hover:bg-indigo-700 dark:bg-indigo-500"
+              >
+                Apply range
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
@@ -798,9 +976,11 @@ function SalaryTab({ driver }: { driver: Driver }) {
 
   const [ledSearch, setLedSearch] = useState("");
   const [ledSort, setLedSort] = useState<SortDir>("desc");
-  const [ledMonth, setLedMonth] = useState("all_time");
+  const [ledPeriod, setLedPeriod] = useState("all_time");
+  const [ledDateFrom, setLedDateFrom] = useState("");
+  const [ledDateTo, setLedDateTo] = useState("");
   const [ledType, setLedType] = useState<TxTypeFilter>("all");
-  const [ledFiltersOpen, setLedFiltersOpen] = useState(false);
+  const [ledPeriodMenuOpen, setLedPeriodMenuOpen] = useState(false);
 
   const driverId = driver._id ?? (driver as { id?: string }).id;
 
@@ -853,12 +1033,19 @@ function SalaryTab({ driver }: { driver: Driver }) {
     [cicoDetail],
   );
 
-  const ledgerRows = useMemo(() => {
-    const q = ledSearch.trim().toLowerCase();
-    let rows = ledger.filter((tx) => txInMonth(tx.date, ledMonth));
+  const ledgerForCards = useMemo(() => {
+    let rows = ledger.filter((tx) =>
+      txInPeriod(tx.date, ledPeriod, ledDateFrom, ledDateTo),
+    );
     if (ledType !== "all") {
       rows = rows.filter((tx) => tx.kind === ledType);
     }
+    return rows;
+  }, [ledger, ledPeriod, ledDateFrom, ledDateTo, ledType]);
+
+  const ledgerRows = useMemo(() => {
+    const q = ledSearch.trim().toLowerCase();
+    let rows = [...ledgerForCards];
     if (q) {
       rows = rows.filter((tx) => {
         const hay = [
@@ -876,7 +1063,22 @@ function SalaryTab({ driver }: { driver: Driver }) {
       const d = txSortTime(a) - txSortTime(b);
       return ledSort === "desc" ? -d : d;
     });
-  }, [ledger, ledSearch, ledMonth, ledType, ledSort]);
+  }, [ledgerForCards, ledSearch, ledSort]);
+
+  const filteredSalarySum = useMemo(
+    () =>
+      ledgerForCards
+        .filter((tx) => tx.kind === "salary")
+        .reduce((s, tx) => s + (Number(tx.amount) || 0), 0),
+    [ledgerForCards],
+  );
+  const filteredAdvanceSum = useMemo(
+    () =>
+      ledgerForCards
+        .filter((tx) => tx.kind === "advance")
+        .reduce((s, tx) => s + (Number(tx.amount) || 0), 0),
+    [ledgerForCards],
+  );
 
   if (loading) {
     return (
@@ -917,56 +1119,97 @@ function SalaryTab({ driver }: { driver: Driver }) {
       ? Math.min(100, Math.round((paidCombined / grandTotal) * 100))
       : 0;
 
-  const tiles = [
-    {
-      label: "Pending payout",
-      hint: "Trip bata + bulk − cash-outs paid",
-      value: fmtCurrency(pendingPayout),
-      sub: `${paidPct}% settled · paid ${fmtCurrency(paidCombined)}`,
-      bg: "bg-teal-50 dark:bg-teal-500/15",
-      icon: (
-        <Wallet className="h-4 w-4 text-teal-700 dark:text-teal-300" />
-      ),
-      accent: true as const,
-    },
-    {
-      label: "Trip bata",
-      hint: "Earnings from completed vehicle trips",
-      value: fmtCurrency(tripBata),
-      bg: "bg-emerald-50 dark:bg-[#0d3325]",
-      icon: (
-        <DollarSign className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
-      ),
-    },
-    {
-      label: "Bulk trip salary",
-      hint: "Advances owed from Bulk Entry trips",
-      value: fmtCurrency(bulkFromTrips),
-      bg: "bg-violet-50 dark:bg-violet-500/15",
-      icon: (
-        <Wallet className="h-4 w-4 text-violet-600 dark:text-violet-300" />
-      ),
-    },
-    {
-      label: "Advance paid",
-      hint: "Advances given on Transaction",
-      value: fmtCurrency(advancePaid),
-      bg: "bg-indigo-50 dark:bg-[#242a57]",
-      icon: (
-        <Wallet className="h-4 w-4 text-indigo-600 dark:text-indigo-300" />
-      ),
-    },
-    {
-      label: "Total km",
-      hint: "All-time trip distance",
-      value: `${totalKm} km`,
-      bg: "bg-orange-50 dark:bg-orange-500/15",
-      icon: <MapPin className="h-4 w-4 text-orange-600 dark:text-orange-300" />,
-    },
-  ];
+  const hasLedgerFilters = ledPeriod !== "all_time" || ledType !== "all";
 
-  const ledFilterCount =
-    (ledMonth !== "all_time" ? 1 : 0) + (ledType !== "all" ? 1 : 0);
+  const tiles = hasLedgerFilters
+    ? [
+        {
+          label: "Salary",
+          hint: "Salary / bata payouts in this view",
+          value: fmtCurrency(filteredSalarySum),
+          bg: "bg-emerald-50 dark:bg-[#0d3325]",
+          icon: (
+            <DollarSign className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+          ),
+        },
+        {
+          label: "Advance",
+          hint: "Advances in this view",
+          value: fmtCurrency(filteredAdvanceSum),
+          bg: "bg-indigo-50 dark:bg-[#242a57]",
+          icon: (
+            <Wallet className="h-4 w-4 text-indigo-600 dark:text-indigo-300" />
+          ),
+        },
+        {
+          label: "Transactions",
+          hint: "Rows matching month & type",
+          value: String(ledgerForCards.length),
+          bg: "bg-violet-50 dark:bg-violet-500/15",
+          icon: (
+            <Wallet className="h-4 w-4 text-violet-600 dark:text-violet-300" />
+          ),
+        },
+        {
+          label: "Total km",
+          hint: "All-time trip distance",
+          value: `${totalKm} km`,
+          bg: "bg-orange-50 dark:bg-orange-500/15",
+          icon: (
+            <MapPin className="h-4 w-4 text-orange-600 dark:text-orange-300" />
+          ),
+        },
+      ]
+    : [
+        {
+          label: "Pending payout",
+          hint: "Trip bata + bulk − cash-outs paid",
+          value: fmtCurrency(pendingPayout),
+          sub: `${paidPct}% settled · paid ${fmtCurrency(paidCombined)}`,
+          bg: "bg-teal-50 dark:bg-teal-500/15",
+          icon: (
+            <Wallet className="h-4 w-4 text-teal-700 dark:text-teal-300" />
+          ),
+          accent: true as const,
+        },
+        {
+          label: "Trip bata",
+          hint: "Earnings from completed vehicle trips",
+          value: fmtCurrency(tripBata),
+          bg: "bg-emerald-50 dark:bg-[#0d3325]",
+          icon: (
+            <DollarSign className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+          ),
+        },
+        {
+          label: "Bulk trip salary",
+          hint: "Advances owed from Bulk Entry trips",
+          value: fmtCurrency(bulkFromTrips),
+          bg: "bg-violet-50 dark:bg-violet-500/15",
+          icon: (
+            <Wallet className="h-4 w-4 text-violet-600 dark:text-violet-300" />
+          ),
+        },
+        {
+          label: "Advance paid",
+          hint: "Advances given on Transaction",
+          value: fmtCurrency(advancePaid),
+          bg: "bg-indigo-50 dark:bg-[#242a57]",
+          icon: (
+            <Wallet className="h-4 w-4 text-indigo-600 dark:text-indigo-300" />
+          ),
+        },
+        {
+          label: "Total km",
+          hint: "All-time trip distance",
+          value: `${totalKm} km`,
+          bg: "bg-orange-50 dark:bg-orange-500/15",
+          icon: (
+            <MapPin className="h-4 w-4 text-orange-600 dark:text-orange-300" />
+          ),
+        },
+      ];
+
 
   return (
     <div className="grid gap-[18px]">
@@ -976,18 +1219,30 @@ function SalaryTab({ driver }: { driver: Driver }) {
             Financial summary
           </h3>
           <p className="mt-0.5 max-w-lg text-xs text-slate-500 dark:text-[#8d94b8]">
-            All-time cards. Search / sort / filter only apply to the table
-            below.
+            Summary cards follow the period and type filters. Search and sort
+            apply to the table only.
           </p>
         </div>
-        <button
-          type="button"
-          onClick={goSalaryAdvance}
-          className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-br from-indigo-600 to-violet-600 px-4 py-2.5 text-sm font-bold text-white shadow-[0_6px_16px_-6px_#4f46e5] transition hover:-translate-y-px active:scale-[0.98]"
-        >
-          <ArrowRightLeft className="h-4 w-4" />
-          Salary/Advance
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <SalaryPeriodMenu
+            period={ledPeriod}
+            onPeriod={setLedPeriod}
+            dateFrom={ledDateFrom}
+            dateTo={ledDateTo}
+            onDateFrom={setLedDateFrom}
+            onDateTo={setLedDateTo}
+            menuOpen={ledPeriodMenuOpen}
+            onMenuOpen={setLedPeriodMenuOpen}
+          />
+          <button
+            type="button"
+            onClick={goSalaryAdvance}
+            className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-br from-indigo-600 to-violet-600 px-4 py-2.5 text-sm font-bold text-white shadow-[0_6px_16px_-6px_#4f46e5] transition hover:-translate-y-px active:scale-[0.98]"
+          >
+            <ArrowRightLeft className="h-4 w-4" />
+            Salary/Advance
+          </button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
@@ -1047,26 +1302,13 @@ function SalaryTab({ driver }: { driver: Driver }) {
       </div>
 
       <Section title="Salary & payment history" padded>
-        <TableToolbar
+        <SalaryTableToolbar
           search={ledSearch}
           onSearch={setLedSearch}
           sortDir={ledSort}
-          onToggleSort={() =>
-            setLedSort((s) => (s === "desc" ? "asc" : "desc"))
-          }
-          filtersOpen={ledFiltersOpen}
-          onToggleFilters={() => setLedFiltersOpen((o) => !o)}
-          month={ledMonth}
-          onMonth={setLedMonth}
+          onSortDir={setLedSort}
           typeFilter={ledType}
           onTypeFilter={setLedType}
-          filterCount={ledFilterCount}
-          onClear={() => {
-            setLedSearch("");
-            setLedMonth("all_time");
-            setLedType("all");
-            setLedSort("desc");
-          }}
         />
         {ledgerRows.length === 0 ? (
           <EmptyMsg

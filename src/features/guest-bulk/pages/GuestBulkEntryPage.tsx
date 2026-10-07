@@ -44,6 +44,7 @@ import {
 } from "../api";
 import type { Agency, BulkTripRow, DriverGroup } from "../../bulk-entry/api";
 import { formatAgencyLabel } from "../../bulk-entry/api";
+import { DateTimePicker } from "../../../components/ui/DateTimePicker";
 import { TimePicker12h } from "../../../components/ui/TimePicker12h";
 import { normalizeHHmm } from "../../../lib/timePickerUtils";
 import { useTheme } from "../../../hooks/useTheme";
@@ -1835,13 +1836,11 @@ export function GuestBulkEntryPage() {
               )}
               <label className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-900 dark:text-emerald-200">
                 <span>Exp</span>
-                <input
-                  type="datetime-local"
+                <DateTimePicker
+                  compact
                   disabled={ownerBusy}
-                  key={`${invite.id}-${invite.expiresAt ?? "none"}`}
-                  defaultValue={toLocalInputValue(invite.expiresAt)}
-                  onBlur={(e) => {
-                    const next = e.target.value;
+                  value={toLocalInputValue(invite.expiresAt)}
+                  onChange={(next) => {
                     const prev = toLocalInputValue(invite.expiresAt);
                     if (next !== prev) void onOwnerExpiryChange(next);
                   }}

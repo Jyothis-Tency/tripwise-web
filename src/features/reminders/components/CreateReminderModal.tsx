@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { X } from 'lucide-react';
 import type { CreateReminderPayload } from '../api';
 import { createReminder } from '../api';
+import { DatePicker } from '../../../components/ui/DatePicker';
 
 interface Props { open: boolean; onClose: () => void; onCreated: () => void; }
 
@@ -56,7 +57,7 @@ const CreateReminderModal: React.FC<Props> = ({ open, onClose, onCreated }) => {
             <div><label className={labelCls}>Phone</label><input className={inputCls} value={form.customerPhone} onChange={e => set('customerPhone', e.target.value)} /></div>
             <div><label className={labelCls}>From *</label><input className={inputCls} value={form.fromLocation} onChange={e => set('fromLocation', e.target.value)} /></div>
             <div><label className={labelCls}>To *</label><input className={inputCls} value={form.toLocation} onChange={e => set('toLocation', e.target.value)} /></div>
-            <div><label className={labelCls}>Trip Date *</label><input className={inputCls} type="date" value={form.tripDate} onChange={e => set('tripDate', e.target.value)} /></div>
+            <div><label className={labelCls}>Trip Date *</label><DatePicker value={form.tripDate} onChange={(v) => set('tripDate', v)} className={inputCls} /></div>
             <div><label className={labelCls}>Vehicle Type</label><input className={inputCls} value={form.vehicleDetails?.vehicleType ?? ''} onChange={e => setForm(p => ({ ...p, vehicleDetails: { vehicleType: e.target.value } }))} /></div>
             <div><label className={labelCls}>Advance (₹)</label><input className={inputCls} type="number" value={form.advanceCollected ?? ''} onChange={e => set('advanceCollected', e.target.value ? Number(e.target.value) : undefined)} /></div>
             <div><label className={labelCls}>Total (₹)</label><input className={inputCls} type="number" value={form.totalPayment ?? ''} onChange={e => set('totalPayment', e.target.value ? Number(e.target.value) : undefined)} /></div>

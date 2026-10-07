@@ -35,6 +35,7 @@ import {
   buildAgencyTxRows,
   type AgencyTxType,
 } from "../agencyTxRows";
+import { DatePicker } from "../../../components/ui/DatePicker";
 
 type EntityTab = CashInCashOutTabId;
 type DetailTabId = CashInCashOutDetailTabId;
@@ -1113,21 +1114,19 @@ export function TransactionHistoryPage() {
                       ))}
                     </select>
                     <div className="flex items-center gap-1.5 text-slate-400">
-                      <input
-                        type="date"
-                        value={dateFrom}
-                        onChange={(e) => setDateFrom(e.target.value)}
-                        aria-label="From date"
-                        className={fieldCls}
-                      />
+                      <DatePicker
+              value={dateFrom}
+              onChange={setDateFrom}
+              aria-label="From date"
+              className={fieldCls}
+            />
                       <span>→</span>
-                      <input
-                        type="date"
-                        value={dateTo}
-                        onChange={(e) => setDateTo(e.target.value)}
-                        aria-label="To date"
-                        className={fieldCls}
-                      />
+                      <DatePicker
+              value={dateTo}
+              onChange={setDateTo}
+              aria-label="To date"
+              className={fieldCls}
+            />
                     </div>
                     <div className="flex gap-1 rounded-xl border border-slate-200 bg-[var(--bg-card)] p-1 dark:border-[#252c4d]">
                       {(

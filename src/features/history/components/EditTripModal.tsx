@@ -6,6 +6,7 @@ import {
   computeAgencyProfitPreview,
   getHistoryTripExpenseBreakdown,
 } from "../tripExpenseBreakdown";
+import { DatePicker } from "../../../components/ui/DatePicker";
 import { TimePicker12h } from "../../../components/ui/TimePicker12h";
 import { normalizeHHmm } from "../../../lib/timePickerUtils";
 import { AgencyNameCombobox } from "../../../components/AgencyNameCombobox";
@@ -316,12 +317,9 @@ export function EditTripModal({
                     <label className="block text-sm text-slate-600 mb-1">
                       Start Date
                     </label>
-                    <input
-                      type="date"
+                    <DatePicker
                       value={fields.startDate}
-                      onChange={(e) =>
-                        handleChange("startDate", e.target.value)
-                      }
+                      onChange={(v) => handleChange("startDate", v)}
                       className={inputCls}
                     />
               </div>
@@ -329,12 +327,9 @@ export function EditTripModal({
                     <label className="block text-sm text-slate-600 mb-1">
                       End Date
                     </label>
-                    <input
-                      type="date"
+                    <DatePicker
                       value={fields.expectedEndDate}
-                      onChange={(e) =>
-                        handleChange("expectedEndDate", e.target.value)
-                      }
+                      onChange={(v) => handleChange("expectedEndDate", v)}
                       className={inputCls}
                     />
               </div>

@@ -1,13 +1,5 @@
 import { useEffect, useState, type ReactNode } from "react";
-import {
-  Users,
-  Truck,
-  Map,
-  Clock,
-  Calendar,
-  IndianRupee,
-  Bell,
-} from "lucide-react";
+import { Users, Truck, Map, Clock, Calendar } from "lucide-react";
 import type { DashboardData, TripSummary } from "../api";
 import { fetchDashboardData } from "../api";
 import { useAuth } from "../../../hooks/useAuth";
@@ -69,12 +61,6 @@ export function DashboardPage() {
   const drivers = (overview.drivers ?? {}) as any;
   const vehicles = (overview.vehicles ?? {}) as any;
   const trips = (overview.trips ?? {}) as any;
-  const earnings = (overview.earnings ?? {}) as any;
-
-  const todayAmt = Number(earnings.today ?? 0);
-  const weekAmt = Number(earnings.thisWeek ?? 0);
-  const monthAmt = Number(earnings.thisMonth ?? 0);
-  const alerts = data?.alerts ?? [];
 
   const dateLabel = new Date().toLocaleDateString("en-IN", {
     day: "numeric",
@@ -192,89 +178,17 @@ export function DashboardPage() {
         />
       </section>
 
-      <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-12">
-        <div className="space-y-6 lg:col-span-8">
-          <TripsPanel
-            title="Ongoing Trips"
-            dotClass="bg-sky-500"
-            trips={data?.ongoingTrips ?? []}
-          />
-          <TripsPanel
-            title="Upcoming Trips"
-            dotClass="bg-amber-500"
-            trips={data?.upcomingTrips ?? []}
-          />
-        </div>
-
-        <aside className="space-y-6 lg:col-span-4">
-          <section className="relative overflow-hidden rounded-2xl border border-slate-200/90 bg-white p-6 shadow-subtle animate-fade-in dark:border-white/10 dark:bg-[#0e111a]/72 dark:backdrop-blur-xl">
-            <div className="absolute inset-x-0 top-0 h-1 bg-amber-500" />
-            <div className="mb-5 flex items-center gap-2.5">
-              <div className="flex h-7 w-7 items-center justify-center rounded-lg border border-amber-200/60 bg-amber-50 text-amber-600 dark:border-amber-500/25 dark:bg-amber-500/10 dark:text-amber-400">
-                <IndianRupee className="h-4 w-4" />
-              </div>
-              <h2 className="text-base font-bold tracking-tight text-slate-900 dark:text-white">
-                Earnings Summary
-              </h2>
-            </div>
-
-            <div className="mb-3.5 rounded-xl border border-slate-200/90 bg-gradient-to-b from-slate-50/80 to-white p-4 dark:border-white/10 dark:from-white/5 dark:to-transparent">
-              <span className="font-mono-metric text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                Today
-              </span>
-              <div className="mt-1 font-sans text-3xl font-extrabold text-slate-900 metric-tabular dark:text-white">
-                ₹{todayAmt.toLocaleString("en-IN", { maximumFractionDigits: 0 })}
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <EarnMini label="This Week" amount={weekAmt} />
-              <EarnMini label="This Month" amount={monthAmt} />
-            </div>
-          </section>
-
-          <section className="relative overflow-hidden rounded-2xl border border-slate-200/90 bg-white p-6 shadow-subtle animate-fade-in dark:border-white/10 dark:bg-[#0e111a]/72 dark:backdrop-blur-xl">
-            <div className="absolute inset-x-0 top-0 h-1 bg-rose-400" />
-            <div className="mb-4 flex items-center justify-between">
-              <div className="flex items-center gap-2.5">
-                <div className="flex h-7 w-7 items-center justify-center rounded-lg border border-rose-100 bg-rose-50 text-rose-500 dark:border-rose-500/25 dark:bg-rose-500/10 dark:text-rose-400">
-                  <Bell className="h-4 w-4" />
-                </div>
-                <h2 className="text-base font-bold tracking-tight text-slate-900 dark:text-white">
-                  Alerts
-                </h2>
-              </div>
-              <span className="inline-flex h-5 min-w-[20px] items-center justify-center rounded-full border border-rose-200/70 bg-rose-50 px-1.5 font-mono-metric text-[11px] font-bold text-rose-600 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-400">
-                {alerts.length}
-              </span>
-            </div>
-
-            {alerts.length === 0 ? (
-              <p className="py-8 text-center text-sm text-slate-400">
-                No active alerts
-              </p>
-            ) : (
-              <ul className="space-y-2">
-                {alerts.slice(0, 5).map((a: any) => (
-                  <li
-                    key={a._id ?? a.id}
-                    className="flex items-start gap-3 rounded-xl border border-rose-100/60 bg-rose-50/40 p-3 dark:border-rose-500/20 dark:bg-rose-500/10"
-                  >
-                    <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-rose-400" />
-                    <div>
-                      <div className="mb-0.5 text-sm font-medium leading-tight text-slate-700 dark:text-slate-200">
-                        {a.title ?? "Alert"}
-                      </div>
-                      <div className="text-xs text-slate-500 dark:text-slate-400">
-                        {a.message ?? a.description ?? ""}
-                      </div>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </section>
-        </aside>
+      <div className="space-y-6">
+        <TripsPanel
+          title="Ongoing Trips"
+          dotClass="bg-sky-500"
+          trips={data?.ongoingTrips ?? []}
+        />
+        <TripsPanel
+          title="Upcoming Trips"
+          dotClass="bg-amber-500"
+          trips={data?.upcomingTrips ?? []}
+        />
       </div>
     </div>
   );
@@ -311,19 +225,6 @@ function KpiCard({
       </div>
       <div className="mt-3 flex items-center gap-2 border-t border-slate-100/90 pt-3 text-xs font-medium text-slate-500 dark:border-white/10">
         {footer}
-      </div>
-    </div>
-  );
-}
-
-function EarnMini({ label, amount }: { label: string; amount: number }) {
-  return (
-    <div className="rounded-xl border border-slate-200/80 bg-slate-50/50 p-3.5 dark:border-white/10 dark:bg-white/5">
-      <span className="font-mono-metric text-[10px] font-bold uppercase tracking-wider text-slate-400">
-        {label}
-      </span>
-      <div className="mt-1 font-sans text-xl font-bold text-slate-800 metric-tabular dark:text-slate-100">
-        ₹{amount.toLocaleString("en-IN", { maximumFractionDigits: 0 })}
       </div>
     </div>
   );

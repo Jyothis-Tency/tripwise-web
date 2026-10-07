@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Search, X, RefreshCw, ChevronLeft, ChevronRight, FileDown, Wallet } from 'lucide-react';
+import { Search, X, RefreshCw, ChevronLeft, ChevronRight, FileDown } from 'lucide-react';
 import jsPDF from 'jspdf';
 import {
   fetchTripHistory,
@@ -12,6 +11,7 @@ import {
 import { TripCard } from '../components/TripCard';
 import { fetchAgencies, type Agency } from '../../bulk-entry/api';
 import { resolveAgencyLabelFromName } from '../../../lib/agencyDisplay';
+import { DatePicker } from "../../../components/ui/DatePicker";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -25,10 +25,6 @@ const STATUS_OPTIONS = [
   { value: 'partial',     label: 'Partial' },
   { value: 'unpaid',      label: 'Unpaid' },
 ];
-
-function fmtCurrency(v: number): string {
-  return `₹${v.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
-}
 
 function getCurrentMonthValue(): string {
   const now = new Date();
@@ -45,55 +41,6 @@ function monthOptions(): { value: string; label: string }[] {
     opts.push({ value, label });
   }
   return opts;
-}
-
-// ─── Payment Summary Banner ───────────────────────────────────────────────────
-
-function PaymentBanner({ summary }: { summary: HistoryPaymentSummary }) {
-  const cards = [
-    {
-      label: "Total Amount",
-      value: summary.totalAmount,
-      wrap: "border-slate-200 bg-[var(--bg-card)] dark:border-[#1e2638]",
-      color: "text-slate-800 dark:text-slate-100",
-      labelCls: "text-slate-500 dark:text-slate-400",
-    },
-    {
-      label: "Total Paid",
-      value: summary.totalPaid,
-      wrap: "border-emerald-200 bg-emerald-50/70 dark:border-emerald-500/30 dark:bg-emerald-500/10",
-      color: "text-emerald-700 dark:text-emerald-400",
-      labelCls: "text-emerald-600/80 dark:text-emerald-400/80",
-    },
-    {
-      label: "Outstanding",
-      value: summary.totalOutstanding,
-      wrap: "border-rose-200 bg-rose-50/70 dark:border-rose-500/30 dark:bg-rose-500/10",
-      color: "text-rose-700 dark:text-rose-400",
-      labelCls: "text-rose-600/80 dark:text-rose-400/80",
-    },
-  ];
-  return (
-    <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-4">
-      {cards.map((item) => (
-        <div
-          key={item.label}
-          className={`rounded-xl border px-5 py-4 shadow-sm sm:py-5 ${item.wrap}`}
-        >
-          <span
-            className={`text-[11px] font-bold uppercase tracking-wider ${item.labelCls}`}
-          >
-            {item.label}
-          </span>
-          <div
-            className={`mt-2 font-mono text-2xl font-extrabold tabular-nums tracking-tight sm:text-3xl ${item.color}`}
-          >
-            {fmtCurrency(item.value)}
-          </div>
-        </div>
-      ))}
-    </div>
-  );
 }
 
 // ─── Empty State ──────────────────────────────────────────────────────────────
@@ -158,7 +105,6 @@ function Pagination({
 // ─── History Page ─────────────────────────────────────────────────────────────
 
 export function HistoryPage() {
-  const navigate = useNavigate();
   // Filter state
   const currentMonth = getCurrentMonthValue();
   const [search, setSearch]       = useState('');
@@ -176,7 +122,7 @@ export function HistoryPage() {
   const [pagination, setPagination]     = useState<HistoryPagination>({
     page: 1, limit: LIMIT, total: 0, pages: 1, hasNext: false, hasPrev: false,
   });
-  const [paymentSummary, setPaymentSummary] = useState<HistoryPaymentSummary>({
+  const [, setPaymentSummary] = useState<HistoryPaymentSummary>({
     totalAmount: 0, totalPaid: 0, totalOutstanding: 0,
   });
   const [loading, setLoading] = useState(false);
@@ -595,6 +541,7 @@ export function HistoryPage() {
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
+          {/* Payout — hidden per product request
           <button
             onClick={() => navigate('/history/payout')}
             className="flex shrink-0 items-center gap-1.5 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 text-sm font-semibold text-indigo-600 transition hover:bg-indigo-100 active:scale-[0.98] dark:border-indigo-500/40 dark:bg-indigo-500/15 dark:text-indigo-300 dark:hover:bg-indigo-500/25"
@@ -602,6 +549,7 @@ export function HistoryPage() {
             <Wallet className="h-4 w-4" />
             Payout
           </button>
+          */}
           <button
             onClick={handleExportPdf}
             className="flex shrink-0 items-center gap-1.5 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 text-sm font-semibold text-indigo-600 transition hover:bg-indigo-100 active:scale-[0.98] dark:border-indigo-500/40 dark:bg-indigo-500/15 dark:text-indigo-300 dark:hover:bg-indigo-500/25"
@@ -620,8 +568,9 @@ export function HistoryPage() {
         </div>
       </div>
 
-      {/* Payment Summary */}
+      {/* Payment Summary — hidden per product request
       <PaymentBanner summary={paymentSummary} />
+      */}
 
       {/* Filters */}
       <div className="space-y-3 rounded-xl border border-slate-200 bg-[var(--bg-card)] p-4 shadow-sm dark:border-[#1e2638] sm:space-y-4 sm:p-5">
@@ -687,17 +636,15 @@ export function HistoryPage() {
                 : 'border-transparent'
             }`}
           >
-            <input
-              type="date"
+            <DatePicker
               value={startDate}
-              onChange={(e) => handleStartDateChange(e.target.value)}
+              onChange={handleStartDateChange}
               className="flex-1 rounded-lg border border-slate-200 bg-[var(--bg-elevated)] px-3 py-2.5 font-mono text-sm text-slate-700 outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-200 dark:border-[#1e2638] dark:text-slate-100"
             />
             <span className="shrink-0 text-sm text-slate-400">to</span>
-            <input
-              type="date"
+            <DatePicker
               value={endDate}
-              onChange={(e) => handleEndDateChange(e.target.value)}
+              onChange={handleEndDateChange}
               className="flex-1 rounded-lg border border-slate-200 bg-[var(--bg-elevated)] px-3 py-2.5 font-mono text-sm text-slate-700 outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-200 dark:border-[#1e2638] dark:text-slate-100"
             />
           </div>

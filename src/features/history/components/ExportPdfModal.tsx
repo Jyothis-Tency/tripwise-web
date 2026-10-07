@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { X, FileDown, Loader2 } from 'lucide-react';
+import { DatePicker } from '../../../components/ui/DatePicker';
 
 interface Props {
   open: boolean;
@@ -56,20 +57,18 @@ export function ExportPdfModal({ open, onClose, onExport }: Props) {
           <div className="space-y-3">
             <div>
               <label className="block text-xs font-medium text-slate-700 mb-1 dark:text-slate-300">Start Date</label>
-              <input
-                type="date"
+              <DatePicker
                 value={startDate}
-                onChange={e => setStartDate(e.target.value)}
+                onChange={setStartDate}
                 disabled={exporting}
                 className="w-full rounded-lg border border-slate-200 bg-[var(--bg-elevated)] px-3 py-2 text-sm text-slate-800 outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-200 dark:border-[#1e2638] dark:text-slate-100"
               />
             </div>
             <div>
               <label className="block text-xs font-medium text-slate-700 mb-1 dark:text-slate-300">End Date</label>
-              <input
-                type="date"
+              <DatePicker
                 value={endDate}
-                onChange={e => setEndDate(e.target.value)}
+                onChange={setEndDate}
                 disabled={exporting}
                 className="w-full rounded-lg border border-slate-200 bg-[var(--bg-elevated)] px-3 py-2 text-sm text-slate-800 outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-200 dark:border-[#1e2638] dark:text-slate-100"
               />

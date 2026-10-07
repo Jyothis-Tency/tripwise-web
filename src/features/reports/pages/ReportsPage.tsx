@@ -18,6 +18,7 @@ import {
 } from "../../history/api";
 import { TripReportPreviewDocument } from "../components/TripReportPreviewDocument";
 import { fetchAgencies, type Agency } from "../../bulk-entry/api";
+import { DatePicker } from "../../../components/ui/DatePicker";
 import { resolveAgencyLabelFromName } from "../../../lib/agencyDisplay";
 import { fetchDrivers, type Driver } from "../../drivers/api";
 import { fetchVehicles, type Vehicle } from "../../vehicles/api";
@@ -501,11 +502,10 @@ export function ReportsPage() {
               <div className="grid grid-cols-2 gap-2">
                 <div>
                   <label className={labelCls}>Start date</label>
-                  <input
-                    type="date"
+                  <DatePicker
                     value={startDate}
-                    onChange={(e) => {
-                      setStartDate(e.target.value);
+                    onChange={(v) => {
+                      setStartDate(v);
                       setFilterMode("daterange");
                       setMonth("");
                       setPreviewLoaded(false);
@@ -515,11 +515,10 @@ export function ReportsPage() {
                 </div>
                 <div>
                   <label className={labelCls}>End date</label>
-                  <input
-                    type="date"
+                  <DatePicker
                     value={endDate}
-                    onChange={(e) => {
-                      setEndDate(e.target.value);
+                    onChange={(v) => {
+                      setEndDate(v);
                       setFilterMode("daterange");
                       setMonth("");
                       setPreviewLoaded(false);

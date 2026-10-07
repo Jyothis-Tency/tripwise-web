@@ -10,6 +10,7 @@ import {
   type Agency,
 } from "../../bulk-entry/api";
 import { createSalaryTransaction } from "../api";
+import { DatePicker } from "../../../components/ui/DatePicker";
 
 const PAYMENT_METHODS = [
   "cash",
@@ -336,12 +337,11 @@ export function DriverPayModal({
               </label>
               <label className="mt-3 block text-xs font-medium text-slate-600 dark:text-slate-400">
                 Date
-                <input
-                  type="date"
-                  className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20 dark:border-white/10 dark:bg-white/5 dark:text-slate-100 dark:focus:border-indigo-400"
-                  value={payDate}
-                  onChange={(e) => setPayDate(e.target.value)}
-                />
+                <DatePicker
+              value={payDate}
+              onChange={setPayDate}
+              className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20 dark:border-white/10 dark:bg-white/5 dark:text-slate-100 dark:focus:border-indigo-400"
+            />
               </label>
               {paymentKind === "pay" && (
                 <label className="mt-3 block text-xs font-medium text-slate-600 dark:text-slate-400">

@@ -20,6 +20,7 @@ import {
   type GuestBulkInvite,
   type GuestBulkSubmission,
 } from "../api";
+import { DateTimePicker } from "../../../components/ui/DateTimePicker";
 
 function toLocalInputValue(iso?: string | null) {
   if (!iso) return "";
@@ -383,13 +384,11 @@ export function GuestInvitesPanel({
                         </div>
                         <label className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
                           <span className="shrink-0">Expires</span>
-                          <input
-                            type="datetime-local"
+                          <DateTimePicker
+                            compact
                             disabled={actionId === inv.id}
-                            defaultValue={toLocalInputValue(inv.expiresAt)}
-                            key={`${inv.id}-${inv.expiresAt ?? "none"}`}
-                            onBlur={(e) => {
-                              const next = e.target.value;
+                            value={toLocalInputValue(inv.expiresAt)}
+                            onChange={(next) => {
                               const prev = toLocalInputValue(inv.expiresAt);
                               if (next !== prev) {
                                 void onExpiryChange(inv.id, next);

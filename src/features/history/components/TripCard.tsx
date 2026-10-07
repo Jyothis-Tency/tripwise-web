@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { DatePicker } from "../../../components/ui/DatePicker";
 import {
   ChevronDown,
   ChevronUp,
@@ -6,7 +7,6 @@ import {
   Car,
   User,
   Calendar,
-  DollarSign,
   Clock,
   Pencil,
   Check,
@@ -14,18 +14,8 @@ import {
   ArrowRight,
   Route,
 } from "lucide-react";
-import type {
-  HistoryTrip,
-  TripPayment,
-  RecordPaymentTripSummary,
-} from "../api";
-import {
-  recordPayment,
-  deleteTrip,
-  fetchPaymentHistory,
-  updateTripFields,
-} from "../api";
-import { PaymentHistoryModal } from "./PaymentHistoryModal";
+import type { HistoryTrip, RecordPaymentTripSummary } from "../api";
+import { deleteTrip, recordPayment, updateTripFields } from "../api";
 import {
   fmtTimeAmPm,
   isoToTimeInputInTz,
@@ -66,31 +56,6 @@ function vehicleNum(v: HistoryTrip["vehicle"]): string {
   if (!v) return "—";
   if (typeof v === "string") return v;
   return v.vehicleNumber ?? "—";
-}
-
-function getPaymentStatus(trip: HistoryTrip): {
-  label: string;
-  color: string;
-  bg: string;
-} {
-  const ps = trip.paymentSummary?.paymentStatus;
-  if (ps === "paid")
-    return {
-      label: "Paid",
-      color: "text-emerald-700 dark:text-emerald-300",
-      bg: "bg-emerald-50 border-emerald-200 dark:bg-emerald-500/15 dark:border-emerald-500/30",
-    };
-  if (ps === "partial")
-    return {
-      label: "Partial",
-      color: "text-amber-700 dark:text-amber-300",
-      bg: "bg-amber-50 border-amber-200 dark:bg-amber-500/15 dark:border-amber-500/30",
-    };
-  return {
-    label: "Unpaid",
-    color: "text-rose-700 dark:text-rose-300",
-    bg: "bg-rose-50 border-rose-200 dark:bg-rose-500/15 dark:border-rose-500/30",
-  };
 }
 
 function getTripStatusStyle(status: string): string {
@@ -405,9 +370,9 @@ function EditableRow({
   );
 }
 
-// ─── Record Payment Modal ─────────────────────────────────────────────────────
+// ─── Record Payment Modal (hidden — kept for future payout UI) ─────────────────
 
-function RecordPaymentModal({
+export function RecordPaymentModal({
   trip,
   onClose,
   onSuccess,
@@ -541,10 +506,9 @@ function RecordPaymentModal({
             <label className="block text-sm font-semibold text-slate-700 mb-1">
               Date
             </label>
-            <input
-              type="date"
+            <DatePicker
               value={date}
-              onChange={(e) => setDate(e.target.value)}
+              onChange={setDate}
               className="w-full rounded-lg border border-slate-200 bg-[var(--bg-elevated)] px-3 py-2.5 text-base font-semibold tabular-nums text-slate-800 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-200 dark:border-[#1e2638] dark:text-slate-100"
             />
           </div>
@@ -621,10 +585,11 @@ export function TripCard({
   readOnly = false,
   defaultExpanded = false,
   onDeleted,
-  onPaymentRecorded,
+  onPaymentRecorded: _onPaymentRecorded,
   onTripUpdated,
   resolveAgencyLabel,
 }: TripCardProps) {
+  void _onPaymentRecorded;
   const [trip, setTrip] = useState<HistoryTrip>(initialTrip);
 
   useEffect(() => {
@@ -634,27 +599,18 @@ export function TripCard({
   const expenseBreakdown = getHistoryTripExpenseBreakdown(trip);
 
   const [expanded, setExpanded] = useState(defaultExpanded);
-  const [showPaymentModal, setShowPaymentModal] = useState(false);
-  const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [deleting, setDeleting] = useState(false);
-  const [payments, setPayments] = useState<TripPayment[]>([]);
-  const [loadingHistory, setLoadingHistory] = useState(false);
 
-  const paymentBadge = getPaymentStatus(trip);
   const totalAmount =
     trip.paymentSummary?.totalAmount ?? (Number(trip.agencyCost) || 0);
   const paidAmount = trip.paymentSummary?.paidAmount ?? trip.paidAmount ?? 0;
   const remaining =
     trip.paymentSummary?.remainingBalance ?? totalAmount - paidAmount;
-  const progress =
-    totalAmount > 0 ? Math.min((paidAmount / totalAmount) * 100, 100) : 0;
-
   const travelledKm =
     trip.startKilometers != null && trip.endKilometers != null
       ? trip.endKilometers - trip.startKilometers
       : null;
 
-  const remainingHeaderShort = remaining < -1e-6 ? "Overpaid" : "Remaining";
   const isPaidSettled = remaining <= 1e-6 && remaining >= -1e-6 && paidAmount > 0;
   const routeFrom = trip.from ?? trip.pickup;
   const routeTo = trip.to ?? trip.drop;
@@ -671,19 +627,6 @@ export function TripCard({
       alert("Failed to delete trip.");
     } finally {
       setDeleting(false);
-    }
-  };
-
-  const handleOpenHistory = async () => {
-    setLoadingHistory(true);
-    try {
-      const data = await fetchPaymentHistory(trip._id);
-      setPayments(data.payments);
-      setShowHistoryModal(true);
-    } catch {
-      alert("Failed to load payment history");
-    } finally {
-      setLoadingHistory(false);
     }
   };
 
@@ -791,72 +734,14 @@ export function TripCard({
               )}
             </div>
 
-            {/* Compact payment progress — beyond Stitch */}
-            <div className="flex max-w-xs items-center gap-2 pt-0.5">
-              <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-slate-100 dark:bg-white/10">
-                <div
-                  className="h-full rounded-full transition-all duration-500"
-                  style={{
-                    width: `${progress}%`,
-                    background:
-                      progress >= 100
-                        ? "linear-gradient(90deg, #10b981, #059669)"
-                        : progress > 0
-                          ? "linear-gradient(90deg, #f59e0b, #d97706)"
-                          : "#f43f5e",
-                  }}
-                />
-              </div>
-              <span className="shrink-0 text-[10px] font-semibold tabular-nums text-slate-400">
-                {Math.round(progress)}%
-              </span>
-            </div>
+            {/* Payment progress / outstanding chips — hidden per product request
+            <div className="flex max-w-xs items-center gap-2 pt-0.5">...</div>
+            */}
+
           </div>
 
           <div className="flex shrink-0 items-start gap-2 sm:gap-3">
-            <div className="hidden min-w-0 flex-col items-end gap-1 sm:flex">
-              <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50/80 px-2.5 py-1.5 dark:border-[#1e2638] dark:bg-white/[0.04]">
-                <span
-                  className={`rounded border px-1.5 py-0.5 text-[10px] font-bold uppercase ${paymentBadge.bg} ${paymentBadge.color}`}
-                >
-                  {paymentBadge.label}
-                </span>
-                <span className="text-[11px] text-slate-500 dark:text-slate-400">
-                  {remainingHeaderShort}
-                </span>
-                <span
-                  className={`text-xs font-bold tabular-nums ${
-                    remaining < -1e-6
-                      ? "text-indigo-600 dark:text-indigo-300"
-                      : remaining > 1e-6
-                        ? "text-amber-700 dark:text-amber-300"
-                        : "text-emerald-700 dark:text-emerald-300"
-                  }`}
-                >
-                  {fmtCurrency(remaining)}
-                </span>
-              </div>
-            </div>
-
-            {/* Mobile payment chip */}
-            <div className="flex flex-col items-end gap-1 sm:hidden">
-              <span
-                className={`rounded border px-1.5 py-0.5 text-[10px] font-bold uppercase ${paymentBadge.bg} ${paymentBadge.color}`}
-              >
-                {paymentBadge.label}
-              </span>
-              <span
-                className={`text-[11px] font-bold tabular-nums ${
-                  remaining > 1e-6
-                    ? "text-amber-700 dark:text-amber-300"
-                    : remaining < -1e-6
-                      ? "text-indigo-600 dark:text-indigo-300"
-                      : "text-emerald-700 dark:text-emerald-300"
-                }`}
-              >
-                {fmtCurrency(remaining)}
-              </span>
-            </div>
+            {/* Payment status chips — hidden per product request */}
 
             <div className="flex flex-col items-end gap-1">
               {!readOnly && (
@@ -1079,160 +964,25 @@ export function TripCard({
                   </div>
                 </section>
 
-                {/* Payment */}
+                {/* Payment — hidden per product request (total/paid/outstanding, record payment, history)
                 <section>
-                  <div className="mb-3 flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-2 dark:border-[#1e2638]">
-                    <div className="flex items-center gap-2">
-                      <span className="h-4 w-1 rounded-full bg-amber-500" />
-                      <h4 className="text-xs font-bold tracking-wider text-amber-600 uppercase dark:text-amber-400">
-                        Payment Status
-                      </h4>
-                    </div>
-                    <div className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-2 py-0.5 dark:border-[#1e2638] dark:bg-white/[0.04]">
-                      <span
-                        className={`rounded border px-1.5 py-0 text-[10px] font-bold ${paymentBadge.bg} ${paymentBadge.color}`}
-                      >
-                        {paymentBadge.label}
-                      </span>
-                      <span className="text-[11px] font-semibold text-slate-500">
-                        {remainingHeaderShort}:
-                      </span>
-                      <span
-                        className={`text-xs font-bold tabular-nums ${
-                          remaining > 1e-6
-                            ? "text-amber-700 dark:text-amber-300"
-                            : remaining < -1e-6
-                              ? "text-indigo-600 dark:text-indigo-300"
-                              : "text-emerald-700 dark:text-emerald-300"
-                        }`}
-                      >
-                        {fmtCurrency(remaining)}
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="mb-3 h-2.5 overflow-hidden rounded-full bg-slate-100 shadow-inner dark:bg-white/10">
-                    <div
-                      className="h-full rounded-full transition-all duration-500"
-                      style={{
-                        width: `${progress}%`,
-                        background:
-                          progress >= 100
-                            ? "linear-gradient(90deg, #10b981, #059669)"
-                            : progress > 0
-                              ? "linear-gradient(90deg, #f59e0b, #d97706)"
-                              : "#f43f5e",
-                      }}
-                    />
-                  </div>
-
-                  <div className="mb-3 space-y-2 rounded-lg border border-slate-200 bg-[var(--bg-elevated)] p-3.5 dark:border-[#1e2638]">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-slate-500 dark:text-slate-400">
-                        Total Amount
-                      </span>
-                      <span className="font-semibold tabular-nums text-slate-800 dark:text-slate-100">
-                        {fmtCurrency(totalAmount)}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-slate-500 dark:text-slate-400">
-                        Paid Amount
-                      </span>
-                      <span className="font-bold tabular-nums text-emerald-600 dark:text-emerald-400">
-                        {fmtCurrency(paidAmount)}
-                      </span>
-                    </div>
-                    <div className="my-1 h-px bg-slate-200 dark:bg-[#1e2638]" />
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="font-medium text-slate-800 dark:text-slate-100">
-                        {remaining < -1e-6 ? "Overpaid (credit)" : "Remaining"}
-                      </span>
-                      <span
-                        className={`text-sm font-bold tabular-nums ${
-                          remaining > 1e-6
-                            ? "text-amber-700 dark:text-amber-300"
-                            : remaining < -1e-6
-                              ? "text-indigo-600 dark:text-indigo-300"
-                              : "text-emerald-700 dark:text-emerald-300"
-                        }`}
-                      >
-                        {fmtCurrency(remaining)}
-                      </span>
-                    </div>
-                  </div>
-
-                  {!readOnly && (
-                    <div className="flex flex-col gap-2 sm:flex-row xl:flex-col">
-                      <button
-                        type="button"
-                        onClick={() => setShowPaymentModal(true)}
-                        className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-indigo-600 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-indigo-700 active:scale-[0.99] dark:bg-indigo-500 dark:hover:bg-indigo-400"
-                      >
-                        <DollarSign className="h-4 w-4" /> Record Payment
-                      </button>
-                      <button
-                        type="button"
-                        onClick={handleOpenHistory}
-                        disabled={loadingHistory}
-                        className="flex flex-1 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-[var(--bg-elevated)] py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50 dark:border-[#1e2638] dark:text-slate-200 dark:hover:bg-white/5"
-                      >
-                        {loadingHistory ? (
-                          <div className="h-4 w-4 animate-spin rounded-full border-2 border-slate-400 border-t-transparent" />
-                        ) : (
-                          <Clock className="h-4 w-4 text-slate-400" />
-                        )}
-                        Payment History
-                      </button>
-                    </div>
-                  )}
+                  ...
                 </section>
+                */}
               </div>
             </div>
           </div>
         )}
       </div>
 
+      {/* Record payment / payment history modals — hidden per product request
       {!readOnly && showPaymentModal && (
-        <RecordPaymentModal
-          trip={trip}
-          onClose={() => setShowPaymentModal(false)}
-          onSuccess={(summary) => {
-            setShowPaymentModal(false);
-            const ps = summary.paymentStatus;
-            const paymentStatus =
-              ps === "paid" || ps === "partial" || ps === "unpaid"
-                ? ps
-                : "unpaid";
-            setTrip((prev) => ({
-              ...prev,
-              paidAmount: summary.paidAmount,
-              paymentSummary: {
-                ...prev.paymentSummary,
-                totalAmount: summary.totalAmount,
-                paidAmount: summary.paidAmount,
-                remainingBalance: summary.remainingBalance,
-                paymentStatus,
-              },
-            }));
-            onPaymentRecorded?.(trip._id, summary);
-          }}
-        />
+        <RecordPaymentModal ... />
       )}
-
       {!readOnly && showHistoryModal && (
-        <PaymentHistoryModal
-          tripNumber={trip.tripNumber || trip._id}
-          payments={payments}
-          summary={{
-            totalAmount: trip.paymentSummary?.totalAmount ?? 0,
-            totalPaid: trip.paymentSummary?.paidAmount ?? 0,
-            remainingBalance: trip.paymentSummary?.remainingBalance ?? 0,
-            paymentStatus: trip.paymentSummary?.paymentStatus ?? "unpaid",
-          }}
-          onClose={() => setShowHistoryModal(false)}
-        />
+        <PaymentHistoryModal ... />
       )}
+      */}
     </>
   );
 }

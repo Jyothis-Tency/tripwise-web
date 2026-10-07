@@ -37,6 +37,7 @@ import {
   agencyNetGrandTotal,
   agencyNetRemaining,
 } from "../agencyLedgerMetrics";
+import { DatePicker } from "../../../components/ui/DatePicker";
 
 type EntityType = "agency" | "driver";
 type CashKind = "cash_in" | "cash_out";
@@ -884,12 +885,11 @@ export function TransactionPage() {
                           </button>
                         </div>
                       </div>
-                      <input
-                        type="date"
-                        value={date}
-                        onChange={(e) => setDate(e.target.value)}
-                        className={`${fieldCls} font-mono`}
-                      />
+                      <DatePicker
+              value={date}
+              onChange={setDate}
+              className={`${fieldCls} font-mono`}
+            />
                     </div>
                     <div>
                       <FieldLabel>Payment method</FieldLabel>

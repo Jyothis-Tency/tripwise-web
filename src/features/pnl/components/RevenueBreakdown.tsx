@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import type { PLRevenue, PLSummary, ExtraCommissionEntry } from "../api";
 import { addExtraCommission, fetchExtraCommissions } from "../api";
+import { DatePicker } from "../../../components/ui/DatePicker";
 
 interface RevenueBreakdownProps {
   revenue: PLRevenue;
@@ -325,12 +326,11 @@ export const RevenueBreakdown: React.FC<RevenueBreakdownProps> = ({
               <label className="mb-1 block text-xs font-semibold text-slate-600 dark:text-slate-400">
                 Date
               </label>
-              <input
-                type="date"
-                value={date}
-                onChange={(e) => setDate(e.target.value)}
-                className={fieldCls}
-              />
+              <DatePicker
+              value={date}
+              onChange={setDate}
+              className={fieldCls}
+            />
             </div>
             <div>
               <label className="mb-1 block text-xs font-semibold text-slate-600 dark:text-slate-400">

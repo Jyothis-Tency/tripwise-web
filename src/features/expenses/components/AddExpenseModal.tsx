@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import type { CreateExpensePayload, Expense } from '../api';
 import { createExpense, updateExpense } from '../api';
+import { DatePicker } from '../../../components/ui/DatePicker';
 
 const CATEGORIES = ['Food', 'Transport', 'Utilities', 'Shopping', 'Entertainment', 'Health', 'Education', 'Other'];
 
@@ -123,11 +124,10 @@ const AddExpenseModal: React.FC<Props> = ({ open, onClose, onCreated, expense })
 
           <div>
             <label className={labelCls}>Date *</label>
-            <input
-              className={inputCls}
-              type="date"
+            <DatePicker
               value={form.date}
-              onChange={e => set('date', e.target.value)}
+              onChange={(v) => set('date', v)}
+              className={inputCls}
             />
           </div>
 

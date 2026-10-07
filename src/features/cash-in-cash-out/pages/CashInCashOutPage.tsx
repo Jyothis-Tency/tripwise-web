@@ -38,6 +38,7 @@ import {
   type CashInCashOutDetailTabId,
   type CashInCashOutTabId,
 } from "../cashInCashOutUiStorage";
+import { DatePicker } from "../../../components/ui/DatePicker";
 
 function fmtCurrency(v: number): string {
   return `₹${Math.abs(v).toLocaleString("en-IN", {
@@ -1999,11 +2000,10 @@ export function CashInCashOutPage() {
           </label>
           <label className="mt-3 block text-xs font-medium text-slate-600">
             Date
-            <input
-              type="date"
-              className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+            <DatePicker
               value={payDate}
-              onChange={(e) => setPayDate(e.target.value)}
+              onChange={setPayDate}
+              className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
             />
           </label>
           <label className="mt-3 block text-xs font-medium text-slate-600">
@@ -2121,11 +2121,10 @@ export function CashInCashOutPage() {
           </label>
           <label className="mt-3 block text-xs font-medium text-slate-600">
             Date
-            <input
-              type="date"
-              className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+            <DatePicker
               value={payDate}
-              onChange={(e) => setPayDate(e.target.value)}
+              onChange={setPayDate}
+              className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
             />
           </label>
           {driverPaymentKind === "cash_out" && (

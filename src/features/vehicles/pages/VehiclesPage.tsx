@@ -24,6 +24,7 @@ import {
 import { AgencyNameCombobox } from "../../../components/AgencyNameCombobox";
 import { resolveAgencyLabelFromName } from "../../../lib/agencyDisplay";
 import { fetchAgencies, type Agency } from "../../bulk-entry/api";
+import { DatePicker } from "../../../components/ui/DatePicker";
 import { TimePicker12h } from "../../../components/ui/TimePicker12h";
 import { isoToHHmmInTz } from "../../../lib/timePickerUtils";
 import { computeAgencyProfitPreview } from "../../history/tripExpenseBreakdown";
@@ -780,20 +781,22 @@ export function TripFormModal({
             </Field>
 
             <Field label="Start Date" id="tstartdate">
-              <input
+              <DatePicker
                 id="tstartdate"
-                type="date"
                 value={form.startDate}
-                onChange={set("startDate")}
+                onChange={(v) =>
+                  setForm((prev) => ({ ...prev, startDate: v }))
+                }
                 className={inputCls}
               />
             </Field>
             <Field label="Expected End Date" id="tenddate">
-              <input
+              <DatePicker
                 id="tenddate"
-                type="date"
                 value={form.expectedEndDate}
-                onChange={set("expectedEndDate")}
+                onChange={(v) =>
+                  setForm((prev) => ({ ...prev, expectedEndDate: v }))
+                }
                 className={inputCls}
               />
             </Field>
@@ -1471,11 +1474,9 @@ function VehicleHistoryTab({
               <label className="text-xs font-medium text-slate-600 dark:text-slate-400">
                 From Date
               </label>
-              <input
-                type="date"
+              <DatePicker
                 value={startDate}
-                onChange={(e) => {
-                  const v = e.target.value;
+                onChange={(v) => {
                   setStartDate(v);
                   setPage(1);
                   if (v && endDate && new Date(endDate) < new Date(v))
@@ -1489,11 +1490,9 @@ function VehicleHistoryTab({
               <label className="text-xs font-medium text-slate-600 dark:text-slate-400">
                 To Date
               </label>
-              <input
-                type="date"
+              <DatePicker
                 value={endDate}
-                onChange={(e) => {
-                  const v = e.target.value;
+                onChange={(v) => {
                   setEndDate(v);
                   setPage(1);
                   if (v && startDate && new Date(v) < new Date(startDate))

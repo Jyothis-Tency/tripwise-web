@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import {
   TrendingUp,
-  Calendar,
   Filter,
   X,
   RefreshCw,
@@ -13,6 +12,7 @@ import type { PLDataResponse } from "../api";
 import { RevenueBreakdown } from "../components/RevenueBreakdown";
 import { TripStatistics } from "../components/TripStatistics";
 import { TopRoutes } from "../components/TopRoutes";
+import { DatePicker } from "../../../components/ui/DatePicker";
 
 type PeriodPreset = "today" | "week" | "month" | "all" | "custom";
 
@@ -37,7 +37,7 @@ function startOfMonth(d: Date): Date {
 }
 
 const dateInputCls =
-  "w-full rounded-lg border border-slate-200 bg-white py-2 pl-10 pr-3 text-sm text-slate-800 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/15 sm:w-40 dark:border-white/10 dark:bg-white/5 dark:text-slate-100 dark:focus:border-indigo-400";
+  "w-full rounded-lg border border-slate-200 bg-white py-2 px-3 text-sm text-slate-800 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/15 sm:w-40 dark:border-white/10 dark:bg-white/5 dark:text-slate-100 dark:focus:border-indigo-400";
 
 export const PLPage: React.FC = () => {
   const [data, setData] = useState<PLDataResponse | null>(null);
@@ -246,35 +246,27 @@ export const PLPage: React.FC = () => {
               <label className="mb-1 block text-[11px] font-bold uppercase tracking-wider text-slate-400">
                 Start Date
               </label>
-              <div className="relative">
-                <Calendar className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                <input
-                  type="date"
-                  value={startDate}
-                  onChange={(e) => {
-                    setPreset("custom");
-                    setStartDate(e.target.value);
-                  }}
-                  className={dateInputCls}
-                />
-              </div>
+              <DatePicker
+                value={startDate}
+                onChange={(v) => {
+                  setPreset("custom");
+                  setStartDate(v);
+                }}
+                className={dateInputCls}
+              />
             </div>
             <div className="w-full sm:w-auto">
               <label className="mb-1 block text-[11px] font-bold uppercase tracking-wider text-slate-400">
                 End Date
               </label>
-              <div className="relative">
-                <Calendar className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                <input
-                  type="date"
-                  value={endDate}
-                  onChange={(e) => {
-                    setPreset("custom");
-                    setEndDate(e.target.value);
-                  }}
-                  className={dateInputCls}
-                />
-              </div>
+              <DatePicker
+                value={endDate}
+                onChange={(v) => {
+                  setPreset("custom");
+                  setEndDate(v);
+                }}
+                className={dateInputCls}
+              />
             </div>
             <div className="flex w-full gap-2 sm:w-auto">
               <button

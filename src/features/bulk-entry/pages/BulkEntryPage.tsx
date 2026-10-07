@@ -36,6 +36,7 @@ import jsPDF from "jspdf";
 import { useAuth } from "../../../hooks/useAuth";
 import { authApi } from "../../auth/api";
 import { TimePicker12h } from "../../../components/ui/TimePicker12h";
+import { DatePicker } from "../../../components/ui/DatePicker";
 import { normalizeHHmm } from "../../../lib/timePickerUtils";
 import { CreateAgencyModal } from "../../../components/AgencyNameCombobox";
 import { DriverNameCombobox } from "../../../components/DriverNameCombobox";
@@ -377,19 +378,19 @@ function EntryFiltersBar({
         <div className="flex flex-wrap items-center gap-2 border-t border-slate-200 bg-[var(--bg-main)] px-3 py-2 sm:px-4 dark:border-[#252c4d]">
           {showDateFilters && (
             <div className="flex items-center gap-1.5 text-slate-400">
-              <input
-                type="date"
+              <DatePicker
                 value={dateFrom}
-                onChange={(e) => onDateFromChange(e.target.value)}
+                onChange={onDateFromChange}
                 aria-label="From date"
+                compact
                 className={entryFilterFieldCls}
               />
               <span>→</span>
-              <input
-                type="date"
+              <DatePicker
                 value={dateTo}
-                onChange={(e) => onDateToChange(e.target.value)}
+                onChange={onDateToChange}
                 aria-label="To date"
+                compact
                 className={entryFilterFieldCls}
               />
             </div>
@@ -1617,10 +1618,9 @@ export function AgencyPayoutTab({
             <label className="text-[10px] font-bold uppercase text-slate-400 mb-1 block">
               Date
             </label>
-            <input
-              type="date"
+            <DatePicker
               value={paymentDate}
-              onChange={(e) => setPaymentDate(e.target.value)}
+              onChange={setPaymentDate}
               className="w-full rounded-lg border border-slate-200 bg-[var(--bg-elevated)] px-3 py-2 text-sm outline-none focus:border-indigo-400 dark:border-[#1e2638] dark:text-slate-100 dark:placeholder:text-slate-500"
             />
           </div>
@@ -1878,12 +1878,11 @@ export function DriverPayoutPanel({
           onChange={(e) => setAmount(e.target.value)}
           className="flex-1 min-w-[80px] rounded-lg border border-slate-200 bg-[var(--bg-elevated)] px-2.5 py-1.5 text-xs outline-none focus:border-indigo-400 dark:border-[#1e2638] dark:text-slate-100"
         />
-        <input
-          type="date"
-          value={paymentDate}
-          onChange={(e) => setPaymentDate(e.target.value)}
-          className="rounded-lg border border-slate-200 bg-[var(--bg-elevated)] px-2.5 py-1.5 text-xs outline-none focus:border-indigo-400 dark:border-[#1e2638] dark:text-slate-100"
-        />
+        <DatePicker
+              value={paymentDate}
+              onChange={setPaymentDate}
+              className="rounded-lg border border-slate-200 bg-[var(--bg-elevated)] px-2.5 py-1.5 text-xs outline-none focus:border-indigo-400 dark:border-[#1e2638] dark:text-slate-100"
+            />
         <select
           value={paymentMethod}
           onChange={(e) => setPaymentMethod(e.target.value)}
@@ -1984,9 +1983,27 @@ const CellInput = memo(function CellInput({
     setLocalVal(value);
   }, [value]);
 
+  if (type === "date") {
+    const dateVal = String(localVal ?? "");
+    return (
+      <DatePicker
+        value={dateVal}
+        compact
+        disabled={disabled}
+        onChange={(v) => {
+          if (disabled) return;
+          setLocalVal(v);
+          onChange(v);
+        }}
+        className={`w-full ${className}`}
+        aria-label={title ?? placeholder ?? "Date"}
+      />
+    );
+  }
+
   if (type === "time") {
     const timeVal = String(localVal ?? "");
-  return (
+    return (
       <TimePicker12h
         value={timeVal}
         allowEmpty
@@ -2559,23 +2576,21 @@ const BulkEntryTable = forwardRef<
                 <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1 dark:text-slate-400">
                   Start Date (optional)
                 </label>
-                <input
-                  type="date"
-                  value={exportStartDate}
-                  onChange={(e) => setExportStartDate(e.target.value)}
-                  className="w-full rounded-lg border border-slate-200 bg-[var(--bg-elevated)] px-3 py-2.5 text-sm outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-200 dark:border-[#1e2638] dark:text-slate-100 dark:placeholder:text-slate-500"
-                />
+                <DatePicker
+              value={exportStartDate}
+              onChange={setExportStartDate}
+              className="w-full rounded-lg border border-slate-200 bg-[var(--bg-elevated)] px-3 py-2.5 text-sm outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-200 dark:border-[#1e2638] dark:text-slate-100 dark:placeholder:text-slate-500"
+            />
               </div>
               <div>
                 <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1 dark:text-slate-400">
                   End Date (optional)
                 </label>
-                <input
-                  type="date"
-                  value={exportEndDate}
-                  onChange={(e) => setExportEndDate(e.target.value)}
-                  className="w-full rounded-lg border border-slate-200 bg-[var(--bg-elevated)] px-3 py-2.5 text-sm outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-200 dark:border-[#1e2638] dark:text-slate-100 dark:placeholder:text-slate-500"
-                />
+                <DatePicker
+              value={exportEndDate}
+              onChange={setExportEndDate}
+              className="w-full rounded-lg border border-slate-200 bg-[var(--bg-elevated)] px-3 py-2.5 text-sm outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-200 dark:border-[#1e2638] dark:text-slate-100 dark:placeholder:text-slate-500"
+            />
               </div>
             </div>
 

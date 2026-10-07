@@ -29,6 +29,7 @@ import {
   type Vehicle,
 } from "../../vehicles/api";
 import { fetchAgencies, type Agency } from "../../bulk-entry/api";
+import { DatePicker } from "../../../components/ui/DatePicker";
 import { computeAgencyProfitPreview } from "../../history/tripExpenseBreakdown";
 
 const inputCls =
@@ -613,11 +614,12 @@ export function CreateNewTripPage() {
                         </div>
                       }
                     >
-                      <input
+                      <DatePicker
                         id="c-startdate"
-                        type="date"
                         value={form.startDate}
-                        onChange={set("startDate")}
+                        onChange={(v) =>
+                          setForm((prev) => ({ ...prev, startDate: v }))
+                        }
                         className={inputCls}
                       />
                     </Field>
@@ -643,11 +645,12 @@ export function CreateNewTripPage() {
                         </div>
                       }
                     >
-                      <input
+                      <DatePicker
                         id="c-enddate"
-                        type="date"
                         value={form.expectedEndDate}
-                        onChange={set("expectedEndDate")}
+                        onChange={(v) =>
+                          setForm((prev) => ({ ...prev, expectedEndDate: v }))
+                        }
                         className={inputCls}
                       />
                     </Field>

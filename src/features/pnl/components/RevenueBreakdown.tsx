@@ -226,26 +226,49 @@ export const RevenueBreakdown: React.FC<RevenueBreakdownProps> = ({
 
   return (
     <div className="space-y-4 sm:space-y-5">
-      {/* Row 1 — agency ledger (matches Transaction History agency KPIs, all agencies) */}
-      <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-3">
-        <div className="rounded-[18px] bg-gradient-to-br from-indigo-900 to-violet-700 px-5 py-[18px] text-white">
-          <span className="block text-[13px] font-bold">Grand total</span>
-          <small className="text-xs text-white/75">
-            {agencyLedgerLoading
-              ? "Loading agencies…"
-              : agencyLedger
-                ? `All time · ${agencyLedger.agencyCount} agencies · Bulk +${fmtCurrency(agencyLedger.bulkTotal)} · Vehicle −${fmtCurrency(agencyLedger.vehicleOut)}`
-                : "All time · Could not load agency totals"}
-          </small>
-          <b className="mt-2 block text-[28px] font-extrabold tracking-tight">
-            {agencyLedgerLoading ? (
-              <Loader2 className="h-7 w-7 animate-spin opacity-80" />
-            ) : agencyLedger ? (
-              fmtSignedCurrency(agencyLedger.grandTotal)
-            ) : (
-              "—"
-            )}
-          </b>
+      {/* Row 1 — agency ledger + total commission under grand total */}
+      <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-3 sm:items-start">
+        <div className="flex flex-col gap-3.5">
+          <div className="rounded-[18px] bg-gradient-to-br from-indigo-900 to-violet-700 px-5 py-[18px] text-white">
+            <span className="block text-[13px] font-bold">Grand total</span>
+            <small className="text-xs text-white/75">
+              {agencyLedgerLoading
+                ? "Loading agencies…"
+                : agencyLedger
+                  ? `All time · ${agencyLedger.agencyCount} agencies · Bulk +${fmtCurrency(agencyLedger.bulkTotal)} · Vehicle −${fmtCurrency(agencyLedger.vehicleOut)}`
+                  : "All time · Could not load agency totals"}
+            </small>
+            <b className="mt-2 block text-[28px] font-extrabold tracking-tight">
+              {agencyLedgerLoading ? (
+                <Loader2 className="h-7 w-7 animate-spin opacity-80" />
+              ) : agencyLedger ? (
+                fmtSignedCurrency(agencyLedger.grandTotal)
+              ) : (
+                "—"
+              )}
+            </b>
+          </div>
+
+          <div
+            className={`${cardBase} border-indigo-100 dark:border-indigo-500/25`}
+          >
+            <div className="flex items-center gap-3 sm:gap-4">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600 sm:h-12 sm:w-12 dark:bg-indigo-500/15 dark:text-indigo-300">
+                <Coins className="h-5 w-5 sm:h-6 sm:w-6" />
+              </div>
+              <div>
+                <p className="text-xs font-medium text-slate-500 sm:text-sm dark:text-slate-400">
+                  Total commission
+                </p>
+                <h3 className="font-mono text-lg font-bold text-indigo-700 metric-tabular sm:text-xl dark:text-indigo-300">
+                  {fmtCurrency(totalCommission)}
+                </h3>
+              </div>
+            </div>
+            <p className="mt-4 text-xs text-slate-400">
+              Commission revenue + extra commission
+            </p>
+          </div>
         </div>
 
         <div className="rounded-[18px] border border-slate-200 bg-[var(--bg-card)] px-5 py-[18px] dark:border-[#252c4d]">
@@ -293,8 +316,8 @@ export const RevenueBreakdown: React.FC<RevenueBreakdownProps> = ({
         </div>
       </div>
 
-      {/* Row 2 — commission */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      {/* Row 2 — commission breakdown */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div
           className={`${cardBase} border-emerald-100 dark:border-emerald-500/20`}
         >
@@ -354,27 +377,6 @@ export const RevenueBreakdown: React.FC<RevenueBreakdownProps> = ({
           </div>
           <p className="mt-4 text-xs text-slate-400">
             Manual add-ins (all time)
-          </p>
-        </div>
-
-        <div
-          className={`${cardBase} border-indigo-100 dark:border-indigo-500/25`}
-        >
-          <div className="flex items-center gap-3 sm:gap-4">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600 sm:h-12 sm:w-12 dark:bg-indigo-500/15 dark:text-indigo-300">
-              <Coins className="h-5 w-5 sm:h-6 sm:w-6" />
-            </div>
-            <div>
-              <p className="text-xs font-medium text-slate-500 sm:text-sm dark:text-slate-400">
-                Total commission
-              </p>
-              <h3 className="font-mono text-lg font-bold text-indigo-700 metric-tabular sm:text-xl dark:text-indigo-300">
-                {fmtCurrency(totalCommission)}
-              </h3>
-            </div>
-          </div>
-          <p className="mt-4 text-xs text-slate-400">
-            Commission revenue + extra commission
           </p>
         </div>
       </div>

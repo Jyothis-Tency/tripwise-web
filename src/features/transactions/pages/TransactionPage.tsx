@@ -37,6 +37,7 @@ import {
   agencyNetGrandTotal,
   agencyNetRemaining,
 } from "../agencyLedgerMetrics";
+import { sumVehicleAgencyCost } from "../vehicleAgencyLedgerMargin";
 import { DatePicker } from "../../../components/ui/DatePicker";
 
 type EntityType = "agency" | "driver";
@@ -292,14 +293,11 @@ export function TransactionPage() {
         const detail = await fetchCashInCashOutAgencyDetail(id, "all_time");
         const cashIn = detail.summary.cashInBulk;
         const cashOut = detail.summary.cashOutAgencyProfit;
-        const vehicleProfit =
-          Number(detail.summary.ownerProfitFromVehicleTrips) ||
-          (detail.tables?.vehicleTripsAgencyProfit ?? []).reduce(
-            (s, t) => s + (Number(t.agencyProfit) || 0),
-            0,
-          );
-        setGrandTotal(agencyNetGrandTotal(cashIn, cashOut, vehicleProfit));
-        setRemaining(agencyNetRemaining(cashIn, cashOut, vehicleProfit));
+        const vehicleAgencyCost = sumVehicleAgencyCost(
+          detail.tables?.vehicleTripsAgencyProfit ?? [],
+        );
+        setGrandTotal(agencyNetGrandTotal(cashIn, cashOut, vehicleAgencyCost));
+        setRemaining(agencyNetRemaining(cashIn, cashOut, vehicleAgencyCost));
       } else {
         const detail = await fetchCashInCashOutDriverDetail(id, "all_time");
         const gt =
@@ -892,10 +890,10 @@ export function TransactionPage() {
                         </div>
                       </div>
                       <DatePicker
-              value={date}
-              onChange={setDate}
-              className={`${fieldCls} font-mono`}
-            />
+                        value={date}
+                        onChange={setDate}
+                        className={`${fieldCls} font-mono`}
+                      />
                     </div>
                     <div>
                       <FieldLabel>Payment method</FieldLabel>

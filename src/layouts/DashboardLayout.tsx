@@ -174,7 +174,7 @@ export function DashboardLayout() {
 
         {/* Content area */}
         <main
-          className={`flex-1 overflow-hidden bg-[var(--bg-main)] ${isFull ? "" : "overflow-y-auto p-4 sm:p-6"}`}
+          className={`min-h-0 flex-1 overflow-hidden bg-[var(--bg-main)] ${isFull ? "flex flex-col" : "overflow-y-auto p-4 sm:p-6"}`}
         >
           <Outlet />
         </main>

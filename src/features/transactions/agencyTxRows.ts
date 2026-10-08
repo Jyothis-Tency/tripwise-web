@@ -1,4 +1,5 @@
 import type { AgencyCashInCashOutDetail } from "../cash-in-cash-out/api";
+import { vehicleAgencyLedgerMargin } from "./vehicleAgencyLedgerMargin";
 
 export type AgencyTxType = "Bulk" | "Vehicle" | "Cash in" | "Cash out";
 
@@ -42,7 +43,8 @@ function formatShortDate(value: string | null | undefined): string {
   });
 }
 
-type BulkCashInRow = AgencyCashInCashOutDetail["tables"]["bulkTripsCashIn"][number];
+type BulkCashInRow =
+  AgencyCashInCashOutDetail["tables"]["bulkTripsCashIn"][number];
 
 type BulkLedgerGroup = BulkCashInRow & { tripCount: number; tripIds: string[] };
 
@@ -57,12 +59,12 @@ function aggregateBulkTripRows(trips: BulkCashInRow[]): BulkLedgerGroup {
   const endMs = trips
     .map((t) => parseTime(t.endDate || t.startDate || t.date))
     .filter(Number.isFinite);
-  const firstStart =
-    startMs.length ? new Date(Math.min(...startMs)).toISOString() : trips[0].startDate;
-  const lastEnd =
-    endMs.length
-      ? new Date(Math.max(...endMs)).toISOString()
-      : trips[trips.length - 1].endDate;
+  const firstStart = startMs.length
+    ? new Date(Math.min(...startMs)).toISOString()
+    : trips[0].startDate;
+  const lastEnd = endMs.length
+    ? new Date(Math.max(...endMs)).toISOString()
+    : trips[trips.length - 1].endDate;
   const latestSort = trips.reduce((best, t) => {
     const tb = parseTime(t.endDate || t.startDate || t.date);
     return tb > best ? tb : best;
@@ -96,7 +98,9 @@ function aggregateBulkTripRows(trips: BulkCashInRow[]): BulkLedgerGroup {
  * One transaction-history row per bulk entry card (`clientGroupId`).
  * Trips without a stored group id stay one row per trip (legacy data).
  */
-export function groupBulkTripsForLedger(rows: BulkCashInRow[]): BulkLedgerGroup[] {
+export function groupBulkTripsForLedger(
+  rows: BulkCashInRow[],
+): BulkLedgerGroup[] {
   if (!rows.length) return [];
 
   const byGroupId = new Map<string, BulkCashInRow[]>();
@@ -137,7 +141,9 @@ function bulkGroupNotes(row: BulkCashInRow, tripCount: number): string {
   return parts.join(" · ");
 }
 
-export function buildAgencyTxRows(detail: AgencyCashInCashOutDetail): AgencyTxRow[] {
+export function buildAgencyTxRows(
+  detail: AgencyCashInCashOutDetail,
+): AgencyTxRow[] {
   const tables = detail?.tables;
   if (!tables) return [];
 
@@ -161,40 +167,38 @@ export function buildAgencyTxRows(detail: AgencyCashInCashOutDetail): AgencyTxRo
     };
   });
 
-  const receipts: AgencyTxRow[] = (tables.bulkReceiptPayments ?? []).map((r) => {
-    const rawNotes = String(r.notes || "").trim();
-    const notes = rawNotes
-      ? /^cash\s*in\b/i.test(rawNotes)
-        ? rawNotes
-        : `Cash in · ${rawNotes}`
-      : "Cash in";
-    return {
-      id: `in-${r._id}`,
-      date: r.paymentDate,
-      amount: r.amount,
-      type: "Cash in",
-      flow: "in",
-      method: r.paymentMethod || "—",
-      notes,
-      sortTime: sortTime(r.paymentDate, r._id),
-    };
-  });
+  const receipts: AgencyTxRow[] = (tables.bulkReceiptPayments ?? []).map(
+    (r) => {
+      const rawNotes = String(r.notes || "").trim();
+      const notes = rawNotes
+        ? /^cash\s*in\b/i.test(rawNotes)
+          ? rawNotes
+          : `Cash in · ${rawNotes}`
+        : "Cash in";
+      return {
+        id: `in-${r._id}`,
+        date: r.paymentDate,
+        amount: r.amount,
+        type: "Cash in",
+        flow: "in",
+        method: r.paymentMethod || "—",
+        notes,
+        sortTime: sortTime(r.paymentDate, r._id),
+      };
+    },
+  );
 
-  // Vehicle trip agencyProfit is owner earnings (not cash out to the agency).
+  // Vehicle trip amount = agency cost collected from the agency.
   const vehicleRows: AgencyTxRow[] = (tables.vehicleTripsAgencyProfit ?? [])
     .filter((t) => String(t.status || "").toLowerCase() === "completed")
     .map((t) => {
-      const amount = Number(t.agencyProfit) || 0;
+      const amount = vehicleAgencyLedgerMargin(t);
       const route = [t.from, t.to].filter(Boolean).join(" → ");
       const tripLabel = t.tripNumber ? `Trip ${t.tripNumber}` : "Vehicle trip";
-      const agency = Number(t.agencyCost) || 0;
-      const totalCab =
-        Number(t.totalCabCost) ||
-        (Number(t.cabCost) || 0) + (Number(t.extraExpenses) || 0);
       const costNote =
-        agency > 0 || totalCab > 0
-          ? `Owner profit · Agency ₹${agency.toLocaleString("en-IN")} − Cab+extras ₹${totalCab.toLocaleString("en-IN")}`
-          : "Owner profit";
+        amount > 0
+          ? `Agency cost ₹${amount.toLocaleString("en-IN")}`
+          : "Agency cost";
       return {
         id: `vehicle-${t._id}`,
         date: t.date,

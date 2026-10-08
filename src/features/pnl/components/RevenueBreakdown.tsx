@@ -19,6 +19,7 @@ import {
   type AgencyCashInSummary,
   type AgencyCashOutSummary,
 } from "../../transactions/agencyLedgerMetrics";
+import { sumVehicleAgencyCost } from "../../transactions/vehicleAgencyLedgerMargin";
 
 interface RevenueBreakdownProps {
   revenue: PLRevenue;
@@ -134,14 +135,15 @@ export const RevenueBreakdown: React.FC<RevenueBreakdownProps> = ({
           if (!id) return null;
           try {
             const detail = await fetchCashInCashOutAgencyDetail(id, "all_time");
+            // Match Transaction History: vehicle portion = agency cost, not profit.
+            const vehicleAgencyCost =
+              Number(detail.summary.agencyCostFromVehicleTrips) ||
+              sumVehicleAgencyCost(
+                detail.tables?.vehicleTripsAgencyProfit ?? [],
+              );
             return {
               ...detail.summary,
-              ownerProfitFromVehicleTrips:
-                detail.summary.ownerProfitFromVehicleTrips ??
-                detail.tables.vehicleTripsAgencyProfit.reduce(
-                  (s, t) => s + (Number(t.agencyProfit) || 0),
-                  0,
-                ),
+              vehicleAgencyCostFromTrips: vehicleAgencyCost,
             };
           } catch {
             return null;
@@ -151,7 +153,7 @@ export const RevenueBreakdown: React.FC<RevenueBreakdownProps> = ({
       const summaries = details.filter(Boolean) as {
         cashInBulk?: AgencyCashInSummary;
         cashOutAgencyProfit?: AgencyCashOutSummary;
-        ownerProfitFromVehicleTrips?: number;
+        vehicleAgencyCostFromTrips?: number;
       }[];
       setAgencyLedger(aggregateAgencyLedgerFromSummaries(summaries));
     } catch {

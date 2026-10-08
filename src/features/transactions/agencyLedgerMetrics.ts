@@ -21,9 +21,7 @@ export type AgencyCashOutSummary = {
 function bulkExposure(cashIn: AgencyCashInSummary): number {
   const total = Number(cashIn.totalOwed);
   if (Number.isFinite(total)) return total;
-  return (
-    (Number(cashIn.fromTrips) || 0) + (Number(cashIn.manualExtra) || 0)
-  );
+  return (Number(cashIn.fromTrips) || 0) + (Number(cashIn.manualExtra) || 0);
 }
 
 /**
@@ -38,17 +36,18 @@ function agencyCashOutExposure(cashOut: AgencyCashOutSummary): number {
 
 /**
  * Grand total of money from the agency before receipts/payouts:
- * bulk (cash in) + vehicle owner profit − explicit cash out extras.
+ * bulk (cash in) + vehicle agency cost − explicit cash out extras.
+ * Transaction / History pass vehicle agency-cost sum as the 3rd arg.
  * Whether cash was collected is handled by Received / Remaining.
  */
 export function agencyNetGrandTotal(
   cashIn: AgencyCashInSummary,
   cashOut: AgencyCashOutSummary,
-  ownerProfitFromVehicles = 0,
+  vehicleAgencyCost = 0,
 ): number {
   return (
     bulkExposure(cashIn) +
-    (Number(ownerProfitFromVehicles) || 0) -
+    (Number(vehicleAgencyCost) || 0) -
     agencyCashOutExposure(cashOut)
   );
 }
@@ -57,12 +56,12 @@ export function agencyNetGrandTotal(
 export function agencyNetRemaining(
   cashIn: AgencyCashInSummary,
   cashOut: AgencyCashOutSummary,
-  ownerProfitFromVehicles = 0,
+  vehicleAgencyCost = 0,
 ): number {
   const received = Number(cashIn.received) || 0;
   const paid = Number(cashOut.paid) || 0;
   return (
-    agencyNetGrandTotal(cashIn, cashOut, ownerProfitFromVehicles) -
+    agencyNetGrandTotal(cashIn, cashOut, vehicleAgencyCost) -
     received -
     paid
   );
@@ -73,18 +72,25 @@ export type AggregatedAgencyLedger = {
   received: number;
   remaining: number;
   bulkTotal: number;
-  /** Explicit cash-out extras/payouts exposure (not vehicle trip profit). */
+  /** Explicit cash-out extras/payouts exposure (not vehicle trip amounts). */
   cashOutExtra: number;
+  /** Vehicle trip agency-cost total (Transaction History / P&L aggregate). */
   ownerProfitFromVehicles: number;
   agencyCount: number;
 };
 
-/** Sum agency ledger KPIs (same math as Transaction History agency cards). */
+/**
+ * Sum agency ledger KPIs.
+ * Pass `vehicleFromAgency` as completed vehicle-trip agency-cost sum
+ * (same as Transaction History cards).
+ */
 export function aggregateAgencyLedgerFromSummaries(
   summaries: {
     cashInBulk?: AgencyCashInSummary;
     cashOutAgencyProfit?: AgencyCashOutSummary;
+    /** Prefer agency-cost sum; legacy name kept for call sites. */
     ownerProfitFromVehicleTrips?: number;
+    vehicleAgencyCostFromTrips?: number;
   }[],
 ): AggregatedAgencyLedger {
   let grandTotal = 0;
@@ -100,13 +106,16 @@ export function aggregateAgencyLedgerFromSummaries(
     const cashOut = s.cashOutAgencyProfit;
     if (!bulk || !cashOut) continue;
     agencyCount += 1;
-    const vehicleProfit = Number(s.ownerProfitFromVehicleTrips) || 0;
+    const vehicleAmount =
+      Number(s.vehicleAgencyCostFromTrips) ||
+      Number(s.ownerProfitFromVehicleTrips) ||
+      0;
     bulkTotal += Number(bulk.fromTrips) || 0;
     cashOutExtra += Number(cashOut.manualExtra) || 0;
-    ownerProfitFromVehicles += vehicleProfit;
-    grandTotal += agencyNetGrandTotal(bulk, cashOut, vehicleProfit);
+    ownerProfitFromVehicles += vehicleAmount;
+    grandTotal += agencyNetGrandTotal(bulk, cashOut, vehicleAmount);
     received += Number(bulk.received) || 0;
-    remaining += agencyNetRemaining(bulk, cashOut, vehicleProfit);
+    remaining += agencyNetRemaining(bulk, cashOut, vehicleAmount);
   }
 
   return {

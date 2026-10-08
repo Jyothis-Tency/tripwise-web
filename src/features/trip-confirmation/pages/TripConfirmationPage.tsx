@@ -12,9 +12,12 @@ import {
   generateTripConfirmationPdf,
   loadTripConfirmationDefaults,
   newField,
+  saveSimpleTripTemplate,
+  simpleToTemplate,
   type TemplateBlock,
   type TripConfirmationTemplate,
 } from "../pdf";
+import { fetchTripConfirmationTemplate } from "../api";
 
 const inputCls =
   "w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-800 outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 dark:border-white/10 dark:bg-white/5 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-indigo-400 dark:focus:ring-indigo-500/20";
@@ -37,9 +40,37 @@ export function TripConfirmationPage() {
     structuredClone(loadTripConfirmationDefaults()),
   );
 
+  const applySimpleTemplate = useCallback((simple: Parameters<typeof simpleToTemplate>[0]) => {
+    const cleaned = saveSimpleTripTemplate(simple);
+    setData(structuredClone(simpleToTemplate(cleaned)));
+  }, []);
+
   const reloadTemplate = useCallback(() => {
     setData(structuredClone(loadTripConfirmationDefaults()));
-  }, []);
+    void (async () => {
+      try {
+        const remote = await fetchTripConfirmationTemplate();
+        if (remote) applySimpleTemplate(remote);
+      } catch {
+        /* keep local */
+      }
+    })();
+  }, [applySimpleTemplate]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const remote = await fetchTripConfirmationTemplate();
+        if (!cancelled && remote) applySimpleTemplate(remote);
+      } catch {
+        /* keep local */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [applySimpleTemplate]);
 
   const updateBlock = (id: string, patch: Partial<TemplateBlock>) => {
     setData((prev) => ({

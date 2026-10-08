@@ -632,7 +632,7 @@ export function DriverDetail({
               <Phone className="h-3.5 w-3.5" /> Call
             </a>
           ) : null}
-          <button
+        <button
             type="button"
             onClick={shareOnWhatsApp}
             className="inline-flex items-center gap-1.5 rounded-xl bg-[#25D366]/90 px-3.5 py-2 text-xs font-bold text-white transition hover:bg-[#25D366]"
@@ -668,7 +668,7 @@ export function DriverDetail({
                 <Ban className="h-3.5 w-3.5" /> Block
               </>
             )}
-          </button>
+        </button>
         </div>
       </div>
 
@@ -810,7 +810,7 @@ function DetailsTab({
                         className={`flex h-9 w-9 items-center justify-center rounded-xl ${f.chip}`}
                       >
                         {f.icon}
-                      </span>
+          </span>
                       <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400 dark:text-[#8d94b8]">
                         {f.label}
                       </span>
@@ -827,9 +827,9 @@ function DetailsTab({
                       >
                         <Copy className="h-3 w-3" />
                         {copied ? "Copied" : "Copy"}
-                      </button>
+          </button>
                     ) : null}
-                  </div>
+        </div>
                   <p
                     className={`break-all text-[15px] font-semibold leading-snug ${
                       empty
@@ -1242,7 +1242,7 @@ function SalaryTab({ driver }: { driver: Driver }) {
             <ArrowRightLeft className="h-4 w-4" />
             Salary/Advance
           </button>
-        </div>
+      </div>
       </div>
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
@@ -1294,8 +1294,8 @@ function SalaryTab({ driver }: { driver: Driver }) {
                   }`}
                 >
                   {"sub" in t && t.sub ? t.sub : t.hint}
-                </span>
-              </div>
+              </span>
+            </div>
             </div>
           </div>
         ))}
@@ -1349,7 +1349,7 @@ function SalaryTab({ driver }: { driver: Driver }) {
                         }`}
                       >
                         {paymentKindLabel(tx.kind)}
-                      </span>
+              </span>
                     </td>
                     <td className="px-2 py-3 font-semibold dark:text-[#eef0ff]">
                       {fmtCurrency(tx.amount)}
@@ -1370,7 +1370,7 @@ function SalaryTab({ driver }: { driver: Driver }) {
                 ))}
               </tbody>
             </table>
-          </div>
+            </div>
         )}
       </Section>
     </div>

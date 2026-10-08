@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import {
   FileText,
@@ -7,16 +7,21 @@ import {
   Plus,
   Trash2,
   ArrowLeft,
+  Loader2,
 } from "lucide-react";
 import {
   applyTripConfirmationSeed,
-  loadTripConfirmationDefaults,
-  saveTripConfirmationDefaults,
-  simpleToTemplate,
-  templateToSimple,
+  loadSimpleTripTemplate,
+  saveSimpleTripTemplate,
+  templateToSimpleFromSeed,
   type SimpleField,
   type SimpleTripTemplate,
 } from "../pdf";
+import { TRIP_CONFIRMATION_SEED } from "../seed";
+import {
+  fetchTripConfirmationTemplate,
+  saveTripConfirmationTemplateRemote,
+} from "../api";
 
 const inputCls =
   "w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-800 outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 dark:border-white/10 dark:bg-white/5 dark:text-slate-100 dark:focus:border-indigo-400 dark:focus:ring-indigo-500/20";
@@ -33,9 +38,31 @@ const labelCls =
  */
 export function TripConfirmationTemplatePage() {
   const [form, setForm] = useState<SimpleTripTemplate>(() =>
-    templateToSimple(loadTripConfirmationDefaults()),
+    loadSimpleTripTemplate(),
   );
   const [savedMsg, setSavedMsg] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [loadingRemote, setLoadingRemote] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const remote = await fetchTripConfirmationTemplate();
+        if (!cancelled && remote) {
+          const cleaned = saveSimpleTripTemplate(remote);
+          setForm(cleaned);
+        }
+      } catch {
+        /* keep local */
+      } finally {
+        if (!cancelled) setLoadingRemote(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const set = <K extends keyof SimpleTripTemplate>(
     key: K,
@@ -81,7 +108,7 @@ export function TripConfirmationTemplatePage() {
     }));
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     const forSave: SimpleTripTemplate = {
       ...form,
       documentTitle: "",
@@ -96,17 +123,39 @@ export function TripConfirmationTemplatePage() {
       extraKm: { ...form.extraKm, value: "" },
       advance: { ...form.advance, value: "" },
     };
-    saveTripConfirmationDefaults(simpleToTemplate(forSave));
-    setForm(forSave);
-    setSavedMsg("Preloads & field names saved.");
-    setTimeout(() => setSavedMsg(null), 2500);
+    const cleaned = saveSimpleTripTemplate(forSave);
+    setForm(cleaned);
+    setSaving(true);
+    setSavedMsg(null);
+    try {
+      await saveTripConfirmationTemplateRemote(cleaned);
+      setSavedMsg("Saved to your account — will stay after reopen.");
+    } catch {
+      setSavedMsg(
+        "Saved on this device. Could not sync to server — check login/network.",
+      );
+    } finally {
+      setSaving(false);
+      setTimeout(() => setSavedMsg(null), 3500);
+    }
   };
 
-  const handleResetSeed = () => {
-    const t = applyTripConfirmationSeed();
-    setForm(templateToSimple(t));
-    setSavedMsg("Reset from seed.");
-    setTimeout(() => setSavedMsg(null), 2500);
+  const handleResetSeed = async () => {
+    const reset = saveSimpleTripTemplate(
+      templateToSimpleFromSeed(TRIP_CONFIRMATION_SEED),
+    );
+    applyTripConfirmationSeed();
+    setForm(reset);
+    setSaving(true);
+    try {
+      await saveTripConfirmationTemplateRemote(reset);
+      setSavedMsg("Reset from seed and saved.");
+    } catch {
+      setSavedMsg("Reset on this device. Server sync failed.");
+    } finally {
+      setSaving(false);
+      setTimeout(() => setSavedMsg(null), 3500);
+    }
   };
 
   return (
@@ -144,10 +193,15 @@ export function TripConfirmationTemplatePage() {
           </button>
           <button
             type="button"
-            onClick={handleSave}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-4 py-1.5 text-xs font-bold text-white shadow-sm hover:bg-indigo-700 dark:bg-gradient-to-r dark:from-indigo-600 dark:to-indigo-500"
+            onClick={() => void handleSave()}
+            disabled={saving || loadingRemote}
+            className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-4 py-1.5 text-xs font-bold text-white shadow-sm hover:bg-indigo-700 disabled:opacity-60 dark:bg-gradient-to-r dark:from-indigo-600 dark:to-indigo-500"
           >
-            <Save className="h-3.5 w-3.5" />
+            {saving ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <Save className="h-3.5 w-3.5" />
+            )}
             Save
           </button>
         </div>

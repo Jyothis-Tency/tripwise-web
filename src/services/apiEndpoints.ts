@@ -12,6 +12,7 @@ export const ApiEndpoints = {
   // OWNER PROFILE
   ownerProfile: '/owners/profile',
   ownerChangePassword: '/owners/password',
+  ownerTripConfirmationTemplate: '/owners/trip-confirmation-template',
 
   // DASHBOARD
   dashboardOverview: '/owners/dashboard/overview',

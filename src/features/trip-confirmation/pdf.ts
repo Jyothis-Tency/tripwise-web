@@ -149,6 +149,9 @@ export function buildTemplateFromSeed(
 export const DEFAULT_TRIP_CONFIRMATION: TripConfirmationTemplate =
   buildTemplateFromSeed();
 
+/** Simple form is source of truth (avoids block round-trip corruption). */
+const LS_KEY_SIMPLE = "tripwise.tripConfirmation.simple.v4";
+/** Legacy block-based keys — migrated once into simple form. */
 const LS_KEY = "tripwise.tripConfirmation.template.v3";
 const LS_KEY_V2 = "tripwise.tripConfirmation.template.v2";
 const LS_KEY_LEGACY = "tripwise.tripConfirmation.defaults";
@@ -161,72 +164,92 @@ function isTemplate(v: unknown): v is TripConfirmationTemplate {
   );
 }
 
-/** Write seed into localStorage (used by seed script / Reset to seed). */
-export function applyTripConfirmationSeed(): TripConfirmationTemplate {
-  const t = buildTemplateFromSeed();
-  saveTripConfirmationDefaults(t);
+function isSimpleTemplate(v: unknown): v is SimpleTripTemplate {
+  return (
+    !!v &&
+    typeof v === "object" &&
+    typeof (v as SimpleTripTemplate).companyName === "string" &&
+    Array.isArray((v as SimpleTripTemplate).tripFields)
+  );
+}
+
+function sanitizeSimple(s: SimpleTripTemplate): SimpleTripTemplate {
+  const fb = templateToSimpleFromSeed(TRIP_CONFIRMATION_SEED);
+  const next: SimpleTripTemplate = {
+    ...fb,
+    ...s,
+    tripFields: Array.isArray(s.tripFields) ? s.tripFields : fb.tripFields,
+    tripDetailFields: migrateTripDetailFields(
+      Array.isArray(s.tripDetailFields) ? s.tripDetailFields : fb.tripDetailFields,
+    ),
+    paymentFields: Array.isArray(s.paymentFields)
+      ? s.paymentFields
+      : fb.paymentFields,
+    packageIncludesItems: Array.isArray(s.packageIncludesItems)
+      ? s.packageIncludesItems
+      : [],
+    extraKm: s.extraKm ?? fb.extraKm,
+    advance: s.advance ?? fb.advance,
+    bankLines: Array.isArray(s.bankLines) ? [...s.bankLines] : [...fb.bankLines],
+  };
+  while (next.bankLines.length < 4) next.bankLines.push("");
+  return next;
+}
+
+export function saveSimpleTripTemplate(simple: SimpleTripTemplate) {
+  const clean = sanitizeSimple(simple);
   try {
+    localStorage.setItem(LS_KEY_SIMPLE, JSON.stringify(clean));
+    // Drop legacy block cache so reopen can't resurrect old labels.
+    localStorage.removeItem(LS_KEY);
     localStorage.removeItem(LS_KEY_V2);
     localStorage.removeItem(LS_KEY_LEGACY);
   } catch {
     /* ignore */
   }
-  return t;
+  return clean;
 }
 
-/** Ensure one UI pageBreak before payment section (PDF still ignores it). */
-function ensureUiPageBreak(blocks: TemplateBlock[]): TemplateBlock[] {
-  if (blocks.some((b) => b.type === "pageBreak")) return blocks;
-  const paymentIdx = blocks.findIndex(
-    (b) =>
-      b.type === "heading" &&
-      b.style === "section" &&
-      /payment/i.test(b.text || ""),
-  );
-  if (paymentIdx <= 0) return blocks;
-  return [
-    ...blocks.slice(0, paymentIdx),
-    newPageBreak(),
-    ...blocks.slice(paymentIdx),
-  ];
-}
-
-export function loadTripConfirmationDefaults(): TripConfirmationTemplate {
+export function loadSimpleTripTemplate(): SimpleTripTemplate {
   try {
+    const raw = localStorage.getItem(LS_KEY_SIMPLE);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (isSimpleTemplate(parsed)) return sanitizeSimple(parsed);
+    }
+    // Migrate legacy block template → simple once.
     const v3 = localStorage.getItem(LS_KEY);
     if (v3) {
       const parsed = JSON.parse(v3);
       if (isTemplate(parsed) && parsed.blocks.length) {
-        const blocks: TemplateBlock[] = parsed.blocks.map((b) => {
-          if (b.type !== "fields") return b;
-          return {
-            ...b,
-            fields: migrateTripDetailFields(b.fields).map((f) => ({
-              id: f.id || nid("f"),
-              label: f.label,
-              value: f.value ?? "",
-            })),
-          };
-        });
-        const next: TripConfirmationTemplate = {
-          blocks: ensureUiPageBreak(blocks),
-        };
-        // Persist migration so UI field labels / 2-column split stay updated.
-        saveTripConfirmationDefaults(next);
-        return next;
+        const simple = sanitizeSimple(templateToSimple(parsed));
+        saveSimpleTripTemplate(simple);
+        return simple;
       }
     }
-    // First visit / after seed bump: apply seed
-    return applyTripConfirmationSeed();
   } catch {
     /* ignore */
   }
-  return buildTemplateFromSeed();
+  return templateToSimpleFromSeed(TRIP_CONFIRMATION_SEED);
 }
 
+/** Write seed into localStorage (used by seed script / Reset to seed). */
+export function applyTripConfirmationSeed(): TripConfirmationTemplate {
+  const simple = templateToSimpleFromSeed(TRIP_CONFIRMATION_SEED);
+  saveSimpleTripTemplate(simple);
+  return simpleToTemplate(simple);
+}
+
+export function loadTripConfirmationDefaults(): TripConfirmationTemplate {
+  return simpleToTemplate(loadSimpleTripTemplate());
+}
+
+/** Persist from blocks (main page label edits) via simple round-trip. */
 export function saveTripConfirmationDefaults(data: TripConfirmationTemplate) {
   try {
-    localStorage.setItem(LS_KEY, JSON.stringify(data));
+    const simple = sanitizeSimple(templateToSimple(data));
+    // Keep preload values; clear only known per-trip slots when saving from main.
+    saveSimpleTripTemplate(simple);
   } catch {
     /* ignore */
   }
@@ -388,7 +411,7 @@ export function templateToSimple(
   };
 }
 
-function templateToSimpleFromSeed(
+export function templateToSimpleFromSeed(
   seed: TripConfirmationSeed,
 ): SimpleTripTemplate {
   return {
@@ -499,8 +522,9 @@ function wrapText(
 }
 
 /**
- * Compact single-page trip confirmation PDF.
- * Skips page breaks; uses tighter spacing and 2-column field rows.
+ * Single-page trip confirmation PDF.
+ * Sequential Y only (no absolute jumps). Empty values still keep tidy rows.
+ * Footer brand/tagline pinned to bottom so they never collide with body.
  */
 export function generateTripConfirmationPdf(data: TripConfirmationTemplate) {
   const doc = new jsPDF("p", "mm", "a4");
@@ -509,27 +533,87 @@ export function generateTripConfirmationPdf(data: TripConfirmationTemplate) {
   const left = 14;
   const right = pageW - 14;
   const maxW = right - left;
-  const bottomLimit = pageH - 14;
+  const footerReserve = 22;
+  const bottomLimit = pageH - footerReserve;
   let y = 14;
   let companyForFilename = "Trip";
-
-  // Soft header band
-  doc.setFillColor(248, 250, 252);
-  doc.rect(0, 0, pageW, 28, "F");
-  doc.setDrawColor(226, 232, 240);
-  doc.setLineWidth(0.3);
-  doc.line(0, 28, pageW, 28);
+  let footerBrand = "";
+  let footerTagline = "";
 
   const blocks = data.blocks.filter((b) => b.type !== "pageBreak");
 
-  const drawSectionRule = () => {
+  const ensureSpace = (need: number) => y + need <= bottomLimit;
+
+  // Header band
+  doc.setFillColor(248, 250, 252);
+  doc.rect(0, 0, pageW, 32, "F");
+  doc.setDrawColor(226, 232, 240);
+  doc.setLineWidth(0.35);
+  doc.line(0, 32, pageW, 32);
+
+  const drawSection = (title: string) => {
+    if (!ensureSpace(10)) return;
+    y += 3;
     doc.setDrawColor(226, 232, 240);
     doc.setLineWidth(0.25);
-    doc.line(left, y - 1.5, right, y - 1.5);
+    doc.line(left, y, right, y);
+    y += 5;
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(9.5);
+    doc.setTextColor(30, 64, 175);
+    doc.text(title.toUpperCase(), left, y);
+    y += 5;
+  };
+
+  const drawFieldGrid = (
+    fields: Array<{ label: string; value: string }>,
+  ) => {
+    const visible = fields.filter((f) => (f.label || "").trim());
+    if (!visible.length) return;
+
+    const colGap = 6;
+    const colW = (maxW - colGap) / 2;
+    const rowH = 7;
+    let col = 0;
+    let rowTop = y;
+
+    for (const f of visible) {
+      if (!ensureSpace(rowH + 2)) break;
+      const label = (f.label || "").trim();
+      let value = (f.value ?? "").trim();
+      if (!value) {
+        value = /time/i.test(label) ? "____________" : "—";
+      }
+
+      const x = left + col * (colW + colGap);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(8);
+      doc.setTextColor(100, 116, 139);
+      const labelText = `${label}:`;
+      doc.text(labelText, x, rowTop);
+
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(9);
+      doc.setTextColor(15, 23, 42);
+      const labelW = doc.getTextWidth(`${labelText} `) + 1;
+      const lines = doc.splitTextToSize(
+        value,
+        Math.max(10, colW - labelW),
+      ) as string[];
+      doc.text(lines[0] ?? "—", x + labelW, rowTop);
+
+      col += 1;
+      if (col >= 2) {
+        col = 0;
+        rowTop += rowH;
+      }
+    }
+    if (col !== 0) rowTop += rowH;
+    y = rowTop + 1;
   };
 
   for (const block of blocks) {
-    if (y > bottomLimit - 8) break; // keep single page; drop overflow rather than page 2
+    if (!ensureSpace(8)) break;
 
     if (block.type === "heading") {
       const text = (block.text || "").trim();
@@ -539,123 +623,78 @@ export function generateTripConfirmationPdf(data: TripConfirmationTemplate) {
         doc.setFont("helvetica", "bold");
         doc.setFontSize(16);
         doc.setTextColor(15, 23, 42);
-        doc.text(text.toUpperCase(), pageW / 2, y + 4, { align: "center" });
-        y = 22;
+        doc.text(text.toUpperCase(), pageW / 2, 14, { align: "center" });
+        y = 38;
       } else if (block.style === "title") {
         doc.setFont("helvetica", "bold");
         doc.setFontSize(11);
         doc.setTextColor(51, 65, 85);
-        doc.text(text.toUpperCase(), pageW / 2, y, { align: "center" });
-        y = 34;
+        doc.text(text.toUpperCase(), pageW / 2, 22, { align: "center" });
+        y = Math.max(y, 38);
       } else {
-        y += 2;
-        drawSectionRule();
-        y += 4;
-        doc.setFont("helvetica", "bold");
-        doc.setFontSize(10);
-        doc.setTextColor(30, 64, 175);
-        doc.text(text.toUpperCase(), left, y);
-        y += 5.5;
+        if (y < 36) y = 38;
+        drawSection(text);
       }
       continue;
     }
 
     if (block.type === "fields") {
-      const visible = block.fields.filter(
-        (f) => (f.label || "").trim() || (f.value || "").trim(),
-      );
-      if (!visible.length) continue;
-
-      // Two-column grid for short label/value pairs
-      const colW = (maxW - 4) / 2;
-      let col = 0;
-      let rowTop = y;
-
-      for (const f of visible) {
-        const label = (f.label || "").trim();
-        let value = (f.value ?? "").trim();
-        if (!value && /time/i.test(label)) value = "____________";
-        if (!label && !value) continue;
-
-        const x = left + col * (colW + 4);
-        doc.setFont("helvetica", "bold");
-        doc.setFontSize(8.5);
-        doc.setTextColor(71, 85, 105);
-        const labelText = label ? `${label}:` : "";
-        if (labelText) doc.text(labelText, x, rowTop);
-
-        doc.setFont("helvetica", "normal");
-        doc.setFontSize(9);
-        doc.setTextColor(15, 23, 42);
-        const labelW = labelText ? doc.getTextWidth(`${labelText} `) + 1 : 0;
-        const valueLines = doc.splitTextToSize(
-          value || "-",
-          Math.max(12, colW - labelW - 1),
-        ) as string[];
-        let vy = rowTop;
-        for (const line of valueLines.slice(0, 2)) {
-          doc.text(line, x + labelW, vy);
-          vy += 4;
-        }
-
-        col += 1;
-        if (col >= 2) {
-          col = 0;
-          rowTop += Math.max(6, valueLines.length * 4 + 1.5);
-        }
-      }
-      if (col !== 0) rowTop += 6;
-      y = rowTop + 1.5;
+      drawFieldGrid(block.fields);
       continue;
     }
 
     if (block.type === "text") {
       const text = (block.text || "").trim();
-      if (!text) {
-        y += 1.5;
+      if (!text) continue;
+
+      // Hold footer for bottom pin — prevents overlap with body content.
+      if (text.startsWith("★") || /^★/.test(text.replace(/\s/g, ""))) {
+        footerBrand = text;
         continue;
       }
-      const isFooter =
-        text.startsWith("★") || /Professional Service/i.test(text);
+      if (/Professional Service/i.test(text)) {
+        footerTagline = text;
+        continue;
+      }
+
       const isPrice = !!block.underline;
+      if (!ensureSpace(isPrice ? 8 : 6)) break;
       doc.setFont("helvetica", block.bold || isPrice ? "bold" : "normal");
-      doc.setFontSize(isPrice ? 12 : isFooter ? 8 : 9);
-      doc.setTextColor(
-        isFooter ? 100 : 15,
-        isFooter ? 116 : 23,
-        isFooter ? 139 : 42,
-      );
+      doc.setFontSize(isPrice ? 11 : 9);
+      doc.setTextColor(15, 23, 42);
       const startY = y;
-      const lh = isPrice ? 5.5 : 4.2;
+      const lh = isPrice ? 5 : 4.2;
       y = wrapText(doc, text, left, y, maxW, lh);
       if (block.underline) {
         const w = Math.min(doc.getTextWidth(text), maxW);
         doc.setDrawColor(30, 64, 175);
-        doc.setLineWidth(0.45);
-        doc.line(left, startY + 1, left + w, startY + 1);
+        doc.setLineWidth(0.4);
+        doc.line(left, startY + 1.2, left + w, startY + 1.2);
       }
-      y += isFooter ? 2.5 : 3;
+      y += 2.5;
       continue;
     }
 
     if (block.type === "list") {
+      const items = (block.items || []).map((i) => i.trim()).filter(Boolean);
       if (block.title?.trim()) {
+        if (!ensureSpace(6)) break;
         doc.setFont("helvetica", "bold");
         doc.setFontSize(9);
         doc.setTextColor(30, 41, 59);
         doc.text(block.title.trim(), left, y);
         y += 4.5;
       }
+      if (!items.length) {
+        y += 1;
+        continue;
+      }
       doc.setFont("helvetica", "normal");
       doc.setFontSize(9);
       doc.setTextColor(30, 41, 59);
-      for (const item of block.items) {
-        if (!item?.trim()) continue;
-        if (y > bottomLimit - 6) break;
-        const lines = doc.splitTextToSize(
-          `•  ${item.trim()}`,
-          maxW - 2,
-        ) as string[];
+      for (const item of items) {
+        if (!ensureSpace(5)) break;
+        const lines = doc.splitTextToSize(`•  ${item}`, maxW - 2) as string[];
         for (const line of lines) {
           doc.text(line, left + 1, y);
           y += 4;
@@ -665,10 +704,29 @@ export function generateTripConfirmationPdf(data: TripConfirmationTemplate) {
     }
   }
 
-  // Bottom accent line
+  // Pinned footer
+  let fy = pageH - 16;
   doc.setDrawColor(30, 64, 175);
-  doc.setLineWidth(0.6);
-  doc.line(left, pageH - 10, right, pageH - 10);
+  doc.setLineWidth(0.55);
+  doc.line(left, fy - 6, right, fy - 6);
+
+  if (footerBrand) {
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(10);
+    doc.setTextColor(15, 23, 42);
+    doc.text(footerBrand, pageW / 2, fy - 1, { align: "center" });
+    fy += 4;
+  }
+  if (footerTagline) {
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(7.5);
+    doc.setTextColor(100, 116, 139);
+    const lines = doc.splitTextToSize(footerTagline, maxW) as string[];
+    for (const line of lines.slice(0, 2)) {
+      doc.text(line, pageW / 2, fy, { align: "center" });
+      fy += 3.5;
+    }
+  }
 
   const safeName = companyForFilename.replace(/[^\w]+/g, "_").slice(0, 24);
   doc.save(`Trip_Confirmation_${safeName}_${Date.now()}.pdf`);

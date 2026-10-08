@@ -37,6 +37,7 @@ import {
   type AgencyTxTripDetail,
   type AgencyTxType,
 } from "../agencyTxRows";
+import { sumVehicleAgencyCost } from "../vehicleAgencyLedgerMargin";
 import { AgencyTxTripDetailModal } from "../components/AgencyTxTripDetailModal";
 import {
   downloadAgencyTransactionHistoryPdf,
@@ -396,7 +397,10 @@ function AgencyTxPdfExportDialog({
       setError("Select at least one transaction type.");
       return;
     }
-    if (!Object.values(sections).some(Boolean) && !Object.values(columns).some(Boolean)) {
+    if (
+      !Object.values(sections).some(Boolean) &&
+      !Object.values(columns).some(Boolean)
+    ) {
       setError("Select at least one section or table column.");
       return;
     }
@@ -423,9 +427,7 @@ function AgencyTxPdfExportDialog({
       });
       onClose();
     } catch (e: unknown) {
-      setError(
-        e instanceof Error ? e.message : "Failed to generate PDF.",
-      );
+      setError(e instanceof Error ? e.message : "Failed to generate PDF.");
     } finally {
       setGenerating(false);
     }
@@ -858,16 +860,20 @@ export function TransactionHistoryPage() {
     const cashOut = agencyDetail.summary.cashOutAgencyProfit;
     if (!bulk || !cashOut) return null;
     const bulkTotal = Number(bulk.fromTrips) || 0;
-    const ownerProfit =
-      Number(agencyDetail.summary.ownerProfitFromVehicleTrips) ||
-      (agencyDetail.tables?.vehicleTripsAgencyProfit ?? []).reduce(
-        (s, t) => s + (Number(t.agencyProfit) || 0),
-        0,
-      );
-    const grandTotal = agencyNetGrandTotal(bulk, cashOut, ownerProfit);
+    // Vehicle portion = agency cost collected from the agency (not owner profit).
+    const vehicleAgencyCost = sumVehicleAgencyCost(
+      agencyDetail.tables?.vehicleTripsAgencyProfit ?? [],
+    );
+    const grandTotal = agencyNetGrandTotal(bulk, cashOut, vehicleAgencyCost);
     const received = Number(bulk.received) || 0;
-    const remaining = agencyNetRemaining(bulk, cashOut, ownerProfit);
-    return { grandTotal, received, remaining, bulkTotal, ownerProfit };
+    const remaining = agencyNetRemaining(bulk, cashOut, vehicleAgencyCost);
+    return {
+      grandTotal,
+      received,
+      remaining,
+      bulkTotal,
+      ownerProfit: vehicleAgencyCost,
+    };
   }, [agencyDetail]);
 
   const driverCards = useMemo(() => {
@@ -1055,7 +1061,7 @@ export function TransactionHistoryPage() {
         : 0;
 
   return (
-    <div className="flex h-full flex-col overflow-hidden bg-[var(--bg-main)]">
+    <div className="flex h-full min-h-0 flex-col overflow-hidden bg-[var(--bg-main)]">
       {/* Top bar */}
       <header className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-slate-200 bg-[var(--bg-card)] px-4 py-3.5 sm:px-7 dark:border-[#252c4d]">
         <div className="min-w-0">
@@ -1103,7 +1109,7 @@ export function TransactionHistoryPage() {
       <div className="flex min-h-0 flex-1 gap-0 p-0 sm:gap-5 sm:p-5">
         {/* Entity list */}
         <section
-          className={`flex w-full shrink-0 flex-col overflow-hidden border-slate-200 bg-[var(--bg-card)] sm:w-[300px] sm:rounded-2xl sm:border lg:w-[320px] dark:border-[#252c4d] ${
+          className={`flex min-h-0 w-full shrink-0 flex-col overflow-hidden border-slate-200 bg-[var(--bg-card)] sm:w-[300px] sm:rounded-2xl sm:border lg:w-[320px] dark:border-[#252c4d] ${
             hasSelection ? "hidden sm:flex" : "flex"
           }`}
         >
@@ -1215,7 +1221,7 @@ export function TransactionHistoryPage() {
               <Loader2 className="h-7 w-7 animate-spin text-indigo-500" />
             </div>
           ) : (
-            <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto sm:pr-0.5">
+            <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden sm:pr-0.5">
               <div className="flex items-start gap-2">
                 <button
                   type="button"
@@ -1349,9 +1355,9 @@ export function TransactionHistoryPage() {
                 </div>
               )}
 
-              {/* Transactions card */}
+              {/* Transactions card — table scrolls inside fixed pane */}
               <div
-                className={`overflow-hidden rounded-2xl border border-slate-200 bg-[var(--bg-card)] dark:border-[#252c4d] ${
+                className={`flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-[var(--bg-card)] dark:border-[#252c4d] ${
                   detailLoading ? "opacity-70" : ""
                 }`}
               >
@@ -1453,34 +1459,33 @@ export function TransactionHistoryPage() {
                     </select>
                     <div className="flex items-center gap-1.5 text-slate-400">
                       <DatePicker
-              value={dateFrom}
-              onChange={setDateFrom}
-              aria-label="From date"
-              className={fieldCls}
-            />
+                        value={dateFrom}
+                        onChange={setDateFrom}
+                        aria-label="From date"
+                        className={fieldCls}
+                      />
                       <span>→</span>
                       <DatePicker
-              value={dateTo}
-              onChange={setDateTo}
-              aria-label="To date"
-              className={fieldCls}
-            />
+                        value={dateTo}
+                        onChange={setDateTo}
+                        aria-label="To date"
+                        className={fieldCls}
+                      />
                     </div>
                     <div className="flex gap-1 rounded-xl border border-slate-200 bg-[var(--bg-card)] p-1 dark:border-[#252c4d]">
-                      {(
-                        tab === "drivers"
-                          ? ([
-                              ["all", "All"],
-                              ["Salary", "Salary"],
-                              ["Advance", "Advance"],
-                            ] as const)
-                          : ([
-                              ["all", "All"],
-                              ["Bulk", "Bulk"],
-                              ["Vehicle", "Vehicle"],
-                              ["Cash in", "Cash in"],
-                              ["Cash out", "Cash out"],
-                            ] as const)
+                      {(tab === "drivers"
+                        ? ([
+                            ["all", "All"],
+                            ["Salary", "Salary"],
+                            ["Advance", "Advance"],
+                          ] as const)
+                        : ([
+                            ["all", "All"],
+                            ["Bulk", "Bulk"],
+                            ["Vehicle", "Vehicle"],
+                            ["Cash in", "Cash in"],
+                            ["Cash out", "Cash out"],
+                          ] as const)
                       ).map(([k, label]) => (
                         <button
                           key={k}
@@ -1520,7 +1525,7 @@ export function TransactionHistoryPage() {
                       : `Record a payment for ${selectedTitle} to see it here.`}
                   </div>
                 ) : (
-                  <div className="overflow-x-auto">
+                  <div className="min-h-0 flex-1 overflow-auto overscroll-contain">
                     <table className="w-full min-w-[640px] border-collapse text-sm">
                       <thead>
                         <tr className="bg-[var(--bg-main)] text-left text-xs font-semibold text-slate-500 dark:text-[#8d94b8]">
@@ -1649,8 +1654,9 @@ export function TransactionHistoryPage() {
             if (!agencyName?.trim()) return "—";
             const match = agencies.find(
               (a) =>
-                String(a.name || "").trim().toLowerCase() ===
-                agencyName.trim().toLowerCase(),
+                String(a.name || "")
+                  .trim()
+                  .toLowerCase() === agencyName.trim().toLowerCase(),
             );
             return match ? formatAgencyLabel(match) : agencyName;
           }}

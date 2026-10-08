@@ -537,6 +537,32 @@ function ensureGroupIds(groups: DriverGroup[] | undefined): DriverGroup[] {
   }));
 }
 
+function stampGuestDriverOnGroups(
+  groups: DriverGroup[] | undefined,
+  name: string,
+  phone: string,
+): DriverGroup[] {
+  const n = String(name ?? "").trim();
+  const p = String(phone ?? "").trim();
+  return ensureGroupIds(groups).map((g) => ({
+    ...g,
+    driverName: n || String(g.driverName ?? "").trim(),
+    driverPhone: p || String(g.driverPhone ?? "").trim(),
+  }));
+}
+
+function stampGuestDriverOnBlocks(
+  blocks: GuestAgencyBlock[],
+  name: string,
+  phone: string,
+): GuestAgencyBlock[] {
+  return blocks.map((b) =>
+    b.status === "accepted"
+      ? b
+      : { ...b, driverGroups: stampGuestDriverOnGroups(b.driverGroups, name, phone) },
+  );
+}
+
 function normalizeGuestBlocks(blocks: GuestAgencyBlock[]): GuestAgencyBlock[] {
   if (!blocks?.length) return [emptyBlock()];
   return blocks.map((b) => ({
@@ -1259,10 +1285,20 @@ export function GuestBulkEntryPage() {
       setLoading(false);
       return;
     }
+    // Drop previous link's driver/draft immediately so autosave cannot
+    // write driver A onto token B while the next invite is still loading.
+    skipNextSync.current = true;
+    syncGenerationRef.current += 1;
+    setLoading(true);
+    setLoadError(null);
+    setInvite(null);
+    setDriverName("");
+    setDriverPhone("");
+    setBlocks([emptyBlock()]);
+    setEditingDriver(false);
+
     let cancelled = false;
     (async () => {
-      setLoading(true);
-      setLoadError(null);
       try {
         const data = await fetchGuestInvite(token);
         if (cancelled) return;
@@ -1271,10 +1307,14 @@ export function GuestBulkEntryPage() {
         setAgencies(data.agencies ?? []);
         setDriverName(data.driverName || "");
         setDriverPhone(data.driverPhone || "");
-        const loaded = ensureEditableWorkspace(
-          normalizeGuestBlocks(
-            data.draft?.blocks?.length ? data.draft.blocks : [emptyBlock()],
+        const loaded = stampGuestDriverOnBlocks(
+          ensureEditableWorkspace(
+            normalizeGuestBlocks(
+              data.draft?.blocks?.length ? data.draft.blocks : [emptyBlock()],
+            ),
           ),
+          data.driverName || "",
+          data.driverPhone || "",
         );
         setBlocks(loaded);
         setPreferredGuestPlate(guestSessionVehiclePlate(loaded));
@@ -1351,7 +1391,11 @@ export function GuestBulkEntryPage() {
         clientId: b.clientId,
         agencyId: b.agencyId ?? null,
         agencyName: b.agencyName,
-        driverGroups: b.driverGroups,
+        driverGroups: stampGuestDriverOnGroups(
+          b.driverGroups,
+          driverName,
+          driverPhone,
+        ),
         status: b.status,
       })),
     }),
@@ -1362,6 +1406,7 @@ export function GuestBulkEntryPage() {
 
   const persistGuestDraft = useCallback(async () => {
     if (!token || !invite) return;
+    if (invite.token && invite.token !== token) return;
     const payload = syncPayloadRef.current;
     const hash = quickHash(JSON.stringify(payload));
     if (hash === lastBackendHash.current) return;

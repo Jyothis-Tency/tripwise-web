@@ -603,7 +603,7 @@ export function EditTripModal({
                 </div>
               </div>
                   <ReadOnlyRow
-                    label="Agency profit"
+                    label="Owner profit"
                     value={fmtCurrency(agencyProfit)}
                     highlight
                   />

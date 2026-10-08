@@ -2,6 +2,10 @@ import type { AgencyCashInCashOutDetail } from "../cash-in-cash-out/api";
 
 export type AgencyTxType = "Bulk" | "Vehicle" | "Cash in" | "Cash out";
 
+export type AgencyTxTripDetail =
+  | { kind: "vehicle"; tripId: string }
+  | { kind: "bulk"; tripIds: string[] };
+
 export type AgencyTxRow = {
   id: string;
   date: string | null;
@@ -11,6 +15,7 @@ export type AgencyTxRow = {
   method: string;
   notes: string;
   sortTime: number;
+  tripDetail?: AgencyTxTripDetail;
 };
 
 function parseTime(value: string | null | undefined): number {
@@ -39,10 +44,11 @@ function formatShortDate(value: string | null | undefined): string {
 
 type BulkCashInRow = AgencyCashInCashOutDetail["tables"]["bulkTripsCashIn"][number];
 
-type BulkLedgerGroup = BulkCashInRow & { tripCount: number };
+type BulkLedgerGroup = BulkCashInRow & { tripCount: number; tripIds: string[] };
 
 function aggregateBulkTripRows(trips: BulkCashInRow[]): BulkLedgerGroup {
-  if (trips.length === 1) return { ...trips[0], tripCount: 1 };
+  const tripIds = trips.map((t) => String(t._id));
+  if (trips.length === 1) return { ...trips[0], tripCount: 1, tripIds };
 
   const grandTotal = trips.reduce((s, t) => s + (Number(t.grandTotal) || 0), 0);
   const startMs = trips
@@ -82,6 +88,7 @@ function aggregateBulkTripRows(trips: BulkCashInRow[]): BulkLedgerGroup {
     status: trips[trips.length - 1].status,
     entryMode: "bulk",
     tripCount: trips.length,
+    tripIds,
   };
 }
 
@@ -111,7 +118,7 @@ export function groupBulkTripsForLedger(rows: BulkCashInRow[]): BulkLedgerGroup[
     grouped.push(aggregateBulkTripRows(trips));
   }
   for (const row of legacy) {
-    grouped.push({ ...row, tripCount: 1 });
+    grouped.push({ ...row, tripCount: 1, tripIds: [String(row._id)] });
   }
 
   return grouped;
@@ -150,20 +157,30 @@ export function buildAgencyTxRows(detail: AgencyCashInCashOutDetail): AgencyTxRo
       method: "—",
       notes: bulkGroupNotes(row, tripCount),
       sortTime: sortTime(row.date, row._id),
+      tripDetail: { kind: "bulk", tripIds: row.tripIds },
     };
   });
 
-  const receipts: AgencyTxRow[] = (tables.bulkReceiptPayments ?? []).map((r) => ({
-    id: `in-${r._id}`,
-    date: r.paymentDate,
-    amount: r.amount,
-    type: "Cash in",
-    flow: "in",
-    method: r.paymentMethod || "—",
-    notes: r.notes || "Payment received",
-    sortTime: sortTime(r.paymentDate, r._id),
-  }));
+  const receipts: AgencyTxRow[] = (tables.bulkReceiptPayments ?? []).map((r) => {
+    const rawNotes = String(r.notes || "").trim();
+    const notes = rawNotes
+      ? /^cash\s*in\b/i.test(rawNotes)
+        ? rawNotes
+        : `Cash in · ${rawNotes}`
+      : "Cash in";
+    return {
+      id: `in-${r._id}`,
+      date: r.paymentDate,
+      amount: r.amount,
+      type: "Cash in",
+      flow: "in",
+      method: r.paymentMethod || "—",
+      notes,
+      sortTime: sortTime(r.paymentDate, r._id),
+    };
+  });
 
+  // Vehicle trip agencyProfit is owner earnings (not cash out to the agency).
   const vehicleRows: AgencyTxRow[] = (tables.vehicleTripsAgencyProfit ?? [])
     .filter((t) => String(t.status || "").toLowerCase() === "completed")
     .map((t) => {
@@ -176,17 +193,18 @@ export function buildAgencyTxRows(detail: AgencyCashInCashOutDetail): AgencyTxRo
         (Number(t.cabCost) || 0) + (Number(t.extraExpenses) || 0);
       const costNote =
         agency > 0 || totalCab > 0
-          ? `Agency ₹${agency.toLocaleString("en-IN")} − Cab+extras ₹${totalCab.toLocaleString("en-IN")}`
-          : "";
+          ? `Owner profit · Agency ₹${agency.toLocaleString("en-IN")} − Cab+extras ₹${totalCab.toLocaleString("en-IN")}`
+          : "Owner profit";
       return {
         id: `vehicle-${t._id}`,
         date: t.date,
         amount,
         type: "Vehicle",
-        flow: "out",
+        flow: "in",
         method: "—",
         notes: [tripLabel, route, costNote].filter(Boolean).join(" · "),
         sortTime: sortTime(t.date, t._id),
+        tripDetail: { kind: "vehicle", tripId: String(t._id) },
       };
     });
 
@@ -198,7 +216,7 @@ export function buildAgencyTxRows(detail: AgencyCashInCashOutDetail): AgencyTxRo
       type: "Cash out",
       flow: "out",
       method: r.paymentMethod || "—",
-      notes: r.notes || "Profit payout",
+      notes: r.notes || "Cash given to agency",
       sortTime: sortTime(r.paymentDate, r._id),
     }),
   );

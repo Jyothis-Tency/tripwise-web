@@ -244,7 +244,7 @@ function AgencyPayoutManager({
                       Status
                     </th>
                     <th className="px-2 py-2.5 font-semibold text-right text-slate-600">
-                      Agency profit
+                      Owner profit
                     </th>
                     <th className="px-3 py-2.5 font-semibold text-center text-slate-600">
                       Actions

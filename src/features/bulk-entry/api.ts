@@ -333,6 +333,33 @@ export async function deleteBulkEntryTrip(id: string): Promise<void> {
   await apiClient.delete(ApiEndpoints.bulkEntryTripById(id));
 }
 
+/** Move an entire bulk entry card (clientGroupId) to another agency. */
+export async function transferBulkEntryGroup(payload: {
+  sourceAgencyId: string;
+  targetAgencyId: string;
+  clientGroupId: string;
+  /** Saved row ids on the card — used when DB clientGroupId does not match UI yet */
+  tripIds?: string[];
+}): Promise<{
+  movedCount: number;
+  tripIds: string[];
+  clientGroupId: string;
+  sourceAgencyId: string;
+  targetAgencyId: string;
+  targetAgencyName?: string;
+}> {
+  const res = await apiClient.post(ApiEndpoints.bulkEntryTransfer, payload);
+  const raw: any = res.data ?? {};
+  return (raw.data ?? raw) as {
+    movedCount: number;
+    tripIds: string[];
+    clientGroupId: string;
+    sourceAgencyId: string;
+    targetAgencyId: string;
+    targetAgencyName?: string;
+  };
+}
+
 // ── Normal Entry ──
 
 /** Fetch one page of normal entry trips for an agency */

@@ -44,7 +44,7 @@ export function computeTripExpenseBreakdownFromLines(
   };
 }
 
-/** Live preview: agency profit from agency cost, cab cost, and optional expense lines. */
+/** Live preview: owner profit (agency cost − cab − non-fuel extras). */
 export function computeAgencyProfitPreview(
   agencyCost: unknown,
   cabCost: unknown,
@@ -58,7 +58,7 @@ export function computeAgencyProfitPreview(
   return roundMoney(Math.max(agency - totalCabCost, 0));
 }
 
-/** Display profit on History/Tracking — matches backend tripAgencyProfitNumber. */
+/** Display owner profit on History/Tracking — matches backend tripAgencyProfitNumber. */
 export function resolveTripAgencyProfitDisplay(trip: {
   agencyCost?: unknown;
   cabCost?: unknown;

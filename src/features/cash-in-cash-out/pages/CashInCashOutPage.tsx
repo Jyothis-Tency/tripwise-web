@@ -119,11 +119,19 @@ function verifyAgencyCashMath(detail: AgencyCashInCashOutDetail): string[] {
       `Bulk advances (₹${advances}) ≠ sum of bulk trip Advance column (₹${bulkAdvancesTable}).`,
     );
   }
+  const ownerProfitSummary =
+    Number(detail.summary.ownerProfitFromVehicleTrips) || 0;
+  if (!moneyEq(vehicleProfitTable, ownerProfitSummary)) {
+    issues.push(
+      `Owner profit from vehicles (₹${ownerProfitSummary}) ≠ sum of vehicle trip profits (₹${vehicleProfitTable}).`,
+    );
+  }
   if (
-    !moneyEq(vehicleProfitTable, detail.summary.cashOutAgencyProfit.fromTrips)
+    !moneyEq(0, detail.summary.cashOutAgencyProfit.fromTrips) &&
+    Number(detail.summary.cashOutAgencyProfit.fromTrips) !== 0
   ) {
     issues.push(
-      `Vehicle cash out (₹${detail.summary.cashOutAgencyProfit.fromTrips}) ≠ sum of vehicle (agency − cab) (₹${vehicleProfitTable}).`,
+      "Cash out fromTrips must be 0 — vehicle profit is owner earnings, not cash out.",
     );
   }
   if (!moneyEq(receiptsTable, detail.summary.cashInBulk.received)) {
@@ -139,23 +147,24 @@ function verifyAgencyCashMath(detail: AgencyCashInCashOutDetail): string[] {
   if (!moneyEq(bulkRemainingCalc, detail.summary.cashInBulk.remaining)) {
     issues.push("Bulk remaining ≠ total owed − received.");
   }
-  const vehicleRemainingCalc = sumMoney([
+  const cashOutRemainingCalc = sumMoney([
     detail.summary.cashOutAgencyProfit.totalOwed,
     -detail.summary.cashOutAgencyProfit.paid,
   ]);
   if (
-    !moneyEq(vehicleRemainingCalc, detail.summary.cashOutAgencyProfit.remaining)
+    !moneyEq(cashOutRemainingCalc, detail.summary.cashOutAgencyProfit.remaining)
   ) {
-    issues.push("Vehicle remaining ≠ total owed − paid.");
+    issues.push("Cash out remaining ≠ total owed − paid.");
   }
   const netCard = agencyTotalRemaining(detail);
   const netCalc = sumMoney([
     detail.summary.cashInBulk.remaining,
+    ownerProfitSummary,
     -detail.summary.cashOutAgencyProfit.remaining,
   ]);
   if (!moneyEq(netCard, netCalc)) {
     issues.push(
-      "Net remaining does not match bulk remaining − vehicle cash out remaining.",
+      "Net remaining does not match bulk remaining + vehicle profit − cash out remaining.",
     );
   }
   return issues;
@@ -245,19 +254,23 @@ function verifyDriverCashMath(detail: DriverCashInCashOutDetail): string[] {
   return issues;
 }
 
-/** Net still to settle with agency (bulk − vehicle − receipts − payouts). */
+/** Net still to settle with agency (bulk + vehicle profit − cash out − receipts − payouts). */
 function agencyTotalRemaining(detail: AgencyCashInCashOutDetail): number {
   const bulk = detail.summary.cashInBulk;
-  const vehicle = detail.summary.cashOutAgencyProfit;
+  const cashOut = detail.summary.cashOutAgencyProfit;
   const owedIn = bulk.totalOwed ?? (bulk.fromTrips || 0) + (bulk.manualExtra || 0);
+  const vehicleProfit =
+    Number(detail.summary.ownerProfitFromVehicleTrips) ||
+    sumMoney(detail.tables.vehicleTripsAgencyProfit.map((r) => r.agencyProfit));
+  // Only manual extras count as cash out owed (not vehicle profit).
   const owedOut =
-    vehicle.totalOwed ??
-    (vehicle.fromTrips || 0) + (vehicle.manualExtra || 0);
+    cashOut.totalOwed ?? (Number(cashOut.manualExtra) || 0);
   return sumMoney([
     owedIn,
+    vehicleProfit,
     -owedOut,
     -(bulk.received || 0),
-    -(vehicle.paid || 0),
+    -(cashOut.paid || 0),
   ]);
 }
 
@@ -327,7 +340,10 @@ function EntitySummaryCards({
         ]
       : [
           { label: "Total from bulk trips", value: metrics.bulkTrips },
-          { label: "Total from vehicle trips", value: metrics.vehicleTrips },
+          {
+            label: "Total from vehicle trips",
+            value: metrics.vehicleTrips,
+          },
           {
             label: "Total remaining to get",
             value: metrics.remainingToGet,
@@ -526,19 +542,24 @@ function buildAgencyUnifiedTrips(
   }));
   const vehicle: Array<
     AgencyUnifiedTripRow & { sortDate: number; sortId: string }
-  > = detail.tables.vehicleTripsAgencyProfit.map((r) => ({
-    id: `vehicle-${r._id}`,
-    source: "Vehicle" as const,
-    date: r.date,
-    reference: r.tripNumber || "—",
-    details: [r.from, r.to].filter(Boolean).join(" → ") || "—",
-    cashIn: null,
-    cashOut: r.agencyProfit,
-    advance: null,
-    status: r.status,
-    sortDate: cashInCashOutSortTime(r.date, r._id),
-    sortId: r._id,
-  }));
+  > = detail.tables.vehicleTripsAgencyProfit.map((r) => {
+    const route = [r.from, r.to].filter(Boolean).join(" → ") || "—";
+    const profit = Number(r.agencyProfit) || 0;
+    return {
+      id: `vehicle-${r._id}`,
+      source: "Vehicle" as const,
+      date: r.date,
+      reference: r.tripNumber || "—",
+      details: route,
+      // Owner profit from vehicle trip = money from agency (cash in column).
+      cashIn: profit,
+      cashOut: null,
+      advance: null,
+      status: r.status,
+      sortDate: cashInCashOutSortTime(r.date, r._id),
+      sortId: r._id,
+    };
+  });
   return [...bulk, ...vehicle]
     .sort(compareCashInCashOutLatestFirst)
     .map(({ sortDate: _s, sortId: _id, ...row }) => row);
@@ -547,16 +568,24 @@ function buildAgencyUnifiedTrips(
 function buildAgencyUnifiedCashHistory(
   detail: AgencyCashInCashOutDetail,
 ): AgencyUnifiedCashRow[] {
-  const receipts = detail.tables.bulkReceiptPayments.map((r) => ({
-    id: `in-${r._id}`,
-    direction: "Cash in" as const,
-    date: r.paymentDate,
-    amount: r.amount,
-    method: r.paymentMethod,
-    notes: r.notes,
-    sortDate: cashInCashOutSortTime(r.paymentDate, r._id),
-    sortId: r._id,
-  }));
+  const receipts = detail.tables.bulkReceiptPayments.map((r) => {
+    const rawNotes = String(r.notes || "").trim();
+    const notes = rawNotes
+      ? /^cash\s*in\b/i.test(rawNotes)
+        ? rawNotes
+        : `Cash in · ${rawNotes}`
+      : "Cash in";
+    return {
+      id: `in-${r._id}`,
+      direction: "Cash in" as const,
+      date: r.paymentDate,
+      amount: r.amount,
+      method: r.paymentMethod,
+      notes,
+      sortDate: cashInCashOutSortTime(r.paymentDate, r._id),
+      sortId: r._id,
+    };
+  });
   const payouts = detail.tables.agencyProfitPayoutPayments.map((r) => ({
     id: `out-${r._id}`,
     direction: "Cash out" as const,

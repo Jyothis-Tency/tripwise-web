@@ -33,8 +33,10 @@ import {
 } from "../agencyLedgerMetrics";
 import {
   buildAgencyTxRows,
+  type AgencyTxTripDetail,
   type AgencyTxType,
 } from "../agencyTxRows";
+import { AgencyTxTripDetailModal } from "../components/AgencyTxTripDetailModal";
 import { DatePicker } from "../../../components/ui/DatePicker";
 
 type EntityTab = CashInCashOutTabId;
@@ -55,6 +57,7 @@ type TxRow = {
   method: string;
   notes: string;
   sortTime: number;
+  tripDetail?: AgencyTxTripDetail;
 };
 
 function agencyTypeBadgeClass(type: AgencyTxType): string {
@@ -62,7 +65,7 @@ function agencyTypeBadgeClass(type: AgencyTxType): string {
     case "Bulk":
       return "bg-indigo-50 text-indigo-700 dark:bg-[#242a57] dark:text-[#a5b4fc]";
     case "Vehicle":
-      return "bg-rose-50 text-rose-600 dark:bg-[#3a1a1e] dark:text-[#fda4af]";
+      return "bg-sky-50 text-sky-700 dark:bg-[#0c2a3a] dark:text-[#7dd3fc]";
     case "Cash in":
       return "bg-emerald-50 text-emerald-700 dark:bg-[#0d3325] dark:text-[#34d399]";
     case "Cash out":
@@ -360,6 +363,8 @@ export function TransactionHistoryPage() {
     title: string;
     body: string;
   } | null>(null);
+  const [tripDetailOpen, setTripDetailOpen] =
+    useState<AgencyTxTripDetail | null>(null);
   const [typeFilter, setTypeFilter] = useState<TypeFilter>("all");
   const [filtersOpen, setFiltersOpen] = useState(false);
 
@@ -563,14 +568,19 @@ export function TransactionHistoryPage() {
   const agencyCards = useMemo(() => {
     if (!agencyDetail?.summary) return null;
     const bulk = agencyDetail.summary.cashInBulk;
-    const profit = agencyDetail.summary.cashOutAgencyProfit;
-    if (!bulk || !profit) return null;
+    const cashOut = agencyDetail.summary.cashOutAgencyProfit;
+    if (!bulk || !cashOut) return null;
     const bulkTotal = Number(bulk.fromTrips) || 0;
-    const vehicleOut = Number(profit.fromTrips) || 0;
-    const grandTotal = agencyNetGrandTotal(bulk, profit);
+    const ownerProfit =
+      Number(agencyDetail.summary.ownerProfitFromVehicleTrips) ||
+      (agencyDetail.tables?.vehicleTripsAgencyProfit ?? []).reduce(
+        (s, t) => s + (Number(t.agencyProfit) || 0),
+        0,
+      );
+    const grandTotal = agencyNetGrandTotal(bulk, cashOut, ownerProfit);
     const received = Number(bulk.received) || 0;
-    const remaining = agencyNetRemaining(bulk, profit);
-    return { grandTotal, received, remaining, bulkTotal, vehicleOut };
+    const remaining = agencyNetRemaining(bulk, cashOut, ownerProfit);
+    return { grandTotal, received, remaining, bulkTotal, ownerProfit };
   }, [agencyDetail]);
 
   const driverCards = useMemo(() => {
@@ -929,8 +939,10 @@ export function TransactionHistoryPage() {
                       Grand total
                     </span>
                     <small className="text-xs text-white/75">
-                      All time · Bulk +{fmtCurrency(agencyCards.bulkTotal)} ·
-                      Vehicle −{fmtCurrency(agencyCards.vehicleOut)}
+                      All time · Bulk +{fmtCurrency(agencyCards.bulkTotal)}
+                      {agencyCards.ownerProfit > 0
+                        ? ` · Vehicle +${fmtCurrency(agencyCards.ownerProfit)}`
+                        : ""}
                     </small>
                     <b className="mt-2 block text-[28px] font-extrabold tracking-tight">
                       {fmtSignedCurrency(agencyCards.grandTotal)}
@@ -1201,6 +1213,10 @@ export function TransactionHistoryPage() {
                         {txRows.map((r) => {
                           const isIn = r.flow === "in";
                           const isSalary = r.type === "Salary";
+                          const canOpenTripDetail =
+                            tab === "agencies" &&
+                            (r.type === "Bulk" || r.type === "Vehicle") &&
+                            Boolean(r.tripDetail);
                           const agencyBadge =
                             tab === "agencies" &&
                             (r.type === "Bulk" ||
@@ -1212,7 +1228,14 @@ export function TransactionHistoryPage() {
                           return (
                             <tr
                               key={r.id}
-                              className="border-t border-slate-100 hover:bg-[var(--bg-main)] dark:border-[#252c4d]"
+                              className={`border-t border-slate-100 hover:bg-[var(--bg-main)] dark:border-[#252c4d] ${
+                                canOpenTripDetail ? "cursor-pointer" : ""
+                              }`}
+                              onClick={() => {
+                                if (canOpenTripDetail && r.tripDetail) {
+                                  setTripDetailOpen(r.tripDetail);
+                                }
+                              }}
                             >
                               <td className="whitespace-nowrap px-[18px] py-3.5 font-medium text-slate-800 dark:text-[#eef0ff]">
                                 {formatDate(r.date)}
@@ -1248,12 +1271,13 @@ export function TransactionHistoryPage() {
                                   <button
                                     type="button"
                                     title="View full notes"
-                                    onClick={() =>
+                                    onClick={(e) => {
+                                      e.stopPropagation();
                                       setNotesPreview({
                                         title: `${r.type} · Notes`,
                                         body: r.notes,
-                                      })
-                                    }
+                                      });
+                                    }}
                                     className="block w-full truncate text-left text-slate-500 underline-offset-2 hover:text-indigo-600 hover:underline dark:text-[#8d94b8] dark:hover:text-[#a5b4fc]"
                                   >
                                     {r.notes}
@@ -1289,6 +1313,22 @@ export function TransactionHistoryPage() {
           title={notesPreview.title}
           body={notesPreview.body}
           onClose={() => setNotesPreview(null)}
+        />
+      )}
+      {tripDetailOpen && selectedAgencyId && (
+        <AgencyTxTripDetailModal
+          detail={tripDetailOpen}
+          agencyId={selectedAgencyId}
+          resolveAgencyLabel={(agencyName) => {
+            if (!agencyName?.trim()) return "—";
+            const match = agencies.find(
+              (a) =>
+                String(a.name || "").trim().toLowerCase() ===
+                agencyName.trim().toLowerCase(),
+            );
+            return match ? formatAgencyLabel(match) : agencyName;
+          }}
+          onClose={() => setTripDetailOpen(null)}
         />
       )}
     </div>

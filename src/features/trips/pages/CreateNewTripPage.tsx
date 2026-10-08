@@ -778,7 +778,7 @@ export function CreateNewTripPage() {
                       <Calculator className="mt-0.5 h-5 w-5 shrink-0 text-indigo-600 dark:text-indigo-400" />
                       <div>
                         <p className="text-sm font-bold text-indigo-900 dark:text-indigo-100">
-                          Agency profit: ₹
+                          Owner profit: ₹
                           {profitPreview.toLocaleString("en-IN", {
                             minimumFractionDigits: 2,
                             maximumFractionDigits: 2,
@@ -790,7 +790,7 @@ export function CreateNewTripPage() {
                           )}
                         </p>
                         <p className="mt-0.5 font-mono text-[11px] text-indigo-600/80 dark:text-indigo-300/70">
-                          Agency cost − Cab cost
+                          Your earnings · Agency cost − Cab cost
                         </p>
                       </div>
                     </div>

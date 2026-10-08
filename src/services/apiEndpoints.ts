@@ -41,6 +41,7 @@ export const ApiEndpoints = {
   // TRIPS
   trips: '/owners/trips',
   tripById: (id: string) => `/owners/trips/${id}`,
+  tripCashIn: (id: string) => `/owners/trips/${id}/cash-in`,
   /** Vehicle module trip cancel (matches owner.js PUT /vehicles/trip/cancel/:id). */
   tripCancel: (id: string) => `/owners/vehicles/trip/cancel/${id}`,
   assignDriverToTrip: (tripId: string) => `/owners/trips/${tripId}/assign-driver`,
@@ -82,6 +83,7 @@ export const ApiEndpoints = {
   // BULK ENTRY
   bulkEntryTrips: '/owners/bulk-entry/trips',
   bulkEntrySync: '/owners/bulk-entry/sync',
+  bulkEntryTransfer: '/owners/bulk-entry/transfer',
   bulkEntryTripById: (id: string) => `/owners/bulk-entry/trips/${id}`,
 
   // GUEST BULK (owner)

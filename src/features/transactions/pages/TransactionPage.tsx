@@ -292,8 +292,14 @@ export function TransactionPage() {
         const detail = await fetchCashInCashOutAgencyDetail(id, "all_time");
         const cashIn = detail.summary.cashInBulk;
         const cashOut = detail.summary.cashOutAgencyProfit;
-        setGrandTotal(agencyNetGrandTotal(cashIn, cashOut));
-        setRemaining(agencyNetRemaining(cashIn, cashOut));
+        const vehicleProfit =
+          Number(detail.summary.ownerProfitFromVehicleTrips) ||
+          (detail.tables?.vehicleTripsAgencyProfit ?? []).reduce(
+            (s, t) => s + (Number(t.agencyProfit) || 0),
+            0,
+          );
+        setGrandTotal(agencyNetGrandTotal(cashIn, cashOut, vehicleProfit));
+        setRemaining(agencyNetRemaining(cashIn, cashOut, vehicleProfit));
       } else {
         const detail = await fetchCashInCashOutDriverDetail(id, "all_time");
         const gt =

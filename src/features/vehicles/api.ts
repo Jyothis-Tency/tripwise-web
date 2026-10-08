@@ -646,3 +646,36 @@ export async function switchTripVehicle(
   const data = raw.data ?? raw;
   return mapTrip(data);
 }
+
+export interface TripCashInPayment {
+  _id: string;
+  amount: number;
+  paymentDate: string | null;
+  paymentMethod: string;
+  notes: string;
+  paymentType: string;
+  createdAt?: string | null;
+}
+
+export async function fetchTripCashInPayments(
+  tripId: string,
+): Promise<TripCashInPayment[]> {
+  const res = await apiClient.get(ApiEndpoints.tripCashIn(tripId));
+  const raw: any = res.data ?? {};
+  const data = raw.data ?? raw;
+  return Array.isArray(data) ? data : [];
+}
+
+export async function recordTripCashIn(
+  tripId: string,
+  body: {
+    amount: number;
+    paymentDate?: string;
+    paymentMethod?: string;
+    notes?: string;
+  },
+): Promise<TripCashInPayment> {
+  const res = await apiClient.post(ApiEndpoints.tripCashIn(tripId), body);
+  const raw: any = res.data ?? {};
+  return (raw.data ?? raw) as TripCashInPayment;
+}

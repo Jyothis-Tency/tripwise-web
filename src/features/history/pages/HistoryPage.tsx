@@ -109,7 +109,7 @@ export function HistoryPage() {
   const currentMonth = getCurrentMonthValue();
   const [search, setSearch]       = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
-  const [status, setStatus]       = useState('completed');
+  const [status, setStatus]       = useState('all');
   const [month, setMonth]         = useState(currentMonth);
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate]     = useState('');
@@ -253,8 +253,6 @@ export function HistoryPage() {
       )
     );
   }, []);
-
-  const hasActiveFilters = status !== 'all' || month !== currentMonth || startDate || endDate || debouncedSearch;
 
   const handleExportPdf = async () => {
     const params: Record<string, any> = {
@@ -648,15 +646,6 @@ export function HistoryPage() {
               className="flex-1 rounded-lg border border-slate-200 bg-[var(--bg-elevated)] px-3 py-2.5 font-mono text-sm text-slate-700 outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-200 dark:border-[#1e2638] dark:text-slate-100"
             />
           </div>
-
-          {hasActiveFilters && (
-            <button
-              onClick={resetFilters}
-              className="col-span-2 flex items-center justify-center gap-1.5 rounded-lg border border-rose-200 bg-rose-50 px-4 py-2.5 text-sm font-medium text-rose-600 transition hover:bg-rose-100 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-300 dark:hover:bg-rose-500/20 sm:col-span-1"
-            >
-              <X className="h-4 w-4" /> Reset to This Month
-            </button>
-          )}
         </div>
       </div>
 

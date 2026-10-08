@@ -100,6 +100,8 @@ export interface AgencyCashInCashOutDetail {
   summary: {
     cashInBulk: AgencyCashSummaryBlock & { received: number };
     cashOutAgencyProfit: AgencyCashSummaryBlock & { paid: number };
+    /** Owner earnings from vehicle trips (not cash-out to agency). */
+    ownerProfitFromVehicleTrips?: number;
   };
   adjustments: AgencyCashAdjustments;
   tables: {

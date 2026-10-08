@@ -134,7 +134,15 @@ export const RevenueBreakdown: React.FC<RevenueBreakdownProps> = ({
           if (!id) return null;
           try {
             const detail = await fetchCashInCashOutAgencyDetail(id, "all_time");
-            return detail.summary;
+            return {
+              ...detail.summary,
+              ownerProfitFromVehicleTrips:
+                detail.summary.ownerProfitFromVehicleTrips ??
+                detail.tables.vehicleTripsAgencyProfit.reduce(
+                  (s, t) => s + (Number(t.agencyProfit) || 0),
+                  0,
+                ),
+            };
           } catch {
             return null;
           }
@@ -143,6 +151,7 @@ export const RevenueBreakdown: React.FC<RevenueBreakdownProps> = ({
       const summaries = details.filter(Boolean) as {
         cashInBulk?: AgencyCashInSummary;
         cashOutAgencyProfit?: AgencyCashOutSummary;
+        ownerProfitFromVehicleTrips?: number;
       }[];
       setAgencyLedger(aggregateAgencyLedgerFromSummaries(summaries));
     } catch {
@@ -234,7 +243,11 @@ export const RevenueBreakdown: React.FC<RevenueBreakdownProps> = ({
             {agencyLedgerLoading
               ? "Loading agencies…"
               : agencyLedger
-                ? `All time · ${agencyLedger.agencyCount} agencies · Bulk +${fmtCurrency(agencyLedger.bulkTotal)} · Vehicle −${fmtCurrency(agencyLedger.vehicleOut)}`
+                ? `All time · ${agencyLedger.agencyCount} agencies · Bulk +${fmtCurrency(agencyLedger.bulkTotal)}${
+                    agencyLedger.ownerProfitFromVehicles > 0
+                      ? ` · Vehicle +${fmtCurrency(agencyLedger.ownerProfitFromVehicles)}`
+                      : ""
+                  }`
                 : "All time · Could not load agency totals"}
           </small>
           <b className="mt-2 block text-[28px] font-extrabold tracking-tight">

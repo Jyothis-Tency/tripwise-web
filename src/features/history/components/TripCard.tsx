@@ -955,7 +955,7 @@ export function TripCard({
                     {E("Advance", fmtCurrency(trip.advance), "advance")}
                     <div className="my-1.5 flex items-baseline justify-between gap-2 rounded-lg border border-emerald-200/80 bg-emerald-50/80 px-2.5 py-2 dark:border-emerald-500/30 dark:bg-emerald-500/10">
                       <span className="text-sm font-medium text-emerald-700 dark:text-emerald-300">
-                        Agency profit
+                        Owner profit
                       </span>
                       <span className="text-base font-bold tabular-nums text-emerald-700 dark:text-emerald-300">
                         {fmtCurrency(resolveTripAgencyProfitDisplay(trip))}

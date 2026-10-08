@@ -111,39 +111,9 @@ export function TripConfirmationPage() {
 
   const renderBlock = (block: (typeof data.blocks)[number]) => {
     if (block.type === "heading") {
-      if (block.style === "company") {
-        if (block.id !== firstCompanyId) return null;
-        return (
-          <label key={block.id} className="block space-y-1.5">
-            <span className="block text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-400">
-              Company name
-            </span>
-            <input
-              className={`${inputCls} font-bold tracking-wider`}
-              value={block.text}
-              onChange={(e) => updateCompanyName(e.target.value)}
-              placeholder="e.g. INWAY CABS"
-            />
-          </label>
-        );
-      }
-      if (block.style === "title") {
-        if (block.id !== firstTitleId) return null;
-        return (
-          <label key={block.id} className="block space-y-1.5">
-            <span className="block text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-400">
-              Document title
-            </span>
-            <input
-              className={`${inputCls} bg-slate-50/50 text-xs font-semibold uppercase tracking-wider dark:bg-white/5`}
-              value={block.text}
-              onChange={(e) =>
-                updateBlock(block.id, { text: e.target.value })
-              }
-              placeholder="ENTER DOCUMENT TITLE…"
-            />
-          </label>
-        );
+      // Company + document title render together in a 2-col row (see page1).
+      if (block.style === "company" || block.style === "title") {
+        return null;
       }
       const text = (block.text || "").trim();
       if (!text) return null;
@@ -336,26 +306,76 @@ export function TripConfirmationPage() {
             <span className="font-mono text-xs text-slate-400">1 / 2</span>
           </div>
           <div className="flex flex-col gap-5">
+            {/* Company + title side by side for quicker fill */}
+            {(firstCompanyId || firstTitleId) && (
+              <div className="grid gap-3.5 sm:grid-cols-2">
+                {page1Blocks
+                  .filter(
+                    (b) =>
+                      b.type === "heading" &&
+                      ((b.style === "company" && b.id === firstCompanyId) ||
+                        (b.style === "title" && b.id === firstTitleId)),
+                  )
+                  .map((block) => {
+                    if (block.type !== "heading") return null;
+                    if (block.style === "company") {
+                      return (
+                        <label key={block.id} className="block space-y-1.5">
+                          <span className="block text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-400">
+                            Company name
+                          </span>
+                          <input
+                            className={`${inputCls} font-bold tracking-wider`}
+                            value={block.text}
+                            onChange={(e) => updateCompanyName(e.target.value)}
+                            placeholder="e.g. INWAY CABS"
+                          />
+                        </label>
+                      );
+                    }
+                    return (
+                      <label key={block.id} className="block space-y-1.5">
+                        <span className="block text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-400">
+                          Document title
+                        </span>
+                        <input
+                          className={`${inputCls} bg-slate-50/50 text-xs font-semibold uppercase tracking-wider dark:bg-white/5`}
+                          value={block.text}
+                          onChange={(e) =>
+                            updateBlock(block.id, { text: e.target.value })
+                          }
+                          placeholder="ENTER DOCUMENT TITLE…"
+                        />
+                      </label>
+                    );
+                  })}
+              </div>
+            )}
             {page1Blocks.map((block) => renderBlock(block))}
           </div>
         </section>
 
-        {page2Blocks.length > 0 && (
-          <section className={sheetCard}>
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3 dark:border-[#1e2638]">
-              <div className="flex items-center gap-2">
-                <span className="h-2 w-2 rounded-full bg-emerald-500" />
-                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                  Page 2 — Payment &amp; bank
-                </span>
-              </div>
-              <span className="font-mono text-xs text-slate-400">2 / 2</span>
+        <section className={sheetCard}>
+          <div className="flex items-center justify-between border-b border-slate-100 pb-3 dark:border-[#1e2638]">
+            <div className="flex items-center gap-2">
+              <span className="h-2 w-2 rounded-full bg-emerald-500" />
+              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                Page 2 — Payment &amp; bank
+              </span>
             </div>
-            <div className="flex flex-col gap-5">
-              {page2Blocks.map((block) => renderBlock(block))}
-            </div>
-          </section>
-        )}
+            <span className="font-mono text-xs text-slate-400">2 / 2</span>
+          </div>
+          <div className="flex flex-col gap-5">
+            {page2Blocks.length > 0 ? (
+              page2Blocks.map((block) => renderBlock(block))
+            ) : (
+              <p className="text-sm text-slate-500 dark:text-slate-400">
+                Payment &amp; bank fields load from the template. Click Reload
+                if this column is empty.
+              </p>
+            )}
+          </div>
+        </section>
       </div>
 
       {/* Sticky mobile CTA */}

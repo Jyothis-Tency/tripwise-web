@@ -59,8 +59,8 @@ export const TRIP_CONFIRMATION_SEED: TripConfirmationSeed = {
   tripDetailFieldNames: [
     "Arrival",
     "Departure",
-    "Pickup",
-    "Drop",
+    "Driver Name",
+    "Driver Number",
     "Pickup Time",
   ],
   bookingHeading: "BOOKING CONFIRMATION",

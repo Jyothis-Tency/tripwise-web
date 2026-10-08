@@ -89,12 +89,27 @@ export function newPageBreak(): TemplateBlock {
   return { id: nid("pb"), type: "pageBreak" };
 }
 
+/** Migrate legacy Pickup/Drop trip-detail labels → Driver Name / Number. */
+function migrateTripDetailFields<T extends { label: string; value: string }>(
+  fields: T[],
+): T[] {
+  return fields.map((f) => {
+    const label = String(f.label || "").trim();
+    if (/^pickup$/i.test(label)) {
+      return { ...f, label: "Driver Name" };
+    }
+    if (/^drop$/i.test(label)) {
+      return { ...f, label: "Driver Number" };
+    }
+    return f;
+  });
+}
+
 /** Build full template blocks from seed (preloads + empty per-trip slots). */
 export function buildTemplateFromSeed(
   seed: TripConfirmationSeed = TRIP_CONFIRMATION_SEED,
 ): TripConfirmationTemplate {
-  const bank = [...seed.bankLines];
-  while (bank.length < 4) bank.push("");
+  const bank = [...seed.bankLines].filter((l) => String(l).trim());
 
   return {
     blocks: [
@@ -114,21 +129,16 @@ export function buildTemplateFromSeed(
       newFields([[seed.advanceLabel, ""]]),
       newText(seed.bookingConfirmSentence),
       newText(seed.balanceSentence, { bold: true }),
+      // UI-only split (Page 1 | Page 2). PDF ignores pageBreak and stays one page.
+      newPageBreak(),
       newHeading(seed.paymentHeading, "section"),
       newFields(
         seed.paymentFields.map(
           (f) => [f.label, f.value] as [string, string],
         ),
       ),
-      newPageBreak(),
-      newHeading(seed.companyName, "company"),
-      newText(bank[0] ?? "", { bold: true }),
-      newText(bank[1] ?? "", { bold: true }),
-      newText(bank[2] ?? "", { bold: true }),
-      newText(bank[3] ?? "", { bold: true }),
-      newText(""),
+      ...bank.map((line) => newText(line, { bold: true })),
       newText(seed.vehicleAvailableSentence, { bold: true }),
-      newText(""),
       newText(seed.footerBrand, { bold: true }),
       newText(seed.footerTagline, { bold: true }),
     ],
@@ -164,13 +174,46 @@ export function applyTripConfirmationSeed(): TripConfirmationTemplate {
   return t;
 }
 
+/** Ensure one UI pageBreak before payment section (PDF still ignores it). */
+function ensureUiPageBreak(blocks: TemplateBlock[]): TemplateBlock[] {
+  if (blocks.some((b) => b.type === "pageBreak")) return blocks;
+  const paymentIdx = blocks.findIndex(
+    (b) =>
+      b.type === "heading" &&
+      b.style === "section" &&
+      /payment/i.test(b.text || ""),
+  );
+  if (paymentIdx <= 0) return blocks;
+  return [
+    ...blocks.slice(0, paymentIdx),
+    newPageBreak(),
+    ...blocks.slice(paymentIdx),
+  ];
+}
+
 export function loadTripConfirmationDefaults(): TripConfirmationTemplate {
   try {
     const v3 = localStorage.getItem(LS_KEY);
     if (v3) {
       const parsed = JSON.parse(v3);
       if (isTemplate(parsed) && parsed.blocks.length) {
-        return { blocks: parsed.blocks };
+        const blocks: TemplateBlock[] = parsed.blocks.map((b) => {
+          if (b.type !== "fields") return b;
+          return {
+            ...b,
+            fields: migrateTripDetailFields(b.fields).map((f) => ({
+              id: f.id || nid("f"),
+              label: f.label,
+              value: f.value ?? "",
+            })),
+          };
+        });
+        const next: TripConfirmationTemplate = {
+          blocks: ensureUiPageBreak(blocks),
+        };
+        // Persist migration so UI field labels / 2-column split stay updated.
+        saveTripConfirmationDefaults(next);
+        return next;
       }
     }
     // First visit / after seed bump: apply seed
@@ -278,17 +321,6 @@ export function templateToSimple(
   const priceText =
     texts.find((t) => t.underline)?.text ?? contentTexts[1]?.text ?? "";
 
-  const pageBreakIdx = data.blocks.findIndex((b) => b.type === "pageBreak");
-  const page2Texts = data.blocks
-    .slice(pageBreakIdx + 1)
-    .filter(
-      (b): b is Extract<TemplateBlock, { type: "text" }> =>
-        b.type === "text" &&
-        !b.text.trim().startsWith("★") &&
-        !/Professional Service/i.test(b.text) &&
-        !/pre-booking/i.test(b.text),
-    );
-
   // booking sentences: after advance field group — contentTexts[2], [3] typically
   const bookingNote =
     contentTexts.find((t) => /confirmed upon receipt/i.test(t.text))?.text ??
@@ -298,6 +330,26 @@ export function templateToSimple(
     contentTexts.find((t) => /Balance:/i.test(t.text))?.text ??
     contentTexts[3]?.text ??
     fallback.bookingSubNote;
+
+  // Bank lines: bold text blocks that look like account details (after payment fields).
+  const bankCandidateTexts = texts.filter(
+    (t) =>
+      t.bold &&
+      t.text.trim() &&
+      !t.text.trim().startsWith("★") &&
+      !/Professional Service/i.test(t.text) &&
+      !/pre-booking/i.test(t.text) &&
+      !/confirmed upon receipt/i.test(t.text) &&
+      !/Balance:/i.test(t.text),
+  );
+  const bankLines = bankCandidateTexts
+    .filter(
+      (t) =>
+        /bank|a\/c|ifsc|branch|account|hdfc|sbi|icici/i.test(t.text) ||
+        /^\d/.test(t.text.trim()),
+    )
+    .map((t) => t.text);
+  while (bankLines.length < 4) bankLines.push("");
 
   return {
     companyName: company,
@@ -317,7 +369,9 @@ export function templateToSimple(
           value: fieldGroups[1].fields[0].value ?? "",
         }
       : { ...fallback.extraKm },
-    tripDetailFields: toFields(fieldGroups[2], fallback.tripDetailFields),
+    tripDetailFields: migrateTripDetailFields(
+      toFields(fieldGroups[2], fallback.tripDetailFields),
+    ),
     advance: fieldGroups[3]?.fields[0]
       ? {
           label: fieldGroups[3].fields[0].label,
@@ -327,12 +381,7 @@ export function templateToSimple(
     bookingNote,
     bookingSubNote,
     paymentFields: toFields(fieldGroups[4], fallback.paymentFields),
-    bankLines: [
-      page2Texts[0]?.text ?? "",
-      page2Texts[1]?.text ?? "",
-      page2Texts[2]?.text ?? "",
-      page2Texts[3]?.text ?? "",
-    ],
+    bankLines: bankLines.slice(0, 4),
     vehicleAvailableSentence: vehicleLine,
     footerBrand,
     footerTagline,
@@ -386,8 +435,8 @@ export function simpleToTemplate(
       : [
           sf("Arrival"),
           sf("Departure"),
-          sf("Pickup"),
-          sf("Drop"),
+          sf("Driver Name"),
+          sf("Driver Number"),
           sf("Pickup Time"),
         ];
   const payment =
@@ -395,8 +444,7 @@ export function simpleToTemplate(
       ? s.paymentFields
       : [sf("UPI ID"), sf("G Pay / PhonePe")];
 
-  const bank = [...(s.bankLines ?? [])];
-  while (bank.length < 4) bank.push("");
+  const bank = [...(s.bankLines ?? [])].filter((line) => String(line).trim());
 
   return {
     blocks: [
@@ -421,17 +469,12 @@ export function simpleToTemplate(
       ]),
       newText(s.bookingNote ?? ""),
       newText(s.bookingSubNote ?? "", { bold: true }),
+      // UI-only split (Page 1 | Page 2). PDF ignores pageBreak and stays one page.
+      newPageBreak(),
       newHeading(s.paymentHeading.trim(), "section"),
       newFields(pairs(payment)),
-      newPageBreak(),
-      newHeading(s.companyName.trim(), "company"),
-      newText(bank[0] ?? "", { bold: true }),
-      newText(bank[1] ?? "", { bold: true }),
-      newText(bank[2] ?? "", { bold: true }),
-      newText(bank[3] ?? "", { bold: true }),
-      newText(""),
+      ...bank.map((line) => newText(line, { bold: true })),
       newText(s.vehicleAvailableSentence ?? "", { bold: true }),
-      newText(""),
       newText(s.footerBrand.trim(), { bold: true }),
       newText(s.footerTagline.trim(), { bold: true }),
     ],
@@ -455,120 +498,177 @@ function wrapText(
   return y;
 }
 
-function ensureSpace(doc: jsPDF, y: number, need: number): number {
-  const pageH = doc.internal.pageSize.getHeight();
-  if (y + need > pageH - 16) {
-    doc.addPage();
-    return 22;
-  }
-  return y;
-}
-
-/** Build PDF from fully editable template blocks. */
+/**
+ * Compact single-page trip confirmation PDF.
+ * Skips page breaks; uses tighter spacing and 2-column field rows.
+ */
 export function generateTripConfirmationPdf(data: TripConfirmationTemplate) {
   const doc = new jsPDF("p", "mm", "a4");
   const pageW = doc.internal.pageSize.getWidth();
-  const left = 18;
-  const maxW = pageW - left * 2;
-  let y = 22;
+  const pageH = doc.internal.pageSize.getHeight();
+  const left = 14;
+  const right = pageW - 14;
+  const maxW = right - left;
+  const bottomLimit = pageH - 14;
+  let y = 14;
   let companyForFilename = "Trip";
 
-  for (const block of data.blocks) {
-    if (block.type === "pageBreak") {
-      doc.addPage();
-      y = 28;
-      continue;
-    }
+  // Soft header band
+  doc.setFillColor(248, 250, 252);
+  doc.rect(0, 0, pageW, 28, "F");
+  doc.setDrawColor(226, 232, 240);
+  doc.setLineWidth(0.3);
+  doc.line(0, 28, pageW, 28);
+
+  const blocks = data.blocks.filter((b) => b.type !== "pageBreak");
+
+  const drawSectionRule = () => {
+    doc.setDrawColor(226, 232, 240);
+    doc.setLineWidth(0.25);
+    doc.line(left, y - 1.5, right, y - 1.5);
+  };
+
+  for (const block of blocks) {
+    if (y > bottomLimit - 8) break; // keep single page; drop overflow rather than page 2
 
     if (block.type === "heading") {
       const text = (block.text || "").trim();
       if (!text) continue;
-      y = ensureSpace(doc, y, 14);
       if (block.style === "company") {
         companyForFilename = text;
         doc.setFont("helvetica", "bold");
-        doc.setFontSize(18);
-        doc.text(text.toUpperCase(), left, y);
-        y += 10;
+        doc.setFontSize(16);
+        doc.setTextColor(15, 23, 42);
+        doc.text(text.toUpperCase(), pageW / 2, y + 4, { align: "center" });
+        y = 22;
       } else if (block.style === "title") {
         doc.setFont("helvetica", "bold");
-        doc.setFontSize(13);
-        doc.text(text.toUpperCase(), left, y);
-        y += 12;
+        doc.setFontSize(11);
+        doc.setTextColor(51, 65, 85);
+        doc.text(text.toUpperCase(), pageW / 2, y, { align: "center" });
+        y = 34;
       } else {
         y += 2;
+        drawSectionRule();
+        y += 4;
         doc.setFont("helvetica", "bold");
-        doc.setFontSize(12);
+        doc.setFontSize(10);
+        doc.setTextColor(30, 64, 175);
         doc.text(text.toUpperCase(), left, y);
-        y += 8;
+        y += 5.5;
       }
       continue;
     }
 
     if (block.type === "fields") {
-      doc.setFontSize(11);
-      for (const f of block.fields) {
+      const visible = block.fields.filter(
+        (f) => (f.label || "").trim() || (f.value || "").trim(),
+      );
+      if (!visible.length) continue;
+
+      // Two-column grid for short label/value pairs
+      const colW = (maxW - 4) / 2;
+      let col = 0;
+      let rowTop = y;
+
+      for (const f of visible) {
         const label = (f.label || "").trim();
-        let value = f.value ?? "";
-        if (!label && !value.trim()) continue;
-        // Blank pickup-time style: empty value → underline
-        if (!value.trim() && /time/i.test(label)) {
-          value = "________________";
+        let value = (f.value ?? "").trim();
+        if (!value && /time/i.test(label)) value = "____________";
+        if (!label && !value) continue;
+
+        const x = left + col * (colW + 4);
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(8.5);
+        doc.setTextColor(71, 85, 105);
+        const labelText = label ? `${label}:` : "";
+        if (labelText) doc.text(labelText, x, rowTop);
+
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(9);
+        doc.setTextColor(15, 23, 42);
+        const labelW = labelText ? doc.getTextWidth(`${labelText} `) + 1 : 0;
+        const valueLines = doc.splitTextToSize(
+          value || "-",
+          Math.max(12, colW - labelW - 1),
+        ) as string[];
+        let vy = rowTop;
+        for (const line of valueLines.slice(0, 2)) {
+          doc.text(line, x + labelW, vy);
+          vy += 4;
         }
-        y = ensureSpace(doc, y, 10);
-        if (label) {
-          doc.setFont("helvetica", "bold");
-          const labelText = `${label}:`;
-          doc.text(labelText, left, y);
-          doc.setFont("helvetica", "normal");
-          const labelW = doc.getTextWidth(`${labelText} `);
-          y = wrapText(doc, value || "—", left + labelW, y, maxW - labelW, 6);
-        } else {
-          doc.setFont("helvetica", "normal");
-          y = wrapText(doc, value, left, y, maxW, 6);
+
+        col += 1;
+        if (col >= 2) {
+          col = 0;
+          rowTop += Math.max(6, valueLines.length * 4 + 1.5);
         }
-        y += 2;
       }
-      y += 2;
+      if (col !== 0) rowTop += 6;
+      y = rowTop + 1.5;
       continue;
     }
 
     if (block.type === "text") {
       const text = (block.text || "").trim();
-      if (!text) continue;
-      y = ensureSpace(doc, y, 12);
-      doc.setFont("helvetica", block.bold ? "bold" : "normal");
-      doc.setFontSize(block.underline ? 14 : 11);
+      if (!text) {
+        y += 1.5;
+        continue;
+      }
+      const isFooter =
+        text.startsWith("★") || /Professional Service/i.test(text);
+      const isPrice = !!block.underline;
+      doc.setFont("helvetica", block.bold || isPrice ? "bold" : "normal");
+      doc.setFontSize(isPrice ? 12 : isFooter ? 8 : 9);
+      doc.setTextColor(
+        isFooter ? 100 : 15,
+        isFooter ? 116 : 23,
+        isFooter ? 139 : 42,
+      );
       const startY = y;
-      y = wrapText(doc, text, left, y, maxW, block.underline ? 7 : 6);
+      const lh = isPrice ? 5.5 : 4.2;
+      y = wrapText(doc, text, left, y, maxW, lh);
       if (block.underline) {
         const w = Math.min(doc.getTextWidth(text), maxW);
-        doc.setLineWidth(0.4);
-        doc.line(left, startY + 1.2, left + w, startY + 1.2);
+        doc.setDrawColor(30, 64, 175);
+        doc.setLineWidth(0.45);
+        doc.line(left, startY + 1, left + w, startY + 1);
       }
-      y += 4;
+      y += isFooter ? 2.5 : 3;
       continue;
     }
 
     if (block.type === "list") {
-      y = ensureSpace(doc, y, 16);
       if (block.title?.trim()) {
         doc.setFont("helvetica", "bold");
-        doc.setFontSize(11);
+        doc.setFontSize(9);
+        doc.setTextColor(30, 41, 59);
         doc.text(block.title.trim(), left, y);
-        y += 7;
+        y += 4.5;
       }
       doc.setFont("helvetica", "normal");
-      doc.setFontSize(11);
+      doc.setFontSize(9);
+      doc.setTextColor(30, 41, 59);
       for (const item of block.items) {
         if (!item?.trim()) continue;
-        y = ensureSpace(doc, y, 8);
-        doc.text(`•  ${item.trim()}`, left + 2, y);
-        y += 6;
+        if (y > bottomLimit - 6) break;
+        const lines = doc.splitTextToSize(
+          `•  ${item.trim()}`,
+          maxW - 2,
+        ) as string[];
+        for (const line of lines) {
+          doc.text(line, left + 1, y);
+          y += 4;
+        }
       }
-      y += 4;
+      y += 2;
     }
   }
+
+  // Bottom accent line
+  doc.setDrawColor(30, 64, 175);
+  doc.setLineWidth(0.6);
+  doc.line(left, pageH - 10, right, pageH - 10);
 
   const safeName = companyForFilename.replace(/[^\w]+/g, "_").slice(0, 24);
   doc.save(`Trip_Confirmation_${safeName}_${Date.now()}.pdf`);

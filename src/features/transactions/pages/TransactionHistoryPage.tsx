@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   ArrowLeft,
+  FileDown,
   Loader2,
   Plus,
   RefreshCw,
@@ -37,7 +38,14 @@ import {
   type AgencyTxType,
 } from "../agencyTxRows";
 import { AgencyTxTripDetailModal } from "../components/AgencyTxTripDetailModal";
+import {
+  downloadAgencyTransactionHistoryPdf,
+  type AgencyTxPdfColumnVisibility,
+  type AgencyTxPdfSectionVisibility,
+} from "../agencyTransactionHistoryPdf";
 import { DatePicker } from "../../../components/ui/DatePicker";
+import { authApi } from "../../auth/api";
+import { useAuth } from "../../../hooks/useAuth";
 
 type EntityTab = CashInCashOutTabId;
 type DetailTabId = CashInCashOutDetailTabId;
@@ -91,9 +99,10 @@ function fmtCurrency(n: number) {
   })}`;
 }
 
-function fmtSignedCurrency(n: number) {
-  const sign = n < 0 ? "−" : n > 0 ? "+" : "";
-  return `${sign}${fmtCurrency(n)}`;
+/** Card amounts without a leading + (minus only when negative). */
+function fmtCardCurrency(n: number) {
+  if (n < 0) return `−${fmtCurrency(n)}`;
+  return fmtCurrency(n);
 }
 
 function mongoIdTime(id?: string) {
@@ -317,10 +326,284 @@ function NotesPreviewDialog({
   );
 }
 
+const AGENCY_TX_TYPES: AgencyTxType[] = [
+  "Bulk",
+  "Vehicle",
+  "Cash in",
+  "Cash out",
+];
+
+const DEFAULT_PDF_SECTIONS: AgencyTxPdfSectionVisibility = {
+  ownerName: true,
+  companyName: true,
+  agencyHeading: true,
+  grandTotal: true,
+  paid: true,
+  remaining: true,
+};
+
+const DEFAULT_PDF_COLUMNS: AgencyTxPdfColumnVisibility = {
+  date: true,
+  time: true,
+  type: true,
+  method: true,
+  notes: true,
+  amount: true,
+};
+
+function AgencyTxPdfExportDialog({
+  agencyName,
+  ownerName,
+  companyName,
+  summary,
+  rows,
+  onClose,
+}: {
+  agencyName: string;
+  ownerName: string;
+  companyName: string;
+  summary: { grandTotal: number; paid: number; remaining: number };
+  rows: TxRow[];
+  onClose: () => void;
+}) {
+  const [sections, setSections] =
+    useState<AgencyTxPdfSectionVisibility>(DEFAULT_PDF_SECTIONS);
+  const [columns, setColumns] =
+    useState<AgencyTxPdfColumnVisibility>(DEFAULT_PDF_COLUMNS);
+  const [types, setTypes] = useState<AgencyTxType[]>([...AGENCY_TX_TYPES]);
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [generating, setGenerating] = useState(false);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  const toggleType = (t: AgencyTxType) => {
+    setTypes((prev) =>
+      prev.includes(t) ? prev.filter((x) => x !== t) : [...prev, t],
+    );
+  };
+
+  const generate = () => {
+    setError(null);
+    if (types.length === 0) {
+      setError("Select at least one transaction type.");
+      return;
+    }
+    if (!Object.values(sections).some(Boolean) && !Object.values(columns).some(Boolean)) {
+      setError("Select at least one section or table column.");
+      return;
+    }
+    setGenerating(true);
+    try {
+      downloadAgencyTransactionHistoryPdf({
+        ownerName,
+        companyName,
+        agencyName,
+        sections,
+        columns,
+        types,
+        dateFrom,
+        dateTo,
+        summary,
+        rows: rows.map((r) => ({
+          date: r.date,
+          amount: r.amount,
+          type: r.type,
+          flow: r.flow,
+          method: r.method,
+          notes: r.notes,
+        })),
+      });
+      onClose();
+    } catch (e: unknown) {
+      setError(
+        e instanceof Error ? e.message : "Failed to generate PDF.",
+      );
+    } finally {
+      setGenerating(false);
+    }
+  };
+
+  const checkCls =
+    "flex items-center gap-2 rounded-lg border border-slate-200 px-2.5 py-2 text-xs font-medium text-slate-700 dark:border-[#252c4d] dark:text-[#c8cce8]";
+
+  return (
+    <div
+      className="fixed inset-0 z-[85] flex items-center justify-center bg-black/45 p-3 sm:p-4"
+      role="dialog"
+      aria-modal="true"
+      onClick={onClose}
+    >
+      <div
+        className="flex max-h-[min(92vh,720px)] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-slate-200 bg-[var(--bg-card)] shadow-xl dark:border-[#252c4d]"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex shrink-0 items-center justify-between border-b border-slate-200 px-4 py-3 dark:border-[#252c4d]">
+          <div>
+            <h3 className="text-sm font-bold text-slate-800 dark:text-[#eef0ff]">
+              Export PDF
+            </h3>
+            <p className="text-[11px] text-slate-500 dark:text-[#8d94b8]">
+              Choose what to include for {agencyName}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-lg p-1 text-slate-500 hover:bg-slate-100 dark:hover:bg-[#252c4d]"
+            aria-label="Close"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4">
+          <section>
+            <h4 className="mb-2 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-[#8d94b8]">
+              Header & summary
+            </h4>
+            <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
+              {(
+                [
+                  ["ownerName", "Owner name"],
+                  ["companyName", "Company name"],
+                  ["agencyHeading", "Agency heading"],
+                  ["grandTotal", "Grand total"],
+                  ["paid", "Paid (Received)"],
+                  ["remaining", "Remaining"],
+                ] as const
+              ).map(([key, label]) => (
+                <label key={key} className={checkCls}>
+                  <input
+                    type="checkbox"
+                    checked={sections[key]}
+                    onChange={(e) =>
+                      setSections((s) => ({ ...s, [key]: e.target.checked }))
+                    }
+                  />
+                  {label}
+                </label>
+              ))}
+            </div>
+          </section>
+
+          <section>
+            <h4 className="mb-2 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-[#8d94b8]">
+              Table columns
+            </h4>
+            <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3">
+              {(
+                [
+                  ["date", "Date"],
+                  ["time", "Time"],
+                  ["type", "Type"],
+                  ["method", "Method"],
+                  ["notes", "Notes (full)"],
+                  ["amount", "Amount"],
+                ] as const
+              ).map(([key, label]) => (
+                <label key={key} className={checkCls}>
+                  <input
+                    type="checkbox"
+                    checked={columns[key]}
+                    onChange={(e) =>
+                      setColumns((c) => ({ ...c, [key]: e.target.checked }))
+                    }
+                  />
+                  {label}
+                </label>
+              ))}
+            </div>
+          </section>
+
+          <section>
+            <h4 className="mb-2 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-[#8d94b8]">
+              Transaction types in table
+            </h4>
+            <div className="flex flex-wrap gap-1.5">
+              {AGENCY_TX_TYPES.map((t) => (
+                <label key={t} className={checkCls}>
+                  <input
+                    type="checkbox"
+                    checked={types.includes(t)}
+                    onChange={() => toggleType(t)}
+                  />
+                  {t}
+                </label>
+              ))}
+            </div>
+          </section>
+
+          <section>
+            <h4 className="mb-2 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-[#8d94b8]">
+              Table date range
+            </h4>
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+              <label className="block text-xs font-medium text-slate-600 dark:text-[#8d94b8]">
+                From
+                <DatePicker
+                  value={dateFrom}
+                  onChange={setDateFrom}
+                  className={`${fieldCls} mt-1`}
+                />
+              </label>
+              <label className="block text-xs font-medium text-slate-600 dark:text-[#8d94b8]">
+                To
+                <DatePicker
+                  value={dateTo}
+                  onChange={setDateTo}
+                  className={`${fieldCls} mt-1`}
+                />
+              </label>
+            </div>
+            <p className="mt-1.5 text-[11px] text-slate-400">
+              Leave blank for all dates. Summary totals stay all-time.
+            </p>
+          </section>
+
+          {error ? <p className="text-xs text-red-600">{error}</p> : null}
+        </div>
+
+        <div className="flex shrink-0 flex-col-reverse gap-2 border-t border-slate-200 px-4 py-3 sm:flex-row sm:justify-end dark:border-[#252c4d]">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={generating}
+            className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium dark:border-[#252c4d]"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            disabled={generating}
+            onClick={generate}
+            className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
+          >
+            {generating ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <FileDown className="h-4 w-4" />
+            )}
+            Generate PDF
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 const fieldCls =
   "w-full rounded-[10px] border border-slate-200 bg-[var(--bg-card)] px-3 py-2 text-sm text-slate-800 outline-none focus:border-indigo-500 dark:border-[#252c4d] dark:text-[#eef0ff]";
 
 export function TransactionHistoryPage() {
+  const { user } = useAuth();
   const savedUi = useMemo(() => loadCashInCashOutUi(), []);
   const prevAgencyIdRef = useRef<string | null>(savedUi.selectedAgencyId);
   const prevDriverIdRef = useRef<string | null>(savedUi.selectedDriverId);
@@ -365,6 +648,10 @@ export function TransactionHistoryPage() {
   } | null>(null);
   const [tripDetailOpen, setTripDetailOpen] =
     useState<AgencyTxTripDetail | null>(null);
+  const [pdfExportOpen, setPdfExportOpen] = useState(false);
+  const [pdfOwnerName, setPdfOwnerName] = useState("");
+  const [pdfCompanyName, setPdfCompanyName] = useState("");
+  const [pdfProfileLoading, setPdfProfileLoading] = useState(false);
   const [typeFilter, setTypeFilter] = useState<TypeFilter>("all");
   const [filtersOpen, setFiltersOpen] = useState(false);
 
@@ -704,6 +991,28 @@ export function TransactionHistoryPage() {
     else setSelectedDriverId(null);
   };
 
+  const openAgencyPdfExport = useCallback(async () => {
+    if (tab !== "agencies" || !agencyCards) return;
+    setPdfOwnerName(String(user?.name ?? "").trim());
+    setPdfCompanyName(String(user?.company ?? "").trim());
+    setPdfExportOpen(true);
+    setPdfProfileLoading(true);
+    try {
+      const profile = await authApi.getOwnerProfile();
+      setPdfOwnerName(String(profile.name ?? "").trim());
+      setPdfCompanyName(String(profile.company ?? "").trim());
+    } catch {
+      // keep auth fallbacks
+    } finally {
+      setPdfProfileLoading(false);
+    }
+  }, [tab, agencyCards, user]);
+
+  const agencyPdfRows = useMemo(() => {
+    if (!agencyDetail) return [] as TxRow[];
+    return buildAgencyTxRows(agencyDetail) as TxRow[];
+  }, [agencyDetail]);
+
   const refreshAll = () => {
     if (tab === "agencies") {
       loadAgencies();
@@ -915,19 +1224,36 @@ export function TransactionHistoryPage() {
                 >
                   <ArrowLeft className="h-5 w-5" />
                 </button>
-                <div className="min-w-0">
-                  <h2 className="truncate text-[22px] font-extrabold tracking-tight text-slate-900 dark:text-[#eef0ff]">
-                    {selectedTitle}
-                    {selectedSubtitle &&
-                    selectedSubtitle !== "Agency" &&
-                    selectedSubtitle !== "Driver"
-                      ? ` · ${selectedSubtitle}`
-                      : ""}
-                  </h2>
-                  <p className="text-[13px] text-slate-500 dark:text-[#8d94b8]">
-                    Transaction history
-                    {detailLoading ? " · Updating…" : ""}
-                  </p>
+                <div className="flex min-w-0 flex-1 flex-wrap items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <h2 className="truncate text-[22px] font-extrabold tracking-tight text-slate-900 dark:text-[#eef0ff]">
+                      {selectedTitle}
+                      {selectedSubtitle &&
+                      selectedSubtitle !== "Agency" &&
+                      selectedSubtitle !== "Driver"
+                        ? ` · ${selectedSubtitle}`
+                        : ""}
+                    </h2>
+                    <p className="text-[13px] text-slate-500 dark:text-[#8d94b8]">
+                      Transaction history
+                      {detailLoading ? " · Updating…" : ""}
+                    </p>
+                  </div>
+                  {tab === "agencies" && agencyCards ? (
+                    <button
+                      type="button"
+                      onClick={() => void openAgencyPdfExport()}
+                      disabled={pdfProfileLoading}
+                      className="inline-flex shrink-0 items-center gap-1.5 rounded-xl border border-indigo-200 bg-indigo-50 px-3 py-2 text-xs font-semibold text-indigo-700 transition hover:bg-indigo-100 disabled:opacity-60 dark:border-indigo-500/30 dark:bg-indigo-500/15 dark:text-indigo-300 dark:hover:bg-indigo-500/25"
+                    >
+                      {pdfProfileLoading ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <FileDown className="h-3.5 w-3.5" />
+                      )}
+                      PDF
+                    </button>
+                  ) : null}
                 </div>
               </div>
 
@@ -939,13 +1265,13 @@ export function TransactionHistoryPage() {
                       Grand total
                     </span>
                     <small className="text-xs text-white/75">
-                      All time · Bulk +{fmtCurrency(agencyCards.bulkTotal)}
+                      All time · Bulk {fmtCurrency(agencyCards.bulkTotal)}
                       {agencyCards.ownerProfit > 0
-                        ? ` · Vehicle +${fmtCurrency(agencyCards.ownerProfit)}`
+                        ? ` · Vehicle ${fmtCurrency(agencyCards.ownerProfit)}`
                         : ""}
                     </small>
                     <b className="mt-2 block text-[28px] font-extrabold tracking-tight">
-                      {fmtSignedCurrency(agencyCards.grandTotal)}
+                      {fmtCardCurrency(agencyCards.grandTotal)}
                     </b>
                   </div>
                   <div className="rounded-[18px] border border-slate-200 bg-[var(--bg-card)] px-5 py-[18px] dark:border-[#252c4d]">
@@ -973,7 +1299,7 @@ export function TransactionHistoryPage() {
                       All time · Still to settle (can be negative)
                     </small>
                     <b className="mt-2 block text-[28px] font-extrabold tracking-tight text-indigo-600 dark:text-[#a5b4fc]">
-                      {fmtSignedCurrency(agencyCards.remaining)}
+                      {fmtCardCurrency(agencyCards.remaining)}
                     </b>
                   </div>
                 </div>
@@ -1017,7 +1343,7 @@ export function TransactionHistoryPage() {
                       All time · Still owed to driver
                     </small>
                     <b className="mt-2 block text-[28px] font-extrabold text-indigo-600 dark:text-[#a5b4fc]">
-                      {fmtSignedCurrency(driverCards.toPay)}
+                      {fmtCardCurrency(driverCards.toPay)}
                     </b>
                   </div>
                 </div>
@@ -1329,6 +1655,20 @@ export function TransactionHistoryPage() {
             return match ? formatAgencyLabel(match) : agencyName;
           }}
           onClose={() => setTripDetailOpen(null)}
+        />
+      )}
+      {pdfExportOpen && tab === "agencies" && agencyCards && (
+        <AgencyTxPdfExportDialog
+          agencyName={selectedTitle}
+          ownerName={pdfOwnerName}
+          companyName={pdfCompanyName}
+          summary={{
+            grandTotal: agencyCards.grandTotal,
+            paid: agencyCards.received,
+            remaining: agencyCards.remaining,
+          }}
+          rows={agencyPdfRows}
+          onClose={() => setPdfExportOpen(false)}
         />
       )}
     </div>

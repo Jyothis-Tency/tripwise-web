@@ -1174,8 +1174,12 @@ function SalaryTab({ driver }: { driver: Driver }) {
         },
         {
           label: "Trip bata",
-          hint: "Earnings from completed vehicle trips",
+          hint: "Earnings from vehicle trips (bata + reimbursed personal expenses)",
           value: fmtCurrency(tripBata),
+          sub:
+            (salaryData?.totalPersonalExpenses ?? 0) > 0
+              ? `incl. ${fmtCurrency(salaryData?.totalPersonalExpenses ?? 0)} personal expenses`
+              : undefined,
           bg: "bg-emerald-50 dark:bg-[#0d3325]",
           icon: (
             <DollarSign className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />

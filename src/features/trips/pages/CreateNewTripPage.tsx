@@ -273,14 +273,14 @@ export function CreateNewTripPage() {
       setError("Agency name is required");
       return;
     }
-    const agencyCostNum = Number(form.agencyCost);
-    const cabCostNum = Number(form.cabCost);
-    if (!form.agencyCost.trim() || !Number.isFinite(agencyCostNum) || agencyCostNum <= 0) {
-      setError("Agency cost must be greater than 0");
+    const agencyCostNum = form.agencyCost.trim() ? Number(form.agencyCost) : 0;
+    const cabCostNum = form.cabCost.trim() ? Number(form.cabCost) : 0;
+    if (form.agencyCost.trim() && (!Number.isFinite(agencyCostNum) || agencyCostNum < 0)) {
+      setError("Agency cost cannot be negative");
       return;
     }
-    if (!form.cabCost.trim() || !Number.isFinite(cabCostNum) || cabCostNum <= 0) {
-      setError("Cab cost must be greater than 0");
+    if (form.cabCost.trim() && (!Number.isFinite(cabCostNum) || cabCostNum < 0)) {
+      setError("Cab cost cannot be negative");
       return;
     }
     if (
@@ -738,7 +738,7 @@ export function CreateNewTripPage() {
                   )}
 
                   <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-                    <Field label="Agency cost (₹)" id="c-agencyC">
+                    <Field label="Agency cost (₹)" id="c-agencyC" optional>
                       <input
                         id="c-agencyC"
                         type="number"
@@ -747,9 +747,10 @@ export function CreateNewTripPage() {
                         value={form.agencyCost}
                         onChange={set("agencyCost")}
                         className={inputCls}
+                        placeholder="0.00"
                       />
                     </Field>
-                    <Field label="Cab cost (₹)" id="c-cabC">
+                    <Field label="Cab cost (₹)" id="c-cabC" optional>
                       <input
                         id="c-cabC"
                         type="number"
@@ -758,6 +759,7 @@ export function CreateNewTripPage() {
                         value={form.cabCost}
                         onChange={set("cabCost")}
                         className={inputCls}
+                        placeholder="0.00"
                       />
                     </Field>
                     <Field label="Advance (₹)" id="c-advance">

@@ -32,6 +32,7 @@ export interface DriverSalaryData {
   totalTrips: number;
   totalKm: number;
   totalAdvance: number;
+  totalPersonalExpenses?: number;
   /** Sum of `salary`-type settlement payments in the same period as the salary summary */
   salaryPaid: number;
   /** Trip Bata still owed after advances and recorded salary payments */
@@ -144,6 +145,8 @@ export async function fetchDriverSalary(driverId: string, month?: string): Promi
         (payload.scheduledTrips ?? 0),
     totalKm: payload.totalKm ?? 0,
     totalAdvance: payload.advanceSalary ?? 0,
+    totalPersonalExpenses:
+      payload.sumTotalPersonalExpense ?? payload.totalPersonalExpense ?? 0,
     salaryPaid: payload.salaryPaid ?? 0,
     pendingTripSalary: pending,
     netSalary: pending,

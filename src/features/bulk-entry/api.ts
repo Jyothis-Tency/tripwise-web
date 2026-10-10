@@ -328,6 +328,16 @@ export async function createBulkTrips(payload: {
   };
 }
 
+/** Update a bulk entry trip */
+export async function updateBulkEntryTrip(
+  id: string,
+  payload: Partial<AgencyTrip>,
+): Promise<AgencyTrip> {
+  const res = await apiClient.put(ApiEndpoints.bulkEntryTripById(id), payload);
+  const raw: any = res.data ?? {};
+  return (raw.data ?? raw) as AgencyTrip;
+}
+
 /** Delete a bulk entry trip */
 export async function deleteBulkEntryTrip(id: string): Promise<void> {
   await apiClient.delete(ApiEndpoints.bulkEntryTripById(id));

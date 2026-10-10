@@ -1650,6 +1650,7 @@ export function TransactionHistoryPage() {
         <AgencyTxTripDetailModal
           detail={tripDetailOpen}
           agencyId={selectedAgencyId}
+          agencyName={selectedTitle}
           resolveAgencyLabel={(agencyName) => {
             if (!agencyName?.trim()) return "—";
             const match = agencies.find(
@@ -1661,6 +1662,11 @@ export function TransactionHistoryPage() {
             return match ? formatAgencyLabel(match) : agencyName;
           }}
           onClose={() => setTripDetailOpen(null)}
+          onUpdated={() => {
+            if (selectedAgencyId) {
+              void loadAgencyDetail(selectedAgencyId, detailMonth);
+            }
+          }}
         />
       )}
       {pdfExportOpen && tab === "agencies" && agencyCards && (

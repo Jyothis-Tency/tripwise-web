@@ -5,7 +5,12 @@ export type AgencyTxType = "Bulk" | "Vehicle" | "Cash in" | "Cash out";
 
 export type AgencyTxTripDetail =
   | { kind: "vehicle"; tripId: string }
-  | { kind: "bulk"; tripIds: string[] };
+  | {
+      kind: "bulk";
+      tripIds: string[];
+      agencyId?: string;
+      agencyName?: string;
+    };
 
 export type AgencyTxRow = {
   id: string;

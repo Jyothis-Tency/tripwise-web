@@ -34,6 +34,8 @@ import {
   type DriverCashInCashOutDetail,
 } from "../../cash-in-cash-out/api";
 import { deletePayoutPayment } from "../../bulk-entry/api";
+import { AgencyTxTripDetailModal } from "../../transactions/components/AgencyTxTripDetailModal";
+import type { AgencyTxTripDetail } from "../../transactions/agencyTxRows";
 import {
   driverAvatarColor,
   driverDisplayName,
@@ -181,6 +183,7 @@ type PaymentRow = {
   date?: string | null;
   /** Underlying source for delete API / provenance */
   source: "vehicle_trip" | "bulk_trip" | "driver_salary" | "bulk_payout";
+  tripDetail?: AgencyTxTripDetail;
 };
 
 function formatTxDisplayDate(date?: string | null): string {
@@ -214,6 +217,7 @@ function buildDriverPaymentRows(
         notes: [tripLabel, route, "Trip bata"].filter(Boolean).join(" · "),
         date: t.date,
         source: "vehicle_trip" as const,
+        tripDetail: { kind: "vehicle" as const, tripId: String(t._id) },
       };
     });
 
@@ -230,6 +234,12 @@ function buildDriverPaymentRows(
         notes: [agency, vehicleNum, "Bulk advance"].filter(Boolean).join(" · "),
         date: t.date,
         source: "bulk_trip" as const,
+        tripDetail: {
+          kind: "bulk" as const,
+          tripIds: [String(t._id)],
+          agencyId: t.agencyId,
+          agencyName: t.agencyName,
+        },
       };
     });
 
@@ -1081,6 +1091,8 @@ function SalaryTab({ driver }: { driver: Driver }) {
   const [ledDateTo, setLedDateTo] = useState("");
   const [ledType, setLedType] = useState<TxTypeFilter>("all");
   const [ledPeriodMenuOpen, setLedPeriodMenuOpen] = useState(false);
+  const [tripDetailOpen, setTripDetailOpen] =
+    useState<AgencyTxTripDetail | null>(null);
 
   const driverId = driver._id ?? (driver as { id?: string }).id;
 
@@ -1414,49 +1426,77 @@ function SalaryTab({ driver }: { driver: Driver }) {
                 </tr>
               </thead>
               <tbody>
-                {ledgerRows.map((tx) => (
-                  <tr
-                    key={tx.id}
-                    className="border-t border-slate-100 dark:border-[#252c4d]"
-                  >
-                    <td className="whitespace-nowrap px-2 py-3 text-slate-600 dark:text-[#8d94b8]">
-                      {formatTxDisplayDate(tx.date)}
-                    </td>
-                    <td className="px-2 py-3">
-                      <span
-                        className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${paymentBadgeClass(
-                          tx.kind,
-                        )}`}
-                      >
-                        {paymentKindLabel(tx.kind)}
-                      </span>
-                    </td>
-                    <td className="px-2 py-3 font-semibold dark:text-[#eef0ff]">
-                      {fmtCurrency(tx.amount)}
-                    </td>
-                    <td className="max-w-[140px] truncate px-2 py-3 text-slate-500 dark:text-[#8d94b8]">
-                      {tx.notes ?? "—"}
-                    </td>
-                    <td className="px-2 py-3">
-                      {(tx.source === "driver_salary" ||
-                        tx.source === "bulk_payout") && (
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteTransaction(tx)}
-                          className="text-rose-400 hover:text-rose-600"
-                          title="Delete transaction"
+                {ledgerRows.map((tx) => {
+                  const isTrip = Boolean(tx.tripDetail);
+                  return (
+                    <tr
+                      key={tx.id}
+                      className={`border-t border-slate-100 hover:bg-[var(--bg-main)] dark:border-[#252c4d] ${
+                        isTrip ? "cursor-pointer" : ""
+                      }`}
+                      onClick={() => {
+                        if (isTrip && tx.tripDetail) {
+                          setTripDetailOpen(tx.tripDetail);
+                        }
+                      }}
+                    >
+                      <td className="whitespace-nowrap px-2 py-3 text-slate-600 dark:text-[#8d94b8]">
+                        {formatTxDisplayDate(tx.date)}
+                      </td>
+                      <td className="px-2 py-3">
+                        <span
+                          className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${paymentBadgeClass(
+                            tx.kind,
+                          )}`}
                         >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                ))}
+                          {paymentKindLabel(tx.kind)}
+                        </span>
+                      </td>
+                      <td className="px-2 py-3 font-semibold dark:text-[#eef0ff]">
+                        {fmtCurrency(tx.amount)}
+                      </td>
+                      <td className="max-w-[140px] truncate px-2 py-3 text-slate-500 dark:text-[#8d94b8]">
+                        {tx.notes ?? "—"}
+                      </td>
+                      <td className="px-2 py-3">
+                        {(tx.source === "driver_salary" ||
+                          tx.source === "bulk_payout") && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteTransaction(tx);
+                            }}
+                            className="text-rose-400 hover:text-rose-600"
+                            title="Delete transaction"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
             </div>
         )}
       </Section>
+      {tripDetailOpen && (
+        <AgencyTxTripDetailModal
+          detail={tripDetailOpen}
+          agencyId={
+            (tripDetailOpen.kind === "bulk" && tripDetailOpen.agencyId) || ""
+          }
+          agencyName={
+            (tripDetailOpen.kind === "bulk" && tripDetailOpen.agencyName) || ""
+          }
+          onClose={() => setTripDetailOpen(null)}
+          onUpdated={() => {
+            loadData();
+          }}
+        />
+      )}
     </div>
   );
 }

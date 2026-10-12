@@ -254,7 +254,12 @@ function buildDriverTxRows(detail: DriverCashInCashOutDetail): TxRow[] {
         method: "—",
         notes: [agency, vehicleNum, "Bulk advance"].filter(Boolean).join(" · "),
         sortTime: sortTime(t.date, t._id),
-        tripDetail: { kind: "bulk" as const, tripIds: [String(t._id)] },
+        tripDetail: {
+          kind: "bulk" as const,
+          tripIds: [String(t._id)],
+          agencyId: t.agencyId,
+          agencyName: t.agencyName,
+        },
       };
     });
 
@@ -1627,7 +1632,6 @@ export function TransactionHistoryPage() {
                         {txRows.map((r) => {
                           const isIn = r.flow === "in";
                           const canOpenTripDetail =
-                            tab === "agencies" &&
                             (r.type === "Bulk" || r.type === "Vehicle") &&
                             Boolean(r.tripDetail);
                           return (
@@ -1712,11 +1716,18 @@ export function TransactionHistoryPage() {
           onClose={() => setNotesPreview(null)}
         />
       )}
-      {tripDetailOpen && selectedAgencyId && (
+      {tripDetailOpen && (
         <AgencyTxTripDetailModal
           detail={tripDetailOpen}
-          agencyId={selectedAgencyId}
-          agencyName={selectedTitle}
+          agencyId={
+            (tripDetailOpen.kind === "bulk" && tripDetailOpen.agencyId) ||
+            selectedAgencyId ||
+            ""
+          }
+          agencyName={
+            (tripDetailOpen.kind === "bulk" && tripDetailOpen.agencyName) ||
+            (tab === "agencies" ? selectedTitle : "")
+          }
           resolveAgencyLabel={(agencyName) => {
             if (!agencyName?.trim()) return "—";
             const match = agencies.find(
@@ -1729,8 +1740,10 @@ export function TransactionHistoryPage() {
           }}
           onClose={() => setTripDetailOpen(null)}
           onUpdated={() => {
-            if (selectedAgencyId) {
+            if (tab === "agencies" && selectedAgencyId) {
               void loadAgencyDetail(selectedAgencyId, detailMonth);
+            } else if (tab === "drivers" && selectedDriverId) {
+              void loadDriverDetail(selectedDriverId, detailMonth);
             }
           }}
         />

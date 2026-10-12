@@ -974,7 +974,7 @@ export function AgencyTxTripDetailModal({
   onUpdated,
 }: {
   detail: AgencyTxTripDetail;
-  agencyId: string;
+  agencyId?: string;
   agencyName?: string;
   resolveAgencyLabel?: (agencyName?: string) => string;
   onClose: () => void;
@@ -995,6 +995,11 @@ export function AgencyTxTripDetailModal({
   const [targetBulkTripForPayment, setTargetBulkTripForPayment] =
     useState<AgencyTrip | null>(null);
 
+  const effectiveAgencyId =
+    (detail.kind === "bulk" && detail.agencyId) || agencyId || "";
+  const effectiveAgencyName =
+    (detail.kind === "bulk" && detail.agencyName) || agencyName || "";
+
   const title =
     detail.kind === "vehicle" ? "Vehicle trip details" : "Bulk entry details";
 
@@ -1010,7 +1015,7 @@ export function AgencyTxTripDetailModal({
     if (detail.kind !== "bulk") return;
     try {
       const idSet = new Set(detail.tripIds.map(String));
-      const { trips } = await fetchAllBulkEntryTrips(agencyId);
+      const { trips } = await fetchAllBulkEntryTrips(effectiveAgencyId);
       const matched = trips.filter((t) =>
         idSet.has(String(t._id ?? t.id ?? "")),
       );
@@ -1023,7 +1028,7 @@ export function AgencyTxTripDetailModal({
     } catch {
       // silently keep current
     }
-  }, [detail, agencyId]);
+  }, [detail, effectiveAgencyId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -1038,7 +1043,7 @@ export function AgencyTxTripDetailModal({
           if (!cancelled) setVehicleTrip(trip);
         } else {
           const idSet = new Set(detail.tripIds.map(String));
-          const { trips } = await fetchAllBulkEntryTrips(agencyId);
+          const { trips } = await fetchAllBulkEntryTrips(effectiveAgencyId);
           const matched = trips.filter((t) =>
             idSet.has(String(t._id ?? t.id ?? "")),
           );
@@ -1072,7 +1077,7 @@ export function AgencyTxTripDetailModal({
     return () => {
       cancelled = true;
     };
-  }, [detail, agencyId]);
+  }, [detail, effectiveAgencyId]);
 
   const bulkHeader = useMemo(() => {
     if (!bulkTrips.length) return null;
@@ -1259,8 +1264,8 @@ export function AgencyTxTripDetailModal({
       {/* Bulk Trip Payment Modal */}
       {paymentBulkTripOpen && (
         <BulkTripCashInModal
-          agencyId={agencyId}
-          agencyName={agencyName}
+          agencyId={effectiveAgencyId}
+          agencyName={effectiveAgencyName}
           bulkTrips={bulkTrips}
           targetTrip={targetBulkTripForPayment}
           resolveAgencyLabel={resolveAgencyLabel}

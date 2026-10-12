@@ -63,13 +63,42 @@ function monthOptions() {
   return opts;
 }
 
+function parseSafeDate(date: string | null | undefined): Date | null {
+  if (!date) return null;
+  const raw = String(date).trim();
+  if (!raw) return null;
+
+  // DD-MM-YYYY or DD/MM/YYYY
+  const dmy = raw.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})/);
+  if (dmy) {
+    const day = parseInt(dmy[1], 10);
+    const month = parseInt(dmy[2], 10) - 1;
+    const year = parseInt(dmy[3], 10);
+    const d = new Date(year, month, day, 12, 0, 0);
+    return Number.isNaN(d.getTime()) ? null : d;
+  }
+
+  // YYYY-MM-DD or YYYY/MM/DD
+  const ymd = raw.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/);
+  if (ymd) {
+    const year = parseInt(ymd[1], 10);
+    const month = parseInt(ymd[2], 10) - 1;
+    const day = parseInt(ymd[3], 10);
+    const d = new Date(year, month, day, 12, 0, 0);
+    return Number.isNaN(d.getTime()) ? null : d;
+  }
+
+  const d = new Date(raw);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
 const MONTH_OPTIONS = monthOptions();
 
 function txInMonth(date: string | null | undefined, month: string) {
   if (!month || month === "all_time") return true;
   if (!date) return false;
-  const d = new Date(date);
-  if (Number.isNaN(d.getTime())) return false;
+  const d = parseSafeDate(date);
+  if (!d) return false;
   const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
   return key === month;
 }
@@ -84,15 +113,22 @@ function txInPeriod(
   if (period === "custom") {
     if (!dateFrom && !dateTo) return true;
     if (!date) return false;
-    const t = new Date(date).getTime();
-    if (Number.isNaN(t)) return false;
+    const d = parseSafeDate(date);
+    if (!d) return false;
+    const t = d.getTime();
     if (dateFrom) {
-      const start = new Date(`${dateFrom}T00:00:00`).getTime();
-      if (!Number.isNaN(start) && t < start) return false;
+      const fromParsed = parseSafeDate(dateFrom);
+      if (fromParsed) {
+        fromParsed.setHours(0, 0, 0, 0);
+        if (t < fromParsed.getTime()) return false;
+      }
     }
     if (dateTo) {
-      const end = new Date(`${dateTo}T23:59:59`).getTime();
-      if (!Number.isNaN(end) && t > end) return false;
+      const toParsed = parseSafeDate(dateTo);
+      if (toParsed) {
+        toParsed.setHours(23, 59, 59, 999);
+        if (t > toParsed.getTime()) return false;
+      }
     }
     return true;
   }
@@ -127,8 +163,8 @@ function formatPeriodButtonLabel(
 function txSortTime(tx: { date?: string | null; createdAt?: string | null }) {
   const raw = tx.date || tx.createdAt;
   if (!raw) return 0;
-  const t = new Date(raw).getTime();
-  return Number.isNaN(t) ? 0 : t;
+  const d = parseSafeDate(raw);
+  return d ? d.getTime() : 0;
 }
 
 type SortDir = "desc" | "asc";
@@ -148,10 +184,13 @@ type PaymentRow = {
 
 function formatTxDisplayDate(date?: string | null): string {
   if (!date) return "—";
-  if (/^\d{2}-\d{2}-\d{4}$/.test(date)) return date;
-  const d = new Date(date);
-  if (!Number.isNaN(d.getTime())) return d.toLocaleDateString("en-IN");
-  return "—";
+  const d = parseSafeDate(date);
+  if (!d) return date;
+  return d.toLocaleDateString("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
 }
 
 /** Same sources as Transaction History driver table. Types: Salary | Advance. */
@@ -984,18 +1023,21 @@ function SalaryTab({ driver }: { driver: Driver }) {
 
   const driverId = driver._id ?? (driver as { id?: string }).id;
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => {
-    loadData();
-  }, [driverId]);
+  const isMonthlyFilter = Boolean(
+    ledPeriod && ledPeriod !== "all_time" && ledPeriod !== "custom",
+  );
+  const monthParam = isMonthlyFilter ? ledPeriod : undefined;
 
   const loadData = async () => {
+    if (!driverId) return;
     setLoading(true);
     setError("");
     try {
       const [salaryRes, cicoRes] = await Promise.all([
-        fetchDriverSalary(driverId!).catch(() => null),
-        fetchCashInCashOutDriverDetail(driverId!, "all_time").catch(() => null),
+        fetchDriverSalary(driverId, monthParam).catch(() => null),
+        fetchCashInCashOutDriverDetail(driverId, monthParam || "all_time").catch(
+          () => null,
+        ),
       ]);
       if (salaryRes) setSalaryData(salaryRes);
       setCicoDetail(cicoRes);
@@ -1005,6 +1047,10 @@ function SalaryTab({ driver }: { driver: Driver }) {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    loadData();
+  }, [driverId, monthParam]);
 
   const handleDeleteTransaction = async (row: PaymentRow) => {
     if (!confirm("Delete this transaction?")) return;
@@ -1065,21 +1111,6 @@ function SalaryTab({ driver }: { driver: Driver }) {
     });
   }, [ledgerForCards, ledSearch, ledSort]);
 
-  const filteredSalarySum = useMemo(
-    () =>
-      ledgerForCards
-        .filter((tx) => tx.kind === "salary")
-        .reduce((s, tx) => s + (Number(tx.amount) || 0), 0),
-    [ledgerForCards],
-  );
-  const filteredAdvanceSum = useMemo(
-    () =>
-      ledgerForCards
-        .filter((tx) => tx.kind === "advance")
-        .reduce((s, tx) => s + (Number(tx.amount) || 0), 0),
-    [ledgerForCards],
-  );
-
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -1096,7 +1127,9 @@ function SalaryTab({ driver }: { driver: Driver }) {
     );
   }
 
-  // Align with Transaction History (all-time).
+  const isPeriodFiltered = ledPeriod !== "all_time";
+  const periodLabel = formatPeriodButtonLabel(ledPeriod, ledDateFrom, ledDateTo);
+
   const bulkFromTrips = Number(cicoDetail?.summary?.bulkAdvance?.fromTrips) || 0;
   const bataFromTrips =
     Number(cicoDetail?.summary?.vehicleBata?.fromTrips) ||
@@ -1110,109 +1143,92 @@ function SalaryTab({ driver }: { driver: Driver }) {
       0);
   const pendingPayout = grandTotal - paidCombined;
 
-  /** Advances given via Transaction (driver cash-in → DriverSalary type=advance). */
   const advancePaid = salaryData?.totalAdvance ?? 0;
   const tripBata = salaryData?.totalEarnings ?? bataFromTrips;
   const totalKm = salaryData?.totalKm ?? 0;
+  const salaryPaidOnly =
+    Number(cicoDetail?.summary?.vehicleBata?.paid) ||
+    salaryData?.salaryPaid ||
+    0;
   const paidPct =
     grandTotal > 0
       ? Math.min(100, Math.round((paidCombined / grandTotal) * 100))
       : 0;
 
-  const hasLedgerFilters = ledPeriod !== "all_time" || ledType !== "all";
-
-  const tiles = hasLedgerFilters
-    ? [
-        {
-          label: "Salary",
-          hint: "Salary / bata payouts in this view",
-          value: fmtCurrency(filteredSalarySum),
-          bg: "bg-emerald-50 dark:bg-[#0d3325]",
-          icon: (
-            <DollarSign className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
-          ),
-        },
-        {
-          label: "Advance",
-          hint: "Advances in this view",
-          value: fmtCurrency(filteredAdvanceSum),
-          bg: "bg-indigo-50 dark:bg-[#242a57]",
-          icon: (
-            <Wallet className="h-4 w-4 text-indigo-600 dark:text-indigo-300" />
-          ),
-        },
-        {
-          label: "Transactions",
-          hint: "Rows matching month & type",
-          value: String(ledgerForCards.length),
-          bg: "bg-violet-50 dark:bg-violet-500/15",
-          icon: (
-            <Wallet className="h-4 w-4 text-violet-600 dark:text-violet-300" />
-          ),
-        },
-        {
-          label: "Total km",
-          hint: "All-time trip distance",
-          value: `${totalKm} km`,
-          bg: "bg-orange-50 dark:bg-orange-500/15",
-          icon: (
-            <MapPin className="h-4 w-4 text-orange-600 dark:text-orange-300" />
-          ),
-        },
-      ]
-    : [
-        {
-          label: "Pending payout",
-          hint: "Trip bata + bulk − cash-outs paid",
-          value: fmtCurrency(pendingPayout),
-          sub: `${paidPct}% settled · paid ${fmtCurrency(paidCombined)}`,
-          bg: "bg-teal-50 dark:bg-teal-500/15",
-          icon: (
-            <Wallet className="h-4 w-4 text-teal-700 dark:text-teal-300" />
-          ),
-          accent: true as const,
-        },
-        {
-          label: "Trip bata",
-          hint: "Earnings from vehicle trips (bata + reimbursed personal expenses)",
-          value: fmtCurrency(tripBata),
-          sub:
-            (salaryData?.totalPersonalExpenses ?? 0) > 0
-              ? `incl. ${fmtCurrency(salaryData?.totalPersonalExpenses ?? 0)} personal expenses`
-              : undefined,
-          bg: "bg-emerald-50 dark:bg-[#0d3325]",
-          icon: (
-            <DollarSign className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
-          ),
-        },
-        {
-          label: "Bulk trip salary",
-          hint: "Advances owed from Bulk Entry trips",
-          value: fmtCurrency(bulkFromTrips),
-          bg: "bg-violet-50 dark:bg-violet-500/15",
-          icon: (
-            <Wallet className="h-4 w-4 text-violet-600 dark:text-violet-300" />
-          ),
-        },
-        {
-          label: "Advance paid",
-          hint: "Advances given on Transaction",
-          value: fmtCurrency(advancePaid),
-          bg: "bg-indigo-50 dark:bg-[#242a57]",
-          icon: (
-            <Wallet className="h-4 w-4 text-indigo-600 dark:text-indigo-300" />
-          ),
-        },
-        {
-          label: "Total km",
-          hint: "All-time trip distance",
-          value: `${totalKm} km`,
-          bg: "bg-orange-50 dark:bg-orange-500/15",
-          icon: (
-            <MapPin className="h-4 w-4 text-orange-600 dark:text-orange-300" />
-          ),
-        },
-      ];
+  const tiles = [
+    {
+      label: "Pending payout",
+      hint: isPeriodFiltered
+        ? `Period balance (Trip bata + bulk − cash-outs)`
+        : "Trip bata + bulk − cash-outs paid",
+      value: fmtCurrency(pendingPayout),
+      sub: isPeriodFiltered
+        ? `paid ${fmtCurrency(paidCombined)} in ${periodLabel}`
+        : `${paidPct}% settled · paid ${fmtCurrency(paidCombined)}`,
+      bg: "bg-teal-50 dark:bg-teal-500/15",
+      icon: <Wallet className="h-4 w-4 text-teal-700 dark:text-teal-300" />,
+      accent: true as const,
+    },
+    {
+      label: "Trip bata",
+      hint: isPeriodFiltered
+        ? `Vehicle trip earnings in ${periodLabel}`
+        : "Earnings from vehicle trips (bata + reimbursed personal expenses)",
+      value: fmtCurrency(tripBata),
+      sub:
+        (salaryData?.totalPersonalExpenses ?? 0) > 0
+          ? `incl. ${fmtCurrency(salaryData?.totalPersonalExpenses ?? 0)} personal expenses`
+          : undefined,
+      bg: "bg-emerald-50 dark:bg-[#0d3325]",
+      icon: (
+        <DollarSign className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+      ),
+    },
+    {
+      label: "Bulk trip salary",
+      hint: isPeriodFiltered
+        ? `Advances owed from Bulk Entry in ${periodLabel}`
+        : "Advances owed from Bulk Entry trips",
+      value: fmtCurrency(bulkFromTrips),
+      bg: "bg-violet-50 dark:bg-violet-500/15",
+      icon: (
+        <Wallet className="h-4 w-4 text-violet-600 dark:text-violet-300" />
+      ),
+    },
+    {
+      label: "Advance paid",
+      hint: isPeriodFiltered
+        ? `Advances given in ${periodLabel}`
+        : "Advances given on Transaction",
+      value: fmtCurrency(advancePaid),
+      bg: "bg-indigo-50 dark:bg-[#242a57]",
+      icon: (
+        <Wallet className="h-4 w-4 text-indigo-600 dark:text-indigo-300" />
+      ),
+    },
+    {
+      label: "Salary paid",
+      hint: isPeriodFiltered
+        ? `Salary / bata paid in ${periodLabel}`
+        : "Total salary / bata payouts settled",
+      value: fmtCurrency(salaryPaidOnly),
+      bg: "bg-cyan-50 dark:bg-cyan-500/15",
+      icon: (
+        <Wallet className="h-4 w-4 text-cyan-600 dark:text-cyan-300" />
+      ),
+    },
+    {
+      label: "Total km",
+      hint: isPeriodFiltered
+        ? `Trip distance in ${periodLabel}`
+        : "All-time trip distance",
+      value: `${totalKm} km`,
+      bg: "bg-orange-50 dark:bg-orange-500/15",
+      icon: (
+        <MapPin className="h-4 w-4 text-orange-600 dark:text-orange-300" />
+      ),
+    },
+  ];
 
 
   return (
@@ -1223,8 +1239,9 @@ function SalaryTab({ driver }: { driver: Driver }) {
             Financial summary
           </h3>
           <p className="mt-0.5 max-w-lg text-xs text-slate-500 dark:text-[#8d94b8]">
-            Summary cards follow the period and type filters. Search and sort
-            apply to the table only.
+            {isPeriodFiltered
+              ? `Financial summary for ${periodLabel}. Search and type filter apply to the table.`
+              : "All-time financial summary. Use the period filter to view month-wise earnings and payouts."}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">

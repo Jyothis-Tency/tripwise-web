@@ -241,6 +241,7 @@ function EditableGridField({
   isCurrency,
   timeEditSeed,
   displayOverride,
+  onSaved,
 }: {
   label: string;
   value: string | number;
@@ -252,6 +253,7 @@ function EditableGridField({
   timeEditSeed?: string;
   /** Shown when not editing (e.g. agency name + phone) */
   displayOverride?: string;
+  onSaved?: (updatedTrip: TripItem) => void;
 }) {
   const rawValue = value == null || value === "" ? "—" : String(value);
   const initialValue = displayOverride?.trim() || rawValue;
@@ -278,11 +280,12 @@ function EditableGridField({
         if (parsed < 0) throw new Error("Negative values are not allowed");
         val = parsed;
       }
-      await updateTrip(tripId, { [fieldKey]: val });
+      const updatedTrip = await updateTrip(tripId, { [fieldKey]: val });
       setDisplayValue(
         NUMBER_FIELDS.has(fieldKey) ? String(val) : editValue || "—",
       );
       setEditing(false);
+      onSaved?.(updatedTrip);
     } catch (err: any) {
       alert(
         err?.message ||
@@ -1967,6 +1970,11 @@ function VehicleHistoryTab({
                     <div className="mt-1 text-sm font-bold text-slate-900 dark:text-white">
                       {formatMoney0(t.driver_salary)}
                     </div>
+                    {(t.driverBata != null || t.extraPersonalExpenses != null) && (
+                      <div className="mt-0.5 text-[10px] font-medium text-emerald-700 dark:text-emerald-300">
+                        (driver bata: {Number(t.driverBata ?? t.driver_salary) || 0}, personal expense: {Number(t.extraPersonalExpenses) || 0}, bulk amount: 0)
+                      </div>
+                    )}
                   </div>
                   <div className="rounded-lg border border-amber-200 bg-amber-50/60 p-2 dark:border-amber-500/30 dark:bg-amber-500/10">
                     <div className="text-[11px] font-semibold text-amber-800 dark:text-amber-300">
@@ -2032,6 +2040,7 @@ interface TripDriverTabProps {
   onAssignDriver: (tripId?: string) => void;
   onUnassignDriver: (tripId?: string) => void;
   onSwitchVehicle: (tripId: string) => void;
+  onTripUpdated?: (updated: TripItem) => void;
 }
 
 function TripDriverTab({
@@ -2043,7 +2052,13 @@ function TripDriverTab({
   onAssignDriver,
   onUnassignDriver,
   onSwitchVehicle,
+  onTripUpdated,
 }: TripDriverTabProps) {
+  const commPct = vehicle.commission
+    ? Number(vehicle.commission) < 1
+      ? Math.round(Number(vehicle.commission) * 100)
+      : Number(vehicle.commission)
+    : 0;
   const [unassigning, setUnassigning] = useState(false);
   const [uErr, setUErr] = useState<string | null>(null);
   const [expandedTripId, setExpandedTripId] = useState<string | null>(null);
@@ -2298,6 +2313,7 @@ function TripDriverTab({
                         0
                       }
                       isCurrency
+                      onSaved={onTripUpdated}
                     />
                     <EditableGridField
                       tripId={activeTrip._id}
@@ -2305,13 +2321,21 @@ function TripDriverTab({
                       label="ADVANCE"
                       value={activeTrip.advance || 0}
                       isCurrency
+                      onSaved={onTripUpdated}
                     />
                     <EditableGridField
                       tripId={activeTrip._id}
                       fieldKey="driver_salary"
                       label="BATA"
-                      value={activeTrip.driver_salary || 0}
+                      value={
+                        activeTrip.driver_salary && Number(activeTrip.driver_salary) > 0
+                          ? activeTrip.driver_salary
+                          : commPct > 0 && Number(activeTrip.cabCost) > 0
+                            ? Math.round((commPct / 100) * Number(activeTrip.cabCost))
+                            : activeTrip.driver_salary || 0
+                      }
                       isCurrency
+                      onSaved={onTripUpdated}
                     />
                     <div>
                       <span className="text-slate-400 block mb-0.5 uppercase">
@@ -2341,6 +2365,7 @@ function TripDriverTab({
                       label="CAB COST"
                       value={activeTrip.cabCost || 0}
                       isCurrency
+                      onSaved={onTripUpdated}
                     />
                     <div>
                       <span className="mb-0.5 block uppercase text-indigo-500 dark:text-indigo-400">
@@ -2348,9 +2373,15 @@ function TripDriverTab({
                       </span>
                       <span className="font-bold text-indigo-700 dark:text-indigo-300">
                         ₹
-                        {Number(activeTrip.agencyProfit || 0).toLocaleString(
-                          "en-IN",
-                        )}
+                        {(
+                          activeTrip.agencyProfit && Number(activeTrip.agencyProfit) > 0
+                            ? Number(activeTrip.agencyProfit)
+                            : Math.max(
+                                (Number(activeTrip.agencyCost) || 0) -
+                                  ((Number(activeTrip.cabCost) || 0) + Number(activeTrip.totalExpenses || 0)),
+                                0,
+                              )
+                        ).toLocaleString("en-IN")}
                       </span>
                     </div>
                   </div>
@@ -2651,6 +2682,7 @@ function TripDriverTab({
                             0
                           }
                           isCurrency
+                          onSaved={onTripUpdated}
                         />
                         <EditableGridField
                           tripId={trip._id}
@@ -2658,13 +2690,21 @@ function TripDriverTab({
                           label="ADVANCE"
                           value={trip.advance || 0}
                           isCurrency
+                          onSaved={onTripUpdated}
                         />
                         <EditableGridField
                           tripId={trip._id}
                           fieldKey="driver_salary"
                           label="BATA"
-                          value={trip.driver_salary || 0}
+                          value={
+                            trip.driver_salary && Number(trip.driver_salary) > 0
+                              ? trip.driver_salary
+                              : commPct > 0 && Number(trip.cabCost) > 0
+                                ? Math.round((commPct / 100) * Number(trip.cabCost))
+                                : trip.driver_salary || 0
+                          }
                           isCurrency
+                          onSaved={onTripUpdated}
                         />
                         <div>
                           <span className="text-slate-400 block mb-0.5 text-[10px] uppercase">
@@ -2694,19 +2734,26 @@ function TripDriverTab({
                           label="CAB COST"
                           value={trip.cabCost || 0}
                           isCurrency
+                          onSaved={onTripUpdated}
                         />
-              <div>
+                        <div>
                           <span className="mb-0.5 block text-[10px] uppercase text-slate-400 dark:text-slate-500">
                             Owner profit
                           </span>
                           <span className="font-bold text-indigo-700 dark:text-indigo-300">
                             ₹
-                            {Number(trip.agencyProfit || 0).toLocaleString(
-                              "en-IN",
-                            )}
+                            {(
+                              trip.agencyProfit && Number(trip.agencyProfit) > 0
+                                ? Number(trip.agencyProfit)
+                                : Math.max(
+                                    (Number(trip.agencyCost) || 0) -
+                                      ((Number(trip.cabCost) || 0) + Number(trip.totalExpenses || 0)),
+                                    0,
+                                  )
+                            ).toLocaleString("en-IN")}
                           </span>
-              </div>
-            </div>
+                        </div>
+                      </div>
                     </div>
                     <div className="mt-3 flex flex-wrap gap-2 border-t border-slate-100 pl-2 pt-2 dark:border-white/10">
                       <button
@@ -2855,6 +2902,9 @@ function VehicleDetailPanel({
     },
     onSwitchVehicle: (tripId: string) =>
       setDetailModal({ kind: "switchVehicle", tripId }),
+    onTripUpdated: (_updatedTrip: TripItem) => {
+      onVehicleUpdated({ _updatedAt: Date.now() } as any);
+    },
   };
 
   return (

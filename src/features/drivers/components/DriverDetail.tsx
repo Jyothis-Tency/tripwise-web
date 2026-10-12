@@ -209,12 +209,18 @@ function buildDriverPaymentRows(
     .map((t) => {
       const route = [t.from, t.to].filter(Boolean).join(" → ");
       const tripLabel = t.tripNumber ? `Trip ${t.tripNumber}` : "Vehicle trip";
+      const bata = Number(t.driverBata ?? t.driverSalary ?? 0);
+      const personal = Number(t.personalExpense ?? 0);
+      const breakdownText =
+        t.driverBata != null || t.personalExpense != null
+          ? ` (driver bata: ${bata}, personal expense: ${personal}, bulk amount: 0)`
+          : "";
       return {
         id: `vehicle-${t._id}`,
         rawId: t._id,
         amount: Number(t.driverSalary) || 0,
         kind: "vehicle" as const,
-        notes: [tripLabel, route, "Trip bata"].filter(Boolean).join(" · "),
+        notes: [tripLabel, route, `Trip bata${breakdownText}`].filter(Boolean).join(" · "),
         date: t.date,
         source: "vehicle_trip" as const,
         tripDetail: { kind: "vehicle" as const, tripId: String(t._id) },
@@ -226,12 +232,13 @@ function buildDriverPaymentRows(
     .map((t) => {
       const agency = t.agencyName?.trim() || "Agency";
       const vehicleNum = t.vehicleNumber?.trim() || "Vehicle";
+      const adv = Number(t.advancePaid) || 0;
       return {
         id: `bulk-trip-${t._id}`,
         rawId: t._id,
-        amount: Number(t.advancePaid) || 0,
+        amount: adv,
         kind: "bulk" as const,
-        notes: [agency, vehicleNum, "Bulk advance"].filter(Boolean).join(" · "),
+        notes: [agency, vehicleNum, `Bulk advance (driver bata: 0, personal expense: 0, bulk amount: ${adv})`].filter(Boolean).join(" · "),
         date: t.date,
         source: "bulk_trip" as const,
         tripDetail: {

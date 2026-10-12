@@ -16,6 +16,7 @@ import {
 import { EditBulkTripModal } from "./EditBulkTripModal";
 import { BulkTripCashInModal } from "./BulkTripCashInModal";
 import {
+  computeDriverSalaryBreakdown,
   getHistoryTripExpenseBreakdown,
   resolveTripAgencyProfitDisplay,
 } from "../../history/tripExpenseBreakdown";
@@ -426,6 +427,7 @@ function VehicleTripSegmentCard({
 
   const ownerProfit = resolveTripAgencyProfitDisplay(trip);
   const breakdown = getHistoryTripExpenseBreakdown(trip);
+  const salaryBreakdown = computeDriverSalaryBreakdown(trip);
   const duration = fmtTripDuration(trip.startTime, trip.endTime);
   const routeFrom = trip.from ?? trip.pickup;
   const routeTo = trip.to ?? trip.drop;
@@ -699,14 +701,31 @@ function VehicleTripSegmentCard({
                 emphasizeValue
               />
               <EditableVehicleRow
-                label="Driver Salary"
-                value={fmtMoney(trip.driver_salary)}
+                label="Driver Bata"
+                value={fmtMoney(salaryBreakdown.driverBata)}
                 rawSeed={trip.driver_salary}
                 fieldKey="driver_salary"
                 tripId={trip._id}
                 type="number"
                 onSaved={handleSaved}
               />
+              <StaticVehicleRow
+                label="Extra personal expenses"
+                value={fmtMoney(salaryBreakdown.personalExpenses)}
+              />
+              <div className="group flex min-w-0 flex-col gap-0.5 py-1.5 border-b border-slate-100/60 dark:border-[#252c4d]/50 last:border-0">
+                <div className="flex items-baseline justify-between gap-2">
+                  <span className="w-[110px] shrink-0 text-xs sm:text-[13px] text-slate-500 dark:text-[#8d94b8]">
+                    Total Salary
+                  </span>
+                  <span className="min-w-0 truncate text-xs sm:text-[13px] whitespace-nowrap tabular-nums font-bold text-slate-900 dark:text-white">
+                    {fmtMoney(salaryBreakdown.totalSalary)}
+                  </span>
+                </div>
+                <div className="text-right text-[11px] font-medium text-slate-500 dark:text-slate-400">
+                  {salaryBreakdown.bracketText}
+                </div>
+              </div>
               <EditableVehicleRow
                 label="Advance"
                 value={fmtMoney(trip.advance)}

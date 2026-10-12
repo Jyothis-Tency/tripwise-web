@@ -47,11 +47,16 @@ export interface HistoryTrip {
     vehicleNumber?: string;
     vehicleModel?: string;
     vehicleType?: string;
+    commission?: number;
   } | string;
   careOf?: { name?: string; phone?: string };
   agencyCost?: number;
   cabCost?: number;
   driver_salary?: number;
+  driverBata?: number;
+  extraPersonalExpenses?: number;
+  totalPersonalExpense?: number;
+  totalDriverSalary?: number;
   advance?: number;
   /** All trip line expenses (fuel + non-fuel). */
   totalExpenses?: number;
@@ -319,6 +324,17 @@ export function mapRawTripToHistoryTrip(t: any): HistoryTrip {
     agencyCost: t.agencyCost,
     cabCost: t.cabCost,
     driver_salary: t.driver_salary,
+    driverBata: t.driverBata ?? t.driver_bata ?? t.driver_salary,
+    extraPersonalExpenses:
+      t.extraPersonalExpenses ??
+      t.totalPersonalExpense ??
+      t.personalExpenses ??
+      t.personalExpense,
+    totalPersonalExpense:
+      t.totalPersonalExpense ??
+      t.extraPersonalExpenses ??
+      t.personalExpenses,
+    totalDriverSalary: t.totalDriverSalary,
     advance: t.advance,
     totalExpenses: t.totalExpenses,
     fuelExpense: t.fuelExpense,

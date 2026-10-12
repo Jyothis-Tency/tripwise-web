@@ -173,7 +173,11 @@ export interface DriverCashInCashOutDetail {
   };
   filter?: CashInCashOutMonthFilter;
   summary: {
-    vehicleBata: AgencyCashSummaryBlock & { paid: number };
+    vehicleBata: AgencyCashSummaryBlock & {
+      paid: number;
+      driverBata?: number;
+      personalExpenses?: number;
+    };
     bulkAdvance: AgencyCashSummaryBlock & { paid: number };
   };
   adjustments: DriverCashAdjustments;
@@ -186,6 +190,8 @@ export interface DriverCashInCashOutDetail {
       date: string | null;
       status: string;
       driverSalary: number;
+      driverBata?: number;
+      personalExpense?: number;
     }>;
     salaryPayments: Array<{
       _id: string;

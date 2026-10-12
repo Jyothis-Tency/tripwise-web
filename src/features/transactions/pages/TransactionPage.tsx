@@ -123,11 +123,13 @@ function BalanceStat({
   value,
   loading,
   tone = "neutral",
+  sub,
 }: {
   label: string;
   value: number | null;
   loading: boolean;
   tone?: "neutral" | "remaining";
+  sub?: string;
 }) {
   const positive = (value ?? 0) >= 0;
   const valueCls =
@@ -147,11 +149,18 @@ function BalanceStat({
           <Loader2 className="h-3.5 w-3.5 animate-spin text-slate-400" />
         </div>
       ) : (
-        <p
-          className={`mt-0.5 text-sm font-bold tabular-nums leading-none ${valueCls}`}
-        >
-          {tone === "remaining" ? fmtSignedCurrency(value) : fmtCurrency(value)}
-        </p>
+        <>
+          <p
+            className={`mt-0.5 text-sm font-bold tabular-nums leading-none ${valueCls}`}
+          >
+            {tone === "remaining" ? fmtSignedCurrency(value) : fmtCurrency(value)}
+          </p>
+          {sub && (
+            <p className="mt-0.5 text-[10px] font-medium text-slate-400 dark:text-slate-500 whitespace-nowrap">
+              {sub}
+            </p>
+          )}
+        </>
       )}
     </div>
   );
@@ -195,6 +204,11 @@ export function TransactionPage() {
   const [success, setSuccess] = useState(false);
   const [grandTotal, setGrandTotal] = useState<number | null>(null);
   const [remaining, setRemaining] = useState<number | null>(null);
+  const [driverBreakdown, setDriverBreakdown] = useState<{
+    driverBata: number;
+    personalExpenses: number;
+    bulkAmount: number;
+  } | null>(null);
   const [balanceLoading, setBalanceLoading] = useState(false);
   const [recentAgencyIds, setRecentAgencyIds] = useState<string[]>(() =>
     loadRecentIds(LS_RECENT_AGENCIES),
@@ -298,6 +312,7 @@ export function TransactionPage() {
         );
         setGrandTotal(agencyNetGrandTotal(cashIn, cashOut, vehicleAgencyCost));
         setRemaining(agencyNetRemaining(cashIn, cashOut, vehicleAgencyCost));
+        setDriverBreakdown(null);
       } else {
         const detail = await fetchCashInCashOutDriverDetail(id, "all_time");
         const gt =
@@ -312,10 +327,19 @@ export function TransactionPage() {
           (Number(detail.summary.bulkAdvance.remaining) || 0);
         setGrandTotal(gt);
         setRemaining(remaining);
+        const driverBata = Number(detail.summary.vehicleBata.driverBata) || 0;
+        const personalExpenses =
+          Number(detail.summary.vehicleBata.personalExpenses) || 0;
+        const bulkAmount =
+          Number(detail.summary.bulkAdvance.totalOwed) ||
+          Number(detail.summary.bulkAdvance.fromTrips) ||
+          0;
+        setDriverBreakdown({ driverBata, personalExpenses, bulkAmount });
       }
     } catch {
       setGrandTotal(null);
       setRemaining(null);
+      setDriverBreakdown(null);
     } finally {
       setBalanceLoading(false);
     }
@@ -325,6 +349,7 @@ export function TransactionPage() {
     if (!selectedId) {
       setGrandTotal(null);
       setRemaining(null);
+      setDriverBreakdown(null);
       return;
     }
     loadBalance(selectedId, entityType);
@@ -573,6 +598,14 @@ export function TransactionPage() {
                   >
                     {fmtSignedCurrency(remaining)}
                   </span>
+                  {driverBreakdown &&
+                    (driverBreakdown.driverBata > 0 ||
+                      driverBreakdown.personalExpenses > 0 ||
+                      driverBreakdown.bulkAmount > 0) && (
+                      <span className="text-xs font-normal text-slate-500 dark:text-slate-400">
+                        (driver bata: {driverBreakdown.driverBata}, personal expense: {driverBreakdown.personalExpenses}, bulk amount: {driverBreakdown.bulkAmount})
+                      </span>
+                    )}
                 </div>
               )}
             </div>
@@ -731,6 +764,14 @@ export function TransactionPage() {
                           label="Grand Total"
                           value={grandTotal}
                           loading={balanceLoading}
+                          sub={
+                            driverBreakdown &&
+                            (driverBreakdown.driverBata > 0 ||
+                              driverBreakdown.personalExpenses > 0 ||
+                              driverBreakdown.bulkAmount > 0)
+                              ? `(driver bata: ${driverBreakdown.driverBata}, personal expense: ${driverBreakdown.personalExpenses}, bulk amount: ${driverBreakdown.bulkAmount})`
+                              : undefined
+                          }
                         />
                         <div
                           className="h-8 w-px bg-slate-200 dark:bg-white/10"
@@ -741,6 +782,14 @@ export function TransactionPage() {
                           value={remaining}
                           loading={balanceLoading}
                           tone="remaining"
+                          sub={
+                            driverBreakdown &&
+                            (driverBreakdown.driverBata > 0 ||
+                              driverBreakdown.personalExpenses > 0 ||
+                              driverBreakdown.bulkAmount > 0)
+                              ? `(driver bata: ${driverBreakdown.driverBata}, personal expense: ${driverBreakdown.personalExpenses}, bulk amount: ${driverBreakdown.bulkAmount})`
+                              : undefined
+                          }
                         />
                       </div>
                     )}
@@ -823,6 +872,14 @@ export function TransactionPage() {
                           <strong className="text-slate-700 dark:text-slate-200">
                             {fmtSignedCurrency(remaining)}
                           </strong>
+                          {driverBreakdown &&
+                            (driverBreakdown.driverBata > 0 ||
+                              driverBreakdown.personalExpenses > 0 ||
+                              driverBreakdown.bulkAmount > 0) && (
+                              <span className="ml-1 text-slate-400 dark:text-slate-500">
+                                (driver bata: {driverBreakdown.driverBata}, personal expense: {driverBreakdown.personalExpenses}, bulk amount: {driverBreakdown.bulkAmount})
+                              </span>
+                            )}
                         </span>
                       )}
                     </div>

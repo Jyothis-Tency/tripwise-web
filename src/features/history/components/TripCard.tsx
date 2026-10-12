@@ -24,6 +24,7 @@ import {
 import { TimePicker12h } from "../../../components/ui/TimePicker12h";
 import { normalizeHHmm } from "../../../lib/timePickerUtils";
 import {
+  computeDriverSalaryBreakdown,
   getHistoryTripExpenseBreakdown,
   resolveTripAgencyProfitDisplay,
 } from "../tripExpenseBreakdown";
@@ -597,6 +598,7 @@ export function TripCard({
   }, [initialTrip]);
 
   const expenseBreakdown = getHistoryTripExpenseBreakdown(trip);
+  const salaryBreakdown = computeDriverSalaryBreakdown(trip);
 
   const [expanded, setExpanded] = useState(defaultExpanded);
   const [deleting, setDeleting] = useState(false);
@@ -948,10 +950,28 @@ export function TripCard({
                       </span>
                     </div>
                     {E(
-                      "Driver Salary",
-                      fmtCurrency(trip.driver_salary),
+                      "Driver Bata",
+                      fmtCurrency(salaryBreakdown.driverBata),
                       "driver_salary",
                     )}
+                    <DetailRow
+                      label="Extra personal expenses"
+                      value={fmtCurrency(salaryBreakdown.personalExpenses)}
+                      emphasizeValue
+                    />
+                    <div className="my-1.5 flex flex-col gap-0.5 rounded-lg border border-indigo-200/80 bg-indigo-50/50 px-2.5 py-2 dark:border-indigo-500/30 dark:bg-indigo-500/10">
+                      <div className="flex items-baseline justify-between gap-2">
+                        <span className="text-sm font-medium text-indigo-900 dark:text-indigo-200">
+                          Total Salary
+                        </span>
+                        <span className="text-base font-bold tabular-nums text-indigo-700 dark:text-indigo-300">
+                          {fmtCurrency(salaryBreakdown.totalSalary)}
+                        </span>
+                      </div>
+                      <span className="text-[11px] font-medium text-indigo-600/80 dark:text-indigo-400">
+                        {salaryBreakdown.bracketText}
+                      </span>
+                    </div>
                     {E("Advance", fmtCurrency(trip.advance), "advance")}
                     <div className="my-1.5 flex items-baseline justify-between gap-2 rounded-lg border border-emerald-200/80 bg-emerald-50/80 px-2.5 py-2 dark:border-emerald-500/30 dark:bg-emerald-500/10">
                       <span className="text-sm font-medium text-emerald-700 dark:text-emerald-300">

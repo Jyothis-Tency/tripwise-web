@@ -4,6 +4,7 @@ import { fetchPaymentHistory, updateTripFields } from "../api";
 import { isoToTimeInputInTz, fmtTripDuration } from "../historyTimeUtils";
 import {
   computeAgencyProfitPreview,
+  computeDriverSalaryBreakdown,
   getHistoryTripExpenseBreakdown,
 } from "../tripExpenseBreakdown";
 import { DatePicker } from "../../../components/ui/DatePicker";
@@ -82,6 +83,23 @@ const currencyWrapCls =
   "flex overflow-hidden rounded-lg border border-slate-200 focus-within:border-indigo-400 focus-within:ring-1 dark:border-[#1e2638]";
 
 function buildInitialFields(trip: HistoryTrip) {
+  let initialSalary = trip.driver_salary?.toString() || "";
+  if (
+    (!initialSalary || initialSalary === "0") &&
+    trip.cabCost &&
+    typeof trip.vehicle === "object" &&
+    trip.vehicle?.commission
+  ) {
+    const comm = Number(trip.vehicle.commission);
+    if (Number.isFinite(comm) && comm > 0) {
+      const pct = comm < 1 ? comm * 100 : comm;
+      const cab = parseFloat(String(trip.cabCost)) || 0;
+      if (cab > 0) {
+        initialSalary = ((pct / 100) * cab).toFixed(2);
+      }
+    }
+  }
+
   return {
     startDate: trip.startDate
       ? trip.startDate.split("T")[0]
@@ -107,7 +125,7 @@ function buildInitialFields(trip: HistoryTrip) {
     notes: trip.notes ?? trip.completionNote ?? "",
     agencyCost: trip.agencyCost?.toString() || "",
     cabCost: trip.cabCost?.toString() || "",
-    driver_salary: trip.driver_salary?.toString() || "",
+    driver_salary: initialSalary,
     advance: trip.advance?.toString() || "",
   };
 }
@@ -161,6 +179,26 @@ export function EditTripModal({
       ),
     [fields.agencyCost, fields.cabCost, trip.expenses],
   );
+
+  const salaryBreakdown = useMemo(
+    () =>
+      computeDriverSalaryBreakdown({
+        ...trip,
+        driver_salary: fields.driver_salary,
+      }),
+    [trip, fields.driver_salary],
+  );
+
+  const vehicleCommission = useMemo(() => {
+    if (typeof trip.vehicle === "object" && trip.vehicle) {
+      const comm = (trip.vehicle as any).commission;
+      const parsed = parseFloat(comm);
+      if (Number.isFinite(parsed) && parsed > 0) {
+        return parsed < 1 ? Math.round(parsed * 100) : parsed;
+      }
+    }
+    return null;
+  }, [trip.vehicle]);
 
   const driverDisplay = historyDriverName(trip.driver, driverNameFallback);
   const vehicleDisplay = historyVehicleNumber(
@@ -217,7 +255,18 @@ export function EditTripModal({
         : "bg-red-50 text-red-700 border-red-200";
 
   const handleChange = (field: keyof FormFields, value: string) => {
-    setFields((prev) => ({ ...prev, [field]: value }));
+    setFields((prev) => {
+      const next = { ...prev, [field]: value };
+      if (field === "cabCost" && vehicleCommission != null) {
+        const cabNum = parseFloat(value) || 0;
+        if (cabNum > 0) {
+          next.driver_salary = ((vehicleCommission / 100) * cabNum).toFixed(2);
+        } else {
+          next.driver_salary = "0";
+        }
+      }
+      return next;
+    });
   };
 
   const calculateDistanceFromKm = () => {
@@ -238,9 +287,17 @@ export function EditTripModal({
         if (v === "") continue;
         if (NUMERIC_KEYS.has(key)) {
           payload[key] = parseFloat(v);
-          } else {
+        } else {
           payload[key] = v;
         }
+      }
+      if (
+        payload.cabCost &&
+        Number(payload.cabCost) > 0 &&
+        (!payload.driver_salary || payload.driver_salary === 0) &&
+        vehicleCommission != null
+      ) {
+        payload.driver_salary = (vehicleCommission / 100) * Number(payload.cabCost);
       }
       const updated = await updateTripFields(
         trip._id,
@@ -568,7 +625,7 @@ export function EditTripModal({
                 <div className="space-y-3">
                   <div>
                     <label className="block text-sm text-slate-600 mb-1">
-                      Driver Salary
+                      Driver Bata {vehicleCommission != null ? `(${vehicleCommission}% Bata)` : ""}
                     </label>
                     <div className={currencyWrapCls}>
                       <span className="px-3 bg-slate-50 dark:bg-white/[0.03] border-r border-slate-200 py-2 text-sm text-slate-500 dark:border-[#1e2638]">
@@ -582,8 +639,27 @@ export function EditTripModal({
                         }
                         className="flex-1 w-full min-w-0 px-3 py-2 text-sm outline-none"
                       />
-                </div>
-              </div>
+                    </div>
+                    <div className="mt-2 rounded-lg border border-indigo-100 bg-indigo-50/40 p-2.5 text-xs dark:border-indigo-500/20 dark:bg-indigo-500/10">
+                      <div className="flex items-center justify-between text-slate-600 dark:text-slate-300">
+                        <span>Extra personal expenses:</span>
+                        <span className="font-semibold tabular-nums text-slate-800 dark:text-slate-100">
+                          {fmtCurrency(salaryBreakdown.personalExpenses)}
+                        </span>
+                      </div>
+                      <div className="mt-1 flex items-center justify-between border-t border-indigo-100/80 pt-1 dark:border-indigo-500/20">
+                        <span className="font-bold text-indigo-900 dark:text-indigo-200">
+                          Total Salary:
+                        </span>
+                        <span className="font-bold tabular-nums text-indigo-700 dark:text-indigo-300">
+                          {fmtCurrency(salaryBreakdown.totalSalary)}
+                        </span>
+                      </div>
+                      <div className="mt-0.5 text-right font-medium text-[11px] text-indigo-600/80 dark:text-indigo-400">
+                        {salaryBreakdown.bracketText}
+                      </div>
+                    </div>
+                  </div>
               <div>
                     <label className="block text-sm text-slate-600 mb-1">
                       Advance

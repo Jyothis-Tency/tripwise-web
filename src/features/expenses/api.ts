@@ -18,15 +18,19 @@ export interface Expense {
 
 export interface TripExpense {
   _id: string;
+  id?: string;
   description?: string;
   amount: number;
   category?: string;
   type?: string;
   date?: string;
+  paidBy?: 'Company' | 'Personal';
+  receiptPath?: string | null;
 }
 
 export interface TripWithExpenses {
   _id: string;
+  id?: string;
   tripNumber?: string;
   customer?: string;
   fromLocation?: string;
@@ -35,6 +39,20 @@ export interface TripWithExpenses {
   status?: string;
   /** Mongo id of the trip's vehicle, when API returns populated or raw id */
   vehicleId?: string;
+  driver?: {
+    _id?: string;
+    firstName?: string;
+    lastName?: string;
+    email?: string;
+    phone?: string;
+  } | null;
+  vehicle?: {
+    _id?: string;
+    vehicleNumber?: string;
+    vehicleModel?: string;
+    vehicleType?: string;
+  } | null;
+  fuelExpense?: number;
   expenses: TripExpense[];
   totalExpenses?: number;
 }
@@ -111,7 +129,7 @@ export async function fetchTripsWithExpenses(params?: {
   const res = await apiClient.get(`${ApiEndpoints.tripsWithExpenses}${qs ? '?' + qs : ''}`);
   const inner = extract(res);
   const rawTrips: any[] = Array.isArray(inner?.trips) ? inner.trips : Array.isArray(inner) ? inner : [];
-  // Backend returns { trip: { _id, from, to, ... }, expenses: [...], totalExpenses }
+  // Backend returns { trip: { _id, from, to, driver, vehicle, ... }, expenses: [...], totalExpenses, fuelExpense }
   // Flatten into our TripWithExpenses shape
   const trips: TripWithExpenses[] = rawTrips.map((item: any) => {
     const t = item.trip ?? item;
@@ -122,8 +140,25 @@ export async function fetchTripsWithExpenses(params?: {
     } else if (typeof veh === 'string') {
       vehicleId = veh;
     }
+
+    const rawExpenses = item.expenses ?? t.expenses ?? [];
+    const expenses: TripExpense[] = Array.isArray(rawExpenses)
+      ? rawExpenses.map((exp: any) => ({
+          _id: exp._id || exp.id || '',
+          id: exp.id || exp._id || '',
+          description: exp.description || '',
+          amount: Number(exp.amount) || 0,
+          category: exp.category || exp.type,
+          type: exp.type || exp.category,
+          date: exp.date || exp.createdAt,
+          paidBy: (exp.paidBy === 'Personal' ? 'Personal' : 'Company') as 'Company' | 'Personal',
+          receiptPath: exp.receiptPath || null,
+        }))
+      : [];
+
     return {
       _id: t._id || t.id || item._id || item.id || '',
+      id: t.id || t._id || item._id || item.id || '',
       tripNumber: t.tripNumber,
       customer: t.customer,
       fromLocation: t.from || t.fromLocation || '',
@@ -131,21 +166,34 @@ export async function fetchTripsWithExpenses(params?: {
       startDate: t.startDate || t.date,
       status: t.status,
       vehicleId,
-      expenses: item.expenses ?? t.expenses ?? [],
-      totalExpenses: item.totalExpenses ?? t.totalExpenses,
+      driver: t.driver && typeof t.driver === 'object' ? t.driver : null,
+      vehicle: veh && typeof veh === 'object' ? veh : null,
+      fuelExpense: Number(item.fuelExpense) || 0,
+      expenses,
+      totalExpenses: Number(item.totalExpenses) || 0,
     };
   });
   return { trips, pagination: inner?.pagination };
 }
 
-export async function addTripExpense(tripId: string, data: { description?: string; amount: number; category?: string; type?: string; date?: string }): Promise<any> {
+export interface AddTripExpensePayload {
+  description?: string;
+  amount: number;
+  category?: string;
+  type?: string;
+  date?: string;
+  paidBy?: 'Company' | 'Personal';
+  receiptPath?: string | null;
+}
+
+export async function addTripExpense(tripId: string, data: AddTripExpensePayload): Promise<any> {
   // Backend expects `type` (Trip embedded expense enum). Frontend historically sent `category` only.
   const type = data.type ?? data.category;
   const res = await apiClient.post(ApiEndpoints.tripExpenses(tripId), { ...data, type });
   return extract(res);
 }
 
-export async function updateTripExpense(tripId: string, expenseId: string, data: Partial<{ description: string; amount: number; category: string; type?: string; date: string }>): Promise<any> {
+export async function updateTripExpense(tripId: string, expenseId: string, data: Partial<AddTripExpensePayload>): Promise<any> {
   const type = data.type ?? data.category;
   const payload = type !== undefined ? { ...data, type } : data;
   const res = await apiClient.put(ApiEndpoints.tripExpenseById(tripId, expenseId), payload);

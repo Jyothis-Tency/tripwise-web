@@ -53,6 +53,9 @@ export interface TripItem {
   agencyProfit?: number | string;
   advance?: number;
   driver_salary?: number;
+  driverBata?: number;
+  extraPersonalExpenses?: number;
+  totalDriverSalary?: number;
   notes?: string;
   careOf?: {
     name?: string;
@@ -126,6 +129,10 @@ export interface HistoryTripItem {
   extraExpenses?: number;
   totalCabCost?: number;
   driver_salary?: number;
+  driverBata?: number;
+  extraPersonalExpenses?: number;
+  totalPersonalExpense?: number;
+  totalDriverSalary?: number;
   agencyProfit?: number;
   agencyCost?: number;
   cabCost?: number;
@@ -167,6 +174,14 @@ function mapTrip(t: any): TripItem {
     agencyProfit: t.agencyProfit ?? t.ownerProfit,
     advance: t.advance,
     driver_salary: t.driver_salary,
+    driverBata: t.driverBata ?? t.driver_bata ?? t.driver_salary,
+    extraPersonalExpenses:
+      t.extraPersonalExpenses ??
+      t.totalPersonalExpense ??
+      t.personalExpenses,
+    totalPersonalExpense:
+      t.totalPersonalExpense ?? t.extraPersonalExpenses,
+    totalDriverSalary: t.totalDriverSalary,
     notes: t.notes,
     careOf: t.careOf,
     driver: t.driver ?? null,
@@ -178,7 +193,6 @@ function mapTrip(t: any): TripItem {
     endKilometers: t.endKilometers,
     startingNote: t.startingNote,
     completionNote: t.completionNote,
-    totalPersonalExpense: t.totalPersonalExpense,
     totalExpenses: t.totalExpenses,
   };
 }
@@ -384,6 +398,14 @@ export async function fetchVehicleHistoryDetailed(params: {
       extraExpenses: t.extraExpenses,
       totalCabCost: t.totalCabCost,
       driver_salary: t.driver_salary,
+      driverBata: t.driverBata ?? t.driver_bata ?? t.driver_salary,
+      extraPersonalExpenses:
+        t.extraPersonalExpenses ??
+        t.totalPersonalExpense ??
+        t.personalExpenses,
+      totalPersonalExpense:
+        t.totalPersonalExpense ?? t.extraPersonalExpenses,
+      totalDriverSalary: t.totalDriverSalary,
       agencyProfit: t.agencyProfit ?? t.ownerProfit,
       agencyCost: t.agencyCost,
       cabCost: t.cabCost,
@@ -420,6 +442,10 @@ export function vehicleHistoryTripToHistoryTrip(t: HistoryTripItem): HistoryTrip
     agencyCost: t.agencyCost,
     cabCost: t.cabCost,
     driver_salary: t.driver_salary,
+    driverBata: t.driverBata ?? t.driver_salary,
+    extraPersonalExpenses: t.extraPersonalExpenses,
+    totalPersonalExpense: t.totalPersonalExpense,
+    totalDriverSalary: t.totalDriverSalary,
     advance: t.advance,
     notes: t.notes ?? t.completionNote,
     completionNote: t.completionNote,

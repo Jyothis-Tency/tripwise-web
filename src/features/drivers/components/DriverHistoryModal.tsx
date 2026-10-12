@@ -388,6 +388,11 @@ export function DriverHistoryModal({
                       <div className="mt-1 text-sm font-bold text-slate-900 dark:text-white">
                         {formatMoney0(t.driver_salary)}
                       </div>
+                      {(t.driverBata != null || t.extraPersonalExpenses != null) && (
+                        <div className="mt-0.5 text-[10px] font-medium text-emerald-700 dark:text-emerald-300">
+                          (driver bata: {Number(t.driverBata ?? t.driver_salary) || 0}, personal expense: {Number(t.extraPersonalExpenses) || 0}, bulk amount: 0)
+                        </div>
+                      )}
                     </div>
                     <div className="rounded-lg border border-amber-200 bg-amber-50 p-2 dark:border-amber-500/30 dark:bg-amber-500/10">
                       <div className="text-[11px] font-semibold text-amber-800 dark:text-amber-300">

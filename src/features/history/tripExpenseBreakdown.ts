@@ -113,3 +113,95 @@ export function getHistoryTripExpenseBreakdown(trip: {
     totalCabCost: roundMoney(extraExpenses + cab),
   };
 }
+
+export type DriverSalaryBreakdown = {
+  driverBata: number;
+  personalExpenses: number;
+  bulkAmount: number;
+  totalSalary: number;
+  bracketText: string;
+};
+
+export function formatDriverSalaryBracket(
+  driverBata: number,
+  personalExpenses: number,
+  bulkAmount: number = 0,
+): string {
+  return `(driver bata: ${driverBata}, personal expense: ${personalExpenses}, bulk amount: ${bulkAmount})`;
+}
+
+export function computeDriverSalaryBreakdown(trip: {
+  driver_salary?: unknown;
+  driverSalary?: unknown;
+  driverBata?: unknown;
+  driver_bata?: unknown;
+  extraPersonalExpenses?: unknown;
+  totalPersonalExpense?: unknown;
+  personalExpenses?: unknown;
+  personalExpense?: unknown;
+  totalDriverSalary?: unknown;
+  bulkAmount?: unknown;
+  bulk_amount?: unknown;
+  bulkAdvance?: unknown;
+  expenses?: Array<{ paidBy?: string; paid_by?: string; amount?: unknown }>;
+}): DriverSalaryBreakdown {
+  const driverBata = roundMoney(
+    Number(
+      trip.driverBata ??
+        trip.driver_bata ??
+        trip.driver_salary ??
+        trip.driverSalary,
+    ) || 0,
+  );
+
+  let personalExpenses = 0;
+  if (
+    trip.extraPersonalExpenses != null ||
+    trip.totalPersonalExpense != null ||
+    trip.personalExpenses != null ||
+    trip.personalExpense != null
+  ) {
+    personalExpenses = roundMoney(
+      Number(
+        trip.extraPersonalExpenses ??
+          trip.totalPersonalExpense ??
+          trip.personalExpenses ??
+          trip.personalExpense,
+      ) || 0,
+    );
+  } else if (Array.isArray(trip.expenses) && trip.expenses.length > 0) {
+    let sum = 0;
+    for (const e of trip.expenses) {
+      const p = String(e?.paidBy ?? e?.paid_by ?? "")
+        .toLowerCase()
+        .trim();
+      if (p === "personal") {
+        sum += Number(e?.amount) || 0;
+      }
+    }
+    personalExpenses = roundMoney(sum);
+  }
+
+  const bulkAmount = roundMoney(
+    Number(trip.bulkAmount ?? trip.bulk_amount ?? trip.bulkAdvance) || 0,
+  );
+
+  const totalSalary =
+    trip.totalDriverSalary != null
+      ? roundMoney(Number(trip.totalDriverSalary) || 0)
+      : roundMoney(driverBata + personalExpenses);
+
+  const bracketText = formatDriverSalaryBracket(
+    driverBata,
+    personalExpenses,
+    bulkAmount,
+  );
+
+  return {
+    driverBata,
+    personalExpenses,
+    bulkAmount,
+    totalSalary,
+    bracketText,
+  };
+}

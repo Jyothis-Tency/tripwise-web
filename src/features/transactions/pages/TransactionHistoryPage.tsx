@@ -227,6 +227,12 @@ function buildDriverTxRows(detail: DriverCashInCashOutDetail): TxRow[] {
     .map((t) => {
       const route = [t.from, t.to].filter(Boolean).join(" → ");
       const tripLabel = t.tripNumber ? `Trip ${t.tripNumber}` : "Vehicle trip";
+      const bata = Number(t.driverBata ?? t.driverSalary ?? 0);
+      const personal = Number(t.personalExpense ?? 0);
+      const breakdownText =
+        t.driverBata != null || t.personalExpense != null
+          ? ` (driver bata: ${bata}, personal expense: ${personal}, bulk amount: 0)`
+          : "";
       return {
         id: `vehicle-${t._id}`,
         date: t.date,
@@ -234,7 +240,7 @@ function buildDriverTxRows(detail: DriverCashInCashOutDetail): TxRow[] {
         type: "Vehicle" as const,
         flow: "in" as const,
         method: "—",
-        notes: [tripLabel, route, "Trip bata"].filter(Boolean).join(" · "),
+        notes: [tripLabel, route, `Trip bata${breakdownText}`].filter(Boolean).join(" · "),
         sortTime: sortTime(t.date, t._id),
         tripDetail: { kind: "vehicle" as const, tripId: String(t._id) },
       };
@@ -245,14 +251,15 @@ function buildDriverTxRows(detail: DriverCashInCashOutDetail): TxRow[] {
     .map((t) => {
       const agency = t.agencyName?.trim() || "Agency";
       const vehicleNum = t.vehicleNumber?.trim() || "Vehicle";
+      const adv = Number(t.advancePaid) || 0;
       return {
         id: `bulk-trip-${t._id}`,
         date: t.date,
-        amount: Number(t.advancePaid) || 0,
+        amount: adv,
         type: "Bulk" as const,
         flow: "in" as const,
         method: "—",
-        notes: [agency, vehicleNum, "Bulk advance"].filter(Boolean).join(" · "),
+        notes: [agency, vehicleNum, `Bulk advance (driver bata: 0, personal expense: 0, bulk amount: ${adv})`].filter(Boolean).join(" · "),
         sortTime: sortTime(t.date, t._id),
         tripDetail: {
           kind: "bulk" as const,
@@ -971,10 +978,16 @@ export function TransactionHistoryPage() {
     const vehicleTrips = Number(bata.fromTrips) || 0;
     const grandTotal = bulkTrips + vehicleTrips;
     const paid = (Number(bata.paid) || 0) + (Number(bulk.paid) || 0);
+    const driverBata = Number(bata.driverBata) || 0;
+    const personalExpenses = Number(bata.personalExpenses) || 0;
+    const bulkAmount = bulkTrips;
     return {
       grandTotal,
       paid,
       toPay: grandTotal - paid,
+      driverBata,
+      personalExpenses,
+      bulkAmount,
     };
   }, [driverDetail]);
 
@@ -1409,6 +1422,15 @@ export function TransactionHistoryPage() {
                     <b className="mt-2 block text-[28px] font-extrabold tracking-tight">
                       {fmtCurrency(driverCards.grandTotal)}
                     </b>
+                    {(driverCards.driverBata > 0 ||
+                      driverCards.personalExpenses > 0 ||
+                      driverCards.bulkAmount > 0) && (
+                      <span className="mt-1 block text-xs font-medium text-white/90">
+                        (driver bata: {driverCards.driverBata}, personal expense:{" "}
+                        {driverCards.personalExpenses}, bulk amount:{" "}
+                        {driverCards.bulkAmount})
+                      </span>
+                    )}
                   </div>
                   <div className="rounded-[18px] border border-slate-200 bg-[var(--bg-card)] px-5 py-[18px] dark:border-[#252c4d]">
                     <span className="block text-[13px] font-bold dark:text-[#eef0ff]">
@@ -1437,6 +1459,15 @@ export function TransactionHistoryPage() {
                     <b className="mt-2 block text-[28px] font-extrabold text-indigo-600 dark:text-[#a5b4fc]">
                       {fmtCardCurrency(driverCards.toPay)}
                     </b>
+                    {(driverCards.driverBata > 0 ||
+                      driverCards.personalExpenses > 0 ||
+                      driverCards.bulkAmount > 0) && (
+                      <span className="mt-1 block text-xs font-medium text-slate-500 dark:text-[#8d94b8]">
+                        (driver bata: {driverCards.driverBata}, personal expense:{" "}
+                        {driverCards.personalExpenses}, bulk amount:{" "}
+                        {driverCards.bulkAmount})
+                      </span>
+                    )}
                   </div>
                 </div>
               )}

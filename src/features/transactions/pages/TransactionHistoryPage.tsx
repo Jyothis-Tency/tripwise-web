@@ -52,7 +52,7 @@ type EntityTab = CashInCashOutTabId;
 type DetailTabId = CashInCashOutDetailTabId;
 type SortDir = "desc" | "asc";
 type AgencyTypeFilter = "all" | AgencyTxType;
-type DriverTypeFilter = "all" | "Salary" | "Advance";
+type DriverTypeFilter = "all" | "Vehicle" | "Bulk" | "Salary" | "Advance";
 type TypeFilter = AgencyTypeFilter | DriverTypeFilter;
 
 type TxRow = {
@@ -69,18 +69,21 @@ type TxRow = {
   tripDetail?: AgencyTxTripDetail;
 };
 
-function agencyTypeBadgeClass(type: AgencyTxType): string {
+function txTypeBadgeClass(type: string): string {
   switch (type) {
     case "Bulk":
       return "bg-indigo-50 text-indigo-700 dark:bg-[#242a57] dark:text-[#a5b4fc]";
     case "Vehicle":
       return "bg-sky-50 text-sky-700 dark:bg-[#0c2a3a] dark:text-[#7dd3fc]";
+    case "Salary":
     case "Cash in":
       return "bg-emerald-50 text-emerald-700 dark:bg-[#0d3325] dark:text-[#34d399]";
+    case "Advance":
+      return "bg-amber-50 text-amber-800 dark:bg-[#3d2e12] dark:text-[#fcd34d]";
     case "Cash out":
       return "bg-amber-50 text-amber-800 dark:bg-[#3d2e12] dark:text-[#fcd34d]";
     default:
-      return "bg-slate-100 text-slate-600";
+      return "bg-slate-100 text-slate-600 dark:bg-[#252c4d] dark:text-[#8d94b8]";
   }
 }
 
@@ -106,6 +109,35 @@ function fmtCardCurrency(n: number) {
   return fmtCurrency(n);
 }
 
+function parseSafeDate(date: string | null | undefined): Date | null {
+  if (!date) return null;
+  const raw = String(date).trim();
+  if (!raw) return null;
+
+  // DD-MM-YYYY or DD/MM/YYYY
+  const dmy = raw.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})/);
+  if (dmy) {
+    const day = parseInt(dmy[1], 10);
+    const month = parseInt(dmy[2], 10) - 1;
+    const year = parseInt(dmy[3], 10);
+    const d = new Date(year, month, day, 12, 0, 0);
+    return Number.isNaN(d.getTime()) ? null : d;
+  }
+
+  // YYYY-MM-DD or YYYY/MM/DD
+  const ymd = raw.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/);
+  if (ymd) {
+    const year = parseInt(ymd[1], 10);
+    const month = parseInt(ymd[2], 10) - 1;
+    const day = parseInt(ymd[3], 10);
+    const d = new Date(year, month, day, 12, 0, 0);
+    return Number.isNaN(d.getTime()) ? null : d;
+  }
+
+  const d = new Date(raw);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
 function mongoIdTime(id?: string) {
   if (!id || !/^[a-f0-9]{24}$/i.test(id)) return 0;
   return parseInt(id.slice(0, 8), 16) * 1000;
@@ -113,16 +145,16 @@ function mongoIdTime(id?: string) {
 
 function sortTime(date?: string | null, id?: string) {
   if (date) {
-    const t = new Date(date).getTime();
-    if (!Number.isNaN(t)) return t;
+    const d = parseSafeDate(date);
+    if (d && !Number.isNaN(d.getTime())) return d.getTime();
   }
   return mongoIdTime(id);
 }
 
 function formatDate(d?: string | null) {
   if (!d) return "—";
-  const x = new Date(d);
-  if (Number.isNaN(x.getTime())) return "—";
+  const x = parseSafeDate(d);
+  if (!x || Number.isNaN(x.getTime())) return "—";
   return x.toLocaleDateString("en-IN", {
     day: "numeric",
     month: "short",
@@ -132,8 +164,12 @@ function formatDate(d?: string | null) {
 
 function formatTime(d?: string | null) {
   if (!d) return "—";
-  const x = new Date(d);
-  if (Number.isNaN(x.getTime())) return "—";
+  const raw = String(d).trim();
+  if (!raw.includes("T") && !raw.includes(":") && !raw.includes(" ")) {
+    return "—";
+  }
+  const x = parseSafeDate(d);
+  if (!x || Number.isNaN(x.getTime())) return "—";
   return x.toLocaleTimeString("en-IN", {
     hour: "2-digit",
     minute: "2-digit",
@@ -142,8 +178,8 @@ function formatTime(d?: string | null) {
 
 function formatMonth(d?: string | null) {
   if (!d) return "—";
-  const x = new Date(d);
-  if (Number.isNaN(x.getTime())) return "—";
+  const x = parseSafeDate(d);
+  if (!x || Number.isNaN(x.getTime())) return "—";
   return x.toLocaleString("en-IN", { month: "short", year: "numeric" });
 }
 
@@ -186,37 +222,76 @@ function buildDriverTxRows(detail: DriverCashInCashOutDetail): TxRow[] {
   const tables = detail?.tables;
   if (!tables) return [];
 
+  const vehicle = (tables.vehicleTrips ?? [])
+    .filter((t) => Number(t.driverSalary) > 0)
+    .map((t) => {
+      const route = [t.from, t.to].filter(Boolean).join(" → ");
+      const tripLabel = t.tripNumber ? `Trip ${t.tripNumber}` : "Vehicle trip";
+      return {
+        id: `vehicle-${t._id}`,
+        date: t.date,
+        amount: Number(t.driverSalary) || 0,
+        type: "Vehicle" as const,
+        flow: "in" as const,
+        method: "—",
+        notes: [tripLabel, route, "Trip bata"].filter(Boolean).join(" · "),
+        sortTime: sortTime(t.date, t._id),
+        tripDetail: { kind: "vehicle" as const, tripId: String(t._id) },
+      };
+    });
+
+  const bulkTrips = (tables.bulkTripsAdvance ?? [])
+    .filter((t) => Number(t.advancePaid) > 0)
+    .map((t) => {
+      const agency = t.agencyName?.trim() || "Agency";
+      const vehicleNum = t.vehicleNumber?.trim() || "Vehicle";
+      return {
+        id: `bulk-trip-${t._id}`,
+        date: t.date,
+        amount: Number(t.advancePaid) || 0,
+        type: "Bulk" as const,
+        flow: "in" as const,
+        method: "—",
+        notes: [agency, vehicleNum, "Bulk advance"].filter(Boolean).join(" · "),
+        sortTime: sortTime(t.date, t._id),
+        tripDetail: { kind: "bulk" as const, tripIds: [String(t._id)] },
+      };
+    });
+
   const bata = (tables.salaryPayments ?? []).map((r) => ({
     id: `salary-${r._id}`,
     date: r.date,
-    amount: r.amount,
+    amount: Number(r.amount) || 0,
     type: "Salary" as const,
     flow: "out" as const,
     method: "—",
     notes: r.notes || "Salary / bata",
     sortTime: sortTime(r.date, r._id),
   }));
+
   const advances = (tables.advanceLedger ?? []).map((r) => ({
     id: `adv-${r._id}`,
     date: r.date,
-    amount: r.amount,
+    amount: Number(r.amount) || 0,
     type: "Advance" as const,
-    flow: "in" as const,
+    flow: "out" as const,
     method: "—",
     notes: r.notes || "Advance",
     sortTime: sortTime(r.date, r._id),
   }));
+
   const bulk = (tables.bulkAdvancePayouts ?? []).map((r) => ({
     id: `bulk-${r._id}`,
     date: r.paymentDate,
-    amount: r.amount,
+    amount: Number(r.amount) || 0,
     type: "Salary" as const,
     flow: "out" as const,
     method: r.paymentMethod || "—",
     notes: r.notes?.trim() || "Salary",
     sortTime: sortTime(r.paymentDate, r._id),
   }));
-  return [...bata, ...advances, ...bulk];
+
+  return [...vehicle, ...bulkTrips, ...bata, ...advances, ...bulk];
 }
 
 function apiErrMessage(err: unknown, fallback: string): string {
@@ -239,17 +314,22 @@ function apiErrMessage(err: unknown, fallback: string): string {
 function inDateRange(date: string | null, from: string, to: string) {
   if (!from && !to) return true;
   if (!date) return false;
-  const t = new Date(date).getTime();
-  if (Number.isNaN(t)) return false;
+  const d = parseSafeDate(date);
+  if (!d || Number.isNaN(d.getTime())) return false;
+  const t = d.getTime();
   if (from) {
-    const start = new Date(from);
-    start.setHours(0, 0, 0, 0);
-    if (t < start.getTime()) return false;
+    const start = parseSafeDate(from);
+    if (start) {
+      start.setHours(0, 0, 0, 0);
+      if (t < start.getTime()) return false;
+    }
   }
   if (to) {
-    const end = new Date(to);
-    end.setHours(23, 59, 59, 999);
-    if (t > end.getTime()) return false;
+    const end = parseSafeDate(to);
+    if (end) {
+      end.setHours(23, 59, 59, 999);
+      if (t > end.getTime()) return false;
+    }
   }
   return true;
 }
@@ -686,6 +766,7 @@ export function TransactionHistoryPage() {
   }, []);
 
   useEffect(() => {
+    setTypeFilter("all");
     if (tab === "agencies") loadAgencies();
     else loadDrivers();
   }, [tab, loadAgencies, loadDrivers]);
@@ -1476,6 +1557,8 @@ export function TransactionHistoryPage() {
                       {(tab === "drivers"
                         ? ([
                             ["all", "All"],
+                            ["Vehicle", "Vehicle"],
+                            ["Bulk", "Bulk"],
                             ["Salary", "Salary"],
                             ["Advance", "Advance"],
                           ] as const)
@@ -1543,19 +1626,10 @@ export function TransactionHistoryPage() {
                       <tbody>
                         {txRows.map((r) => {
                           const isIn = r.flow === "in";
-                          const isSalary = r.type === "Salary";
                           const canOpenTripDetail =
                             tab === "agencies" &&
                             (r.type === "Bulk" || r.type === "Vehicle") &&
                             Boolean(r.tripDetail);
-                          const agencyBadge =
-                            tab === "agencies" &&
-                            (r.type === "Bulk" ||
-                              r.type === "Vehicle" ||
-                              r.type === "Cash in" ||
-                              r.type === "Cash out")
-                              ? agencyTypeBadgeClass(r.type as AgencyTxType)
-                              : null;
                           return (
                             <tr
                               key={r.id}
@@ -1579,17 +1653,9 @@ export function TransactionHistoryPage() {
                               </td>
                               <td className="px-[18px] py-3.5">
                                 <span
-                                  className={`rounded-full px-2.5 py-0.5 text-[11px] font-bold ${
-                                    agencyBadge
-                                      ? agencyBadge
-                                      : tab === "drivers"
-                                        ? isSalary
-                                          ? "bg-emerald-50 text-emerald-700 dark:bg-[#0d3325] dark:text-[#34d399]"
-                                          : "bg-indigo-50 text-indigo-700 dark:bg-[#242a57] dark:text-[#a5b4fc]"
-                                        : isIn
-                                          ? "bg-emerald-50 text-emerald-700 dark:bg-[#0d3325] dark:text-[#34d399]"
-                                          : "bg-rose-50 text-rose-600 dark:bg-[#3a1a1e] dark:text-[#fda4af]"
-                                  }`}
+                                  className={`rounded-full px-2.5 py-0.5 text-[11px] font-bold ${txTypeBadgeClass(
+                                    r.type,
+                                  )}`}
                                 >
                                   {r.type}
                                 </span>

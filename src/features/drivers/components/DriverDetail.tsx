@@ -168,18 +168,19 @@ function txSortTime(tx: { date?: string | null; createdAt?: string | null }) {
 }
 
 type SortDir = "desc" | "asc";
-type TxTypeFilter = "all" | "advance" | "salary";
+type TxTypeFilter = "all" | "vehicle" | "bulk" | "salary" | "advance";
+
+type PaymentKind = "vehicle" | "bulk" | "salary" | "advance";
 
 type PaymentRow = {
   id: string;
   rawId: string;
   amount: number;
-  /** advance = cash-in or bulk advance payout; salary = bata cash-out */
-  kind: "advance" | "salary";
+  kind: PaymentKind;
   notes?: string;
   date?: string | null;
-  /** Underlying source for delete API */
-  source: "driver_salary" | "bulk_payout";
+  /** Underlying source for delete API / provenance */
+  source: "vehicle_trip" | "bulk_trip" | "driver_salary" | "bulk_payout";
 };
 
 function formatTxDisplayDate(date?: string | null): string {
@@ -193,12 +194,44 @@ function formatTxDisplayDate(date?: string | null): string {
   });
 }
 
-/** Same sources as Transaction History driver table. Types: Salary | Advance. */
+/** Same sources as Transaction History driver table. Types: Vehicle | Bulk | Salary | Advance. */
 function buildDriverPaymentRows(
   detail: DriverCashInCashOutDetail | null,
 ): PaymentRow[] {
   const tables = detail?.tables;
   if (!tables) return [];
+
+  const vehicle = (tables.vehicleTrips ?? [])
+    .filter((t) => Number(t.driverSalary) > 0)
+    .map((t) => {
+      const route = [t.from, t.to].filter(Boolean).join(" → ");
+      const tripLabel = t.tripNumber ? `Trip ${t.tripNumber}` : "Vehicle trip";
+      return {
+        id: `vehicle-${t._id}`,
+        rawId: t._id,
+        amount: Number(t.driverSalary) || 0,
+        kind: "vehicle" as const,
+        notes: [tripLabel, route, "Trip bata"].filter(Boolean).join(" · "),
+        date: t.date,
+        source: "vehicle_trip" as const,
+      };
+    });
+
+  const bulkTrips = (tables.bulkTripsAdvance ?? [])
+    .filter((t) => Number(t.advancePaid) > 0)
+    .map((t) => {
+      const agency = t.agencyName?.trim() || "Agency";
+      const vehicleNum = t.vehicleNumber?.trim() || "Vehicle";
+      return {
+        id: `bulk-trip-${t._id}`,
+        rawId: t._id,
+        amount: Number(t.advancePaid) || 0,
+        kind: "bulk" as const,
+        notes: [agency, vehicleNum, "Bulk advance"].filter(Boolean).join(" · "),
+        date: t.date,
+        source: "bulk_trip" as const,
+      };
+    });
 
   const salary = (tables.salaryPayments ?? []).map((r) => ({
     id: `salary-${r._id}`,
@@ -229,11 +262,37 @@ function buildDriverPaymentRows(
     source: "bulk_payout" as const,
   }));
 
-  return [...salary, ...advances, ...bulk];
+  return [...vehicle, ...bulkTrips, ...salary, ...advances, ...bulk];
 }
 
 function paymentKindLabel(kind: PaymentRow["kind"]): string {
-  return kind === "salary" ? "Salary" : "Advance";
+  switch (kind) {
+    case "vehicle":
+      return "Vehicle";
+    case "bulk":
+      return "Bulk";
+    case "salary":
+      return "Salary";
+    case "advance":
+      return "Advance";
+    default:
+      return "Other";
+  }
+}
+
+function paymentBadgeClass(kind: PaymentRow["kind"]): string {
+  switch (kind) {
+    case "bulk":
+      return "bg-indigo-50 text-indigo-700 dark:bg-[#242a57] dark:text-[#a5b4fc]";
+    case "vehicle":
+      return "bg-sky-50 text-sky-700 dark:bg-[#0c2a3a] dark:text-[#7dd3fc]";
+    case "salary":
+      return "bg-emerald-50 text-emerald-700 dark:bg-[#0d3325] dark:text-[#34d399]";
+    case "advance":
+      return "bg-amber-50 text-amber-800 dark:bg-[#3d2e12] dark:text-[#fcd34d]";
+    default:
+      return "bg-slate-100 text-slate-600 dark:bg-[#252c4d] dark:text-[#8d94b8]";
+  }
 }
 
 function SalaryTableToolbar({
@@ -282,6 +341,8 @@ function SalaryTableToolbar({
         className="rounded-[10px] border border-slate-200 bg-[var(--bg-main)] px-2.5 py-2 text-xs font-semibold text-slate-700 outline-none dark:border-[#252c4d] dark:text-[#eef0ff]"
       >
         <option value="all">All types</option>
+        <option value="vehicle">Vehicle</option>
+        <option value="bulk">Bulk</option>
         <option value="salary">Salary</option>
         <option value="advance">Advance</option>
       </select>
@@ -1363,14 +1424,12 @@ function SalaryTab({ driver }: { driver: Driver }) {
                     </td>
                     <td className="px-2 py-3">
                       <span
-                        className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${
-                          tx.kind === "salary"
-                            ? "bg-emerald-50 text-emerald-700 dark:bg-[#0d3325] dark:text-[#34d399]"
-                            : "bg-indigo-50 text-indigo-700 dark:bg-[#242a57] dark:text-[#a5b4fc]"
-                        }`}
+                        className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${paymentBadgeClass(
+                          tx.kind,
+                        )}`}
                       >
                         {paymentKindLabel(tx.kind)}
-              </span>
+                      </span>
                     </td>
                     <td className="px-2 py-3 font-semibold dark:text-[#eef0ff]">
                       {fmtCurrency(tx.amount)}
@@ -1379,13 +1438,17 @@ function SalaryTab({ driver }: { driver: Driver }) {
                       {tx.notes ?? "—"}
                     </td>
                     <td className="px-2 py-3">
-                      <button
-                        type="button"
-                        onClick={() => handleDeleteTransaction(tx)}
-                        className="text-rose-400 hover:text-rose-600"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
+                      {(tx.source === "driver_salary" ||
+                        tx.source === "bulk_payout") && (
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteTransaction(tx)}
+                          className="text-rose-400 hover:text-rose-600"
+                          title="Delete transaction"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      )}
                     </td>
                   </tr>
                 ))}

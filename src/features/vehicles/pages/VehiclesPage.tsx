@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   Car,
@@ -29,6 +29,11 @@ import { DatePicker } from "../../../components/ui/DatePicker";
 import { TimePicker12h } from "../../../components/ui/TimePicker12h";
 import { isoToHHmmInTz } from "../../../lib/timePickerUtils";
 import { computeAgencyProfitPreview } from "../../history/tripExpenseBreakdown";
+import {
+  loadVehiclesUi,
+  saveVehiclesUi,
+  type VehicleDetailTabId,
+} from "../vehiclesUiStorage";
 import {
   fetchVehicles,
   fetchVehicleById,
@@ -1798,64 +1803,56 @@ function VehicleHistoryTab({
         </div>
       </div>
 
-      {/* Statistics banner — Stitch-style white cards + indigo labels */}
+      {/* Statistics banner — even 3×2 grid */}
       {financialStats && (
-        <section className="space-y-3">
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-[#1e2638] dark:bg-[#0e121d]/80">
-              <div className="text-[10px] font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">
-                Total agency cost
+        <section>
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
+            {(
+              [
+                {
+                  label: "Total agency cost",
+                  value: formatMoney0(
+                    financialStats.billedRevenue ?? financialStats.totalRevenue,
+                  ),
+                },
+                {
+                  label: "Total cab cost",
+                  value: formatMoney0(
+                    financialStats.cabFare ?? financialStats.totalRevenue,
+                  ),
+                },
+                {
+                  label: "Driver Salary",
+                  value: formatMoney0(financialStats.totalDriverSalary),
+                },
+                {
+                  label: "Owner Revenue",
+                  value: formatMoney0(financialStats.ownerRevenue),
+                },
+                {
+                  label: "Trip Expense",
+                  value: formatMoney0(financialStats.totalExpenses),
+                },
+                {
+                  label: "Vehicle Expenses",
+                  value: formatMoney0(financialStats.vehicleExpenses ?? 0),
+                },
+              ] as const
+            ).map((stat) => (
+              <div
+                key={stat.label}
+                className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-[#1e2638] dark:bg-[#0e121d]/80"
+              >
+                <div className="text-[10px] font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">
+                  {stat.label}
+                </div>
+                <div className="mt-1 text-sm font-bold tabular-nums text-slate-900 dark:text-white">
+                  {stat.value}
+                </div>
               </div>
-              <div className="mt-1 text-sm font-bold text-slate-900 dark:text-white">
-                {formatMoney0(
-                  financialStats.billedRevenue ?? financialStats.totalRevenue,
-                )}
-              </div>
-            </div>
-            <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-[#1e2638] dark:bg-[#0e121d]/80">
-              <div className="text-[10px] font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">
-                Total cab cost
-              </div>
-              <div className="mt-1 text-sm font-bold text-slate-900 dark:text-white">
-                {formatMoney0(
-                  financialStats.cabFare ?? financialStats.totalRevenue,
-                )}
-              </div>
-            </div>
-            <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-[#1e2638] dark:bg-[#0e121d]/80">
-              <div className="text-[10px] font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">
-                Driver Salary
-              </div>
-              <div className="mt-1 text-sm font-bold text-slate-900 dark:text-white">
-                {formatMoney0(financialStats.totalDriverSalary)}
-              </div>
-            </div>
-            <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-[#1e2638] dark:bg-[#0e121d]/80">
-              <div className="text-[10px] font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">
-                Owner Revenue
-              </div>
-              <div className="mt-1 text-sm font-bold text-slate-900 dark:text-white">
-                {formatMoney0(financialStats.ownerRevenue)}
-              </div>
-            </div>
-            <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-[#1e2638] dark:bg-[#0e121d]/80 sm:col-span-2 lg:col-span-1">
-              <div className="text-[10px] font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">
-                Trip Expense
-              </div>
-              <div className="mt-1 text-sm font-bold text-slate-900 dark:text-white">
-                {formatMoney0(financialStats.totalExpenses)}
-              </div>
-            </div>
-            <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-[#1e2638] dark:bg-[#0e121d]/80 sm:col-span-2 lg:col-span-2">
-              <div className="text-[10px] font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">
-                Vehicle Expenses
-              </div>
-              <div className="mt-1 text-sm font-bold text-slate-900 dark:text-white">
-                {formatMoney0(financialStats.vehicleExpenses ?? 0)}
-              </div>
-            </div>
+            ))}
           </div>
-      </section>
+        </section>
       )}
 
       {/* Content */}
@@ -1948,13 +1945,21 @@ function VehicleHistoryTab({
                     <div className="mt-1 font-medium text-indigo-700 dark:text-indigo-300">
                       {kmTravelledText(t)}
                     </div>
+                    <div className="mt-1 truncate">
+                      Agency:{" "}
+                      <span className="font-medium text-slate-700 dark:text-slate-200">
+                        {resolveAgencyLabel(t.agencyName) ||
+                          t.agencyName ||
+                          "—"}
+                      </span>
+                    </div>
                   </div>
                   <div className="text-xs text-slate-600 dark:text-slate-400">
                     <div>
                       Date: {formatDate(t.startDate ?? t.departureDate)}
                     </div>
                     <div className="mt-1 flex items-center gap-2">
-                      <UserCheck className="h-4 w-4 text-slate-400" />
+                      <UserCheck className="h-4 w-4 shrink-0 text-slate-400" />
                       <span className="truncate">
                         Driver: {resolveDriverName(t)}
                       </span>
@@ -2824,14 +2829,19 @@ interface VehicleDetailPanelProps {
   vehicle: Vehicle;
   onVehicleUpdated: (updated: Partial<Vehicle>) => void;
   onBackClicked: () => void;
+  detailTab: VehicleDetailTabId;
+  onDetailTabChange: (tab: VehicleDetailTabId) => void;
 }
 
 function VehicleDetailPanel({
   vehicle,
   onVehicleUpdated,
   onBackClicked,
+  detailTab,
+  onDetailTabChange,
 }: VehicleDetailPanelProps) {
-  const [tab, setTab] = useState<"upcoming" | "live" | "history">("live");
+  const tab = detailTab;
+  const setTab = onDetailTabChange;
   const [detailModal, setDetailModal] = useState<DetailModal | null>(null);
   const [ownerAgencies, setOwnerAgencies] = useState<Agency[]>([]);
 
@@ -3043,11 +3053,17 @@ function VehicleDetailPanel({
 type PageModal = "add" | "edit" | null;
 
 export function VehiclesPage() {
+  const savedUi = useMemo(() => loadVehiclesUi(), []);
+  const selectedIdRef = useRef<string | null>(savedUi.selectedVehicleId);
+
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = useState(savedUi.search);
   const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
+  const [detailTab, setDetailTab] = useState<VehicleDetailTabId>(
+    savedUi.detailTab,
+  );
   const [pageModal, setPageModal] = useState<PageModal>(null);
 
   const selectedVehicle =
@@ -3058,10 +3074,20 @@ export function VehiclesPage() {
     setError(null);
     try {
       const data = await fetchVehicles({ page: 1, limit: 50, search: q });
-      setVehicles(data.items);
-      setSelectedIdx(null);
+      const items = data.items ?? [];
+      setVehicles(items);
+      const keepId = selectedIdRef.current;
+      if (keepId) {
+        const idx = items.findIndex((v) => v._id === keepId);
+        setSelectedIdx(idx >= 0 ? idx : null);
+        if (idx < 0) selectedIdRef.current = null;
+      } else {
+        setSelectedIdx(null);
+      }
     } catch (e: any) {
       setError(e?.response?.data?.message ?? "Failed to load vehicles");
+      setVehicles([]);
+      setSelectedIdx(null);
     } finally {
       setLoading(false);
     }
@@ -3072,14 +3098,36 @@ export function VehiclesPage() {
     return () => clearTimeout(t);
   }, [search, load]);
 
+  useEffect(() => {
+    saveVehiclesUi({
+      search,
+      selectedVehicleId: selectedIdRef.current,
+      detailTab,
+    });
+  }, [search, selectedIdx, detailTab, vehicles]);
+
+  const selectVehicle = (i: number) => {
+    setSelectedIdx(i);
+    selectedIdRef.current = vehicles[i]?._id ?? null;
+  };
+
+  const clearSelection = () => {
+    setSelectedIdx(null);
+    selectedIdRef.current = null;
+  };
+
   const handleSaved = (saved: Vehicle) => {
     setVehicles((prev) => {
       const idx = prev.findIndex((v) => v._id === saved._id);
       if (idx >= 0) {
         const n = [...prev];
         n[idx] = saved;
+        selectedIdRef.current = saved._id;
+        setSelectedIdx(idx);
         return n;
       }
+      selectedIdRef.current = saved._id;
+      setSelectedIdx(0);
       return [saved, ...prev];
     });
   };
@@ -3090,14 +3138,16 @@ export function VehiclesPage() {
       try {
         const fullVehicle = await fetchVehicleById(selectedVehicle._id);
         setVehicles((prev) =>
-          prev.map((v, i) => (i === selectedIdx ? fullVehicle : v)),
+          prev.map((v) => (v._id === selectedVehicle._id ? fullVehicle : v)),
         );
       } catch (e) {
         console.error("Failed to refetch vehicle after update", e);
       }
     } else {
       setVehicles((prev) =>
-        prev.map((v, i) => (i === selectedIdx ? { ...v, ...updated } : v)),
+        prev.map((v) =>
+          v._id === selectedVehicle._id ? { ...v, ...updated } : v,
+        ),
       );
     }
   };
@@ -3166,9 +3216,9 @@ export function VehiclesPage() {
                 key={v._id}
                 vehicle={v}
                 isSelected={i === selectedIdx}
-                onSelect={() => setSelectedIdx(i)}
+                onSelect={() => selectVehicle(i)}
                 onEdit={() => {
-                  setSelectedIdx(i);
+                  selectVehicle(i);
                   setPageModal("edit");
                 }}
               />
@@ -3185,7 +3235,9 @@ export function VehiclesPage() {
           <VehicleDetailPanel
             vehicle={selectedVehicle}
             onVehicleUpdated={handleVehicleUpdated}
-            onBackClicked={() => setSelectedIdx(null)}
+            onBackClicked={clearSelection}
+            detailTab={detailTab}
+            onDetailTabChange={setDetailTab}
           />
         ) : !loading ? (
           <div className="flex h-full items-center justify-center">

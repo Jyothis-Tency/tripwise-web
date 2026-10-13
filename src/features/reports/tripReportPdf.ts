@@ -1,6 +1,8 @@
 import jsPDF from "jspdf";
 import type { HistoryTrip } from "../history/api";
+import type { TripReportTotals } from "./entityReportTotals";
 import type { ReportFieldSelection } from "./reportFieldConfig";
+import { tripReportTotalLines } from "./reportTotalsDisplay";
 import {
   buildReportCardLines,
   maxBodyLineCount,
@@ -13,13 +15,7 @@ export type TripReportPdfOptions = {
   resolveAgencyLabel?: (agencyName?: string) => string;
   fieldSelection: ReportFieldSelection;
   tripSource?: "vehicle" | "bulk";
-  paymentSummary?: {
-    totalAmount: number;
-    totalPaid: number;
-    totalOutstanding: number;
-    totalReceived?: number;
-    totalRemaining?: number;
-  } | null;
+  reportTotals?: TripReportTotals | null;
 };
 
 export function downloadTripReportPdf(
@@ -101,32 +97,13 @@ export function downloadTripReportPdf(
   };
 
   writeText(title, leftX, y, { size: 18, bold: true });
-  
-  let rightY = y;
-  const writeRight = (text: string, size: number, bold: boolean) => {
-    writeText(text, rightX - textWidth(text), rightY, { size, bold });
-    rightY += 6;
-  };
+  const tripsLabel = `Total Trips: ${trips.length}`;
+  writeText(tripsLabel, rightX - textWidth(tripsLabel), y + 2, {
+    size: 11,
+    bold: true,
+  });
 
-  writeRight(`Total Trips: ${trips.length}`, 11, true);
-
-  if (options.tripSource === "bulk") {
-    const totalGrand = trips.reduce((sum, t) => sum + (Number(t.cabCost) || 0), 0);
-    const totalAdvance = trips.reduce((sum, t) => sum + (Number(t.advance) || 0), 0);
-    const totalBalance = trips.reduce((sum, t) => sum + (Number(t.balanceAmount) || 0), 0);
-    
-    writeRight(`Grand Total: Rs. ${totalGrand.toLocaleString("en-IN", { minimumFractionDigits: 2 })}`, 10, true);
-    writeRight(`Total Advance: Rs. ${totalAdvance.toLocaleString("en-IN", { minimumFractionDigits: 2 })}`, 10, false);
-    writeRight(`Total Balance: Rs. ${totalBalance.toLocaleString("en-IN", { minimumFractionDigits: 2 })}`, 10, false);
-    
-    if (options.paymentSummary && options.paymentSummary.totalReceived !== undefined && options.paymentSummary.totalRemaining !== undefined) {
-      rightY += 2;
-      writeRight(`Payouts Received: Rs. ${options.paymentSummary.totalReceived.toLocaleString("en-IN", { minimumFractionDigits: 2 })}`, 10, true);
-      writeRight(`Remaining: Rs. ${options.paymentSummary.totalRemaining.toLocaleString("en-IN", { minimumFractionDigits: 2 })}`, 10, false);
-    }
-  }
-
-  y += 7;
+  y += 8;
   writeText(`Generated on: ${fmtDate(new Date())}`, leftX, y, {
     size: 10,
     color: [51, 65, 85],
@@ -139,7 +116,40 @@ export function downloadTripReportPdf(
     });
     y += 6;
   }
-  y = Math.max(y, rightY) + 3;
+
+  const totalLines = options.reportTotals
+    ? tripReportTotalLines(options.reportTotals)
+    : [];
+  if (totalLines.length > 0) {
+    y += 2;
+    writeText("Report totals", leftX, y, {
+      size: 10,
+      bold: true,
+      color: [71, 85, 105],
+    });
+    y += 5;
+    const colGap = 6;
+    const colW = (pageWidth - colGap) / 2;
+    const rowH = 5;
+    for (let i = 0; i < totalLines.length; i++) {
+      const line = totalLines[i];
+      const col = i % 2;
+      const row = Math.floor(i / 2);
+      const x = leftX + col * (colW + colGap);
+      const rowY = y + row * rowH;
+      writeText(`${line.label}:`, x, rowY, {
+        size: 9,
+        bold: false,
+        color: [71, 85, 105],
+      });
+      const val = line.value;
+      writeText(val, x + colW - textWidth(val), rowY, {
+        size: 9,
+        bold: Boolean(line.emphasize),
+      });
+    }
+    y += Math.ceil(totalLines.length / 2) * rowH + 4;
+  }
 
   doc.setDrawColor(60, 60, 60);
   doc.line(leftX, y, rightX, y);

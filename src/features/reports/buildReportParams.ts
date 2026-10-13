@@ -8,10 +8,17 @@ export type ReportDateFilter = {
   endDate: string;
 };
 
-const TRIP_STATUSES = new Set([
+const VEHICLE_TRIP_STATUSES = new Set([
   "scheduled",
   "in_progress",
   "completed",
+  "cancelled",
+]);
+/** AgencyTrip / bulk entry statuses (not vehicle trip lifecycle). */
+const BULK_TRIP_STATUSES = new Set([
+  "draft",
+  "pending",
+  "converted",
   "cancelled",
 ]);
 const PAYMENT_STATUSES = new Set(["paid", "partial", "unpaid"]);
@@ -21,6 +28,7 @@ const PAYMENT_STATUSES = new Set(["paid", "partial", "unpaid"]);
  * Trip status and payment status are separate filters.
  * When only payment status is set, it is sent as `status` (backend legacy).
  * When both are set, trip status goes to `status` and payment to `paymentStatus`.
+ * Bulk entries use pending/converted/… — vehicle statuses like "completed" are ignored.
  */
 export function buildTripReportHistoryParams(
   entity: ReportEntityFilter | null,
@@ -33,12 +41,15 @@ export function buildTripReportHistoryParams(
     paymentStatus?: string;
   },
 ): HistoryParams {
+  const tripSource = opts?.tripSource ?? "vehicle";
   const paymentStatus =
     opts?.paymentStatus && opts.paymentStatus !== "all"
       ? opts.paymentStatus
       : "";
+  const allowedStatuses =
+    tripSource === "bulk" ? BULK_TRIP_STATUSES : VEHICLE_TRIP_STATUSES;
   const hasTrip =
-    tripStatus && tripStatus !== "all" && TRIP_STATUSES.has(tripStatus);
+    tripStatus && tripStatus !== "all" && allowedStatuses.has(tripStatus);
   const hasPayment =
     paymentStatus && PAYMENT_STATUSES.has(paymentStatus);
 
@@ -47,7 +58,7 @@ export function buildTripReportHistoryParams(
     limit: opts?.limit ?? 20,
     sortBy: "startDate",
     sortOrder: "desc",
-    tripSource: opts?.tripSource ?? "vehicle",
+    tripSource,
   };
 
   if (hasTrip && hasPayment) {
@@ -58,6 +69,9 @@ export function buildTripReportHistoryParams(
   } else if (hasPayment) {
     // Backend treats paid/partial/unpaid on the status query as payment filter
     params.status = paymentStatus;
+  } else if (tripSource === "bulk") {
+    // Omit status so backend returns all non-cancelled bulk rows
+    params.status = "all";
   }
 
   if (dates.filterMode === "month" && dates.month && dates.month !== "all_time") {

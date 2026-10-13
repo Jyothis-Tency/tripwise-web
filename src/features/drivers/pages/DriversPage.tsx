@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Search, UserPlus, Users, ArrowLeft } from "lucide-react";
 import type { Driver, DriverBlockFilter } from "../api";
@@ -8,21 +8,37 @@ import { DriverDetail } from "../components/DriverDetail";
 import { AddDriverModal } from "../components/AddDriverModal";
 import { EditDriverModal } from "../components/EditDriverModal";
 import { EmptyState } from "../../../components/ui/EmptyState";
+import {
+  loadDriversUi,
+  saveDriversUi,
+  type DriverDetailTabId,
+} from "../driversUiStorage";
 
 export default function DriversPage() {
+  const savedUi = useMemo(() => loadDriversUi(), []);
   const [searchParams, setSearchParams] = useSearchParams();
   const driverParam = searchParams.get("driver");
   const tabParam = searchParams.get("tab");
 
+  const initialDriverId = driverParam || savedUi.selectedDriverId;
+  const initialTab: DriverDetailTabId =
+    tabParam === "salary"
+      ? "salary"
+      : tabParam === "details"
+        ? "details"
+        : savedUi.detailTab;
+
   const [drivers, setDrivers] = useState<Driver[]>([]);
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState("");
-  const [blockFilter, setBlockFilter] =
-    useState<DriverBlockFilter>("unblocked");
+  const [search, setSearch] = useState(savedUi.search);
+  const [blockFilter, setBlockFilter] = useState<DriverBlockFilter>(
+    savedUi.blockFilter,
+  );
   const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
+  const [detailTab, setDetailTab] = useState<DriverDetailTabId>(initialTab);
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingDriver, setEditingDriver] = useState<Driver | null>(null);
-  const selectedIdRef = useRef<string | null>(driverParam);
+  const selectedIdRef = useRef<string | null>(initialDriverId);
 
   const loadDrivers = useCallback(async () => {
     setLoading(true);
@@ -66,29 +82,53 @@ export default function DriversPage() {
     }
   }, [driverParam, drivers, loading]);
 
+  useEffect(() => {
+    if (tabParam === "salary" || tabParam === "details") {
+      setDetailTab(tabParam);
+    }
+  }, [tabParam, driverParam]);
+
+  useEffect(() => {
+    saveDriversUi({
+      search,
+      blockFilter,
+      selectedDriverId: selectedIdRef.current,
+      detailTab,
+    });
+  }, [search, blockFilter, selectedIdx, detailTab, drivers]);
+
   const selectedDriver =
     selectedIdx !== null ? (drivers[selectedIdx] ?? null) : null;
+
+  const syncUrl = (driverId: string | null, tab: DriverDetailTabId) => {
+    const next = new URLSearchParams(searchParams);
+    if (driverId) {
+      next.set("driver", driverId);
+      if (tab === "salary") next.set("tab", "salary");
+      else next.delete("tab");
+    } else {
+      next.delete("driver");
+      next.delete("tab");
+    }
+    setSearchParams(next, { replace: true });
+  };
 
   const selectDriver = (i: number) => {
     setSelectedIdx(i);
     const id = drivers[i]?._id ?? null;
     selectedIdRef.current = id;
-    if (id) {
-      const next = new URLSearchParams(searchParams);
-      next.set("driver", id);
-      if (tabParam === "salary") next.set("tab", "salary");
-      else next.delete("tab");
-      setSearchParams(next, { replace: true });
-    }
+    syncUrl(id, detailTab);
   };
 
   const clearSelection = () => {
     setSelectedIdx(null);
     selectedIdRef.current = null;
-    const next = new URLSearchParams(searchParams);
-    next.delete("driver");
-    next.delete("tab");
-    setSearchParams(next, { replace: true });
+    syncUrl(null, detailTab);
+  };
+
+  const handleDetailTabChange = (tab: DriverDetailTabId) => {
+    setDetailTab(tab);
+    if (selectedIdRef.current) syncUrl(selectedIdRef.current, tab);
   };
 
   return (
@@ -214,7 +254,8 @@ export default function DriversPage() {
                 key={selectedDriver._id}
                 driver={selectedDriver}
                 avatarIndex={selectedIdx ?? 0}
-                initialTab={tabParam === "salary" ? "salary" : "details"}
+                initialTab={detailTab}
+                onTabChange={handleDetailTabChange}
                 onBack={clearSelection}
                 onEdit={() => setEditingDriver(selectedDriver)}
                 onBlockChange={() => loadDrivers()}

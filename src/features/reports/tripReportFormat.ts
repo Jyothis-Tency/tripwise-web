@@ -89,11 +89,26 @@ export function toTripReportRow(
     totalTime: fmtTripDuration(trip.startTime, trip.endTime),
     agencyCost: reportFmtRs(trip.agencyCost ?? 0),
     cabCost: reportFmtRs(trip.cabCost ?? 0),
+    grandTotal: reportFmtRs(
+      (trip as { grandTotal?: number }).grandTotal ??
+        trip.paymentSummary?.totalAmount ??
+        trip.cabCost ??
+        trip.agencyCost ??
+        0,
+    ),
+    driverSalary: reportFmtRs(
+      trip.totalDriverSalary ??
+        trip.driver_salary ??
+        trip.driverBata ??
+        0,
+    ),
     agencyProfit: reportFmtRs(agencyProfit),
     fuelExpense: reportFmtRs(expenses.fuelExpense),
     extraExpenses: reportFmtRs(expenses.extraExpenses),
     advance: reportFmtRs(trip.advance ?? 0),
-    balance: reportFmtRs(trip.balanceAmount ?? trip.paymentSummary?.remainingBalance ?? 0),
+    balance: reportFmtRs(
+      trip.balanceAmount ?? trip.paymentSummary?.remainingBalance ?? 0,
+    ),
     toll: reportFmtRs(trip.toll ?? 0),
     notes: trip.notes ?? "N/A",
     vehicleType: trip.vehicleType ?? "N/A",
@@ -119,11 +134,13 @@ export function reportFieldLabel(id: ReportFieldId): string {
     totalTime: "Total Time:",
     agencyCost: "Agency Cost",
     cabCost: "Cab Cost",
+    grandTotal: "Grand Total",
+    driverSalary: "Driver Salary",
     agencyProfit: "Owner Profit",
     fuelExpense: "Fuel",
     extraExpenses: "Extra Expenses",
     advance: "Advance",
-    balance: "Balance",
+    balance: "Remaining",
     toll: "Toll",
     notes: "Notes",
     vehicleType: "Vehicle Type:",

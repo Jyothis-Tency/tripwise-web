@@ -658,6 +658,7 @@ interface DriverDetailProps {
   driver: Driver;
   avatarIndex?: number;
   initialTab?: "details" | "salary";
+  onTabChange?: (tab: "details" | "salary") => void;
   onBack?: () => void;
   onEdit?: () => void;
   onBlockChange: () => void;
@@ -668,6 +669,7 @@ export function DriverDetail({
   driver,
   avatarIndex = 0,
   initialTab = "details",
+  onTabChange,
   onEdit,
   onBlockChange,
 }: DriverDetailProps) {
@@ -678,6 +680,11 @@ export function DriverDetail({
   useEffect(() => {
     setTab(initialTab);
   }, [initialTab, driver._id]);
+
+  const selectTab = (next: "details" | "salary") => {
+    setTab(next);
+    onTabChange?.(next);
+  };
 
   const name = driverDisplayName(driver);
   const isBlocked = !!driver.isBlocked;
@@ -795,7 +802,7 @@ export function DriverDetail({
           <button
             key={t}
             type="button"
-            onClick={() => setTab(t)}
+            onClick={() => selectTab(t)}
             className={`px-4 py-3.5 text-sm font-bold capitalize transition ${
               tab === t
                 ? "border-b-[3px] border-indigo-600 text-indigo-600 dark:border-indigo-400 dark:text-[#a5b4fc]"

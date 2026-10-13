@@ -15,6 +15,8 @@ export type ReportFieldId =
   | "totalTime"
   | "agencyCost"
   | "cabCost"
+  | "grandTotal"
+  | "driverSalary"
   | "agencyProfit"
   | "fuelExpense"
   | "extraExpenses"
@@ -55,20 +57,27 @@ export const REPORT_FIELD_DEFS: ReportFieldDef[] = [
   { id: "totalTime", label: "Total Time", section: "middle", defaultOn: true },
   { id: "agencyCost", label: "Agency Cost", section: "right", defaultOn: true },
   { id: "cabCost", label: "Cab Cost", section: "right", defaultOn: true },
+  { id: "grandTotal", label: "Grand Total", section: "right", defaultOn: true },
+  {
+    id: "driverSalary",
+    label: "Driver Salary",
+    section: "right",
+    defaultOn: true,
+  },
   { id: "agencyProfit", label: "Owner Profit", section: "right", defaultOn: false },
   { id: "fuelExpense", label: "Fuel", section: "right", defaultOn: false },
   { id: "extraExpenses", label: "Extra Expenses", section: "right", defaultOn: false },
-  { id: "advance", label: "Advance", section: "right", defaultOn: false },
-  { id: "balance", label: "Balance", section: "right", defaultOn: false },
+  { id: "advance", label: "Advance", section: "right", defaultOn: true },
+  { id: "balance", label: "Remaining", section: "right", defaultOn: true },
   { id: "toll", label: "Toll", section: "right", defaultOn: false },
   { id: "notes", label: "Notes", section: "left", defaultOn: false },
   { id: "vehicleType", label: "Vehicle Type", section: "header", defaultOn: false },
   { id: "mobileNumber", label: "Mobile Number", section: "header", defaultOn: false },
 ];
 
+/** Bulk-only presentation fields (not typical vehicle-trip columns). */
 export const BULK_ONLY_FIELDS: ReportFieldId[] = [
-  "advance",
-  "balance",
+  "grandTotal",
   "toll",
   "notes",
   "vehicleType",
@@ -97,14 +106,28 @@ export function defaultReportFieldSelection(
   const sel = {} as ReportFieldSelection;
   for (const f of REPORT_FIELD_DEFS) {
     if (tripSource === "bulk") {
-      if (BULK_ONLY_FIELDS.includes(f.id)) {
-        sel[f.id] = true;
-        continue;
-      }
       if (VEHICLE_ONLY_FIELDS.includes(f.id)) {
         sel[f.id] = false;
         continue;
       }
+      if (BULK_ONLY_FIELDS.includes(f.id)) {
+        sel[f.id] = f.defaultOn;
+        continue;
+      }
+      // Shared money fields for bulk agency reports
+      if (
+        f.id === "cabCost" ||
+        f.id === "advance" ||
+        f.id === "balance" ||
+        f.id === "driverSalary"
+      ) {
+        sel[f.id] = true;
+        continue;
+      }
+    }
+    if (tripSource === "vehicle" && f.id === "grandTotal") {
+      sel[f.id] = false;
+      continue;
     }
     sel[f.id] = f.defaultOn;
   }

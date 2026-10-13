@@ -7,6 +7,12 @@ import { VehicleExpensesPane } from "../components/VehicleExpensesPane";
 import { fetchVehicles, type Vehicle } from "../../vehicles/api";
 import { VehicleListCard } from "../../vehicles/components/VehicleListCard";
 import {
+  loadExpensesUi,
+  saveExpensesUi,
+  type ExpensesModeId,
+  type ExpensesPayerFilter,
+} from "../expensesUiStorage";
+import {
   Car,
   Search,
   ChevronLeft,
@@ -16,7 +22,7 @@ import {
   ArrowRight,
 } from "lucide-react";
 
-type ExpensesMode = "trip" | "vehicle";
+type ExpensesMode = ExpensesModeId;
 
 function ModeTabsBar({
   mode,
@@ -82,21 +88,29 @@ function getTripStatusStyle(status?: string): string {
 }
 
 const ExpensesPage: React.FC = () => {
-  const [mode, setMode] = useState<ExpensesMode>("trip");
+  const savedUi = useMemo(() => loadExpensesUi(), []);
+
+  const [mode, setMode] = useState<ExpensesMode>(savedUi.mode);
 
   // Trip Expenses State
-  const [search, setSearch] = useState("");
-  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [search, setSearch] = useState(savedUi.tripSearch);
+  const [debouncedSearch, setDebouncedSearch] = useState(savedUi.tripSearch);
   const [trips, setTrips] = useState<TripWithExpenses[]>([]);
   const [tripLoading, setTripLoading] = useState(true);
-  const [payerFilter, setPayerFilter] = useState<"all" | "company" | "personal">("all");
-  const [selectedTripId, setSelectedTripId] = useState<string | null>(null);
+  const [payerFilter, setPayerFilter] = useState<ExpensesPayerFilter>(
+    savedUi.payerFilter,
+  );
+  const [selectedTripId, setSelectedTripId] = useState<string | null>(
+    savedUi.selectedTripId,
+  );
 
   // Vehicle Expenses State
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
-  const [vehicleSearch, setVehicleSearch] = useState("");
+  const [vehicleSearch, setVehicleSearch] = useState(savedUi.vehicleSearch);
   const [vehicleLoading, setVehicleLoading] = useState(false);
-  const [selectedVehicleId, setSelectedVehicleId] = useState<string | null>(null);
+  const [selectedVehicleId, setSelectedVehicleId] = useState<string | null>(
+    savedUi.selectedVehicleId,
+  );
 
   // Debounce trip search
   useEffect(() => {
@@ -105,6 +119,24 @@ const ExpensesPage: React.FC = () => {
     }, 300);
     return () => clearTimeout(t);
   }, [search]);
+
+  useEffect(() => {
+    saveExpensesUi({
+      mode,
+      tripSearch: search,
+      payerFilter,
+      selectedTripId,
+      vehicleSearch,
+      selectedVehicleId,
+    });
+  }, [
+    mode,
+    search,
+    payerFilter,
+    selectedTripId,
+    vehicleSearch,
+    selectedVehicleId,
+  ]);
 
   const loadTrips = useCallback(async () => {
     setTripLoading(true);
@@ -161,7 +193,13 @@ const ExpensesPage: React.FC = () => {
     if (mode !== "trip") return;
     setSelectedTripId((prev) => {
       if (prev && trips.some((t) => t._id === prev)) return prev;
-      if (typeof window !== "undefined" && window.innerWidth >= 768 && trips.length > 0) {
+      // Desktop only: auto-select first when nothing is remembered
+      if (
+        !prev &&
+        typeof window !== "undefined" &&
+        window.innerWidth >= 768 &&
+        trips.length > 0
+      ) {
         return trips[0]._id;
       }
       return null;

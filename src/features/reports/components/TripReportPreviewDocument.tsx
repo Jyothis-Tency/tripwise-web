@@ -1,5 +1,7 @@
 import type { HistoryTrip } from "../../history/api";
+import type { TripReportTotals } from "../entityReportTotals";
 import type { ReportFieldSelection } from "../reportFieldConfig";
+import { tripReportTotalLines } from "../reportTotalsDisplay";
 import { buildReportCardLines } from "../tripReportCardLayout";
 import { toTripReportRow } from "../tripReportFormat";
 
@@ -68,7 +70,7 @@ export function TripReportPreviewDocument({
   resolveAgencyLabel,
   pageNote,
   tripIndexOffset = 0,
-  paymentSummary,
+  reportTotals,
 }: {
   trips: HistoryTrip[];
   totalTrips: number;
@@ -78,18 +80,14 @@ export function TripReportPreviewDocument({
   resolveAgencyLabel: (agencyName?: string) => string;
   pageNote?: string;
   tripIndexOffset?: number;
-  paymentSummary?: {
-    totalAmount: number;
-    totalPaid: number;
-    totalOutstanding: number;
-    totalReceived?: number;
-    totalRemaining?: number;
-  } | null;
+  /** Full vehicle/bulk totals across all matching trips. */
+  reportTotals?: TripReportTotals | null;
 }) {
   const generatedOn = (() => {
     const d = new Date();
     return `${d.getDate()}/${d.getMonth() + 1}/${d.getFullYear()}`;
   })();
+  const totalLines = reportTotals ? tripReportTotalLines(reportTotals) : [];
 
   return (
     <div className="mx-auto w-full max-w-full bg-white text-slate-900 shadow-[0_20px_40px_-14px_rgba(15,23,42,0.28)] ring-1 ring-slate-900/10">
@@ -118,31 +116,35 @@ export function TripReportPreviewDocument({
             <p className="text-sm font-bold text-slate-900 tabular-nums">
               Total Trips: {totalTrips.toLocaleString("en-IN")}
             </p>
-            {paymentSummary && (
-              <div className="mt-2 flex flex-col gap-0.5 items-end">
-                <p className="text-xs font-bold text-slate-900">
-                  Grand Total: Rs. {paymentSummary.totalAmount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
-                </p>
-                <p className="text-[11px] text-slate-700">
-                  Total Advance: Rs. {paymentSummary.totalPaid.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
-                </p>
-                <p className="text-[11px] text-slate-700">
-                  Total Balance: Rs. {paymentSummary.totalOutstanding.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
-                </p>
-                {paymentSummary.totalReceived !== undefined && paymentSummary.totalRemaining !== undefined && (
-                  <div className="mt-1 pt-1 border-t border-slate-200">
-                    <p className="text-xs font-bold text-slate-800">
-                      Payouts Received: Rs. {paymentSummary.totalReceived.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
-                    </p>
-                    <p className="text-[11px] text-slate-700">
-                      Remaining: Rs. {paymentSummary.totalRemaining.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
-                    </p>
-                  </div>
-                )}
-              </div>
-            )}
           </div>
         </div>
+
+        {totalLines.length > 0 && (
+          <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50/70 px-3 py-3 sm:px-4">
+            <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.14em] text-slate-500">
+              Report totals
+            </p>
+            <div className="grid grid-cols-1 gap-x-6 gap-y-1.5 sm:grid-cols-2">
+              {totalLines.map((line) => (
+                <div
+                  key={line.label}
+                  className="flex items-baseline justify-between gap-3 text-[12px]"
+                >
+                  <span className="text-slate-600">{line.label}</span>
+                  <span
+                    className={`tabular-nums ${
+                      line.emphasize
+                        ? "font-bold text-slate-900"
+                        : "font-semibold text-slate-800"
+                    }`}
+                  >
+                    {line.value}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         <hr className="my-4 border-slate-300" />
 

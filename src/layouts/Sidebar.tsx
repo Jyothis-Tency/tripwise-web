@@ -128,18 +128,15 @@ export function Sidebar({
         className={`flex shrink-0 items-center border-b border-slate-100 dark:border-[#1e2638] ${collapsed ? "h-14 justify-center px-2" : "gap-3 px-3.5 py-3.5"}`}
       >
         <div className="flex min-w-0 flex-1 items-center gap-2.5">
-          <TripwiseLogo
-            className="h-11 w-11 shrink-0 drop-shadow-[0_0_14px_rgba(99,102,241,0.4)]"
-          />
-          {!collapsed && (
-            <div className="min-w-0">
-              <div className="truncate text-sm font-bold tracking-tight text-slate-900 dark:text-white">
-                Tripwise
-              </div>
-              <p className="truncate text-[11px] font-medium text-slate-400 dark:text-slate-500">
-                Fleet operations
-              </p>
-            </div>
+          {collapsed ? (
+            <TripwiseLogo className="h-10 w-10 shrink-0" variant="auto" />
+          ) : (
+            <TripwiseLogo
+              className="min-w-0"
+              variant="auto"
+              withWordmark
+              tagline="Fleet operations"
+            />
           )}
         </div>
         {onClose && (

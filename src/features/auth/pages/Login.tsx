@@ -74,27 +74,59 @@ export function LoginPage() {
         )}
       </button>
 
-      {/* Branding panel */}
-      <div className="relative flex shrink-0 flex-col items-center justify-center overflow-hidden rounded-b-[32px] bg-gradient-to-br from-indigo-600 via-indigo-600 to-indigo-800 px-6 py-10 pb-20 text-center text-white sm:py-12 lg:min-h-screen lg:flex-1 lg:rounded-none lg:pb-12 dark:from-indigo-950 dark:via-[#0b1120] dark:to-[#060a15]">
+      {/* Branding panel — light: soft surface + navy mark; dark: navy + amber mark */}
+      <div
+        className={`relative flex shrink-0 flex-col items-center justify-center overflow-hidden rounded-b-[32px] px-6 py-10 pb-20 text-center sm:py-12 lg:min-h-screen lg:flex-1 lg:rounded-none lg:pb-12 ${
+          theme === "dark"
+            ? "bg-gradient-to-br from-[#12243A] via-[#16304c] to-[#0c1828] text-white"
+            : "bg-gradient-to-br from-[#F7F8FA] via-[#EEF1F5] to-[#E4E7EC] text-[#12243A]"
+        }`}
+      >
         <div
-          className="pointer-events-none absolute -top-24 -left-16 h-64 w-64 rounded-full bg-indigo-400/20 blur-3xl dark:bg-indigo-500/15"
+          className={`pointer-events-none absolute -top-24 -left-16 h-64 w-64 rounded-full blur-3xl ${
+            theme === "dark" ? "bg-[#F5A300]/15" : "bg-[#12243A]/08"
+          }`}
           aria-hidden
         />
         <div
-          className="pointer-events-none absolute -right-20 -bottom-20 h-72 w-72 rounded-full bg-indigo-300/15 blur-3xl dark:bg-indigo-400/10"
+          className={`pointer-events-none absolute -right-20 -bottom-20 h-72 w-72 rounded-full blur-3xl ${
+            theme === "dark" ? "bg-[#F5A300]/10" : "bg-[#F5A300]/12"
+          }`}
           aria-hidden
         />
         <div className="relative z-10 animate-fade-in">
           <div className="mx-auto mb-6 flex justify-center sm:mb-8">
-            <TripwiseLogo className="h-32 w-32 drop-shadow-[0_0_32px_rgba(99,102,241,0.5)] sm:h-36 sm:w-36 lg:h-40 lg:w-40" />
+            <TripwiseLogo
+              variant={theme === "dark" ? "amber" : "navy"}
+              className={`h-28 w-28 sm:h-32 sm:w-32 lg:h-36 lg:w-36 ${
+                theme === "dark"
+                  ? "drop-shadow-[0_12px_32px_rgba(245,163,0,0.35)]"
+                  : "drop-shadow-[0_12px_28px_rgba(18,36,58,0.18)]"
+              }`}
+            />
           </div>
-          <h1 className="mb-2 text-2xl font-bold tracking-tight sm:text-3xl lg:text-4xl">
-            Tripwise
+          <h1 className="mb-2 font-[family-name:Sora,ui-sans-serif,system-ui,sans-serif] text-2xl font-bold tracking-tight sm:text-3xl lg:text-4xl">
+            Trip
+            <span
+              className={
+                theme === "dark" ? "text-[#F5A300]" : "text-[#C98200]"
+              }
+            >
+              wise
+            </span>
           </h1>
-          <p className="mb-4 text-xs font-medium tracking-widest text-indigo-100 uppercase sm:mb-6 sm:text-sm lg:text-base dark:text-indigo-300/80">
+          <p
+            className={`mb-4 text-xs font-medium tracking-widest uppercase sm:mb-6 sm:text-sm lg:text-base ${
+              theme === "dark" ? "text-slate-300" : "text-slate-500"
+            }`}
+          >
             Fleet Management
           </p>
-          <p className="mx-auto hidden max-w-xs text-sm leading-relaxed text-indigo-100/80 sm:block lg:max-w-md lg:text-base dark:text-slate-400">
+          <p
+            className={`mx-auto hidden max-w-xs text-sm leading-relaxed sm:block lg:max-w-md lg:text-base ${
+              theme === "dark" ? "text-slate-400" : "text-slate-500"
+            }`}
+          >
             Comprehensive trip management for fleet owners and drivers
           </p>
         </div>

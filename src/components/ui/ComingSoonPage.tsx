@@ -19,7 +19,7 @@ export function ComingSoonPage({
             <span className="text-4xl">{icon}</span>
           </div>
         ) : (
-          <TripwiseLogo className="mb-6 h-24 w-24 drop-shadow-md" />
+          <TripwiseLogo variant="auto" className="mb-6 h-24 w-24" />
         )}
         <h2 className="mb-2 text-xl font-bold tracking-tight text-slate-800 dark:text-slate-100">
           {title}

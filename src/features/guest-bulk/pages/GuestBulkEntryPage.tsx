@@ -1736,7 +1736,7 @@ export function GuestBulkEntryPage() {
   if (loading) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-[var(--bg-main)]">
-        <TripwiseLogo className="h-16 w-16 drop-shadow-md" />
+        <TripwiseLogo variant="auto" className="h-16 w-16" />
         <Loader2 className="h-6 w-6 animate-spin text-indigo-500" />
       </div>
     );
@@ -1746,7 +1746,7 @@ export function GuestBulkEntryPage() {
     return (
       <div className="flex min-h-screen items-center justify-center bg-[var(--bg-main)] p-6">
         <div className="w-full max-w-md rounded-2xl border border-rose-200 bg-[var(--bg-card)] p-6 text-center shadow-sm dark:border-rose-500/30">
-          <TripwiseLogo className="mx-auto mb-4 h-16 w-16" />
+          <TripwiseLogo variant="auto" className="mx-auto mb-4 h-16 w-16" />
           <AlertCircle className="mx-auto mb-3 h-10 w-10 text-rose-400" />
           <h1 className="text-lg font-bold text-slate-800 dark:text-white">
             Link unavailable
@@ -1768,9 +1768,12 @@ export function GuestBulkEntryPage() {
       <header className="shrink-0 border-b border-slate-200 bg-[var(--bg-card)]/95 px-2.5 py-2 shadow-sm backdrop-blur dark:border-[#1e2638] sm:px-4 sm:py-3">
         <div className="mx-auto flex max-w-5xl flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
           <div className="flex min-w-0 flex-1 items-start gap-2 sm:gap-3">
-            <TripwiseLogo className="mt-0.5 h-9 w-9 shrink-0 sm:h-12 sm:w-12" />
+            <TripwiseLogo
+              variant="auto"
+              className="mt-0.5 h-9 w-9 shrink-0 sm:h-12 sm:w-12"
+            />
             <div className="min-w-0 flex-1">
-            <p className="text-[10px] font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-[#C98200] dark:text-[#F5A300]">
               {isOwner
                 ? "Tripwise · owner review"
                 : "Tripwise · driver entry"}

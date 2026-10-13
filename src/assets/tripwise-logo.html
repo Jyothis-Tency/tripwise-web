@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tripwise logo</title>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@700&display=swap" rel="stylesheet">
+<style>
+:root { --navy: #12243A; --amber: #F5A300; --amber-deep: #C98200; }
+* { box-sizing: border-box; }
+body { margin: 0; font-family: system-ui, -apple-system, "Segoe UI", sans-serif; background: #E4E7EC; padding: 24px; }
+.grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; max-width: 1100px; margin: 0 auto; }
+.panel { aspect-ratio: 4 / 3; border-radius: 16px; display: flex; align-items: center; justify-content: center; position: relative; }
+.panel .label { position: absolute; left: 16px; bottom: 12px; font-size: 13px; }
+.light { background: #F7F8FA; color: #475467; --tile: var(--navy); --t: #FFFFFF; --dash: var(--navy); --word: var(--navy); --accent: var(--amber-deep); }
+.dark { background: var(--navy); color: #98A2B3; --tile: var(--amber); --t: var(--navy); --dash: var(--amber); --word: #FFFFFF; --accent: var(--amber); }
+.lockup { display: flex; align-items: center; gap: 18px; }
+.lockup svg { width: clamp(64px, 11vw, 120px); height: auto; }
+.only svg { width: clamp(96px, 20vw, 200px); height: auto; }
+.word { font-family: "Sora", "Segoe UI", system-ui, sans-serif; font-weight: 700; font-size: clamp(30px, 5.5vw, 56px); letter-spacing: -0.03em; color: var(--word); }
+.word span { color: var(--accent); }
+@media (max-width: 640px) { .grid { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+<symbol id="mark" viewBox="0 0 120 120">
+<rect width="120" height="120" rx="28" fill="var(--tile)"/>
+<rect x="24" y="24" width="72" height="18" rx="9" fill="var(--t)"/>
+<rect x="51" y="24" width="18" height="72" rx="9" fill="var(--t)"/>
+<line x1="34" y1="33" x2="86" y2="33" stroke="var(--dash)" stroke-width="3" stroke-linecap="round" stroke-dasharray="1 7"/>
+<line x1="60" y1="46" x2="60" y2="86" stroke="var(--dash)" stroke-width="3" stroke-linecap="round" stroke-dasharray="1 7"/>
+</symbol>
+</svg>
+
+<main class="grid">
+<section class="panel light">
+<div class="lockup">
+<svg viewBox="0 0 120 120" role="img" aria-label="Tripwise mark"><use href="#mark"/></svg>
+<div class="word">Trip<span>wise</span></div>
+</div>
+<div class="label">Light, with text</div>
+</section>
+
+<section class="panel dark">
+<div class="lockup">
+<svg viewBox="0 0 120 120" role="img" aria-label="Tripwise mark"><use href="#mark"/></svg>
+<div class="word">Trip<span>wise</span></div>
+</div>
+<div class="label">Dark, with text</div>
+</section>
+
+<section class="panel light only">
+<svg viewBox="0 0 120 120" role="img" aria-label="Tripwise mark"><use href="#mark"/></svg>
+<div class="label">Light, logo only</div>
+</section>
+
+<section class="panel dark only">
+<svg viewBox="0 0 120 120" role="img" aria-label="Tripwise mark"><use href="#mark"/></svg>
+<div class="label">Dark, logo only</div>
+</section>
+</main>
+</body>
+</html>

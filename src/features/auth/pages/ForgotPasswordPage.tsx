@@ -118,16 +118,37 @@ export function ForgotPasswordPage() {
         )}
       </button>
 
-      <div className="relative flex shrink-0 flex-col items-center justify-center overflow-hidden bg-gradient-to-br from-indigo-600 via-indigo-600 to-indigo-800 px-6 py-10 text-center text-white lg:min-h-screen lg:flex-1 dark:from-indigo-950 dark:via-[#0b1120] dark:to-[#060a15]">
+      <div
+        className={`relative flex shrink-0 flex-col items-center justify-center overflow-hidden px-6 py-10 text-center lg:min-h-screen lg:flex-1 ${
+          theme === "dark"
+            ? "bg-gradient-to-br from-[#12243A] via-[#16304c] to-[#0c1828] text-white"
+            : "bg-gradient-to-br from-[#F7F8FA] via-[#EEF1F5] to-[#E4E7EC] text-[#12243A]"
+        }`}
+      >
         <div
-          className="pointer-events-none absolute -top-20 -left-10 h-56 w-56 rounded-full bg-indigo-400/20 blur-3xl"
+          className={`pointer-events-none absolute -top-20 -left-10 h-56 w-56 rounded-full blur-3xl ${
+            theme === "dark" ? "bg-[#F5A300]/15" : "bg-[#12243A]/08"
+          }`}
           aria-hidden
         />
         <div className="relative z-10 mx-auto mb-6 flex justify-center">
-          <TripwiseLogo className="h-32 w-32 drop-shadow-[0_0_28px_rgba(99,102,241,0.45)] sm:h-36 sm:w-36" />
+          <TripwiseLogo
+            variant={theme === "dark" ? "amber" : "navy"}
+            className={`h-28 w-28 sm:h-32 sm:w-32 ${
+              theme === "dark"
+                ? "drop-shadow-[0_12px_28px_rgba(245,163,0,0.35)]"
+                : "drop-shadow-[0_12px_28px_rgba(18,36,58,0.18)]"
+            }`}
+          />
         </div>
-        <h1 className="relative z-10 text-2xl font-bold">Reset password</h1>
-        <p className="relative z-10 mt-2 max-w-xs text-sm text-indigo-100 dark:text-slate-400">
+        <h1 className="relative z-10 font-[family-name:Sora,ui-sans-serif,system-ui,sans-serif] text-2xl font-bold">
+          Reset password
+        </h1>
+        <p
+          className={`relative z-10 mt-2 max-w-xs text-sm ${
+            theme === "dark" ? "text-slate-300" : "text-slate-500"
+          }`}
+        >
           We&apos;ll email you a one-time code. Your current password cannot be
           shown — set a new one with the code.
         </p>

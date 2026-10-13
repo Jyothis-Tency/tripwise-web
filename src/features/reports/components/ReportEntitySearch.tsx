@@ -124,17 +124,13 @@ export function ReportEntitySearch({
   const iconFor = (kind: Suggestion["kind"]) => {
     switch (kind) {
       case "driver":
-        return <User className="h-4 w-4 text-indigo-500 dark:text-indigo-400" />;
+        return <User className="h-3.5 w-3.5 text-slate-500" />;
       case "vehicle":
-        return (
-          <Car className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
-        );
+        return <Car className="h-3.5 w-3.5 text-slate-500" />;
       case "agency":
-        return (
-          <Building2 className="h-4 w-4 text-violet-600 dark:text-violet-400" />
-        );
+        return <Building2 className="h-3.5 w-3.5 text-slate-500" />;
       case "trip":
-        return <Hash className="h-4 w-4 text-amber-600 dark:text-amber-400" />;
+        return <Hash className="h-3.5 w-3.5 text-slate-500" />;
     }
   };
 
@@ -153,14 +149,14 @@ export function ReportEntitySearch({
 
   return (
     <div ref={wrapRef} className="relative space-y-2">
-      <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-        Search entity / ID
+      <label className="mb-1.5 block text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">
+        Entity / ID
       </label>
       {value && (
         <div className="flex flex-wrap items-center gap-2">
-          <span className="inline-flex items-center gap-1.5 rounded-full border border-indigo-200 bg-indigo-50 px-3 py-1 text-sm font-medium text-indigo-800 dark:border-indigo-500/40 dark:bg-indigo-500/15 dark:text-indigo-200">
+          <span className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 bg-slate-50 px-2.5 py-1 text-[12px] font-medium text-slate-800 dark:border-[#243049] dark:bg-[#0b1220] dark:text-slate-200">
             {iconFor(value.type === "trip" ? "trip" : value.type)}
-            <span className="text-xs uppercase text-indigo-600/80 dark:text-indigo-400">
+            <span className="font-mono text-[10px] uppercase tracking-wider text-slate-400">
               {value.type === "trip"
                 ? "Trip"
                 : value.type.charAt(0).toUpperCase() + value.type.slice(1)}
@@ -169,7 +165,7 @@ export function ReportEntitySearch({
             <button
               type="button"
               onClick={() => onChange(null)}
-              className="ml-0.5 rounded-full p-0.5 hover:bg-indigo-100 dark:hover:bg-indigo-500/25"
+              className="ml-0.5 rounded p-0.5 hover:bg-slate-200/80 dark:hover:bg-white/10"
               aria-label="Clear filter"
             >
               <X className="h-3.5 w-3.5" />
@@ -179,7 +175,7 @@ export function ReportEntitySearch({
       )}
 
       <div className="relative">
-        <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 dark:text-slate-500" />
+        <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400 dark:text-slate-500" />
         <input
           type="text"
           value={query}
@@ -190,8 +186,8 @@ export function ReportEntitySearch({
             setOpen(true);
           }}
           onFocus={() => setOpen(true)}
-          placeholder="Search trip number, driver, vehicle, or agency…"
-          className="w-full rounded-lg border border-slate-200 bg-[var(--bg-elevated)] py-2.5 pl-10 pr-10 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-indigo-400 focus:ring-1 focus:ring-indigo-200 disabled:opacity-60 dark:border-[#1e2638] dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-indigo-400"
+          placeholder="Trip #, driver, vehicle, agency…"
+          className="w-full rounded-md border border-slate-200/90 bg-white py-2 pl-8 pr-8 text-[13px] text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-slate-400 focus:ring-1 focus:ring-slate-300 disabled:opacity-60 dark:border-[#243049] dark:bg-[#0b1220] dark:text-slate-100 dark:placeholder:text-slate-500"
           disabled={!!value}
         />
         {query && !value && (
@@ -201,22 +197,22 @@ export function ReportEntitySearch({
               setQuery("");
               onQueryChange?.("");
             }}
-            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
           >
-            <X className="h-4 w-4" />
+            <X className="h-3.5 w-3.5" />
           </button>
         )}
       </div>
 
       {open && !value && query.trim() && (
-        <div className="absolute z-20 mt-1 max-h-64 w-full overflow-y-auto rounded-xl border border-slate-200 bg-[var(--bg-card)] shadow-lg dark:border-[#1e2638]">
+        <div className="absolute z-20 mt-1 max-h-64 w-full overflow-y-auto rounded-lg border border-slate-200 bg-white shadow-lg dark:border-[#243049] dark:bg-[#0e1524]">
           {loadingTrips && suggestions.length === 0 && (
-            <p className="px-4 py-3 text-sm text-slate-500 dark:text-slate-400">
-              Searching trips…
+            <p className="px-3 py-2.5 text-[12px] text-slate-500 dark:text-slate-400">
+              Searching…
             </p>
           )}
           {!loadingTrips && suggestions.length === 0 && (
-            <p className="px-4 py-3 text-sm text-slate-500 dark:text-slate-400">
+            <p className="px-3 py-2.5 text-[12px] text-slate-500 dark:text-slate-400">
               No matches
             </p>
           )}
@@ -225,13 +221,13 @@ export function ReportEntitySearch({
               key={`${s.kind}-${s.kind === "agency" ? s.name : s.kind === "trip" ? s.tripNumber : s.id}`}
               type="button"
               onClick={() => selectSuggestion(s)}
-              className="flex w-full items-center gap-3 border-b border-slate-100 px-4 py-2.5 text-left text-sm last:border-0 hover:bg-indigo-50/60 dark:border-[#1e2638] dark:hover:bg-indigo-500/10"
+              className="flex w-full items-center gap-2.5 border-b border-slate-100 px-3 py-2 text-left text-[13px] last:border-0 hover:bg-slate-50 dark:border-[#1e2638] dark:hover:bg-white/[0.04]"
             >
               {iconFor(s.kind)}
               <span className="min-w-0 flex-1 truncate font-medium text-slate-800 dark:text-slate-100">
                 {s.label}
               </span>
-              <span className="shrink-0 text-xs text-slate-400 dark:text-slate-500">
+              <span className="shrink-0 font-mono text-[10px] uppercase tracking-wider text-slate-400 dark:text-slate-500">
                 {kindLabel(s.kind)}
               </span>
             </button>

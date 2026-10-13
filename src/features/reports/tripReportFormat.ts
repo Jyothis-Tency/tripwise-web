@@ -1,6 +1,10 @@
 import type { HistoryTrip } from "../history/api";
 import { historyDriverName, historyVehicleNumber } from "../history/historyTripDisplay";
 import { fmtTimeAmPm, fmtTripDuration } from "../history/historyTimeUtils";
+import {
+  computeAgencyProfitPreview,
+  getHistoryTripExpenseBreakdown,
+} from "../history/tripExpenseBreakdown";
 import type { ReportFieldId } from "./reportFieldConfig";
 
 export function reportFmtDate(raw: unknown): string {
@@ -62,6 +66,12 @@ export function toTripReportRow(
       ? `${trip.startKilometers} km`
       : "N/A";
 
+  const expenses = getHistoryTripExpenseBreakdown(trip);
+  const agencyProfit =
+    trip.agencyProfit != null && Number.isFinite(Number(trip.agencyProfit))
+      ? Number(trip.agencyProfit)
+      : computeAgencyProfitPreview(trip.agencyCost, trip.cabCost, trip.expenses);
+
   return {
     tripNumber: trip.tripNumber ? String(trip.tripNumber) : "N/A",
     driver: historyDriverName(trip.driver),
@@ -77,7 +87,11 @@ export function toTripReportRow(
     startTime: fmtTimeAmPm(trip.startTime),
     totalKm: reportTotalKm(trip),
     totalTime: fmtTripDuration(trip.startTime, trip.endTime),
+    agencyCost: reportFmtRs(trip.agencyCost ?? 0),
     cabCost: reportFmtRs(trip.cabCost ?? 0),
+    agencyProfit: reportFmtRs(agencyProfit),
+    fuelExpense: reportFmtRs(expenses.fuelExpense),
+    extraExpenses: reportFmtRs(expenses.extraExpenses),
     advance: reportFmtRs(trip.advance ?? 0),
     balance: reportFmtRs(trip.balanceAmount ?? trip.paymentSummary?.remainingBalance ?? 0),
     toll: reportFmtRs(trip.toll ?? 0),
@@ -103,7 +117,11 @@ export function reportFieldLabel(id: ReportFieldId): string {
     startTime: "Starting Time:",
     totalKm: "Total KM:",
     totalTime: "Total Time:",
+    agencyCost: "Agency Cost",
     cabCost: "Cab Cost",
+    agencyProfit: "Owner Profit",
+    fuelExpense: "Fuel",
+    extraExpenses: "Extra Expenses",
     advance: "Advance",
     balance: "Balance",
     toll: "Toll",

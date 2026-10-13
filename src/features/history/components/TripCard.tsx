@@ -1,8 +1,6 @@
 import { useState, useEffect } from "react";
 import { DatePicker } from "../../../components/ui/DatePicker";
 import {
-  ChevronDown,
-  ChevronUp,
   Trash2,
   Car,
   User,
@@ -13,6 +11,8 @@ import {
   X,
   ArrowRight,
   Route,
+  Maximize2,
+  Building2,
 } from "lucide-react";
 import type { HistoryTrip, RecordPaymentTripSummary } from "../api";
 import { deleteTrip, recordPayment, updateTripFields } from "../api";
@@ -569,6 +569,7 @@ export function RecordPaymentModal({
 interface TripCardProps {
   trip: HistoryTrip;
   readOnly?: boolean;
+  /** @deprecated Details open in a modal; kept for call-site compatibility. */
   defaultExpanded?: boolean;
   onDeleted?: () => void;
   /** Called with server summary after a payment; parent can patch list without refetching. */
@@ -600,8 +601,22 @@ export function TripCard({
   const expenseBreakdown = getHistoryTripExpenseBreakdown(trip);
   const salaryBreakdown = computeDriverSalaryBreakdown(trip);
 
-  const [expanded, setExpanded] = useState(defaultExpanded);
+  const [detailOpen, setDetailOpen] = useState(defaultExpanded);
   const [deleting, setDeleting] = useState(false);
+
+  useEffect(() => {
+    if (!detailOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setDetailOpen(false);
+    };
+    document.addEventListener("keydown", onKey);
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prev;
+    };
+  }, [detailOpen]);
 
   const totalAmount =
     trip.paymentSummary?.totalAmount ?? (Number(trip.agencyCost) || 0);
@@ -618,6 +633,11 @@ export function TripCard({
   const routeTo = trip.to ?? trip.drop;
   const durationLabel = fmtTripDuration(trip.startTime, trip.endTime);
   const plate = vehicleNum(trip.vehicle);
+  const agencyLabel = (
+    resolveAgencyLabel
+      ? resolveAgencyLabel(trip.agencyName)
+      : trip.agencyName || ""
+  ).trim();
 
   const handleDelete = async () => {
     if (!confirm("Delete this trip? This cannot be undone.")) return;
@@ -662,90 +682,256 @@ export function TripCard({
     />
   );
 
+  const detailBody = (
+    <div className="grid min-w-0 grid-cols-1 gap-6 lg:grid-cols-12 lg:gap-8">
+      <section className="min-w-0 lg:col-span-7">
+        <div className="mb-3 flex items-center gap-2 border-b border-slate-100 pb-2 dark:border-[#1e2638]">
+          <span className="h-4 w-1 rounded-full bg-indigo-500" />
+          <h4 className="text-xs font-bold tracking-wider text-indigo-500 uppercase dark:text-indigo-400">
+            Trip Details
+          </h4>
+        </div>
+        <div className="space-y-0.5 rounded-lg border border-slate-100 bg-slate-50/40 px-3 py-2 dark:border-[#1e2638] dark:bg-white/[0.03] sm:px-4 sm:py-3">
+          <DetailRow
+            label="Trip Number"
+            value={fmt(trip.tripNumber)}
+            emphasizeValue
+          />
+          <DetailRow
+            label="Status"
+            value={(trip.status ?? "—").replace(/_/g, " ")}
+          />
+          {E(
+            "Start Date",
+            fmtDate(trip.startDate ?? trip.date),
+            "startDate",
+          )}
+          {trip.endDate &&
+            E("End Date", fmtDate(trip.endDate), "expectedEndDate")}
+          {E(
+            "Start Time",
+            fmtTimeAmPm(trip.startTime),
+            "startTime",
+            undefined,
+            isoToTimeInputInTz(trip.startTime),
+          )}
+          {E(
+            "End Time",
+            fmtTimeAmPm(trip.endTime),
+            "endTime",
+            undefined,
+            isoToTimeInputInTz(trip.endTime),
+          )}
+          <DetailRow
+            label="Trip duration"
+            value={durationLabel}
+            highlight
+            emphasizeValue
+          />
+          <DetailRow label="Driver" value={driverName(trip.driver)} />
+          {typeof trip.driver !== "string" && trip.driver?.phone && (
+            <DetailRow
+              label="Driver Phone"
+              value={fmt(trip.driver.phone)}
+              emphasizeValue
+            />
+          )}
+          <DetailRow label="Vehicle" value={plate} />
+          {typeof trip.vehicle !== "string" && trip.vehicle?.vehicleType && (
+            <DetailRow
+              label="Vehicle Type"
+              value={fmt(trip.vehicle.vehicleType)}
+            />
+          )}
+          {E("From", fmt(trip.from ?? trip.pickup ?? ""), "from")}
+          {E("To", fmt(trip.to ?? trip.drop ?? ""), "to")}
+          {E("Distance", fmt(trip.distance || ""), "distance")}
+          {E(
+            "Start KM",
+            trip.startKilometers != null ? `${trip.startKilometers}` : "—",
+            "startKilometers",
+          )}
+          {E(
+            "End KM",
+            trip.endKilometers != null ? `${trip.endKilometers}` : "—",
+            "endKilometers",
+          )}
+          {travelledKm != null && (
+            <DetailRow
+              label="KM Travelled"
+              value={`${travelledKm} km`}
+              highlight
+              emphasizeValue
+            />
+          )}
+          {E("Customer", fmt(trip.customer || ""), "customer")}
+          {E(
+            "Agency",
+            fmt(
+              resolveAgencyLabel
+                ? resolveAgencyLabel(trip.agencyName)
+                : trip.agencyName || "",
+            ),
+            "agencyName",
+          )}
+          {trip.careOf?.name && (
+            <DetailRow label="Care Of" value={fmt(trip.careOf.name)} />
+          )}
+          {E(
+            "Notes",
+            fmt(trip.notes ?? trip.completionNote ?? ""),
+            "notes",
+          )}
+        </div>
+
+        {(routeFrom || routeTo || travelledKm != null) && (
+          <div className="mt-4 flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-[var(--bg-elevated)] p-3 dark:border-[#1e2638]">
+            <div className="flex min-w-0 items-center gap-3">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-indigo-200 bg-indigo-50 text-indigo-600 dark:border-indigo-500/30 dark:bg-indigo-500/15 dark:text-indigo-300">
+                <Route className="h-4 w-4" />
+              </span>
+              <div className="min-w-0">
+                <div className="truncate text-sm font-semibold text-slate-800 dark:text-slate-100">
+                  {routeFrom && routeTo
+                    ? `${routeFrom} → ${routeTo}`
+                    : "Trip route"}
+                </div>
+                <div className="text-[11px] text-slate-500 dark:text-slate-400">
+                  {[
+                    travelledKm != null ? `${travelledKm} km travelled` : null,
+                    durationLabel !== "—" ? durationLabel : null,
+                    plate !== "—" ? plate : null,
+                  ]
+                    .filter(Boolean)
+                    .join(" · ") || "Route summary"}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </section>
+
+      <div className="min-w-0 space-y-6 lg:col-span-5 lg:border-l lg:border-slate-100 lg:pl-8 dark:lg:border-[#1e2638]">
+        <section className="min-w-0">
+          <div className="mb-3 flex items-center gap-2 border-b border-slate-100 pb-2 dark:border-[#1e2638]">
+            <span className="h-4 w-1 rounded-full bg-emerald-500" />
+            <h4 className="text-xs font-bold tracking-wider text-emerald-600 uppercase dark:text-emerald-400">
+              Financial Details
+            </h4>
+          </div>
+          <div className="min-w-0 space-y-1 overflow-x-auto">
+            {E("Agency Cost", fmtCurrency(trip.agencyCost), "agencyCost")}
+            {E("Cab Cost", fmtCurrency(trip.cabCost), "cabCost")}
+            <DetailRow
+              label="Fuel expense"
+              value={fmtCurrency(expenseBreakdown.fuelExpense)}
+              emphasizeValue
+            />
+            <DetailRow
+              label="Extra Expenses"
+              value={fmtCurrency(expenseBreakdown.extraExpenses)}
+              emphasizeValue
+            />
+            <div className="my-1.5 flex items-baseline justify-between gap-2 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-2 dark:border-[#1e2638] dark:bg-white/[0.04]">
+              <span className="text-sm font-medium text-slate-700 dark:text-slate-200">
+                Total Cab Cost
+              </span>
+              <span className="text-base font-bold tabular-nums text-indigo-600 dark:text-indigo-300">
+                {fmtCurrency(expenseBreakdown.totalCabCost)}
+              </span>
+            </div>
+            {E(
+              "Driver Bata",
+              fmtCurrency(salaryBreakdown.driverBata),
+              "driver_salary",
+            )}
+            <DetailRow
+              label="Extra personal expenses"
+              value={fmtCurrency(salaryBreakdown.personalExpenses)}
+              emphasizeValue
+            />
+            <div className="my-1.5 flex flex-col gap-0.5 rounded-lg border border-indigo-200/80 bg-indigo-50/50 px-2.5 py-2 dark:border-indigo-500/30 dark:bg-indigo-500/10">
+              <div className="flex items-baseline justify-between gap-2">
+                <span className="text-sm font-medium text-indigo-900 dark:text-indigo-200">
+                  Total Salary
+                </span>
+                <span className="text-base font-bold tabular-nums text-indigo-700 dark:text-indigo-300">
+                  {fmtCurrency(salaryBreakdown.totalSalary)}
+                </span>
+              </div>
+              <span className="text-[11px] font-medium text-indigo-600/80 dark:text-indigo-400">
+                {salaryBreakdown.bracketText}
+              </span>
+            </div>
+            {E("Advance", fmtCurrency(trip.advance), "advance")}
+            <div className="my-1.5 flex items-baseline justify-between gap-2 rounded-lg border border-emerald-200/80 bg-emerald-50/80 px-2.5 py-2 dark:border-emerald-500/30 dark:bg-emerald-500/10">
+              <span className="text-sm font-medium text-emerald-700 dark:text-emerald-300">
+                Owner profit
+              </span>
+              <span className="text-base font-bold tabular-nums text-emerald-700 dark:text-emerald-300">
+                {fmtCurrency(resolveTripAgencyProfitDisplay(trip))}
+              </span>
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>
+  );
+
   return (
     <>
-      <div
-        className={`group relative overflow-hidden rounded-xl border bg-[var(--bg-card)] shadow-sm transition-all duration-200 dark:border-[#1e2638] ${
-          expanded
-            ? "border-indigo-400/50 shadow-md dark:border-indigo-500/40"
-            : "border-slate-200 hover:border-slate-300 hover:shadow-md dark:hover:border-slate-600"
-        }`}
+      <article
+        role="button"
+        tabIndex={0}
+        onClick={() => setDetailOpen(true)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            setDetailOpen(true);
+          }
+        }}
+        className="group relative flex h-full cursor-pointer flex-col overflow-hidden rounded-2xl border border-slate-200 bg-[var(--bg-card)] shadow-sm transition duration-200 hover:-translate-y-0.5 hover:border-indigo-300 hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 dark:border-[#1e2638] dark:hover:border-indigo-500/40"
       >
         <div
           className={`absolute inset-y-0 left-0 w-1 bg-gradient-to-b ${paymentAccentClass(remaining, isPaidSettled)}`}
           aria-hidden
         />
 
-        {/* Header */}
-        <div
-          className="flex cursor-pointer items-start gap-3 px-4 py-3.5 transition hover:bg-slate-50/70 sm:gap-4 sm:px-5 sm:py-4 dark:hover:bg-white/[0.03]"
-          onClick={() => setExpanded((e) => !e)}
-        >
-          <div className="min-w-0 flex-1 space-y-2">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="truncate font-mono text-base font-bold tracking-tight text-slate-900 tabular-nums sm:text-lg dark:text-slate-100">
-                {trip.tripNumber ?? trip._id}
-              </span>
-              <span
-                className={`inline-flex shrink-0 items-center gap-1.5 rounded-md px-2 py-0.5 text-[10px] font-bold tracking-wider uppercase sm:text-[11px] ${getTripStatusStyle(trip.status)}`}
-              >
-                <span
-                  className={`h-1.5 w-1.5 rounded-full ${tripStatusDotClass(trip.status)}`}
-                />
-                {trip.status?.replace(/_/g, " ")}
-              </span>
-              {durationLabel && durationLabel !== "—" && (
-                <span className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10px] font-semibold text-slate-600 dark:border-[#1e2638] dark:bg-white/[0.04] dark:text-slate-300">
-                  <Clock className="h-3 w-3" />
-                  {durationLabel}
+        <div className="flex flex-1 flex-col gap-3 p-4 pl-5 sm:p-4 sm:pl-5">
+          <div className="flex items-start justify-between gap-2">
+            <div className="min-w-0 space-y-2">
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span className="truncate font-mono text-sm font-bold tracking-tight text-slate-900 tabular-nums dark:text-slate-100">
+                  {trip.tripNumber ?? trip._id}
                 </span>
-              )}
-            </div>
+                <span
+                  className={`inline-flex shrink-0 items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-bold tracking-wider uppercase ${getTripStatusStyle(trip.status)}`}
+                >
+                  <span
+                    className={`h-1.5 w-1.5 rounded-full ${tripStatusDotClass(trip.status)}`}
+                  />
+                  {trip.status?.replace(/_/g, " ")}
+                </span>
+              </div>
 
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-sm text-slate-600 dark:text-slate-400">
-              {routeFrom && routeTo && (
-                <span className="inline-flex min-w-0 max-w-full items-center gap-1.5 font-medium text-slate-800 dark:text-slate-200">
+              {routeFrom && routeTo ? (
+                <p className="flex min-w-0 items-center gap-1.5 text-sm font-semibold text-slate-800 dark:text-slate-100">
                   <span className="truncate">{routeFrom}</span>
                   <ArrowRight className="h-3.5 w-3.5 shrink-0 text-indigo-400" />
                   <span className="truncate">{routeTo}</span>
-                </span>
+                </p>
+              ) : (
+                <p className="text-sm text-slate-400">No route set</p>
               )}
-              <span className="inline-flex items-center gap-1.5 font-semibold tabular-nums text-slate-800 dark:text-slate-200">
-                <Calendar className="h-3.5 w-3.5 shrink-0 text-slate-400" />
-                {fmtDate(trip.startDate ?? trip.date)}
-              </span>
-            </div>
-
-            <div className="flex flex-wrap items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
-              <span className="inline-flex items-center gap-1.5">
-                <User className="h-3.5 w-3.5 shrink-0 text-slate-400" />
-                <span className="font-medium text-slate-800 dark:text-slate-200">
-                  {driverName(trip.driver)}
-                </span>
-              </span>
-              {plate !== "—" && (
-                <span className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5 font-mono text-xs font-semibold tracking-wide text-slate-700 dark:border-[#1e2638] dark:bg-white/[0.04] dark:text-slate-200">
-                  <Car className="h-3 w-3 text-slate-400" />
-                  {plate}
-                </span>
-              )}
-              {travelledKm != null && (
-                <span className="font-bold tabular-nums text-slate-800 dark:text-slate-100">
-                  {travelledKm} km
-                </span>
+              {agencyLabel && agencyLabel !== "—" && (
+                <p className="flex min-w-0 items-center gap-1.5 text-xs font-medium text-slate-500 dark:text-slate-400">
+                  <Building2 className="h-3 w-3 shrink-0 text-slate-400" />
+                  <span className="truncate">{agencyLabel}</span>
+                </p>
               )}
             </div>
 
-            {/* Payment progress / outstanding chips — hidden per product request
-            <div className="flex max-w-xs items-center gap-2 pt-0.5">...</div>
-            */}
-
-          </div>
-
-          <div className="flex shrink-0 items-start gap-2 sm:gap-3">
-            {/* Payment status chips — hidden per product request */}
-
-            <div className="flex flex-col items-end gap-1">
+            <div className="flex shrink-0 items-center gap-0.5">
               {!readOnly && (
                 <button
                   type="button"
@@ -754,255 +940,106 @@ export function TripCard({
                     handleDelete();
                   }}
                   disabled={deleting}
-                  className="rounded-lg p-1.5 text-slate-400 transition hover:bg-rose-50 hover:text-rose-500 disabled:opacity-40 dark:hover:bg-rose-500/10"
+                  className="rounded-lg p-1.5 text-slate-400 opacity-70 transition hover:bg-rose-50 hover:text-rose-500 hover:opacity-100 disabled:opacity-40 group-hover:opacity-100 dark:hover:bg-rose-500/10"
                   aria-label="Delete trip"
                 >
                   <Trash2 className="h-4 w-4" />
                 </button>
               )}
+              <span
+                className="rounded-lg p-1.5 text-slate-400 transition group-hover:bg-indigo-50 group-hover:text-indigo-600 dark:group-hover:bg-indigo-500/15 dark:group-hover:text-indigo-300"
+                aria-hidden
+              >
+                <Maximize2 className="h-4 w-4" />
+              </span>
+            </div>
+          </div>
+
+          <div className="mt-auto flex flex-wrap items-center gap-1.5 border-t border-slate-100 pt-3 text-[11px] dark:border-[#1e2638]">
+            <span className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-slate-50 px-2 py-1 font-semibold tabular-nums text-slate-700 dark:border-[#1e2638] dark:bg-white/[0.04] dark:text-slate-200">
+              <Calendar className="h-3 w-3 text-slate-400" />
+              {fmtDate(trip.startDate ?? trip.date)}
+            </span>
+            {durationLabel && durationLabel !== "—" && (
+              <span className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-slate-50 px-2 py-1 font-semibold text-slate-600 dark:border-[#1e2638] dark:bg-white/[0.04] dark:text-slate-300">
+                <Clock className="h-3 w-3" />
+                {durationLabel}
+              </span>
+            )}
+            <span className="inline-flex max-w-[46%] items-center gap-1 truncate rounded-md border border-slate-200 bg-slate-50 px-2 py-1 font-medium text-slate-700 dark:border-[#1e2638] dark:bg-white/[0.04] dark:text-slate-200">
+              <User className="h-3 w-3 shrink-0 text-slate-400" />
+              <span className="truncate">{driverName(trip.driver)}</span>
+            </span>
+            {plate !== "—" && (
+              <span className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-slate-50 px-2 py-1 font-mono text-[10px] font-semibold tracking-wide text-slate-700 dark:border-[#1e2638] dark:bg-white/[0.04] dark:text-slate-200">
+                <Car className="h-3 w-3 text-slate-400" />
+                {plate}
+              </span>
+            )}
+            {travelledKm != null && (
+              <span className="ml-auto font-bold tabular-nums text-slate-800 dark:text-slate-100">
+                {travelledKm} km
+              </span>
+            )}
+          </div>
+        </div>
+      </article>
+
+      {detailOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-end justify-center bg-slate-900/45 p-0 sm:items-center sm:p-4 dark:bg-black/60"
+          onClick={() => setDetailOpen(false)}
+          role="presentation"
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label={`Trip ${trip.tripNumber ?? trip._id}`}
+            className="flex max-h-[92vh] w-full flex-col overflow-hidden rounded-t-2xl border border-slate-200 bg-[var(--bg-card)] shadow-2xl sm:max-w-4xl sm:rounded-2xl dark:border-[#1e2638]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex shrink-0 items-start justify-between gap-3 border-b border-slate-100 px-4 py-3.5 sm:px-5 dark:border-[#1e2638]">
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <h3 className="truncate font-mono text-base font-bold text-slate-900 dark:text-white sm:text-lg">
+                    {trip.tripNumber ?? trip._id}
+                  </h3>
+                  <span
+                    className={`inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-[10px] font-bold tracking-wider uppercase ${getTripStatusStyle(trip.status)}`}
+                  >
+                    <span
+                      className={`h-1.5 w-1.5 rounded-full ${tripStatusDotClass(trip.status)}`}
+                    />
+                    {trip.status?.replace(/_/g, " ")}
+                  </span>
+                </div>
+                <p className="mt-0.5 truncate text-xs text-slate-500 dark:text-slate-400">
+                  {[
+                    routeFrom && routeTo ? `${routeFrom} → ${routeTo}` : null,
+                    fmtDate(trip.startDate ?? trip.date),
+                    driverName(trip.driver) !== "—"
+                      ? driverName(trip.driver)
+                      : null,
+                  ]
+                    .filter(Boolean)
+                    .join(" · ")}
+                </p>
+              </div>
               <button
                 type="button"
+                onClick={() => setDetailOpen(false)}
                 className="rounded-lg p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-white/5 dark:hover:text-slate-200"
-                aria-expanded={expanded}
-                aria-label={expanded ? "Collapse trip" : "Expand trip"}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setExpanded((x) => !x);
-                }}
+                aria-label="Close"
               >
-                {expanded ? (
-                  <ChevronUp className="h-5 w-5" />
-                ) : (
-                  <ChevronDown className="h-5 w-5" />
-                )}
+                <X className="h-5 w-5" />
               </button>
+            </div>
+            <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-5 sm:py-5">
+              {detailBody}
             </div>
           </div>
         </div>
-
-        {/* Expanded details */}
-        {expanded && (
-          <div className="border-t border-slate-100 px-4 py-4 sm:px-5 sm:py-5 dark:border-[#1e2638]">
-            <div className="grid min-w-0 grid-cols-1 gap-6 xl:grid-cols-12 xl:gap-8">
-              {/* Trip Details */}
-              <section className="min-w-0 xl:col-span-7">
-                <div className="mb-3 flex items-center gap-2 border-b border-slate-100 pb-2 dark:border-[#1e2638]">
-                  <span className="h-4 w-1 rounded-full bg-indigo-500" />
-                  <h4 className="text-xs font-bold tracking-wider text-indigo-500 uppercase dark:text-indigo-400">
-                    Trip Details
-                  </h4>
-                </div>
-                <div className="space-y-0.5 rounded-lg border border-slate-100 bg-slate-50/40 px-3 py-2 dark:border-[#1e2638] dark:bg-white/[0.03] sm:px-4 sm:py-3">
-                  <DetailRow
-                    label="Trip Number"
-                    value={fmt(trip.tripNumber)}
-                    emphasizeValue
-                  />
-                  <DetailRow
-                    label="Status"
-                    value={(trip.status ?? "—").replace(/_/g, " ")}
-                  />
-                  {E(
-                    "Start Date",
-                    fmtDate(trip.startDate ?? trip.date),
-                    "startDate",
-                  )}
-                  {trip.endDate &&
-                    E("End Date", fmtDate(trip.endDate), "expectedEndDate")}
-                  {E(
-                    "Start Time",
-                    fmtTimeAmPm(trip.startTime),
-                    "startTime",
-                    undefined,
-                    isoToTimeInputInTz(trip.startTime),
-                  )}
-                  {E(
-                    "End Time",
-                    fmtTimeAmPm(trip.endTime),
-                    "endTime",
-                    undefined,
-                    isoToTimeInputInTz(trip.endTime),
-                  )}
-                  <DetailRow
-                    label="Trip duration"
-                    value={durationLabel}
-                    highlight
-                    emphasizeValue
-                  />
-                  <DetailRow label="Driver" value={driverName(trip.driver)} />
-                  {typeof trip.driver !== "string" && trip.driver?.phone && (
-                    <DetailRow
-                      label="Driver Phone"
-                      value={fmt(trip.driver.phone)}
-                      emphasizeValue
-                    />
-                  )}
-                  <DetailRow label="Vehicle" value={plate} />
-                  {typeof trip.vehicle !== "string" &&
-                    trip.vehicle?.vehicleType && (
-                      <DetailRow
-                        label="Vehicle Type"
-                        value={fmt(trip.vehicle.vehicleType)}
-                      />
-                    )}
-                  {E("From", fmt(trip.from ?? trip.pickup ?? ""), "from")}
-                  {E("To", fmt(trip.to ?? trip.drop ?? ""), "to")}
-                  {E("Distance", fmt(trip.distance || ""), "distance")}
-                  {E(
-                    "Start KM",
-                    trip.startKilometers != null
-                      ? `${trip.startKilometers}`
-                      : "—",
-                    "startKilometers",
-                  )}
-                  {E(
-                    "End KM",
-                    trip.endKilometers != null ? `${trip.endKilometers}` : "—",
-                    "endKilometers",
-                  )}
-                  {travelledKm != null && (
-                    <DetailRow
-                      label="KM Travelled"
-                      value={`${travelledKm} km`}
-                      highlight
-                      emphasizeValue
-                    />
-                  )}
-                  {E("Customer", fmt(trip.customer || ""), "customer")}
-                  {E(
-                    "Agency",
-                    fmt(
-                      resolveAgencyLabel
-                        ? resolveAgencyLabel(trip.agencyName)
-                        : trip.agencyName || "",
-                    ),
-                    "agencyName",
-                  )}
-                  {trip.careOf?.name && (
-                    <DetailRow label="Care Of" value={fmt(trip.careOf.name)} />
-                  )}
-                  {E(
-                    "Notes",
-                    fmt(trip.notes ?? trip.completionNote ?? ""),
-                    "notes",
-                  )}
-                </div>
-
-                {(routeFrom || routeTo || travelledKm != null) && (
-                  <div className="mt-4 flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-[var(--bg-elevated)] p-3 dark:border-[#1e2638]">
-                    <div className="flex min-w-0 items-center gap-3">
-                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-indigo-200 bg-indigo-50 text-indigo-600 dark:border-indigo-500/30 dark:bg-indigo-500/15 dark:text-indigo-300">
-                        <Route className="h-4 w-4" />
-                      </span>
-                      <div className="min-w-0">
-                        <div className="truncate text-sm font-semibold text-slate-800 dark:text-slate-100">
-                          {routeFrom && routeTo
-                            ? `${routeFrom} → ${routeTo}`
-                            : "Trip route"}
-                        </div>
-                        <div className="text-[11px] text-slate-500 dark:text-slate-400">
-                          {[
-                            travelledKm != null ? `${travelledKm} km travelled` : null,
-                            durationLabel !== "—" ? durationLabel : null,
-                            plate !== "—" ? plate : null,
-                          ]
-                            .filter(Boolean)
-                            .join(" · ") || "Route summary"}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </section>
-
-              <div className="min-w-0 space-y-6 xl:col-span-5 xl:border-l xl:border-slate-100 xl:pl-8 dark:xl:border-[#1e2638]">
-                {/* Financial */}
-                <section className="min-w-0">
-                  <div className="mb-3 flex items-center gap-2 border-b border-slate-100 pb-2 dark:border-[#1e2638]">
-                    <span className="h-4 w-1 rounded-full bg-emerald-500" />
-                    <h4 className="text-xs font-bold tracking-wider text-emerald-600 uppercase dark:text-emerald-400">
-                      Financial Details
-                    </h4>
-                  </div>
-                  <div className="min-w-0 space-y-1 overflow-x-auto">
-                    {E(
-                      "Agency Cost",
-                      fmtCurrency(trip.agencyCost),
-                      "agencyCost",
-                    )}
-                    {E("Cab Cost", fmtCurrency(trip.cabCost), "cabCost")}
-                    <DetailRow
-                      label="Fuel expense"
-                      value={fmtCurrency(expenseBreakdown.fuelExpense)}
-                      emphasizeValue
-                    />
-                    <DetailRow
-                      label="Extra Expenses"
-                      value={fmtCurrency(expenseBreakdown.extraExpenses)}
-                      emphasizeValue
-                    />
-                    <div className="my-1.5 flex items-baseline justify-between gap-2 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-2 dark:border-[#1e2638] dark:bg-white/[0.04]">
-                      <span className="text-sm font-medium text-slate-700 dark:text-slate-200">
-                        Total Cab Cost
-                      </span>
-                      <span className="text-base font-bold tabular-nums text-indigo-600 dark:text-indigo-300">
-                        {fmtCurrency(expenseBreakdown.totalCabCost)}
-                      </span>
-                    </div>
-                    {E(
-                      "Driver Bata",
-                      fmtCurrency(salaryBreakdown.driverBata),
-                      "driver_salary",
-                    )}
-                    <DetailRow
-                      label="Extra personal expenses"
-                      value={fmtCurrency(salaryBreakdown.personalExpenses)}
-                      emphasizeValue
-                    />
-                    <div className="my-1.5 flex flex-col gap-0.5 rounded-lg border border-indigo-200/80 bg-indigo-50/50 px-2.5 py-2 dark:border-indigo-500/30 dark:bg-indigo-500/10">
-                      <div className="flex items-baseline justify-between gap-2">
-                        <span className="text-sm font-medium text-indigo-900 dark:text-indigo-200">
-                          Total Salary
-                        </span>
-                        <span className="text-base font-bold tabular-nums text-indigo-700 dark:text-indigo-300">
-                          {fmtCurrency(salaryBreakdown.totalSalary)}
-                        </span>
-                      </div>
-                      <span className="text-[11px] font-medium text-indigo-600/80 dark:text-indigo-400">
-                        {salaryBreakdown.bracketText}
-                      </span>
-                    </div>
-                    {E("Advance", fmtCurrency(trip.advance), "advance")}
-                    <div className="my-1.5 flex items-baseline justify-between gap-2 rounded-lg border border-emerald-200/80 bg-emerald-50/80 px-2.5 py-2 dark:border-emerald-500/30 dark:bg-emerald-500/10">
-                      <span className="text-sm font-medium text-emerald-700 dark:text-emerald-300">
-                        Owner profit
-                      </span>
-                      <span className="text-base font-bold tabular-nums text-emerald-700 dark:text-emerald-300">
-                        {fmtCurrency(resolveTripAgencyProfitDisplay(trip))}
-                      </span>
-                    </div>
-                  </div>
-                </section>
-
-                {/* Payment — hidden per product request (total/paid/outstanding, record payment, history)
-                <section>
-                  ...
-                </section>
-                */}
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Record payment / payment history modals — hidden per product request
-      {!readOnly && showPaymentModal && (
-        <RecordPaymentModal ... />
       )}
-      {!readOnly && showHistoryModal && (
-        <PaymentHistoryModal ... />
-      )}
-      */}
     </>
   );
 }

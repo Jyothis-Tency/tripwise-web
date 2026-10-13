@@ -1,4 +1,10 @@
+import type { HistoryTrip } from "../history/api";
 import type { ReportHeader, ReportRunResult } from "./api";
+import {
+  type ReportFieldSelection,
+  visibleReportFields,
+} from "./reportFieldConfig";
+import { toTripReportRow } from "./tripReportFormat";
 
 function escapeCsvCell(v: unknown): string {
   const s = v == null ? "" : String(v);
@@ -67,6 +73,52 @@ export function downloadReportCsv(
   const stamp = new Date().toISOString().slice(0, 10);
   a.href = url;
   a.download = filename ?? `tripwise-report-${result.dataSource}-${stamp}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+/** CSV for trip-card reports (selected fields). */
+export function downloadTripReportCsv(
+  trips: HistoryTrip[],
+  fieldSelection: ReportFieldSelection,
+  opts?: {
+    tripSource?: "vehicle" | "bulk";
+    resolveAgencyLabel?: (agencyName?: string) => string;
+    filename?: string;
+  },
+): void {
+  if (!trips.length) {
+    throw new Error("No trips to export.");
+  }
+  const tripSource = opts?.tripSource ?? "vehicle";
+  const resolveAgencyLabel = opts?.resolveAgencyLabel ?? ((n) => n ?? "N/A");
+  const fields = visibleReportFields(tripSource).filter(
+    (f) => fieldSelection[f.id],
+  );
+  if (fields.length === 0) {
+    throw new Error("Select at least one report field.");
+  }
+
+  const headers = ["Trip #", ...fields.map((f) => f.label)];
+  const lines = [headers.map(escapeCsvCell).join(",")];
+
+  for (const trip of trips) {
+    const row = toTripReportRow(trip, resolveAgencyLabel);
+    lines.push(
+      [row.tripNumber, ...fields.map((f) => row[f.id])]
+        .map(escapeCsvCell)
+        .join(","),
+    );
+  }
+
+  const blob = new Blob(["\uFEFF" + lines.join("\r\n")], {
+    type: "text/csv;charset=utf-8",
+  });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  const stamp = new Date().toISOString().slice(0, 10);
+  a.href = url;
+  a.download = opts?.filename ?? `tripwise-trips-${stamp}.csv`;
   a.click();
   URL.revokeObjectURL(url);
 }

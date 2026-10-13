@@ -104,6 +104,8 @@ export interface HistoryParams {
   page?: number;
   limit?: number;
   status?: string;
+  /** Filter by computed payment status (paid | partial | unpaid). Combines with trip status. */
+  paymentStatus?: string;
   month?: string;      // e.g. "2024-03"
   search?: string;
   sortBy?: string;
@@ -214,18 +216,41 @@ export async function fetchAllTripHistory(
       }
       return { items: res.trips, pagination: res.pagination };
     },
-    { pageSize: DEFAULT_LIST_PAGE_SIZE },
+    {
+      pageSize: DEFAULT_LIST_PAGE_SIZE,
+      // Reports / exports must load every matching trip — no safety truncate.
+      maxRows: Number.MAX_SAFE_INTEGER,
+    },
   );
+
+  // Prefer totals computed from the full loaded set (accurate for multi-page exports)
+  const aggregated: HistoryPaymentSummary = {
+    totalAmount: 0,
+    totalPaid: 0,
+    totalOutstanding: 0,
+  };
+  for (const trip of result.items) {
+    aggregated.totalAmount +=
+      Number(trip.paymentSummary?.totalAmount ?? trip.agencyCost) || 0;
+    aggregated.totalPaid +=
+      Number(trip.paymentSummary?.paidAmount ?? trip.paidAmount) || 0;
+    aggregated.totalOutstanding +=
+      Number(
+        trip.paymentSummary?.remainingBalance ?? trip.balanceAmount,
+      ) || 0;
+  }
 
   return {
     trips: result.items,
     complete: result.complete,
     paymentSummary:
-      paymentSummary ?? {
-        totalAmount: 0,
-        totalPaid: 0,
-        totalOutstanding: 0,
-      },
+      result.items.length > 0
+        ? aggregated
+        : paymentSummary ?? {
+            totalAmount: 0,
+            totalPaid: 0,
+            totalOutstanding: 0,
+          },
     allTimePaymentSummary,
   };
 }

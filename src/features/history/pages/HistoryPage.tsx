@@ -31,17 +31,25 @@ function getCurrentMonthValue(): string {
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 }
 
+const CUSTOM_DATE_VALUE = 'custom_date';
+
 function monthOptions(): { value: string; label: string }[] {
-  const opts: { value: string; label: string }[] = [{ value: 'all_time', label: 'All Time' }];
+  const opts: { value: string; label: string }[] = [
+    { value: 'all_time', label: 'All Time' },
+    { value: CUSTOM_DATE_VALUE, label: 'Custom date' },
+  ];
   const now = new Date();
   for (let i = 0; i < 24; i++) {
     const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
     const value = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-    const label = d.toLocaleString('en-IN', { month: 'long', year: 'numeric' });
+    const label = d.toLocaleString('en-IN', { month: 'short', year: 'numeric' });
     opts.push({ value, label });
   }
   return opts;
 }
+
+const filterInputCls =
+  'h-8 rounded-md border border-slate-200 bg-[var(--bg-elevated)] px-2.5 text-xs font-medium text-slate-700 outline-none transition focus:border-indigo-400 focus:ring-1 focus:ring-indigo-200 dark:border-[#1e2638] dark:text-slate-100';
 
 // ─── Empty State ──────────────────────────────────────────────────────────────
 
@@ -78,24 +86,24 @@ function Pagination({
 }) {
   if (p.pages <= 1) return null;
   return (
-    <div className="flex items-center justify-between pb-2 pt-4">
-      <span className="text-xs text-slate-500 dark:text-slate-400 sm:text-sm">
+    <div className="flex items-center justify-between pt-3">
+      <span className="text-[11px] text-slate-500 dark:text-slate-400">
         Page {p.page}/{p.pages} · {p.total} trips
       </span>
-      <div className="flex items-center gap-1.5 sm:gap-2">
+      <div className="flex items-center gap-1">
         <button
           disabled={!p.hasPrev}
           onClick={() => onChange(p.page - 1)}
-          className="flex items-center gap-1 rounded-lg border border-slate-200 bg-[var(--bg-elevated)] px-3 py-1.5 text-xs font-medium text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-[#1e2638] dark:text-slate-300 dark:hover:bg-white/5 sm:text-sm"
+          className="inline-flex h-7 items-center gap-0.5 rounded-md border border-slate-200 bg-[var(--bg-elevated)] px-2 text-[11px] font-medium text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-[#1e2638] dark:text-slate-300 dark:hover:bg-white/5"
         >
-          <ChevronLeft className="h-3.5 w-3.5 sm:h-4 sm:w-4" /> Prev
+          <ChevronLeft className="h-3.5 w-3.5" /> Prev
         </button>
         <button
           disabled={!p.hasNext}
           onClick={() => onChange(p.page + 1)}
-          className="flex items-center gap-1 rounded-lg border border-slate-200 bg-[var(--bg-elevated)] px-3 py-1.5 text-xs font-medium text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-[#1e2638] dark:text-slate-300 dark:hover:bg-white/5 sm:text-sm"
+          className="inline-flex h-7 items-center gap-0.5 rounded-md border border-slate-200 bg-[var(--bg-elevated)] px-2 text-[11px] font-medium text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-[#1e2638] dark:text-slate-300 dark:hover:bg-white/5"
         >
-          Next <ChevronRight className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+          Next <ChevronRight className="h-3.5 w-3.5" />
         </button>
       </div>
     </div>
@@ -115,7 +123,7 @@ export function HistoryPage() {
   const [endDate, setEndDate]     = useState('');
   const [page, setPage]           = useState(1);
   const [filterMode, setFilterMode] = useState<'month' | 'daterange'>('month');
-  const LIMIT = 10;
+  const LIMIT = 12;
 
   // Data state
   const [trips, setTrips]               = useState<HistoryTrip[]>([]);
@@ -195,6 +203,12 @@ export function HistoryPage() {
   useEffect(() => { loadAllTimeStats(); }, [loadAllTimeStats]);
 
   const handleMonthChange = (val: string) => {
+    if (val === CUSTOM_DATE_VALUE) {
+      setFilterMode('daterange');
+      setMonth('');
+      setPage(1);
+      return;
+    }
     setMonth(val);
     setFilterMode('month');
     setStartDate('');
@@ -526,79 +540,71 @@ export function HistoryPage() {
   };
 
   return (
-    <div className="flex flex-col gap-5 bg-[var(--bg-main)] px-4 py-5 sm:gap-6 sm:px-6 sm:py-6">
+    <div className="flex h-full min-h-0 flex-col gap-3 overflow-hidden bg-[var(--bg-main)] px-4 pb-3 pt-3 sm:gap-3.5 sm:px-5 sm:pt-3">
 
       {/* Page Header */}
-      <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
-        <div>
-          <h1 className="text-xl font-bold tracking-tight text-slate-800 dark:text-white sm:text-2xl">
+      <div className="flex shrink-0 flex-col justify-between gap-2 sm:flex-row sm:items-center">
+        <div className="min-w-0">
+          <h1 className="text-lg font-bold tracking-tight text-slate-800 dark:text-white sm:text-xl">
             Trip History
           </h1>
-          <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">
-            View, filter, and audit fleet trips &amp; settlement status
+          <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+            Filter and open trips for full details
           </p>
         </div>
-        <div className="flex flex-wrap gap-2">
-          {/* Payout — hidden per product request
+        <div className="flex flex-wrap gap-1.5">
           <button
-            onClick={() => navigate('/history/payout')}
-            className="flex shrink-0 items-center gap-1.5 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 text-sm font-semibold text-indigo-600 transition hover:bg-indigo-100 active:scale-[0.98] dark:border-indigo-500/40 dark:bg-indigo-500/15 dark:text-indigo-300 dark:hover:bg-indigo-500/25"
-          >
-            <Wallet className="h-4 w-4" />
-            Payout
-          </button>
-          */}
-          <button
+            type="button"
             onClick={handleExportPdf}
-            className="flex shrink-0 items-center gap-1.5 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 text-sm font-semibold text-indigo-600 transition hover:bg-indigo-100 active:scale-[0.98] dark:border-indigo-500/40 dark:bg-indigo-500/15 dark:text-indigo-300 dark:hover:bg-indigo-500/25"
+            className="inline-flex h-8 items-center gap-1.5 rounded-md border border-indigo-200 bg-indigo-50 px-2.5 text-xs font-semibold text-indigo-600 transition hover:bg-indigo-100 dark:border-indigo-500/40 dark:bg-indigo-500/15 dark:text-indigo-300 dark:hover:bg-indigo-500/25"
           >
-            <FileDown className="h-4 w-4" />
+            <FileDown className="h-3.5 w-3.5" />
             Export
           </button>
           <button
+            type="button"
             onClick={load}
             disabled={loading}
-            className="flex shrink-0 items-center gap-1.5 rounded-lg border border-slate-200 bg-[var(--bg-elevated)] px-3 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-50 disabled:opacity-50 active:scale-[0.98] dark:border-[#1e2638] dark:text-slate-300 dark:hover:bg-white/5"
+            className="inline-flex h-8 items-center gap-1.5 rounded-md border border-slate-200 bg-[var(--bg-elevated)] px-2.5 text-xs font-medium text-slate-600 transition hover:bg-slate-50 disabled:opacity-50 dark:border-[#1e2638] dark:text-slate-300 dark:hover:bg-white/5"
           >
-            <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
             Refresh
           </button>
         </div>
       </div>
 
-      {/* Payment Summary — hidden per product request
-      <PaymentBanner summary={paymentSummary} />
-      */}
+      {/* Compact filter toolbar */}
+      <div className="shrink-0 rounded-xl border border-slate-200 bg-[var(--bg-card)] p-2.5 shadow-sm dark:border-[#1e2638] sm:p-3">
+        <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+          <div className="relative w-full max-w-xs sm:w-56 sm:max-w-none md:w-64">
+            <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => handleSearchChange(e.target.value)}
+              placeholder="Search trips…"
+              className="h-8 w-full rounded-md border border-slate-200 bg-[var(--bg-elevated)] py-0 pl-8 pr-8 text-xs text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-indigo-400 focus:ring-1 focus:ring-indigo-200 dark:border-[#1e2638] dark:text-slate-100 dark:placeholder:text-slate-500"
+            />
+            {search && (
+              <button
+                type="button"
+                onClick={() => handleSearchChange('')}
+                className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-0.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-white/5 dark:hover:text-slate-200"
+                aria-label="Clear search"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </div>
 
-      {/* Filters */}
-      <div className="space-y-3 rounded-xl border border-slate-200 bg-[var(--bg-card)] p-4 shadow-sm dark:border-[#1e2638] sm:space-y-4 sm:p-5">
-        <div className="relative">
-          <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 dark:text-slate-500" />
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => handleSearchChange(e.target.value)}
-            placeholder="Search by Trip ID, driver, vehicle or location…"
-            className="w-full rounded-lg border border-slate-200 bg-[var(--bg-elevated)] py-2.5 pl-10 pr-10 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-indigo-400 focus:ring-1 focus:ring-indigo-200 dark:border-[#1e2638] dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-indigo-400"
-          />
-          {search && (
-            <button
-              onClick={() => handleSearchChange('')}
-              className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
-            >
-              <X className="h-4 w-4" />
-            </button>
-          )}
-        </div>
-
-        <div className="grid grid-cols-2 gap-3 sm:flex sm:flex-wrap">
           <select
             value={status}
             onChange={(e) => {
               setStatus(e.target.value);
               setPage(1);
             }}
-            className="rounded-lg border border-slate-200 bg-[var(--bg-elevated)] px-4 py-2.5 text-sm font-medium text-slate-700 outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-200 dark:border-[#1e2638] dark:text-slate-100"
+            className={`${filterInputCls} min-w-[7.5rem]`}
+            aria-label="Status"
           >
             {STATUS_OPTIONS.map((o) => (
               <option key={o.value} value={o.value}>
@@ -608,13 +614,16 @@ export function HistoryPage() {
           </select>
 
           <select
-            value={filterMode === 'month' ? month : ''}
+            value={
+              filterMode === 'daterange' ? CUSTOM_DATE_VALUE : month
+            }
             onChange={(e) => handleMonthChange(e.target.value)}
-            className={`rounded-lg border bg-[var(--bg-elevated)] px-4 py-2.5 text-sm font-medium outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-200 dark:border-[#1e2638] dark:text-slate-100 ${
+            className={`${filterInputCls} min-w-[8.5rem] ${
               filterMode === 'month'
-                ? 'border-indigo-300 text-indigo-700 ring-1 ring-indigo-100 dark:border-indigo-500/40 dark:text-indigo-300 dark:ring-indigo-500/20'
-                : 'border-slate-200 text-slate-700'
+                ? 'border-indigo-300 text-indigo-700 dark:border-indigo-500/40 dark:text-indigo-300'
+                : ''
             }`}
+            aria-label="Period"
           >
             {monthOptions().map((o) => (
               <option key={o.value} value={o.value}>
@@ -623,34 +632,39 @@ export function HistoryPage() {
             ))}
           </select>
 
-          <span className="hidden items-center text-xs font-semibold uppercase text-slate-400 dark:text-slate-500 sm:flex">
-            or
-          </span>
+          {filterMode === 'daterange' && (
+            <div className="flex items-center gap-1">
+              <DatePicker
+                value={startDate}
+                onChange={handleStartDateChange}
+                className={`${filterInputCls} w-[8.25rem] font-mono`}
+              />
+              <span className="text-[10px] font-medium text-slate-400">–</span>
+              <DatePicker
+                value={endDate}
+                onChange={handleEndDateChange}
+                className={`${filterInputCls} w-[8.25rem] font-mono`}
+              />
+            </div>
+          )}
 
-          <div
-            className={`col-span-2 flex items-center gap-2 rounded-lg border p-1 ${
-              filterMode === 'daterange'
-                ? 'border-indigo-300 ring-1 ring-indigo-100 dark:border-indigo-500/40 dark:ring-indigo-500/20'
-                : 'border-transparent'
-            }`}
-          >
-            <DatePicker
-              value={startDate}
-              onChange={handleStartDateChange}
-              className="flex-1 rounded-lg border border-slate-200 bg-[var(--bg-elevated)] px-3 py-2.5 font-mono text-sm text-slate-700 outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-200 dark:border-[#1e2638] dark:text-slate-100"
-            />
-            <span className="shrink-0 text-sm text-slate-400">to</span>
-            <DatePicker
-              value={endDate}
-              onChange={handleEndDateChange}
-              className="flex-1 rounded-lg border border-slate-200 bg-[var(--bg-elevated)] px-3 py-2.5 font-mono text-sm text-slate-700 outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-200 dark:border-[#1e2638] dark:text-slate-100"
-            />
-          </div>
+          {(search ||
+            status !== 'all' ||
+            filterMode === 'daterange' ||
+            (filterMode === 'month' && month !== currentMonth)) && (
+            <button
+              type="button"
+              onClick={resetFilters}
+              className="inline-flex h-8 items-center rounded-md px-2 text-[11px] font-semibold text-slate-500 transition hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-white/5 dark:hover:text-slate-200"
+            >
+              Reset
+            </button>
+          )}
         </div>
       </div>
 
-      {/* Trip List */}
-      <div className="space-y-3">
+      {/* Trip grid */}
+      <div className="min-h-0 flex-1 overflow-y-auto">
         {loading && (
           <div className="flex justify-center py-16">
             <RefreshCw className="h-6 w-6 animate-spin text-indigo-500" />
@@ -673,21 +687,25 @@ export function HistoryPage() {
           <EmptyState onReset={resetFilters} />
         )}
 
-        {!loading &&
-          !error &&
-          trips.map((trip) => (
-            <TripCard
-              key={trip._id}
-              trip={trip}
-              onDeleted={load}
-              onPaymentRecorded={handlePaymentRecorded}
-              onTripUpdated={handleTripUpdated}
-              resolveAgencyLabel={resolveAgencyLabel}
-            />
-          ))}
-      </div>
+        {!loading && !error && trips.length > 0 && (
+          <div className="grid grid-cols-1 gap-3 sm:gap-4 md:grid-cols-2">
+            {trips.map((trip) => (
+              <TripCard
+                key={trip._id}
+                trip={trip}
+                onDeleted={load}
+                onPaymentRecorded={handlePaymentRecorded}
+                onTripUpdated={handleTripUpdated}
+                resolveAgencyLabel={resolveAgencyLabel}
+              />
+            ))}
+          </div>
+        )}
 
-      {!loading && <Pagination p={pagination} onChange={setPage} />}
+        {!loading && (
+          <Pagination p={pagination} onChange={setPage} />
+        )}
+      </div>
     </div>
   );
 }

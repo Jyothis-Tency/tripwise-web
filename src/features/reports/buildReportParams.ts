@@ -8,20 +8,57 @@ export type ReportDateFilter = {
   endDate: string;
 };
 
+const TRIP_STATUSES = new Set([
+  "scheduled",
+  "in_progress",
+  "completed",
+  "cancelled",
+]);
+const PAYMENT_STATUSES = new Set(["paid", "partial", "unpaid"]);
+
+/**
+ * Build History API params.
+ * Trip status and payment status are separate filters.
+ * When only payment status is set, it is sent as `status` (backend legacy).
+ * When both are set, trip status goes to `status` and payment to `paymentStatus`.
+ */
 export function buildTripReportHistoryParams(
   entity: ReportEntityFilter | null,
-  status: string,
+  tripStatus: string,
   dates: ReportDateFilter,
-  opts?: { page?: number; limit?: number; tripSource?: 'vehicle' | 'bulk' },
+  opts?: {
+    page?: number;
+    limit?: number;
+    tripSource?: "vehicle" | "bulk";
+    paymentStatus?: string;
+  },
 ): HistoryParams {
+  const paymentStatus =
+    opts?.paymentStatus && opts.paymentStatus !== "all"
+      ? opts.paymentStatus
+      : "";
+  const hasTrip =
+    tripStatus && tripStatus !== "all" && TRIP_STATUSES.has(tripStatus);
+  const hasPayment =
+    paymentStatus && PAYMENT_STATUSES.has(paymentStatus);
+
   const params: HistoryParams = {
     page: opts?.page ?? 1,
     limit: opts?.limit ?? 20,
-    status: status === "all" ? undefined : status,
     sortBy: "startDate",
     sortOrder: "desc",
     tripSource: opts?.tripSource ?? "vehicle",
   };
+
+  if (hasTrip && hasPayment) {
+    params.status = tripStatus;
+    params.paymentStatus = paymentStatus;
+  } else if (hasTrip) {
+    params.status = tripStatus;
+  } else if (hasPayment) {
+    // Backend treats paid/partial/unpaid on the status query as payment filter
+    params.status = paymentStatus;
+  }
 
   if (dates.filterMode === "month" && dates.month && dates.month !== "all_time") {
     params.month = dates.month;
@@ -53,6 +90,7 @@ export function buildTripReportHistoryParams(
 export function reportFilterSubtitle(
   entity: ReportEntityFilter | null,
   dates: ReportDateFilter,
+  extras?: { tripStatus?: string; paymentStatus?: string },
 ): string {
   const parts: string[] = [];
   if (entity) {
@@ -70,6 +108,12 @@ export function reportFilterSubtitle(
     );
   } else if (dates.filterMode === "daterange" && dates.startDate && dates.endDate) {
     parts.push(`${dates.startDate} – ${dates.endDate}`);
+  }
+  if (extras?.tripStatus && extras.tripStatus !== "all") {
+    parts.push(extras.tripStatus.replace(/_/g, " "));
+  }
+  if (extras?.paymentStatus && extras.paymentStatus !== "all") {
+    parts.push(extras.paymentStatus);
   }
   return parts.join(" · ");
 }

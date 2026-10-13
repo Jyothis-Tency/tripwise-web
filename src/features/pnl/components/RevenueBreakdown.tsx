@@ -7,19 +7,17 @@ import {
   X,
   BadgePercent,
   Coins,
+  Wallet,
+  UserRound,
 } from "lucide-react";
 import type { PLRevenue, ExtraCommissionEntry } from "../api";
 import { addExtraCommission, fetchExtraCommissions } from "../api";
 import { DatePicker } from "../../../components/ui/DatePicker";
-import { fetchAllAgencies } from "../../bulk-entry/api";
-import { fetchCashInCashOutAgencyDetail } from "../../cash-in-cash-out/api";
 import {
-  aggregateAgencyLedgerFromSummaries,
-  type AggregatedAgencyLedger,
-  type AgencyCashInSummary,
-  type AgencyCashOutSummary,
-} from "../../transactions/agencyLedgerMetrics";
-import { sumVehicleAgencyCost } from "../../transactions/vehicleAgencyLedgerMargin";
+  fetchCashInCashOutSummary,
+  type CashInCashOutSummary,
+} from "../../cash-in-cash-out/api";
+import type { AggregatedAgencyLedger } from "../../transactions/agencyLedgerMetrics";
 
 interface RevenueBreakdownProps {
   revenue: PLRevenue;
@@ -114,6 +112,13 @@ export const RevenueBreakdown: React.FC<RevenueBreakdownProps> = ({
   const [agencyLedger, setAgencyLedger] =
     useState<AggregatedAgencyLedger | null>(null);
   const [agencyLedgerLoading, setAgencyLedgerLoading] = useState(true);
+  const [driverSalarySummary, setDriverSalarySummary] = useState<
+    CashInCashOutSummary["drivers"]["vehicleBata"] | null
+  >(null);
+  const [driverSalaryLoading, setDriverSalaryLoading] = useState(true);
+
+  const ownerProfit =
+    Number(revenue.ownerProfit ?? revenue.agencyProfit) || 0;
 
   const [modal, setModal] = useState<"add" | "history" | null>(null);
   const [amount, setAmount] = useState("");
@@ -125,47 +130,46 @@ export const RevenueBreakdown: React.FC<RevenueBreakdownProps> = ({
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historyError, setHistoryError] = useState<string | null>(null);
 
-  const loadAgencyLedger = useCallback(async () => {
+  const loadLedgerSummary = useCallback(async () => {
     setAgencyLedgerLoading(true);
+    setDriverSalaryLoading(true);
     try {
-      const { agencies } = await fetchAllAgencies();
-      const details = await Promise.all(
-        agencies.map(async (a) => {
-          const id = a._id ?? a.id;
-          if (!id) return null;
-          try {
-            const detail = await fetchCashInCashOutAgencyDetail(id, "all_time");
-            // Match Transaction History: vehicle portion = agency cost, not profit.
-            const vehicleAgencyCost =
-              Number(detail.summary.agencyCostFromVehicleTrips) ||
-              sumVehicleAgencyCost(
-                detail.tables?.vehicleTripsAgencyProfit ?? [],
-              );
-            return {
-              ...detail.summary,
-              vehicleAgencyCostFromTrips: vehicleAgencyCost,
-            };
-          } catch {
-            return null;
-          }
-        }),
-      );
-      const summaries = details.filter(Boolean) as {
-        cashInBulk?: AgencyCashInSummary;
-        cashOutAgencyProfit?: AgencyCashOutSummary;
-        vehicleAgencyCostFromTrips?: number;
-      }[];
-      setAgencyLedger(aggregateAgencyLedgerFromSummaries(summaries));
+      // Single summary endpoint (was: 1 call per agency + slow sequential driver loop)
+      const cico = await fetchCashInCashOutSummary();
+      const vehicleCost = Number(cico.agencies.vehicleAgencyCostTotal) || 0;
+      const bulk = cico.agencies.cashInBulk;
+      const cashOut = cico.agencies.cashOutAgencyProfit;
+      const ledger: AggregatedAgencyLedger = {
+        grandTotal:
+          Number(cico.agencies.grandTotal) ||
+          (Number(bulk.totalOwed) || 0) +
+            vehicleCost -
+            (Number(cashOut.totalOwed) || 0),
+        received: Number(bulk.received) || 0,
+        remaining:
+          Number(cico.agencies.remaining) ||
+          (Number(cico.agencies.grandTotal) || 0) -
+            (Number(bulk.received) || 0) -
+            (Number(cashOut.paid) || 0),
+        bulkTotal: Number(bulk.fromTrips) || Number(bulk.totalOwed) || 0,
+        cashOutExtra: Number(cashOut.manualExtra ?? cashOut.totalOwed) || 0,
+        ownerProfitFromVehicles: vehicleCost,
+        agencyCount: Number(cico.agencies.agencyCount) || 0,
+      };
+      setAgencyLedger(ledger);
+      setDriverSalarySummary(cico.drivers.vehicleBata ?? null);
     } catch {
       setAgencyLedger(null);
+      setDriverSalarySummary(null);
     } finally {
       setAgencyLedgerLoading(false);
+      setDriverSalaryLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    void loadAgencyLedger();
-  }, [loadAgencyLedger, revenue]);
+    void loadLedgerSummary();
+  }, [loadLedgerSummary, revenue]);
 
   const loadHistory = useCallback(async () => {
     setHistoryLoading(true);
@@ -210,7 +214,7 @@ export const RevenueBreakdown: React.FC<RevenueBreakdownProps> = ({
       });
       setModal(null);
       await onRefresh?.();
-      await loadAgencyLedger();
+      await loadLedgerSummary();
     } catch (err: any) {
       setSaveError(
         err?.response?.data?.message ||
@@ -391,6 +395,76 @@ export const RevenueBreakdown: React.FC<RevenueBreakdownProps> = ({
           <p className="mt-4 text-xs text-slate-400">
             Manual add-ins (all time)
           </p>
+        </div>
+      </div>
+
+      {/* Row 3 — owner profit + driver salary */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div
+          className={`${cardBase} border-teal-100 dark:border-teal-500/25`}
+        >
+          <div className="flex items-center gap-3 sm:gap-4">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-teal-50 text-teal-700 sm:h-12 sm:w-12 dark:bg-teal-500/15 dark:text-teal-300">
+              <Wallet className="h-5 w-5 sm:h-6 sm:w-6" />
+            </div>
+            <div>
+              <p className="text-xs font-medium text-slate-500 sm:text-sm dark:text-slate-400">
+                Total owner profit
+              </p>
+              <h3 className="font-mono text-lg font-bold text-teal-700 metric-tabular sm:text-xl dark:text-teal-300">
+                {fmtCurrency(ownerProfit)}
+              </h3>
+            </div>
+          </div>
+          <p className="mt-4 text-xs text-slate-400">
+            Vehicle trips · agency cost − cab &amp; expenses (all time)
+          </p>
+        </div>
+
+        <div
+          className={`${cardBase} border-sky-100 dark:border-sky-500/25`}
+        >
+          <div className="flex items-center gap-3 sm:gap-4">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-sky-50 text-sky-700 sm:h-12 sm:w-12 dark:bg-sky-500/15 dark:text-sky-300">
+              <UserRound className="h-5 w-5 sm:h-6 sm:w-6" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-xs font-medium text-slate-500 sm:text-sm dark:text-slate-400">
+                Total driver salary
+              </p>
+              <h3 className="font-mono text-lg font-bold text-slate-900 metric-tabular sm:text-xl dark:text-white">
+                {driverSalaryLoading ? (
+                  <Loader2 className="h-5 w-5 animate-spin text-sky-600" />
+                ) : driverSalarySummary ? (
+                  fmtCurrency(driverSalarySummary.totalOwed)
+                ) : (
+                  fmtCurrency(Number(revenue.driverSalary) || 0)
+                )}
+              </h3>
+            </div>
+          </div>
+          <div className="mt-4 flex flex-wrap gap-x-4 gap-y-1 text-xs">
+            <span className="text-slate-500 dark:text-slate-400">
+              Given:{" "}
+              <span className="font-semibold tabular-nums text-emerald-600 dark:text-emerald-400">
+                {driverSalaryLoading
+                  ? "…"
+                  : driverSalarySummary
+                    ? fmtCurrency(driverSalarySummary.paid)
+                    : "—"}
+              </span>
+            </span>
+            <span className="text-slate-500 dark:text-slate-400">
+              Pending:{" "}
+              <span className="font-semibold tabular-nums text-amber-600 dark:text-amber-400">
+                {driverSalaryLoading
+                  ? "…"
+                  : driverSalarySummary
+                    ? fmtCurrency(driverSalarySummary.remaining)
+                    : "—"}
+              </span>
+            </span>
+          </div>
         </div>
       </div>
 

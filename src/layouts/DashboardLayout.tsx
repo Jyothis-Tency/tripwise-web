@@ -4,6 +4,7 @@ import { Menu, ChevronRight, Moon, Sun } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useAuth } from "../hooks/useAuth";
 import { useTheme } from "../hooks/useTheme";
+import { authApi } from "../features/auth/api";
 
 const routeTitle: Record<string, string> = {
   "/": "Dashboard",
@@ -53,6 +54,7 @@ const fullHeightPaths = [
   "/transaction",
   "/transaction-history",
   "/reports",
+  "/history",
 ];
 
 export function DashboardLayout() {
@@ -68,14 +70,47 @@ export function DashboardLayout() {
   }, [pathname]);
 
   const title = routeTitle[pathname] ?? (user?.name || "Dashboard");
-  const isFull = fullHeightPaths.some((p) => pathname.startsWith(p));
+  const isFull = fullHeightPaths.some((p) =>
+    p === "/history"
+      ? pathname === "/history"
+      : pathname === p || pathname.startsWith(`${p}/`),
+  );
   const breadcrumbs = routeBreadcrumbs[pathname];
 
   const closeMobileMenu = () => setIsMobileMenuOpen(false);
 
-  const userName = user?.name || "Owner";
-  const initials = userName
-    .split(" ")
+  const [profileCompany, setProfileCompany] = useState<string>("");
+
+  useEffect(() => {
+    if (!user?.company) {
+      authApi
+        .getOwnerProfile()
+        .then((p) => {
+          if (p.company) {
+            setProfileCompany(p.company);
+            try {
+              const raw = localStorage.getItem("userData");
+              if (raw) {
+                const u = JSON.parse(raw);
+                u.company = p.company;
+                localStorage.setItem("userData", JSON.stringify(u));
+              }
+            } catch {}
+          }
+        })
+        .catch(() => {});
+    }
+  }, [user?.company]);
+
+  const companyDisplayName =
+    user?.company?.trim() ||
+    profileCompany.trim() ||
+    user?.name?.trim() ||
+    "Company";
+
+  const initials = companyDisplayName
+    .split(/\s+/)
+    .filter(Boolean)
     .map((n: string) => n[0])
     .join("")
     .slice(0, 2)
@@ -161,12 +196,15 @@ export function DashboardLayout() {
                 <Moon className="h-4 w-4" />
               )}
             </button>
-            <div className="hidden items-center gap-2 rounded-lg border border-slate-100 bg-slate-50 px-2.5 py-1.5 sm:flex dark:border-white/10 dark:bg-white/5">
+            <div
+              className="hidden items-center gap-2 rounded-lg border border-slate-100 bg-slate-50 px-2.5 py-1.5 sm:flex dark:border-white/10 dark:bg-white/5"
+              title={companyDisplayName}
+            >
               <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-indigo-50 text-[11px] font-bold text-indigo-600 dark:bg-indigo-500/15 dark:text-indigo-300">
                 {initials}
               </span>
-              <span className="max-w-[120px] truncate text-sm font-medium text-slate-600 dark:text-slate-300">
-                {userName}
+              <span className="max-w-[180px] truncate text-sm font-semibold text-slate-700 dark:text-slate-200">
+                {companyDisplayName}
               </span>
             </div>
           </div>

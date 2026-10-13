@@ -1129,7 +1129,7 @@ function SalaryTab({ driver }: { driver: Driver }) {
   };
 
   useEffect(() => {
-    loadData();
+      loadData();
   }, [driverId, monthParam]);
 
   const handleDeleteTransaction = async (row: PaymentRow) => {
@@ -1457,7 +1457,7 @@ function SalaryTab({ driver }: { driver: Driver }) {
                           )}`}
                         >
                           {paymentKindLabel(tx.kind)}
-                        </span>
+              </span>
                       </td>
                       <td className="px-2 py-3 font-semibold dark:text-[#eef0ff]">
                         {fmtCurrency(tx.amount)}

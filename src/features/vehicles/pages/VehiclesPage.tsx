@@ -1532,7 +1532,7 @@ function TripCashInModal({
             )}
             Mark cash in
           </button>
-        </div>
+          </div>
 
         <div className="border-t border-slate-100 pt-3 dark:border-white/10">
           <div className="flex items-center justify-between text-xs">
@@ -1734,7 +1734,7 @@ function VehicleHistoryTab({
 
       {/* Filters card */}
       <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-[#1e2638] dark:bg-[#0e121d]/80">
-        <div className="space-y-3">
+    <div className="space-y-3">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
             <div className="w-full sm:w-40">
               <label className="text-xs font-medium text-slate-600 dark:text-slate-400">
@@ -1855,7 +1855,7 @@ function VehicleHistoryTab({
               </div>
             </div>
           </div>
-        </section>
+      </section>
       )}
 
       {/* Content */}
@@ -2736,7 +2736,7 @@ function TripDriverTab({
                           isCurrency
                           onSaved={onTripUpdated}
                         />
-                        <div>
+              <div>
                           <span className="mb-0.5 block text-[10px] uppercase text-slate-400 dark:text-slate-500">
                             Owner profit
                           </span>
@@ -2752,8 +2752,8 @@ function TripDriverTab({
                                   )
                             ).toLocaleString("en-IN")}
                           </span>
-                        </div>
-                      </div>
+              </div>
+            </div>
                     </div>
                     <div className="mt-3 flex flex-wrap gap-2 border-t border-slate-100 pl-2 pt-2 dark:border-white/10">
                       <button

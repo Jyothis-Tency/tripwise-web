@@ -33,6 +33,7 @@ export interface TripWithExpenses {
   id?: string;
   tripNumber?: string;
   customer?: string;
+  agencyName?: string;
   fromLocation?: string;
   toLocation?: string;
   startDate?: string;
@@ -161,6 +162,7 @@ export async function fetchTripsWithExpenses(params?: {
       id: t.id || t._id || item._id || item.id || '',
       tripNumber: t.tripNumber,
       customer: t.customer,
+      agencyName: t.agencyName || t.agency || '',
       fromLocation: t.from || t.fromLocation || '',
       toLocation: t.to || t.toLocation || '',
       startDate: t.startDate || t.date,

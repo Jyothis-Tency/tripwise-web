@@ -11,12 +11,19 @@ export interface CashInCashOutMoneyBlock {
 
 export interface CashInCashOutSummary {
   agencies: {
-    cashInBulk: CashInCashOutMoneyBlock;
+    cashInBulk: CashInCashOutMoneyBlock & { fromTrips?: number };
     cashOutAgencyProfit: {
       totalOwed: number;
       paid: number;
       remaining: number;
+      manualExtra?: number;
     };
+    /** Completed vehicle-trip agency cost (all agencies). */
+    vehicleAgencyCostTotal?: number;
+    agencyCount?: number;
+    /** Bulk + vehicle agency cost − cash-out extras */
+    grandTotal?: number;
+    remaining?: number;
   };
   drivers: {
     vehicleBata: {

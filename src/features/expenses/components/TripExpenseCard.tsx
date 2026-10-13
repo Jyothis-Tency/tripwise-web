@@ -165,7 +165,7 @@ export const TripExpenseCard: React.FC<Props> = ({
     paidBy: "Company",
     date: new Date().toISOString().split("T")[0],
   });
-
+  
   // Edit State
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editExp, setEditExp] = useState<{
@@ -241,7 +241,7 @@ export const TripExpenseCard: React.FC<Props> = ({
         paidBy: "Company",
         date: new Date().toISOString().split("T")[0],
       });
-      setAdding(false);
+      setAdding(false); 
       onRefresh();
     } catch (e: any) {
       const msg = e?.response?.data?.message || e?.message || "Could not add expense";
@@ -390,7 +390,7 @@ export const TripExpenseCard: React.FC<Props> = ({
                 <span>{expenses.length} {expenses.length === 1 ? "expense" : "expenses"}</span>
                 {personalTotal > 0 && (
                   <span className="font-semibold text-amber-600 dark:text-amber-400">
-                    · {fmtCurrency(personalTotal)} reimbursable
+                    · {fmtCurrency(personalTotal)} Driver paid
                   </span>
                 )}
               </div>
@@ -474,7 +474,7 @@ export const TripExpenseCard: React.FC<Props> = ({
           {personalTotal > 0 && (
             <span className="inline-flex items-center gap-1 rounded-md bg-amber-50 px-2 py-0.5 text-[11px] font-bold text-amber-700 ring-1 ring-amber-500/20 dark:bg-amber-500/15 dark:text-amber-300">
               <Wallet className="h-3 w-3" />
-              Driver Paid (Reimbursable): {fmtCurrency(personalTotal)}
+              Driver paid: {fmtCurrency(personalTotal)}
             </span>
           )}
         </div>
@@ -544,7 +544,7 @@ export const TripExpenseCard: React.FC<Props> = ({
                   <label className="mb-1 block text-[11px] font-semibold text-slate-600 dark:text-slate-400">
                     Category *
                   </label>
-                  <select
+                  <select 
                     value={newExp.category}
                     onChange={(e) => setNewExp((p) => ({ ...p, category: e.target.value }))}
                     className="w-full rounded-xl border border-slate-200 bg-[var(--bg-main)] px-3 py-2 text-xs font-semibold text-slate-800 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 dark:border-white/10 dark:text-slate-100"
@@ -716,7 +716,7 @@ export const TripExpenseCard: React.FC<Props> = ({
                           <label className="mb-1 block text-[11px] font-semibold text-slate-600 dark:text-slate-400">
                             Category
                           </label>
-                          <select
+              <select 
                             value={editExp.category}
                             onChange={(e) => setEditExp((p) => ({ ...p, category: e.target.value }))}
                             className="w-full rounded-xl border border-slate-200 bg-[var(--bg-main)] px-2.5 py-1.5 text-xs font-semibold text-slate-800 outline-none focus:border-indigo-500 dark:border-white/10 dark:text-slate-100"
@@ -726,7 +726,7 @@ export const TripExpenseCard: React.FC<Props> = ({
                                 {c}
                               </option>
                             ))}
-                          </select>
+              </select>
                         </div>
 
                         <div>
@@ -848,7 +848,7 @@ export const TripExpenseCard: React.FC<Props> = ({
                           {isPersonal ? (
                             <span className="inline-flex items-center gap-1 rounded-md bg-amber-50 px-2 py-0.5 text-[11px] font-bold text-amber-700 ring-1 ring-amber-500/30 dark:bg-amber-500/15 dark:text-amber-300">
                               <Wallet className="h-3 w-3" />
-                              Driver Paid (Reimbursable)
+                              Driver paid
                             </span>
                           ) : (
                             <span className="inline-flex items-center gap-1 rounded-md bg-blue-50 px-2 py-0.5 text-[11px] font-semibold text-blue-700 dark:bg-blue-500/10 dark:text-blue-300">
@@ -927,7 +927,7 @@ export const TripExpenseCard: React.FC<Props> = ({
                         </button>
                       </div>
                     </div>
-                  </div>
+              </div>
                 );
               })}
             </div>

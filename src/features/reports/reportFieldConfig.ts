@@ -13,7 +13,11 @@ export type ReportFieldId =
   | "startTime"
   | "totalKm"
   | "totalTime"
+  | "agencyCost"
   | "cabCost"
+  | "agencyProfit"
+  | "fuelExpense"
+  | "extraExpenses"
   | "advance"
   | "balance"
   | "toll"
@@ -49,13 +53,40 @@ export const REPORT_FIELD_DEFS: ReportFieldDef[] = [
   { id: "startTime", label: "Starting Time", section: "middle", defaultOn: true },
   { id: "totalKm", label: "Total KM", section: "middle", defaultOn: true },
   { id: "totalTime", label: "Total Time", section: "middle", defaultOn: true },
+  { id: "agencyCost", label: "Agency Cost", section: "right", defaultOn: true },
   { id: "cabCost", label: "Cab Cost", section: "right", defaultOn: true },
+  { id: "agencyProfit", label: "Owner Profit", section: "right", defaultOn: false },
+  { id: "fuelExpense", label: "Fuel", section: "right", defaultOn: false },
+  { id: "extraExpenses", label: "Extra Expenses", section: "right", defaultOn: false },
   { id: "advance", label: "Advance", section: "right", defaultOn: false },
   { id: "balance", label: "Balance", section: "right", defaultOn: false },
   { id: "toll", label: "Toll", section: "right", defaultOn: false },
   { id: "notes", label: "Notes", section: "left", defaultOn: false },
   { id: "vehicleType", label: "Vehicle Type", section: "header", defaultOn: false },
   { id: "mobileNumber", label: "Mobile Number", section: "header", defaultOn: false },
+];
+
+export const BULK_ONLY_FIELDS: ReportFieldId[] = [
+  "advance",
+  "balance",
+  "toll",
+  "notes",
+  "vehicleType",
+  "mobileNumber",
+];
+
+export const VEHICLE_ONLY_FIELDS: ReportFieldId[] = [
+  "from",
+  "to",
+  "customer",
+  "startKilometers",
+  "startTime",
+  "totalKm",
+  "totalTime",
+  "agencyCost",
+  "agencyProfit",
+  "fuelExpense",
+  "extraExpenses",
 ];
 
 export type ReportFieldSelection = Record<ReportFieldId, boolean>;
@@ -66,13 +97,11 @@ export function defaultReportFieldSelection(
   const sel = {} as ReportFieldSelection;
   for (const f of REPORT_FIELD_DEFS) {
     if (tripSource === "bulk") {
-      // For bulk trips, select bulk-specific fields by default
-      if (["advance", "balance", "notes", "vehicleType", "mobileNumber", "toll"].includes(f.id)) {
+      if (BULK_ONLY_FIELDS.includes(f.id)) {
         sel[f.id] = true;
         continue;
       }
-      // Unselect vehicle-specific fields
-      if (["from", "to", "customer", "startKilometers", "startTime", "totalKm", "totalTime"].includes(f.id)) {
+      if (VEHICLE_ONLY_FIELDS.includes(f.id)) {
         sel[f.id] = false;
         continue;
       }
@@ -80,6 +109,26 @@ export function defaultReportFieldSelection(
     sel[f.id] = f.defaultOn;
   }
   return sel;
+}
+
+export function visibleReportFields(
+  tripSource: "vehicle" | "bulk",
+): ReportFieldDef[] {
+  return REPORT_FIELD_DEFS.filter((f) => {
+    if (tripSource === "bulk" && VEHICLE_ONLY_FIELDS.includes(f.id)) return false;
+    if (tripSource === "vehicle" && BULK_ONLY_FIELDS.includes(f.id)) return false;
+    return true;
+  });
+}
+
+export function selectionForAllVisible(
+  tripSource: "vehicle" | "bulk",
+): ReportFieldSelection {
+  const all = defaultReportFieldSelection(tripSource);
+  for (const f of visibleReportFields(tripSource)) {
+    all[f.id] = true;
+  }
+  return all;
 }
 
 export function isReportFieldOn(

@@ -21,13 +21,9 @@ export function buildReportCardLines(
     value: row[id] ?? "N/A",
   });
 
-  const header: ReportLine[] = [];
-  if (selection.driver) {
-    header.push(line("driver", reportFieldLabel("driver")));
-  }
-  if (selection.vehicle) {
-    header.push(line("vehicle", reportFieldLabel("vehicle")));
-  }
+  const header = selectedFieldsInSection(selection, "header").map((f) =>
+    line(f.id, reportFieldLabel(f.id)),
+  );
 
   const left = selectedFieldsInSection(selection, "left").map((f) =>
     line(f.id, reportFieldLabel(f.id)),

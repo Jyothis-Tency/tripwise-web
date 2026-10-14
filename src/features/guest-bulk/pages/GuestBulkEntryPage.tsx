@@ -669,12 +669,6 @@ function blockShowsAgencyPill(block: GuestAgencyBlock) {
   return blockHasTripData(block) || Boolean(block.agencyId || block.agencyName?.trim());
 }
 
-function guestAgencyBlockKey(block: GuestAgencyBlock): string {
-  if (block.agencyId) return `id:${block.agencyId}`;
-  const name = String(block.agencyName ?? "").trim().toLowerCase();
-  return name ? `name:${name}` : "";
-}
-
 /** Keep an open block for new entry when everything else is already approved. */
 function ensureEditableWorkspace(
   blocks: GuestAgencyBlock[],
@@ -706,66 +700,64 @@ function pickActiveBlockId(
   );
 }
 
-/** After closing an approved view, focus an open block ready for new trips. */
+/**
+ * Leave the current pill and focus a blank new-entry workspace.
+ * Never copy the previous pill's agency into the new entry.
+ */
 function focusNextEntryWorkspace(
   blocks: GuestAgencyBlock[],
-  fromApproved?: GuestAgencyBlock,
+  fromPill?: GuestAgencyBlock,
 ): { blocks: GuestAgencyBlock[]; activeId: string } {
-  const key = fromApproved ? guestAgencyBlockKey(fromApproved) : "";
-  if (key) {
-    const sameAgencyOpen = blocks.find(
-      (b) => b.status !== "accepted" && guestAgencyBlockKey(b) === key,
-    );
-    if (sameAgencyOpen) {
-      return { blocks, activeId: sameAgencyOpen.clientId };
-    }
+  const excludeId = fromPill?.clientId;
+
+  // Prefer another existing blank open draft (no agency, no trips).
+  const blankOpen = blocks.find(
+    (b) =>
+      b.clientId !== excludeId &&
+      b.status !== "accepted" &&
+      !blockHasTripData(b) &&
+      !b.agencyId &&
+      !String(b.agencyName ?? "").trim(),
+  );
+  if (blankOpen) {
+    return { blocks, activeId: blankOpen.clientId };
   }
 
-  const emptyOpen = blocks.find(
-    (b) => b.status !== "accepted" && !blockHasTripData(b),
-  );
-  if (emptyOpen) {
-    if (
-      fromApproved &&
-      !emptyOpen.agencyId &&
-      !String(emptyOpen.agencyName ?? "").trim()
-    ) {
-      const next = blocks.map((b) =>
-        b.clientId === emptyOpen.clientId
-          ? {
-              ...b,
-              agencyId: fromApproved.agencyId ?? null,
-              agencyName: fromApproved.agencyName ?? "",
-            }
-          : b,
-      );
-      return { blocks: next, activeId: emptyOpen.clientId };
-    }
-    return { blocks, activeId: emptyOpen.clientId };
+  // Leaving an open draft with no trips → clear its agency and reuse as blank entry.
+  // (Avoids staying stuck on e.g. "Samsung" with agency prefilled and empty rows.)
+  if (
+    fromPill &&
+    fromPill.status !== "accepted" &&
+    !blockHasTripData(fromPill)
+  ) {
+    const next = blocks.map((b) =>
+      b.clientId === fromPill.clientId
+        ? {
+            ...b,
+            agencyId: null,
+            agencyName: "",
+            activityAt: new Date().toISOString(),
+          }
+        : b,
+    );
+    return { blocks: next, activeId: fromPill.clientId };
   }
 
   const sessionPlate =
-    guestSessionVehiclePlate(blocks) || plateFromBlock(fromApproved);
-  const nb = emptyBlock(sessionPlate); // preferred plate applied at page level for new blocks
-  if (fromApproved) {
-    nb.agencyId = fromApproved.agencyId ?? null;
-    nb.agencyName = fromApproved.agencyName ?? "";
-  }
+    guestSessionVehiclePlate(blocks) || plateFromBlock(fromPill);
+  const nb = emptyBlock(sessionPlate);
   return { blocks: [...blocks, nb], activeId: nb.clientId };
 }
 
 /**
- * Open pills → select that draft.
- * Approved pills → first click shows read-only history; second click (same pill) closes and opens entry.
+ * First click → select that agency draft / history.
+ * Second click on the same active pill → blank new entry (agency cleared).
  */
 function activateAgencyPill(
   blocks: GuestAgencyBlock[],
   pill: GuestAgencyBlock,
   activeClientId: string,
 ): { blocks: GuestAgencyBlock[]; activeId: string } {
-  if (pill.status !== "accepted") {
-    return { blocks, activeId: pill.clientId };
-  }
   if (pill.clientId === activeClientId) {
     return focusNextEntryWorkspace(blocks, pill);
   }
@@ -1439,6 +1431,11 @@ export function GuestBulkEntryPage() {
       if (!mountedRef.current || gen !== syncGenerationRef.current) return;
       lastBackendHash.current = quickHash(JSON.stringify(syncPayloadRef.current));
       setSyncStatus("saved");
+      setApproveError((prev) =>
+        prev && /phone number already exists|guest link with this phone/i.test(prev)
+          ? null
+          : prev,
+      );
       if (data.draft?.blocks) {
         if (editingDepthRef.current > 0) {
           pendingAcceptedDraftRef.current = data.draft.blocks;
@@ -1451,8 +1448,20 @@ export function GuestBulkEntryPage() {
       setTimeout(() => {
         if (mountedRef.current) setSyncStatus("idle");
       }, 2000);
-    } catch {
-      if (mountedRef.current) setSyncStatus("error");
+    } catch (e: unknown) {
+      if (!mountedRef.current) return;
+      setSyncStatus("error");
+      const msg = e instanceof Error ? e.message : "";
+      if (
+        msg &&
+        /phone number already exists|guest link with this phone/i.test(msg)
+      ) {
+        setApproveError(msg);
+        // Stop retry storms until the guest changes name/phone/blocks again.
+        lastBackendHash.current = quickHash(
+          JSON.stringify(syncPayloadRef.current),
+        );
+      }
     }
   }, [token, invite]);
 
@@ -1533,10 +1542,16 @@ export function GuestBulkEntryPage() {
     }
 
     setBlocks((prev) => {
+      const active =
+        prev.find((b) => b.clientId === activeClientId) ??
+        prev.find((b) => b.status === "open");
+
+      // Another open draft already uses this agency — switch to it
+      // (don't steal trips from the current block onto a duplicate).
       const existingOpen = prev.find(
         (b) =>
           b.status === "open" &&
-          agencyId &&
+          b.clientId !== active?.clientId &&
           String(b.agencyId ?? "") === String(agencyId),
       );
       if (existingOpen) {
@@ -1544,10 +1559,7 @@ export function GuestBulkEntryPage() {
         return prev;
       }
 
-      const active =
-        prev.find((b) => b.clientId === activeClientId) ??
-        prev.find((b) => b.status === "open");
-
+      // Viewing approved history → start a fresh open entry with this agency.
       if (active?.status === "accepted") {
         const nb = emptyBlock(
           resolveGuestSessionPlate(prev, preferredGuestPlate),
@@ -1558,7 +1570,8 @@ export function GuestBulkEntryPage() {
         return [...prev, nb];
       }
 
-      if (active && !blockHasTripData(active)) {
+      // Open draft: always set/change agency in place (even if trips exist).
+      if (active && active.status === "open") {
         setActiveClientId(active.clientId);
         return prev.map((b) =>
           b.clientId === active.clientId
@@ -1566,6 +1579,7 @@ export function GuestBulkEntryPage() {
                 ...b,
                 agencyId: agencyId || null,
                 agencyName,
+                activityAt: new Date().toISOString(),
               }
             : b,
         );
@@ -1904,7 +1918,17 @@ export function GuestBulkEntryPage() {
             onEdit={() => setEditingDriver(true)}
             onDone={() => setEditingDriver(false)}
             onNameChange={setDriverName}
-            onPhoneChange={setDriverPhone}
+            onPhoneChange={(v) => {
+              setDriverPhone(v);
+              setApproveError((prev) =>
+                prev &&
+                /phone number already exists|guest link with this phone/i.test(
+                  prev,
+                )
+                  ? null
+                  : prev,
+              );
+            }}
           />
         </div>
 
@@ -1955,11 +1979,11 @@ export function GuestBulkEntryPage() {
                       key={b.clientId}
                       type="button"
                       title={
-                        b.status === "accepted"
-                          ? active
-                            ? "Click again to enter new trips"
-                            : "View approved batch"
-                          : undefined
+                        active
+                          ? "Click again for a blank new entry"
+                          : b.status === "accepted"
+                            ? "View approved batch"
+                            : "Open this agency draft"
                       }
                       onClick={() => {
                         const { blocks: next, activeId } = activateAgencyPill(

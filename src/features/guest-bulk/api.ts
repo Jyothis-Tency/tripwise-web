@@ -15,12 +15,31 @@ export interface GuestAgencyBlock {
   activityAt?: string | null;
   rowCount?: number;
   syncResult?: unknown;
+  /** Present on owner overview — which link user owns this block */
+  guestUserId?: string | null;
+  guestName?: string;
+  guestPhone?: string;
+}
+
+export interface GuestLinkUser {
+  id: string;
+  name: string;
+  phone: string;
+  status: "active" | "blocked";
+  lastSeenAt?: string | null;
+  pendingSubmissions?: number;
+  rowCount?: number;
+  openRowCount?: number;
+  createdAt?: string;
 }
 
 export interface GuestBulkInvite {
   id: string;
   token: string;
   label: string;
+  scope?: "driver" | "agency";
+  agencyId?: string | null;
+  agencyName?: string;
   status: "active" | "revoked";
   expiresAt?: string | null;
   expired?: boolean;
@@ -30,6 +49,13 @@ export interface GuestBulkInvite {
   allowCreateAgency: boolean;
   maxRows: number;
   isOwner?: boolean;
+  joinRequired?: boolean;
+  /** Owner seeing all link users' drafts merged */
+  ownerOverview?: boolean;
+  guestUserId?: string | null;
+  guestUser?: GuestLinkUser | null;
+  guestUsers?: GuestLinkUser[];
+  guestUserCount?: number;
   agencies?: Agency[];
   draft?: {
     blocks: GuestAgencyBlock[];
@@ -58,7 +84,24 @@ export interface GuestBulkSubmission {
   syncResult?: unknown;
 }
 
-function authHeaders(): HeadersInit {
+const GUEST_USER_KEY = (token: string) => `guestBulkUser:${token}`;
+
+export function loadStoredGuestUserId(token: string): string | null {
+  if (typeof localStorage === "undefined") return null;
+  return localStorage.getItem(GUEST_USER_KEY(token));
+}
+
+export function storeGuestUserId(token: string, userId: string) {
+  if (typeof localStorage === "undefined") return;
+  localStorage.setItem(GUEST_USER_KEY(token), userId);
+}
+
+export function clearStoredGuestUserId(token: string) {
+  if (typeof localStorage === "undefined") return;
+  localStorage.removeItem(GUEST_USER_KEY(token));
+}
+
+function authHeaders(guestUserId?: string | null): HeadersInit {
   const token =
     typeof localStorage !== "undefined"
       ? localStorage.getItem("accessToken")
@@ -67,17 +110,19 @@ function authHeaders(): HeadersInit {
     "Content-Type": "application/json",
     "ngrok-skip-browser-warning": "true",
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    ...(guestUserId ? { "X-Guest-User": guestUserId } : {}),
   };
 }
 
 async function guestFetch<T>(
   path: string,
   init?: RequestInit,
+  guestUserId?: string | null,
 ): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
     ...init,
     headers: {
-      ...authHeaders(),
+      ...authHeaders(guestUserId),
       ...(init?.headers ?? {}),
     },
   });
@@ -98,8 +143,32 @@ async function guestFetch<T>(
 
 export async function fetchGuestInvite(
   token: string,
+  guestUserId?: string | null,
 ): Promise<GuestBulkInvite> {
-  return guestFetch<GuestBulkInvite>(ApiEndpoints.guestBulkByToken(token));
+  const uid = guestUserId ?? loadStoredGuestUserId(token);
+  const q = uid ? `?guestUserId=${encodeURIComponent(uid)}` : "";
+  return guestFetch<GuestBulkInvite>(
+    `${ApiEndpoints.guestBulkByToken(token)}${q}`,
+    undefined,
+    uid,
+  );
+}
+
+export async function joinGuestBulk(
+  token: string,
+  body: { name: string; phone: string },
+): Promise<GuestBulkInvite> {
+  const data = await guestFetch<GuestBulkInvite>(
+    ApiEndpoints.guestBulkJoin(token),
+    {
+      method: "POST",
+      body: JSON.stringify(body),
+    },
+  );
+  if (data.guestUserId) {
+    storeGuestUserId(token, data.guestUserId);
+  }
+  return data;
 }
 
 export async function createGuestAgency(
@@ -118,6 +187,7 @@ export async function syncGuestBulk(
   payload: {
     driverName?: string;
     driverPhone?: string;
+    guestUserId?: string | null;
     blocks: Array<{
       clientId: string;
       agencyId?: string | null;
@@ -126,32 +196,57 @@ export async function syncGuestBulk(
     }>;
   },
 ): Promise<GuestBulkInvite> {
-  return guestFetch<GuestBulkInvite>(ApiEndpoints.guestBulkSync(token), {
-    method: "POST",
-    body: JSON.stringify(payload),
-  });
+  const guestUserId =
+    payload.guestUserId ?? loadStoredGuestUserId(token) ?? undefined;
+  return guestFetch<GuestBulkInvite>(
+    ApiEndpoints.guestBulkSync(token),
+    {
+      method: "POST",
+      body: JSON.stringify({ ...payload, guestUserId }),
+    },
+    guestUserId,
+  );
 }
 
 export async function approveGuestBulk(
   token: string,
-  body: { clientId?: string; all?: boolean },
+  body: { clientId?: string; all?: boolean; guestUserId?: string | null },
 ): Promise<GuestBulkInvite & { approved?: unknown[] }> {
-  return guestFetch(ApiEndpoints.guestBulkApprove(token), {
-    method: "POST",
-    body: JSON.stringify(body),
-  });
+  const guestUserId =
+    body.guestUserId ?? loadStoredGuestUserId(token) ?? undefined;
+  return guestFetch(
+    ApiEndpoints.guestBulkApprove(token),
+    {
+      method: "POST",
+      body: JSON.stringify({ ...body, guestUserId }),
+    },
+    guestUserId,
+  );
 }
 
 // ─── Owner APIs ───────────────────────────────────────────────────────────────
 
 export async function createGuestBulkInvite(body: {
   label?: string;
+  scope?: "driver" | "agency";
+  agencyId?: string;
   driverName?: string;
   driverPhone?: string;
   expiresInDays?: number;
   maxRows?: number;
 }): Promise<GuestBulkInvite> {
   const res = await apiClient.post(ApiEndpoints.guestBulkInvites, body);
+  const raw: any = res.data ?? {};
+  return (raw.data ?? raw) as GuestBulkInvite;
+}
+
+/** Get or create the agency guest link for Bulk Entry. */
+export async function ensureAgencyGuestInvite(
+  agencyId: string,
+): Promise<GuestBulkInvite> {
+  const res = await apiClient.post(ApiEndpoints.guestBulkInviteForAgency, {
+    agencyId,
+  });
   const raw: any = res.data ?? {};
   return (raw.data ?? raw) as GuestBulkInvite;
 }
@@ -179,6 +274,45 @@ export async function unrevokeGuestBulkInvite(
   return (raw.data ?? raw) as GuestBulkInvite;
 }
 
+export async function rotateGuestBulkInviteToken(
+  id: string,
+): Promise<GuestBulkInvite> {
+  const res = await apiClient.post(ApiEndpoints.guestBulkInviteRotateToken(id));
+  const raw: any = res.data ?? {};
+  return (raw.data ?? raw) as GuestBulkInvite;
+}
+
+export async function fetchGuestLinkUsers(
+  inviteId: string,
+): Promise<GuestLinkUser[]> {
+  const res = await apiClient.get(ApiEndpoints.guestBulkInviteUsers(inviteId));
+  const raw: any = res.data ?? {};
+  const d = raw.data ?? raw;
+  return Array.isArray(d) ? d : [];
+}
+
+export async function blockGuestLinkUser(
+  inviteId: string,
+  userId: string,
+): Promise<GuestLinkUser> {
+  const res = await apiClient.post(
+    ApiEndpoints.guestBulkInviteUserBlock(inviteId, userId),
+  );
+  const raw: any = res.data ?? {};
+  return (raw.data ?? raw) as GuestLinkUser;
+}
+
+export async function unblockGuestLinkUser(
+  inviteId: string,
+  userId: string,
+): Promise<GuestLinkUser> {
+  const res = await apiClient.post(
+    ApiEndpoints.guestBulkInviteUserUnblock(inviteId, userId),
+  );
+  const raw: any = res.data ?? {};
+  return (raw.data ?? raw) as GuestLinkUser;
+}
+
 export async function updateGuestBulkInvite(
   id: string,
   body: {
@@ -198,36 +332,22 @@ export async function updateGuestBulkInvite(
 export async function fetchGuestBulkSubmissions(
   status?: "pending" | "accepted" | "rejected",
 ): Promise<GuestBulkSubmission[]> {
-  let url = ApiEndpoints.guestBulkSubmissions;
-  if (status) url += `?status=${status}`;
-  const res = await apiClient.get(url);
+  const res = await apiClient.get(ApiEndpoints.guestBulkSubmissions, {
+    params: status ? { status } : undefined,
+  });
   const raw: any = res.data ?? {};
   const d = raw.data ?? raw;
   return Array.isArray(d) ? d : [];
 }
 
-export async function acceptGuestBulkSubmission(
-  id: string,
-): Promise<GuestBulkSubmission> {
-  const res = await apiClient.post(ApiEndpoints.guestBulkSubmissionAccept(id));
-  const raw: any = res.data ?? {};
-  return (raw.data ?? raw) as GuestBulkSubmission;
-}
-
-export async function rejectGuestBulkSubmission(
-  id: string,
-): Promise<GuestBulkSubmission> {
-  const res = await apiClient.post(ApiEndpoints.guestBulkSubmissionReject(id));
-  const raw: any = res.data ?? {};
-  return (raw.data ?? raw) as GuestBulkSubmission;
-}
-
 export function guestBulkShareUrl(token: string): string {
-  const origin =
-    typeof window !== "undefined" ? window.location.origin : "";
-  return `${origin}/guest-bulk/${token}`;
+  if (typeof window === "undefined") return `/guest-bulk/${token}`;
+  return `${window.location.origin}/guest-bulk/${token}`;
 }
 
-export function newBlockClientId() {
-  return `b_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+export function newBlockClientId(): string {
+  if (typeof crypto !== "undefined" && crypto.randomUUID) {
+    return `b_${crypto.randomUUID().replace(/-/g, "").slice(0, 16)}`;
+  }
+  return `b_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
 }

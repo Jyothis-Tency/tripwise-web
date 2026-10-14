@@ -96,11 +96,20 @@ export const ApiEndpoints = {
 
   // GUEST BULK (owner)
   guestBulkInvites: '/owners/guest-bulk/invites',
+  guestBulkInviteForAgency: '/owners/guest-bulk/invites/for-agency',
   guestBulkInviteById: (id: string) => `/owners/guest-bulk/invites/${id}`,
   guestBulkInviteRevoke: (id: string) =>
     `/owners/guest-bulk/invites/${id}/revoke`,
   guestBulkInviteUnrevoke: (id: string) =>
     `/owners/guest-bulk/invites/${id}/unrevoke`,
+  guestBulkInviteRotateToken: (id: string) =>
+    `/owners/guest-bulk/invites/${id}/rotate-token`,
+  guestBulkInviteUsers: (id: string) =>
+    `/owners/guest-bulk/invites/${id}/users`,
+  guestBulkInviteUserBlock: (id: string, userId: string) =>
+    `/owners/guest-bulk/invites/${id}/users/${userId}/block`,
+  guestBulkInviteUserUnblock: (id: string, userId: string) =>
+    `/owners/guest-bulk/invites/${id}/users/${userId}/unblock`,
   guestBulkSubmissions: '/owners/guest-bulk/submissions',
   guestBulkSubmissionAccept: (id: string) =>
     `/owners/guest-bulk/submissions/${id}/accept`,
@@ -109,6 +118,7 @@ export const ApiEndpoints = {
 
   // GUEST BULK (public token)
   guestBulkByToken: (token: string) => `/guest/bulk/${token}`,
+  guestBulkJoin: (token: string) => `/guest/bulk/${token}/join`,
   guestBulkCreateAgency: (token: string) => `/guest/bulk/${token}/agencies`,
   guestBulkSync: (token: string) => `/guest/bulk/${token}/sync`,
   guestBulkApprove: (token: string) => `/guest/bulk/${token}/approve`,

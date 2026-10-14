@@ -28,19 +28,34 @@ import {
   Building2,
   Pencil,
   User,
+  Users,
+  KeyRound,
+  PanelLeft,
+  PanelRight,
+  Clock,
+  Search,
+  ArrowUpDown,
 } from "lucide-react";
 import {
   approveGuestBulk,
+  blockGuestLinkUser,
+  clearStoredGuestUserId,
   createGuestAgency,
   fetchGuestInvite,
   guestBulkShareUrl,
+  joinGuestBulk,
+  loadStoredGuestUserId,
   newBlockClientId,
   revokeGuestBulkInvite,
+  rotateGuestBulkInviteToken,
+  storeGuestUserId,
   syncGuestBulk,
+  unblockGuestLinkUser,
   unrevokeGuestBulkInvite,
   updateGuestBulkInvite,
   type GuestAgencyBlock,
   type GuestBulkInvite,
+  type GuestLinkUser,
 } from "../api";
 import type { Agency, BulkTripRow, DriverGroup } from "../../bulk-entry/api";
 import { formatAgencyLabel } from "../../bulk-entry/api";
@@ -52,6 +67,12 @@ import { TripwiseLogo } from "../../../components/brand/TripwiseLogo";
 
 type SyncStatus = "idle" | "saving" | "saved" | "error";
 const AUTOSAVE_DELAY = 800;
+
+function storedGuestSessionError(msg: string) {
+  return /guest session not found|enter your phone again|blocked from this link/i.test(
+    msg,
+  );
+}
 
 const inputCls =
   "w-full touch-manipulation rounded-md border border-slate-200 bg-[var(--bg-elevated)] px-2 py-1.5 text-sm text-slate-800 outline-none transition focus:border-indigo-400 focus:ring-1 focus:ring-indigo-200 disabled:cursor-not-allowed disabled:opacity-60 sm:rounded-lg sm:px-3 sm:py-2.5 dark:border-[#1e2638] dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-indigo-400";
@@ -435,27 +456,59 @@ function normalizeGuestPlate(raw: string): string {
 }
 
 const MS_24H = 24 * 60 * 60 * 1000;
+const IST = "Asia/Kolkata";
 
 function formatGuestPillTimeline(iso?: string | null): string {
   if (!iso) return "";
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return "";
-  const pad = (n: number) => String(n).padStart(2, "0");
-  const format12h = (date: Date) => {
-    let h = date.getHours();
-    const m = date.getMinutes();
-    const ampm = h >= 12 ? "PM" : "AM";
-    h = h % 12 || 12;
-    return `${h}:${pad(m)} ${ampm}`;
-  };
   const age = Date.now() - d.getTime();
   if (age >= 0 && age < MS_24H) {
-    return format12h(d);
+    return d.toLocaleTimeString("en-IN", {
+      timeZone: IST,
+      hour: "numeric",
+      minute: "2-digit",
+      hour12: true,
+    });
   }
-  const dd = pad(d.getDate());
-  const mm = pad(d.getMonth() + 1);
-  const yyyy = d.getFullYear();
-  return `${dd}/${mm}/${yyyy} ${format12h(d)}`;
+  return d.toLocaleString("en-IN", {
+    timeZone: IST,
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  });
+}
+
+/** Searchable IST date/time tokens for an ISO timestamp */
+function istSearchHaystack(iso?: string | null): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  const parts = [
+    formatGuestPillTimeline(iso),
+    d.toLocaleDateString("en-IN", {
+      timeZone: IST,
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+    }),
+    d.toLocaleDateString("en-IN", {
+      timeZone: IST,
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    }),
+    d.toLocaleTimeString("en-IN", {
+      timeZone: IST,
+      hour: "numeric",
+      minute: "2-digit",
+      hour12: true,
+    }),
+  ];
+  return parts.join(" ").toLowerCase();
 }
 
 function guestBlockTimelineIso(block: GuestAgencyBlock): string | null {
@@ -1236,6 +1289,35 @@ export function GuestBulkEntryPage() {
   const [blocks, setBlocks] = useState<GuestAgencyBlock[]>([emptyBlock()]);
   const [activeClientId, setActiveClientId] = useState("");
   const [isOwner, setIsOwner] = useState(false);
+  const [guestUserId, setGuestUserId] = useState<string | null>(null);
+  const [joinRequired, setJoinRequired] = useState(false);
+  const [joinName, setJoinName] = useState("");
+  const [joinPhone, setJoinPhone] = useState("");
+  const [joining, setJoining] = useState(false);
+  const [joinError, setJoinError] = useState<string | null>(null);
+  const [agencyGuestUsers, setAgencyGuestUsers] = useState<GuestLinkUser[]>(
+    [],
+  );
+  /** Owner overview: null = all users; else filter table to one link user */
+  const [focusedGuestUserId, setFocusedGuestUserId] = useState<string | null>(
+    null,
+  );
+  const [usersSidebarOpen, setUsersSidebarOpen] = useState(false);
+  const [entriesSidebarOpen, setEntriesSidebarOpen] = useState(false);
+  const [userSearch, setUserSearch] = useState("");
+  const [userFilter, setUserFilter] = useState<
+    "all" | "active" | "blocked" | "pending"
+  >("all");
+  const [userSort, setUserSort] = useState<
+    "name-asc" | "name-desc" | "pending" | "recent" | "phone"
+  >("recent");
+  const [entrySearch, setEntrySearch] = useState("");
+  const [entryFilter, setEntryFilter] = useState<
+    "all" | "open" | "approve" | "approved"
+  >("all");
+  const [entrySort, setEntrySort] = useState<
+    "newest" | "oldest" | "name" | "status"
+  >("newest");
 
   const [showCreateAgency, setShowCreateAgency] = useState(false);
   const [newName, setNewName] = useState("");
@@ -1271,6 +1353,91 @@ export function GuestBulkEntryPage() {
     };
   }, []);
 
+  const applyInviteData = useCallback((data: GuestBulkInvite) => {
+    setInvite(data);
+    setIsOwner(Boolean(data.isOwner));
+    setAgencies(data.agencies ?? []);
+    setJoinRequired(Boolean(data.joinRequired) && !data.isOwner);
+    setAgencyGuestUsers(data.guestUsers ?? []);
+    const ownerOverview = Boolean(
+      data.isOwner && (data.ownerOverview || data.scope === "agency"),
+    );
+    const uid = ownerOverview ? null : data.guestUserId ?? null;
+    setGuestUserId(uid);
+    if (uid && token) storeGuestUserId(token, uid);
+    if (ownerOverview && token) clearStoredGuestUserId(token);
+
+    setDriverName(data.driverName || "");
+    setDriverPhone(data.driverPhone || "");
+
+    if (data.joinRequired && !data.isOwner) {
+      setBlocks([emptyBlock()]);
+      setActiveClientId("");
+      skipNextSync.current = true;
+      return;
+    }
+
+    // Owner agency overview: show every link user's blocks (read-only)
+    if (ownerOverview) {
+      const raw = data.draft?.blocks ?? [];
+      const loaded = raw.length
+        ? normalizeGuestBlocks(raw).map((b) =>
+            b.status === "accepted"
+              ? b
+              : {
+                  ...b,
+                  driverGroups: stampGuestDriverOnGroups(
+                    b.driverGroups,
+                    b.guestName || data.driverName || "",
+                    b.guestPhone || data.driverPhone || "",
+                  ),
+                },
+          )
+        : [];
+      setBlocks(loaded);
+      setPreferredGuestPlate(guestSessionVehiclePlate(loaded));
+      setFocusedGuestUserId((prev) => {
+        if (prev && data.guestUsers?.some((u) => u.id === prev)) return prev;
+        return null;
+      });
+      setActiveClientId(
+        loaded.find((b) => b.status !== "accepted")?.clientId ||
+          loaded[0]?.clientId ||
+          "",
+      );
+      skipNextSync.current = true;
+      lastBackendHash.current = "";
+      return;
+    }
+
+    const loaded = stampGuestDriverOnBlocks(
+      ensureEditableWorkspace(
+        normalizeGuestBlocks(
+          data.draft?.blocks?.length ? data.draft.blocks : [emptyBlock()],
+        ),
+      ),
+      data.driverName || "",
+      data.driverPhone || "",
+    );
+    setBlocks(loaded);
+    setPreferredGuestPlate(guestSessionVehiclePlate(loaded));
+    setActiveClientId(
+      pickActiveBlockId(
+        loaded,
+        data.driverName || "",
+        data.driverPhone || "",
+      ),
+    );
+    skipNextSync.current = true;
+    lastBackendHash.current = quickHash(
+      JSON.stringify({
+        driverName: data.driverName || "",
+        driverPhone: data.driverPhone || "",
+        blocks: loaded,
+      }),
+    );
+  }, [token]);
+
   useEffect(() => {
     if (!token) {
       setLoadError("Invalid invite link");
@@ -1288,48 +1455,47 @@ export function GuestBulkEntryPage() {
     setDriverPhone("");
     setBlocks([emptyBlock()]);
     setEditingDriver(false);
+    setJoinRequired(false);
+    setJoinError(null);
+    setGuestUserId(loadStoredGuestUserId(token));
+    setAgencyGuestUsers([]);
 
     let cancelled = false;
     (async () => {
       try {
-        const data = await fetchGuestInvite(token);
+        const stored = loadStoredGuestUserId(token);
+        let data = await fetchGuestInvite(token, stored);
+        // Logged-in owner always gets the full agency overview (all users)
+        if (data.isOwner && data.scope === "agency" && stored) {
+          clearStoredGuestUserId(token);
+          data = await fetchGuestInvite(token, null);
+        }
         if (cancelled) return;
-        setInvite(data);
-        setIsOwner(Boolean(data.isOwner));
-        setAgencies(data.agencies ?? []);
-        setDriverName(data.driverName || "");
-        setDriverPhone(data.driverPhone || "");
-        const loaded = stampGuestDriverOnBlocks(
-          ensureEditableWorkspace(
-            normalizeGuestBlocks(
-              data.draft?.blocks?.length ? data.draft.blocks : [emptyBlock()],
-            ),
-          ),
-          data.driverName || "",
-          data.driverPhone || "",
-        );
-        setBlocks(loaded);
-        setPreferredGuestPlate(guestSessionVehiclePlate(loaded));
-        setActiveClientId(
-          pickActiveBlockId(
-            loaded,
-            data.driverName || "",
-            data.driverPhone || "",
-          ),
-        );
-        skipNextSync.current = true;
-        lastBackendHash.current = quickHash(
-          JSON.stringify({
-            driverName: data.driverName || "",
-            driverPhone: data.driverPhone || "",
-            blocks: loaded,
-          }),
-        );
+        applyInviteData(data);
       } catch (e: unknown) {
         if (!cancelled) {
-          setLoadError(
-            e instanceof Error ? e.message : "Failed to load invite",
-          );
+          const msg =
+            e instanceof Error ? e.message : "Failed to load invite";
+          // Stale guest session — clear and retry as join
+          if (
+            storedGuestSessionError(msg) &&
+            loadStoredGuestUserId(token)
+          ) {
+            clearStoredGuestUserId(token);
+            try {
+              const data = await fetchGuestInvite(token, null);
+              if (!cancelled) applyInviteData(data);
+              return;
+            } catch (e2: unknown) {
+              if (!cancelled) {
+                setLoadError(
+                  e2 instanceof Error ? e2.message : "Failed to load invite",
+                );
+              }
+              return;
+            }
+          }
+          setLoadError(msg);
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -1338,7 +1504,7 @@ export function GuestBulkEntryPage() {
     return () => {
       cancelled = true;
     };
-  }, [token]);
+  }, [token, applyInviteData]);
 
   useEffect(() => {
     if (!activeClientId && blocks.length > 0) {
@@ -1399,6 +1565,9 @@ export function GuestBulkEntryPage() {
   const persistGuestDraft = useCallback(async () => {
     if (!token || !invite) return;
     if (invite.token && invite.token !== token) return;
+    if (invite.joinRequired && !invite.isOwner) return;
+    // Owner overview is read-only (merged drafts from all link users)
+    if (invite.isOwner && invite.scope === "agency") return;
     const payload = syncPayloadRef.current;
     const hash = quickHash(JSON.stringify(payload));
     if (hash === lastBackendHash.current) return;
@@ -1418,6 +1587,7 @@ export function GuestBulkEntryPage() {
       const data = await syncGuestBulk(token, {
         driverName: payload.driverName,
         driverPhone: payload.driverPhone,
+        guestUserId: guestUserId ?? invite.guestUserId,
         blocks: [
           ...openBlocks,
           ...accepted.map((b) => ({
@@ -1463,7 +1633,85 @@ export function GuestBulkEntryPage() {
         );
       }
     }
-  }, [token, invite]);
+  }, [token, invite, guestUserId]);
+
+  const onJoin = async () => {
+    if (!token) return;
+    setJoining(true);
+    setJoinError(null);
+    try {
+      const data = await joinGuestBulk(token, {
+        name: joinName.trim(),
+        phone: joinPhone.trim(),
+      });
+      applyInviteData(data);
+    } catch (e: unknown) {
+      setJoinError(e instanceof Error ? e.message : "Could not join");
+    } finally {
+      setJoining(false);
+    }
+  };
+
+  const reloadOwnerOverview = async () => {
+    if (!token) return;
+    clearStoredGuestUserId(token);
+    const data = await fetchGuestInvite(token, null);
+    applyInviteData(data);
+  };
+
+  const onRotateToken = async () => {
+    if (!invite?.id) return;
+    if (
+      !window.confirm(
+        "Rotate URL? The old link stops working. Share the new link with drivers.",
+      )
+    ) {
+      return;
+    }
+    setOwnerBusy(true);
+    setApproveError(null);
+    try {
+      const data = await rotateGuestBulkInviteToken(invite.id);
+      // New token — navigate by opening same origin path
+      window.location.href = guestBulkShareUrl(data.token);
+    } catch (e: unknown) {
+      const msg =
+        e && typeof e === "object" && "response" in e
+          ? (e as { response?: { data?: { message?: string } } }).response?.data
+              ?.message
+          : null;
+      setApproveError(
+        msg || (e instanceof Error ? e.message : "Rotate failed"),
+      );
+    } finally {
+      setOwnerBusy(false);
+    }
+  };
+
+  const onToggleBlockUser = async (user: GuestLinkUser) => {
+    if (!invite?.id) return;
+    setOwnerBusy(true);
+    setApproveError(null);
+    try {
+      if (user.status === "blocked") {
+        await unblockGuestLinkUser(invite.id, user.id);
+      } else {
+        await blockGuestLinkUser(invite.id, user.id);
+      }
+      await reloadOwnerOverview();
+    } catch (e: unknown) {
+      const msg =
+        e && typeof e === "object" && "response" in e
+          ? (e as { response?: { data?: { message?: string } } }).response?.data
+              ?.message
+          : null;
+      setApproveError(
+        msg || (e instanceof Error ? e.message : "Update user failed"),
+      );
+    } finally {
+      setOwnerBusy(false);
+    }
+  };
 
   const flushPendingAcceptedMerge = () => {
     const pending = pendingAcceptedDraftRef.current;
@@ -1491,6 +1739,8 @@ export function GuestBulkEntryPage() {
 
   useEffect(() => {
     if (!token || !invite || loading) return;
+    if (joinRequired) return;
+    if (invite.isOwner && invite.scope === "agency") return;
     if (skipNextSync.current) {
       skipNextSync.current = false;
       return;
@@ -1508,7 +1758,7 @@ export function GuestBulkEntryPage() {
     return () => {
       if (timerRef.current) clearTimeout(timerRef.current);
     };
-  }, [token, invite, loading, syncPayload, persistGuestDraft]);
+  }, [token, invite, loading, syncPayload, persistGuestDraft, joinRequired]);
 
   useEffect(() => {
     const flushOnHide = () => {
@@ -1619,17 +1869,32 @@ export function GuestBulkEntryPage() {
   const onApprove = async (clientId?: string) => {
     if (!token) return;
     setApproveError(null);
+    const ownerOverview = Boolean(
+      invite?.isOwner && invite.scope === "agency",
+    );
+    const pool =
+      ownerOverview && focusedGuestUserId
+        ? blocks.filter(
+            (b) => String(b.guestUserId) === String(focusedGuestUserId),
+          )
+        : blocks;
     const targets = clientId
-      ? blocks.filter((b) => b.clientId === clientId && b.status !== "accepted")
-      : blocks.filter((b) => b.status !== "accepted");
+      ? pool.filter((b) => b.clientId === clientId && b.status !== "accepted")
+      : pool.filter((b) => b.status !== "accepted");
     for (const b of targets) {
-      const err = guestApproveBlockError(
-        b,
-        guestDriverName,
-        guestDriverPhone,
-      );
+      const name = ownerOverview
+        ? b.guestName || guestDriverName
+        : guestDriverName;
+      const phone = ownerOverview
+        ? b.guestPhone || guestDriverPhone
+        : guestDriverPhone;
+      const err = guestApproveBlockError(b, name, phone);
       if (err) {
         setApproveError(err);
+        return;
+      }
+      if (ownerOverview && !b.guestUserId) {
+        setApproveError("Missing guest user on this entry.");
         return;
       }
     }
@@ -1639,28 +1904,50 @@ export function GuestBulkEntryPage() {
     }
     setApproving(clientId ?? "__all__");
     try {
-      const data = await approveGuestBulk(
-        token,
-        clientId ? { clientId } : { all: true },
-      );
-      skipNextSync.current = true;
-      if (data.draft?.blocks) {
-        const next = ensureEditableWorkspace(
-          normalizeGuestBlocks(data.draft.blocks),
-        );
-        setBlocks(next);
-        setActiveClientId(
-          pickActiveBlockId(next, guestDriverName, guestDriverPhone),
+      if (ownerOverview) {
+        if (clientId) {
+          const block = targets[0];
+          await approveGuestBulk(token, {
+            clientId,
+            guestUserId: block.guestUserId,
+          });
+        } else {
+          const byUser = new Map<string, GuestAgencyBlock[]>();
+          for (const b of targets) {
+            const uid = String(b.guestUserId);
+            if (!byUser.has(uid)) byUser.set(uid, []);
+            byUser.get(uid)!.push(b);
+          }
+          for (const [uid] of byUser) {
+            await approveGuestBulk(token, { all: true, guestUserId: uid });
+          }
+        }
+        skipNextSync.current = true;
+        await reloadOwnerOverview();
+      } else {
+        const data = await approveGuestBulk(token, {
+          ...(clientId ? { clientId } : { all: true }),
+          guestUserId: guestUserId ?? invite?.guestUserId,
+        });
+        skipNextSync.current = true;
+        if (data.draft?.blocks) {
+          const next = ensureEditableWorkspace(
+            normalizeGuestBlocks(data.draft.blocks),
+          );
+          setBlocks(next);
+          setActiveClientId(
+            pickActiveBlockId(next, guestDriverName, guestDriverPhone),
+          );
+        }
+        setInvite((prev) => (prev ? { ...prev, ...data } : data));
+        lastBackendHash.current = quickHash(
+          JSON.stringify({
+            driverName: data.driverName || driverName,
+            driverPhone: data.driverPhone || driverPhone,
+            blocks: data.draft?.blocks ?? blocks,
+          }),
         );
       }
-      setInvite((prev) => (prev ? { ...prev, ...data } : data));
-      lastBackendHash.current = quickHash(
-        JSON.stringify({
-          driverName: data.driverName || driverName,
-          driverPhone: data.driverPhone || driverPhone,
-          blocks: data.draft?.blocks ?? blocks,
-        }),
-      );
     } catch (e: unknown) {
       setApproveError(e instanceof Error ? e.message : "Approve failed");
     } finally {
@@ -1742,10 +2029,169 @@ export function GuestBulkEntryPage() {
     return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
   };
 
-  const openBlocks = blocks.filter((b) => b.status !== "accepted");
+  const ownerOverviewMode = Boolean(isOwner && invite?.scope === "agency");
+  const displayBlocks = useMemo(() => {
+    if (!ownerOverviewMode || !focusedGuestUserId) return blocks;
+    return blocks.filter(
+      (b) => String(b.guestUserId) === String(focusedGuestUserId),
+    );
+  }, [blocks, ownerOverviewMode, focusedGuestUserId]);
+
+  const displayActiveBlock = useMemo(() => {
+    if (!displayBlocks.length) return null;
+    return (
+      displayBlocks.find((b) => b.clientId === activeClientId) ??
+      displayBlocks.find((b) => b.status !== "accepted") ??
+      displayBlocks[0]
+    );
+  }, [displayBlocks, activeClientId]);
+
+  const openBlocks = displayBlocks.filter((b) => b.status !== "accepted");
   const canApproveAll = openBlocks.some((b) =>
-    blockPendingOwnerApproval(b, guestDriverName, guestDriverPhone),
+    blockPendingOwnerApproval(
+      b,
+      ownerOverviewMode ? b.guestName || guestDriverName : guestDriverName,
+      ownerOverviewMode ? b.guestPhone || guestDriverPhone : guestDriverPhone,
+    ),
   );
+
+  const filteredAgencyUsers = useMemo(() => {
+    const q = userSearch.trim().toLowerCase();
+    const qDigits = q.replace(/\D/g, "");
+    let list = [...agencyGuestUsers];
+    if (userFilter === "active") {
+      list = list.filter((u) => u.status !== "blocked");
+    } else if (userFilter === "blocked") {
+      list = list.filter((u) => u.status === "blocked");
+    } else if (userFilter === "pending") {
+      list = list.filter((u) => (u.pendingSubmissions ?? 0) > 0);
+    }
+    if (q) {
+      list = list.filter((u) => {
+        const name = (u.name || "").toLowerCase();
+        const phone = (u.phone || "").toLowerCase();
+        const phoneDigits = phone.replace(/\D/g, "");
+        const status = (u.status || "").toLowerCase();
+        return (
+          name.includes(q) ||
+          phone.includes(q) ||
+          status.includes(q) ||
+          (qDigits.length > 0 && phoneDigits.includes(qDigits))
+        );
+      });
+    }
+    list.sort((a, b) => {
+      if (userSort === "name-asc") {
+        return (a.name || "").localeCompare(b.name || "", "en-IN");
+      }
+      if (userSort === "name-desc") {
+        return (b.name || "").localeCompare(a.name || "", "en-IN");
+      }
+      if (userSort === "phone") {
+        return (a.phone || "").localeCompare(b.phone || "", "en-IN");
+      }
+      if (userSort === "pending") {
+        return (b.pendingSubmissions ?? 0) - (a.pendingSubmissions ?? 0);
+      }
+      // recent — lastSeenAt desc
+      const at = a.lastSeenAt ? new Date(a.lastSeenAt).getTime() : 0;
+      const bt = b.lastSeenAt ? new Date(b.lastSeenAt).getTime() : 0;
+      return bt - at;
+    });
+    return list;
+  }, [agencyGuestUsers, userSearch, userFilter, userSort]);
+
+  const filteredEntryBlocks = useMemo(() => {
+    const q = entrySearch.trim().toLowerCase();
+    const qDigits = q.replace(/\D/g, "");
+    let list = displayBlocks.filter(blockShowsAgencyPill);
+    list = list.filter((b) => {
+      const name = b.guestName || guestDriverName;
+      const phone = b.guestPhone || guestDriverPhone;
+      const pending = blockPendingOwnerApproval(b, name, phone);
+      if (entryFilter === "approved") return b.status === "accepted";
+      if (entryFilter === "approve") return pending;
+      if (entryFilter === "open") {
+        return b.status !== "accepted" && !pending;
+      }
+      return true;
+    });
+    if (q) {
+      list = list.filter((b) => {
+        const name = (b.guestName || "").toLowerCase();
+        const phone = (b.guestPhone || "").toLowerCase();
+        const phoneDigits = phone.replace(/\D/g, "");
+        const iso = guestBlockTimelineIso(b);
+        const timeHay = istSearchHaystack(iso);
+        const status =
+          b.status === "accepted"
+            ? "approved"
+            : blockPendingOwnerApproval(
+                  b,
+                  b.guestName || guestDriverName,
+                  b.guestPhone || guestDriverPhone,
+                )
+              ? "approve pending"
+              : "open";
+        return (
+          name.includes(q) ||
+          phone.includes(q) ||
+          timeHay.includes(q) ||
+          status.includes(q) ||
+          (qDigits.length > 0 && phoneDigits.includes(qDigits))
+        );
+      });
+    }
+    list.sort((a, b) => {
+      if (entrySort === "name") {
+        return (a.guestName || "").localeCompare(b.guestName || "", "en-IN");
+      }
+      if (entrySort === "status") {
+        const rank = (block: GuestAgencyBlock) => {
+          if (block.status === "accepted") return 2;
+          if (
+            blockPendingOwnerApproval(
+              block,
+              block.guestName || guestDriverName,
+              block.guestPhone || guestDriverPhone,
+            )
+          ) {
+            return 0;
+          }
+          return 1;
+        };
+        return rank(a) - rank(b);
+      }
+      const at = guestBlockTimelineIso(a)
+        ? new Date(guestBlockTimelineIso(a)!).getTime()
+        : 0;
+      const bt = guestBlockTimelineIso(b)
+        ? new Date(guestBlockTimelineIso(b)!).getTime()
+        : 0;
+      return entrySort === "oldest" ? at - bt : bt - at;
+    });
+    return list;
+  }, [
+    displayBlocks,
+    entrySearch,
+    entryFilter,
+    entrySort,
+    guestDriverName,
+    guestDriverPhone,
+  ]);
+
+  const focusGuestUser = (userId: string | null) => {
+    setFocusedGuestUserId(userId);
+    setUsersSidebarOpen(false);
+    const pool = userId
+      ? blocks.filter((b) => String(b.guestUserId) === String(userId))
+      : blocks;
+    const next =
+      pool.find((b) => b.status !== "accepted")?.clientId ||
+      pool[0]?.clientId ||
+      "";
+    setActiveClientId(next);
+  };
 
   if (loading) {
     return (
@@ -1773,15 +2219,449 @@ export function GuestBulkEntryPage() {
     );
   }
 
+  if (joinRequired) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-[var(--bg-main)] p-6">
+        <div className="w-full max-w-md space-y-4 rounded-2xl border border-slate-200 bg-[var(--bg-card)] p-6 shadow-sm dark:border-[#1e2638]">
+          <TripwiseLogo variant="auto" className="mx-auto h-16 w-16" />
+          <div className="text-center">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-[#C98200] dark:text-[#F5A300]">
+              Tripwise · agency entry
+            </p>
+            <h1 className="mt-1 text-lg font-bold text-slate-800 dark:text-white">
+              {invite.agencyName || invite.label}
+            </h1>
+            <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
+              Enter your name and phone to open your private workspace. Use the
+              same phone later to resume.
+            </p>
+          </div>
+          {joinError && (
+            <div className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-300">
+              {joinError}
+            </div>
+          )}
+          <input
+            value={joinName}
+            onChange={(e) => setJoinName(e.target.value)}
+            placeholder="Your name"
+            className={inputCls}
+            autoComplete="name"
+          />
+          <input
+            value={joinPhone}
+            onChange={(e) => setJoinPhone(e.target.value)}
+            placeholder="Phone (10 digits)"
+            inputMode="tel"
+            className={inputCls}
+            autoComplete="tel"
+          />
+          <button
+            type="button"
+            disabled={joining || !joinName.trim() || joinPhone.trim().length < 10}
+            onClick={() => void onJoin()}
+            className={`${btnSolidCls} w-full bg-indigo-600 text-white dark:bg-indigo-500 sm:text-sm`}
+          >
+            {joining ? "Opening…" : "Continue"}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   const expiresLabel = invite.expiresAt
     ? new Date(invite.expiresAt).toLocaleString()
     : "";
+  const isAgencyScope = invite.scope === "agency";
+  const agencyLocked = isAgencyScope;
+  const viewBlock = ownerOverviewMode ? displayActiveBlock : activeBlock;
+  const focusedGuest = focusedGuestUserId
+    ? agencyGuestUsers.find((u) => u.id === focusedGuestUserId) ?? null
+    : null;
+
+  const sidebarSelectCls =
+    "w-full rounded-md border border-slate-200 bg-[var(--bg-elevated)] px-2 py-1.5 text-[11px] text-slate-700 outline-none focus:border-indigo-400 dark:border-[#1e2638] dark:text-slate-200";
+  const sidebarSearchCls =
+    "w-full rounded-md border border-slate-200 bg-[var(--bg-elevated)] py-1.5 pl-7 pr-2 text-[11px] text-slate-700 outline-none placeholder:text-slate-400 focus:border-indigo-400 dark:border-[#1e2638] dark:text-slate-200 dark:placeholder:text-slate-500";
+
+  const usersSidebar = ownerOverviewMode ? (
+    <aside className="flex h-full w-full flex-col bg-[var(--bg-card)]">
+      <div className="shrink-0 space-y-2 border-b border-slate-100 px-3 py-3 dark:border-[#1e2638]">
+        <div className="flex items-center gap-2">
+          <Users className="h-4 w-4 text-indigo-500" />
+          <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">
+            Link users
+          </p>
+          <span className="ml-auto rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-500 dark:bg-white/10 dark:text-slate-400">
+            {filteredAgencyUsers.length}
+            {filteredAgencyUsers.length !== agencyGuestUsers.length
+              ? `/${agencyGuestUsers.length}`
+              : ""}
+          </span>
+        </div>
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="rounded bg-emerald-600 px-1.5 py-0.5 text-[10px] font-bold uppercase text-white dark:bg-emerald-500">
+            Owner
+          </span>
+          {(invite.status === "revoked" || invite.expired) && (
+            <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-800 dark:bg-amber-500/20 dark:text-amber-200">
+              {invite.status === "revoked" ? "Revoked" : "Expired"}
+            </span>
+          )}
+        </div>
+        <label className="flex flex-col gap-1 text-[11px] font-medium text-slate-500 dark:text-slate-400">
+          Expires
+          <DateTimePicker
+            compact
+            disabled={ownerBusy}
+            value={toLocalInputValue(invite.expiresAt)}
+            onChange={(next) => {
+              const prev = toLocalInputValue(invite.expiresAt);
+              if (next !== prev) void onOwnerExpiryChange(next);
+            }}
+            className="w-full rounded-lg border border-slate-200 bg-[var(--bg-elevated)] px-2 py-1.5 text-[11px] text-slate-700 dark:border-[#1e2638] dark:text-slate-200"
+          />
+        </label>
+        <div className="relative">
+          <Search className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
+          <input
+            value={userSearch}
+            onChange={(e) => setUserSearch(e.target.value)}
+            placeholder="Search name, phone…"
+            className={sidebarSearchCls}
+          />
+        </div>
+        <div className="grid grid-cols-2 gap-1.5">
+          <label className="space-y-0.5">
+            <span className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+              Filter
+            </span>
+            <select
+              value={userFilter}
+              onChange={(e) =>
+                setUserFilter(
+                  e.target.value as
+                    | "all"
+                    | "active"
+                    | "blocked"
+                    | "pending",
+                )
+              }
+              className={sidebarSelectCls}
+            >
+              <option value="all">All</option>
+              <option value="active">Active</option>
+              <option value="blocked">Blocked</option>
+              <option value="pending">Pending</option>
+            </select>
+          </label>
+          <label className="space-y-0.5">
+            <span className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+              <ArrowUpDown className="h-3 w-3" />
+              Sort
+            </span>
+            <select
+              value={userSort}
+              onChange={(e) =>
+                setUserSort(
+                  e.target.value as
+                    | "name-asc"
+                    | "name-desc"
+                    | "pending"
+                    | "recent"
+                    | "phone",
+                )
+              }
+              className={sidebarSelectCls}
+            >
+              <option value="recent">Recent</option>
+              <option value="name-asc">Name A–Z</option>
+              <option value="name-desc">Name Z–A</option>
+              <option value="phone">Phone</option>
+              <option value="pending">Pending</option>
+            </select>
+          </label>
+        </div>
+      </div>
+
+      <div className="min-h-0 flex-1 overflow-y-auto p-2">
+        <button
+          type="button"
+          onClick={() => focusGuestUser(null)}
+          className={`mb-1 flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left transition ${
+            !focusedGuestUserId
+              ? "bg-indigo-50 text-indigo-800 dark:bg-indigo-500/15 dark:text-indigo-200"
+              : "text-slate-600 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-white/5"
+          }`}
+        >
+          <Users className="h-3.5 w-3.5 shrink-0 opacity-70" />
+          <span className="min-w-0 flex-1 truncate text-xs font-semibold">
+            All users
+          </span>
+          {(invite.pendingSubmissions ?? 0) > 0 && (
+            <span className="shrink-0 rounded-full bg-orange-500 px-1.5 py-0.5 text-[9px] font-bold text-white">
+              {invite.pendingSubmissions}
+            </span>
+          )}
+        </button>
+
+        {agencyGuestUsers.length === 0 ? (
+          <p className="px-2 py-6 text-center text-xs text-slate-400">
+            No one has joined yet — share the link
+          </p>
+        ) : filteredAgencyUsers.length === 0 ? (
+          <p className="px-2 py-6 text-center text-xs text-slate-400">
+            No users match
+          </p>
+        ) : (
+          <ul className="space-y-0.5">
+            {filteredAgencyUsers.map((u) => {
+              const selected = focusedGuestUserId === u.id;
+              const pending = u.pendingSubmissions ?? 0;
+              return (
+                <li key={u.id}>
+                  <div
+                    className={`group flex items-stretch gap-0.5 rounded-lg ${
+                      selected
+                        ? "bg-indigo-50 dark:bg-indigo-500/15"
+                        : "hover:bg-slate-50 dark:hover:bg-white/5"
+                    }`}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => focusGuestUser(u.id)}
+                      className="min-w-0 flex-1 px-2.5 py-2 text-left"
+                    >
+                      <p
+                        className={`truncate text-xs font-semibold ${
+                          selected
+                            ? "text-indigo-900 dark:text-indigo-100"
+                            : "text-slate-800 dark:text-slate-100"
+                        }`}
+                      >
+                        {u.name}
+                        {u.status === "blocked" ? (
+                          <span className="ml-1 text-[10px] font-medium text-rose-500">
+                            blocked
+                          </span>
+                        ) : null}
+                      </p>
+                      <p className="truncate font-mono text-[10px] text-slate-400">
+                        {u.phone}
+                      </p>
+                      <p className="mt-0.5 truncate text-[10px] text-slate-400">
+                        {(u.openRowCount ?? 0) > 0
+                          ? `${u.openRowCount} open`
+                          : "No open rows"}
+                        {pending > 0 ? ` · ${pending} pending` : ""}
+                      </p>
+                    </button>
+                    <button
+                      type="button"
+                      disabled={ownerBusy}
+                      title={u.status === "blocked" ? "Unblock" : "Block"}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        void onToggleBlockUser(u);
+                      }}
+                      className={`m-1 shrink-0 self-center rounded-md p-1.5 opacity-70 transition hover:opacity-100 disabled:opacity-40 ${
+                        u.status === "blocked"
+                          ? "text-emerald-600 hover:bg-emerald-50 dark:text-emerald-400 dark:hover:bg-emerald-500/10"
+                          : "text-rose-500 hover:bg-rose-50 dark:text-rose-400 dark:hover:bg-rose-500/10"
+                      }`}
+                    >
+                      {u.status === "blocked" ? (
+                        <RotateCcw className="h-3.5 w-3.5" />
+                      ) : (
+                        <Ban className="h-3.5 w-3.5" />
+                      )}
+                    </button>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </div>
+    </aside>
+  ) : null;
+
+  const entriesSidebar = ownerOverviewMode ? (
+    <aside className="flex h-full w-full flex-col bg-[var(--bg-card)]">
+      <div className="shrink-0 space-y-2 border-b border-slate-100 px-3 py-3 dark:border-[#1e2638]">
+        <div className="flex items-center gap-2">
+          <Clock className="h-4 w-4 text-indigo-500" />
+          <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">
+            Entries
+          </p>
+          <span className="ml-auto rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-500 dark:bg-white/10 dark:text-slate-400">
+            {filteredEntryBlocks.length}
+          </span>
+        </div>
+        <p className="truncate text-[11px] text-slate-400">
+          {focusedGuest
+            ? focusedGuest.name
+            : "All users · IST (India)"}
+        </p>
+        <div className="relative">
+          <Search className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
+          <input
+            value={entrySearch}
+            onChange={(e) => setEntrySearch(e.target.value)}
+            placeholder="Name, phone, date, time…"
+            className={sidebarSearchCls}
+          />
+        </div>
+        <div className="grid grid-cols-2 gap-1.5">
+          <label className="space-y-0.5">
+            <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+              Filter
+            </span>
+            <select
+              value={entryFilter}
+              onChange={(e) =>
+                setEntryFilter(
+                  e.target.value as "all" | "open" | "approve" | "approved",
+                )
+              }
+              className={sidebarSelectCls}
+            >
+              <option value="all">All</option>
+              <option value="approve">Approve</option>
+              <option value="open">Open</option>
+              <option value="approved">Approved</option>
+            </select>
+          </label>
+          <label className="space-y-0.5">
+            <span className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+              <ArrowUpDown className="h-3 w-3" />
+              Sort
+            </span>
+            <select
+              value={entrySort}
+              onChange={(e) =>
+                setEntrySort(
+                  e.target.value as "newest" | "oldest" | "name" | "status",
+                )
+              }
+              className={sidebarSelectCls}
+            >
+              <option value="newest">Newest</option>
+              <option value="oldest">Oldest</option>
+              <option value="name">Name</option>
+              <option value="status">Status</option>
+            </select>
+          </label>
+        </div>
+      </div>
+      <div className="min-h-0 flex-1 overflow-y-auto p-2">
+        {filteredEntryBlocks.length === 0 ? (
+          <p className="px-2 py-8 text-center text-xs text-slate-400">
+            {displayBlocks.some(blockShowsAgencyPill)
+              ? "No entries match"
+              : "No entries yet"}
+          </p>
+        ) : (
+          <ul className="space-y-0.5">
+            {filteredEntryBlocks.map((b) => {
+              const pillName = b.guestName || guestDriverName;
+              const pillPhone = b.guestPhone || guestDriverPhone;
+              const pending = blockPendingOwnerApproval(
+                b,
+                pillName,
+                pillPhone,
+              );
+              const active = viewBlock?.clientId === b.clientId;
+              const timelineLabel =
+                formatGuestPillTimeline(guestBlockTimelineIso(b)) || "—";
+              const statusLabel =
+                b.status === "accepted"
+                  ? "Approved"
+                  : pending
+                    ? "Approve"
+                    : "Open";
+              return (
+                <li key={`${b.guestUserId ?? ""}-${b.clientId}`}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setActiveClientId(b.clientId);
+                      if (b.guestUserId) {
+                        setFocusedGuestUserId(String(b.guestUserId));
+                      }
+                      setEntriesSidebarOpen(false);
+                    }}
+                    className={`flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left transition ${
+                      active
+                        ? b.status === "accepted"
+                          ? "bg-emerald-50 dark:bg-emerald-500/15"
+                          : pending
+                            ? "bg-amber-50 dark:bg-amber-500/15"
+                            : "bg-indigo-50 dark:bg-indigo-500/15"
+                        : "hover:bg-slate-50 dark:hover:bg-white/5"
+                    }`}
+                  >
+                    <div className="min-w-0 flex-1">
+                      {!focusedGuestUserId && (
+                        <p className="truncate text-[11px] font-semibold text-slate-700 dark:text-slate-200">
+                          {b.guestName || "Driver"}
+                        </p>
+                      )}
+                      {!focusedGuestUserId && b.guestPhone ? (
+                        <p className="truncate font-mono text-[10px] text-slate-400">
+                          {b.guestPhone}
+                        </p>
+                      ) : null}
+                      <p
+                        className={`truncate font-mono text-xs font-semibold ${
+                          active
+                            ? "text-slate-900 dark:text-white"
+                            : "text-slate-600 dark:text-slate-300"
+                        }`}
+                      >
+                        {timelineLabel}
+                      </p>
+                    </div>
+                    <span
+                      className={`shrink-0 rounded px-1.5 py-0.5 text-[9px] font-bold uppercase text-white ${
+                        b.status === "accepted"
+                          ? "bg-emerald-600 dark:bg-emerald-500"
+                          : pending
+                            ? "bg-amber-500 dark:bg-amber-600"
+                            : "bg-slate-400 dark:bg-slate-500"
+                      }`}
+                    >
+                      {statusLabel}
+                    </span>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </div>
+    </aside>
+  ) : null;
 
   return (
     <div className="flex h-dvh flex-col overflow-hidden bg-[var(--bg-main)]">
       <header className="shrink-0 border-b border-slate-200 bg-[var(--bg-card)]/95 px-2.5 py-2 shadow-sm backdrop-blur dark:border-[#1e2638] sm:px-4 sm:py-3">
-        <div className="mx-auto flex max-w-5xl flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
+        <div
+          className={`mx-auto flex w-full flex-col gap-2 sm:flex-row sm:items-center sm:gap-4 ${
+            ownerOverviewMode ? "max-w-[90rem]" : "max-w-5xl"
+          }`}
+        >
           <div className="flex min-w-0 flex-1 items-start gap-2 sm:gap-3">
+            {ownerOverviewMode && (
+              <button
+                type="button"
+                onClick={() => setUsersSidebarOpen(true)}
+                title="Link users"
+                className={`${btnIconCls} mt-0.5 border-slate-200 bg-[var(--bg-elevated)] text-slate-500 hover:text-indigo-600 md:hidden dark:border-[#1e2638] dark:text-slate-400`}
+              >
+                <PanelLeft className="h-4 w-4" />
+              </button>
+            )}
             <TripwiseLogo
               variant="auto"
               className="mt-0.5 h-9 w-9 shrink-0 sm:h-12 sm:w-12"
@@ -1790,10 +2670,14 @@ export function GuestBulkEntryPage() {
             <p className="text-[10px] font-bold uppercase tracking-wider text-[#C98200] dark:text-[#F5A300]">
               {isOwner
                 ? "Tripwise · owner review"
-                : "Tripwise · driver entry"}
+                : isAgencyScope
+                  ? "Tripwise · agency entry"
+                  : "Tripwise · driver entry"}
             </p>
             <h1 className="truncate text-base font-bold leading-snug text-slate-800 dark:text-white sm:text-lg">
-              {invite.label}
+              {isAgencyScope && invite.agencyName
+                ? invite.agencyName
+                : invite.label}
             </h1>
             {expiresLabel && (
               <p className="mt-0.5 text-[11px] text-slate-400 dark:text-slate-500 sm:text-xs">
@@ -1803,7 +2687,7 @@ export function GuestBulkEntryPage() {
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
-            <SyncBadge status={syncStatus} />
+            {!isOwner && <SyncBadge status={syncStatus} />}
             <button
               type="button"
               onClick={toggleTheme}
@@ -1860,6 +2744,18 @@ export function GuestBulkEntryPage() {
                 </span>
               </button>
             )}
+            {isOwner && isAgencyScope && (
+              <button
+                type="button"
+                disabled={ownerBusy}
+                onClick={() => void onRotateToken()}
+                title="Rotate URL"
+                className={`${btnOutlineCls} border-amber-200 bg-[var(--bg-elevated)] text-amber-700 hover:bg-amber-50 disabled:opacity-60 dark:border-amber-500/30 dark:text-amber-300 dark:hover:bg-amber-500/10 sm:text-sm`}
+              >
+                <KeyRound className="h-4 w-4" />
+                <span className="hidden sm:inline">Rotate</span>
+              </button>
+            )}
             {isOwner && canApproveAll && (
               <button
                 type="button"
@@ -1867,15 +2763,60 @@ export function GuestBulkEntryPage() {
                 onClick={() => onApprove()}
                 className={`${btnSolidCls} flex-1 bg-emerald-600 text-white shadow-sm hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-emerald-500 dark:hover:bg-emerald-400 sm:flex-none sm:text-sm`}
               >
-                {approving === "__all__" ? "Approving…" : "Approve all"}
+                {approving === "__all__"
+                  ? "Approving…"
+                  : focusedGuest
+                    ? `Approve ${focusedGuest.name.split(" ")[0]}`
+                    : "Approve all"}
+              </button>
+            )}
+            {ownerOverviewMode && (
+              <button
+                type="button"
+                onClick={() => setEntriesSidebarOpen(true)}
+                title="Entries"
+                className={`${btnIconCls} border-slate-200 bg-[var(--bg-elevated)] text-slate-500 hover:text-indigo-600 md:hidden dark:border-[#1e2638] dark:text-slate-400`}
+              >
+                <PanelRight className="h-4 w-4" />
               </button>
             )}
           </div>
         </div>
       </header>
 
+      <div className="flex min-h-0 flex-1">
+        {ownerOverviewMode && (
+          <div className="hidden w-64 shrink-0 border-r border-slate-200 md:block dark:border-[#1e2638] lg:w-72">
+            {usersSidebar}
+          </div>
+        )}
+
+        {ownerOverviewMode && usersSidebarOpen && (
+          <div className="fixed inset-0 z-40 md:hidden">
+            <button
+              type="button"
+              aria-label="Close users"
+              className="absolute inset-0 bg-black/40"
+              onClick={() => setUsersSidebarOpen(false)}
+            />
+            <div className="absolute inset-y-0 left-0 w-[min(18rem,85vw)] border-r border-slate-200 shadow-xl dark:border-[#1e2638]">
+              <button
+                type="button"
+                onClick={() => setUsersSidebarOpen(false)}
+                className="absolute right-2 top-2.5 z-10 rounded-md p-1.5 text-slate-400 hover:bg-slate-100 dark:hover:bg-white/5"
+                aria-label="Close"
+              >
+                <X className="h-4 w-4" />
+              </button>
+              {usersSidebar}
+            </div>
+          </div>
+        )}
+
       <main
-        className="mx-auto min-h-0 w-full max-w-5xl flex-1 space-y-3 overflow-y-auto p-3 pb-28 sm:space-y-4 sm:p-6 sm:pb-24"
+        className={`mx-auto min-h-0 w-full flex-1 space-y-3 overflow-y-auto p-3 pb-28 sm:space-y-4 sm:p-6 sm:pb-24 ${
+          ownerOverviewMode ? "max-w-5xl" : "max-w-5xl"
+        }`}
         onFocusCapture={handleFormFocusIn}
         onBlurCapture={handleFormFocusOut}
       >
@@ -1885,92 +2826,122 @@ export function GuestBulkEntryPage() {
           </div>
         )}
 
-        <div className="flex flex-wrap items-center gap-3">
-          {isOwner && (
-            <div className="inline-flex flex-wrap items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50/80 px-3 py-2 dark:border-emerald-500/30 dark:bg-emerald-500/10">
-              <span className="rounded bg-emerald-600 px-1.5 py-0.5 text-[10px] font-bold uppercase text-white dark:bg-emerald-500">
-                Owner
-              </span>
-              {(invite.status === "revoked" || invite.expired) && (
-                <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-800 dark:bg-amber-500/20 dark:text-amber-200">
-                  {invite.status === "revoked" ? "Revoked" : "Expired"}
-                </span>
-              )}
-              <label className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-900 dark:text-emerald-200">
-                <span>Exp</span>
-                <DateTimePicker
-                  compact
-                  disabled={ownerBusy}
-                  value={toLocalInputValue(invite.expiresAt)}
-                  onChange={(next) => {
-                    const prev = toLocalInputValue(invite.expiresAt);
-                    if (next !== prev) void onOwnerExpiryChange(next);
-                  }}
-                  className="w-[10.75rem] rounded border border-emerald-200 bg-[var(--bg-elevated)] px-1 py-0.5 text-[11px] text-slate-700 dark:border-emerald-500/30 dark:text-slate-200"
-                />
-              </label>
-            </div>
-          )}
-          <GuestDriverSummary
-            name={driverName}
-            phone={driverPhone}
-            editing={editingDriver}
-            onEdit={() => setEditingDriver(true)}
-            onDone={() => setEditingDriver(false)}
-            onNameChange={setDriverName}
-            onPhoneChange={(v) => {
-              setDriverPhone(v);
-              setApproveError((prev) =>
-                prev &&
-                /phone number already exists|guest link with this phone/i.test(
-                  prev,
-                )
-                  ? null
-                  : prev,
-              );
-            }}
-          />
-        </div>
+        {!isOwner && (
+          <div className="flex flex-wrap items-center gap-3">
+            <GuestDriverSummary
+              name={driverName}
+              phone={driverPhone}
+              editing={editingDriver && !isAgencyScope}
+              onEdit={() => {
+                if (!isAgencyScope) setEditingDriver(true);
+              }}
+              onDone={() => setEditingDriver(false)}
+              onNameChange={setDriverName}
+              onPhoneChange={(v) => {
+                if (isAgencyScope) return;
+                setDriverPhone(v);
+                setApproveError((prev) =>
+                  prev &&
+                  /phone number already exists|guest link with this phone/i.test(
+                    prev,
+                  )
+                    ? null
+                    : prev,
+                );
+              }}
+            />
+          </div>
+        )}
 
-        {activeBlock && (() => {
+        {ownerOverviewMode && focusedGuest && (
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs text-slate-400">Showing</span>
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-indigo-200 bg-indigo-50 px-2.5 py-1 text-xs font-semibold text-indigo-800 dark:border-indigo-500/30 dark:bg-indigo-500/15 dark:text-indigo-200">
+              <User className="h-3 w-3" />
+              {focusedGuest.name}
+              <button
+                type="button"
+                onClick={() => focusGuestUser(null)}
+                className="ml-0.5 rounded-full p-0.5 hover:bg-indigo-100 dark:hover:bg-indigo-500/20"
+                aria-label="Clear filter"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </span>
+          </div>
+        )}
+
+        {ownerOverviewMode && displayBlocks.length === 0 && (
+          <p className="rounded-xl border border-dashed border-slate-200 py-10 text-center text-sm text-slate-400 dark:border-[#1e2638]">
+            {focusedGuest
+              ? `${focusedGuest.name} has no trip entries yet`
+              : "No trip entries yet from link users"}
+          </p>
+        )}
+
+        {viewBlock && (() => {
           const showNewAgency =
-            invite.allowCreateAgency && activeBlock.status !== "accepted";
+            invite.allowCreateAgency &&
+            !agencyLocked &&
+            viewBlock.status !== "accepted";
           const showApproveBtn =
-            isOwner && activeBlock.status !== "accepted";
+            isOwner && viewBlock.status !== "accepted";
+          const blockDriverName = ownerOverviewMode
+            ? viewBlock.guestName || guestDriverName
+            : guestDriverName;
+          const blockDriverPhone = ownerOverviewMode
+            ? viewBlock.guestPhone || guestDriverPhone
+            : guestDriverPhone;
           const activeApproveReady = blockPendingOwnerApproval(
-            activeBlock,
-            guestDriverName,
-            guestDriverPhone,
+            viewBlock,
+            blockDriverName,
+            blockDriverPhone,
           );
           const activeApproveHint = guestApproveBlockError(
-            activeBlock,
-            guestDriverName,
-            guestDriverPhone,
+            viewBlock,
+            blockDriverName,
+            blockDriverPhone,
           );
           return (
           <section
             className={`space-y-3 rounded-xl border p-3 sm:space-y-4 sm:p-4 ${
-              activeBlock.status === "accepted"
+              viewBlock.status === "accepted"
                 ? "border-emerald-200 bg-emerald-50/40 dark:border-emerald-500/30 dark:bg-emerald-500/10"
                 : "border-slate-200 bg-[var(--bg-card)] shadow-sm dark:border-[#1e2638]"
             }`}
           >
-            {activeBlock.status === "accepted" && (
+            {viewBlock.status === "accepted" && (
               <p className="flex items-center gap-1 text-[10px] font-medium text-emerald-700 dark:text-emerald-300">
                 <CheckCircle2 className="h-3 w-3 shrink-0" />
                 Approved — read-only
               </p>
             )}
 
-            {blocks.some(blockShowsAgencyPill) && (
+            {ownerOverviewMode &&
+              (viewBlock.guestName || viewBlock.guestPhone) && (
+                <div className="inline-flex items-center gap-2 rounded-lg border border-indigo-200 bg-indigo-50/80 px-3 py-2 dark:border-indigo-500/30 dark:bg-indigo-500/10">
+                  <User className="h-4 w-4 text-indigo-500" />
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold text-slate-800 dark:text-slate-100">
+                      {viewBlock.guestName || "Driver"}
+                    </p>
+                    <p className="truncate font-mono text-xs text-slate-500 dark:text-slate-400">
+                      {viewBlock.guestPhone || "—"}
+                    </p>
+                  </div>
+                </div>
+              )}
+
+            {!ownerOverviewMode &&
+              displayBlocks.some(blockShowsAgencyPill) && (
               <div className="flex flex-wrap gap-1">
-                {blocks.filter(blockShowsAgencyPill).map((b) => {
+                {displayBlocks.filter(blockShowsAgencyPill).map((b) => {
                   const pending = blockPendingOwnerApproval(
                     b,
                     guestDriverName,
                     guestDriverPhone,
                   );
-                  const active = b.clientId === activeBlock.clientId;
+                  const active = b.clientId === viewBlock.clientId;
                   const timelineLabel = formatGuestPillTimeline(
                     guestBlockTimelineIso(b),
                   );
@@ -2020,9 +2991,7 @@ export function GuestBulkEntryPage() {
                         ) : null}
                       </span>
                       {timelineLabel ? (
-                        <span
-                          className="w-full pl-4 text-[9px] font-normal leading-tight opacity-75"
-                        >
+                        <span className="w-full pl-4 text-[9px] font-normal leading-tight opacity-75">
                           {timelineLabel}
                         </span>
                       ) : null}
@@ -2033,42 +3002,60 @@ export function GuestBulkEntryPage() {
             )}
 
             <VehicleGroupsEditor
-              groups={activeBlock.driverGroups}
-              readOnly={activeBlock.status === "accepted"}
+              groups={viewBlock.driverGroups}
+              readOnly={
+                viewBlock.status === "accepted" || ownerOverviewMode
+              }
               sessionPlate={sessionVehiclePlate}
               onSessionPlateChange={handleSessionPlateChange}
               toolbarStart={
                 <>
-                  <label className="min-w-0">
-                    <span className={mobileLabelCls}>Agency *</span>
-                    <div className="mt-0.5">
-                      <GuestAgencyPicker
-                        agencies={agencies}
-                        value={activeBlock.agencyId ?? ""}
-                        fallbackName={activeBlock.agencyName}
-                        disabled={activeBlock.status === "accepted"}
-                        onChange={selectAgency}
-                        onCreateNew={
-                          showNewAgency
-                            ? () => setShowCreateAgency(true)
-                            : undefined
-                        }
-                      />
+                  {agencyLocked ? (
+                    <div className="min-w-0">
+                      <span className={mobileLabelCls}>Agency</span>
+                      <div
+                        className={`mt-0.5 flex min-h-8 items-center gap-1.5 text-sm font-semibold text-slate-800 sm:min-h-10 dark:text-slate-100`}
+                      >
+                        <Building2 className="h-3.5 w-3.5 shrink-0 text-indigo-500/80" />
+                        <span className="truncate">
+                          {viewBlock.agencyName ||
+                            invite.agencyName ||
+                            "Agency"}
+                        </span>
+                      </div>
                     </div>
-                  </label>
+                  ) : (
+                    <label className="min-w-0">
+                      <span className={mobileLabelCls}>Agency *</span>
+                      <div className="mt-0.5">
+                        <GuestAgencyPicker
+                          agencies={agencies}
+                          value={viewBlock.agencyId ?? ""}
+                          fallbackName={viewBlock.agencyName}
+                          disabled={viewBlock.status === "accepted"}
+                          onChange={selectAgency}
+                          onCreateNew={
+                            showNewAgency
+                              ? () => setShowCreateAgency(true)
+                              : undefined
+                          }
+                        />
+                      </div>
+                    </label>
+                  )}
                   {showApproveBtn && (
                     <button
                       type="button"
                       disabled={Boolean(approving) || !activeApproveReady}
                       title={activeApproveHint ?? undefined}
-                      onClick={() => onApprove(activeBlock.clientId)}
+                      onClick={() => onApprove(viewBlock.clientId)}
                       className={`${btnSolidCls} shrink-0 self-end px-2.5 text-white transition disabled:cursor-not-allowed dark:bg-emerald-500 ${
                         activeApproveReady
                           ? "bg-emerald-600 shadow-sm ring-2 ring-emerald-400/50 hover:bg-emerald-700 dark:ring-emerald-400/40"
                           : "bg-emerald-600/50 opacity-70"
                       }`}
                     >
-                      {approving === activeBlock.clientId ? "…" : "Approve"}
+                      {approving === viewBlock.clientId ? "…" : "Approve"}
                     </button>
                   )}
                 </>
@@ -2076,7 +3063,7 @@ export function GuestBulkEntryPage() {
               onChange={(updater) => {
                 setBlocks((prev) =>
                   prev.map((b) => {
-                    if (b.clientId !== activeBlock.clientId) return b;
+                    if (b.clientId !== viewBlock.clientId) return b;
                     const nextGroups =
                       typeof updater === "function"
                         ? updater(b.driverGroups)
@@ -2098,10 +3085,41 @@ export function GuestBulkEntryPage() {
         })()}
 
         <p className="pb-2 text-center text-xs text-slate-400 dark:text-slate-500">
-          Autosaves as you type · no submit needed
+          {isOwner
+            ? "Users left · entries right · Approve when ready"
+            : "Autosaves as you type · no submit needed"}
           {invite.maxRows ? ` · max ${invite.maxRows} rows` : ""}
         </p>
       </main>
+
+        {ownerOverviewMode && (
+          <div className="hidden w-56 shrink-0 border-l border-slate-200 md:block dark:border-[#1e2638] lg:w-64">
+            {entriesSidebar}
+          </div>
+        )}
+
+        {ownerOverviewMode && entriesSidebarOpen && (
+          <div className="fixed inset-0 z-40 md:hidden">
+            <button
+              type="button"
+              aria-label="Close entries"
+              className="absolute inset-0 bg-black/40"
+              onClick={() => setEntriesSidebarOpen(false)}
+            />
+            <div className="absolute inset-y-0 right-0 w-[min(18rem,85vw)] border-l border-slate-200 shadow-xl dark:border-[#1e2638]">
+              <button
+                type="button"
+                onClick={() => setEntriesSidebarOpen(false)}
+                className="absolute left-2 top-2.5 z-10 rounded-md p-1.5 text-slate-400 hover:bg-slate-100 dark:hover:bg-white/5"
+                aria-label="Close"
+              >
+                <X className="h-4 w-4" />
+              </button>
+              {entriesSidebar}
+            </div>
+          </div>
+        )}
+      </div>
 
       {showCreateAgency && (
         <div

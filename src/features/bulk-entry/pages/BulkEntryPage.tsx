@@ -67,11 +67,12 @@ import {
   type DriverPayoutSummary,
   type PayoutPayment,
 } from "../api";
+import { GuestLinkButton } from "../../guest-bulk/components/GuestInvitesPanel";
 import {
-  GuestInvitesPanel,
-  GuestLinkButton,
-} from "../../guest-bulk/components/GuestInvitesPanel";
-import { fetchGuestBulkInvites } from "../../guest-bulk/api";
+  ensureAgencyGuestInvite,
+  fetchGuestBulkInvites,
+  guestBulkShareUrl,
+} from "../../guest-bulk/api";
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // HELPERS
@@ -4353,8 +4354,9 @@ export function BulkEntryPage() {
   const [agencyLoading, setAgencyLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showDropdown, setShowDropdown] = useState(false);
-  const [showGuestPanel, setShowGuestPanel] = useState(false);
   const [guestPendingCount, setGuestPendingCount] = useState(0);
+  const [guestLinkOpening, setGuestLinkOpening] = useState(false);
+  const [guestLinkError, setGuestLinkError] = useState<string | null>(null);
   const [tripLoadNotice, setTripLoadNotice] = useState<string | null>(null);
 
   // Delete confirmations (prevents rapid double-deletes & gives server time)
@@ -4649,11 +4651,16 @@ export function BulkEntryPage() {
     (async () => {
       try {
         const inv = await fetchGuestBulkInvites();
-        if (!cancelled) {
-          setGuestPendingCount(
-            inv.reduce((n, i) => n + (i.pendingSubmissions ?? 0), 0),
-          );
-        }
+        if (cancelled) return;
+        const agencyId = selectedAgency?._id ?? selectedAgency?.id ?? "";
+        const pending = inv
+          .filter(
+            (i) =>
+              i.scope === "agency" &&
+              (!agencyId || String(i.agencyId) === String(agencyId)),
+          )
+          .reduce((n, i) => n + (i.pendingSubmissions ?? 0), 0);
+        setGuestPendingCount(pending);
       } catch {
         /* silent */
       }
@@ -4661,7 +4668,37 @@ export function BulkEntryPage() {
     return () => {
       cancelled = true;
     };
-  }, [showGuestPanel]);
+  }, [selectedId, selectedAgency]);
+
+  const openAgencyGuestLink = useCallback(async () => {
+    const agencyId = selectedAgency?._id ?? selectedAgency?.id;
+    if (!agencyId) {
+      setGuestLinkError("Select an agency first");
+      return;
+    }
+    setGuestLinkOpening(true);
+    setGuestLinkError(null);
+    try {
+      const inv = await ensureAgencyGuestInvite(String(agencyId));
+      window.open(
+        guestBulkShareUrl(inv.token),
+        "_blank",
+        "noopener,noreferrer",
+      );
+      setGuestPendingCount(inv.pendingSubmissions ?? guestPendingCount);
+    } catch (e: unknown) {
+      const msg =
+        e && typeof e === "object" && "response" in e
+          ? (e as { response?: { data?: { message?: string } } }).response?.data
+              ?.message
+          : null;
+      setGuestLinkError(
+        msg || (e instanceof Error ? e.message : "Could not open guest link"),
+      );
+    } finally {
+      setGuestLinkOpening(false);
+    }
+  }, [selectedAgency, guestPendingCount]);
 
   // ── Load trips when agency/mode changes ──
   const loadTrips = useCallback(async () => {
@@ -5344,8 +5381,19 @@ export function BulkEntryPage() {
           {isBulkMode && (
             <GuestLinkButton
               pendingCount={guestPendingCount}
-              onClick={() => setShowGuestPanel(true)}
+              disabled={guestLinkOpening || !selectedAgency}
+              title={
+                selectedAgency
+                  ? `Open guest link for ${formatAgencyLabel(selectedAgency)}`
+                  : "Select an agency first"
+              }
+              onClick={() => void openAgencyGuestLink()}
             />
+          )}
+          {guestLinkError && (
+            <span className="text-[11px] font-medium text-rose-600 dark:text-rose-400 max-w-[10rem] truncate sm:max-w-xs">
+              {guestLinkError}
+            </span>
           )}
 
           {/* Payout — temporarily disabled
@@ -5589,10 +5637,6 @@ export function BulkEntryPage() {
         </ModalShell>
       )}
 
-      <GuestInvitesPanel
-        open={showGuestPanel}
-        onClose={() => setShowGuestPanel(false)}
-      />
     </div>
   );
 }

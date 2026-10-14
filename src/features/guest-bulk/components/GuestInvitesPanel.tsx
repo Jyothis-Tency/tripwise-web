@@ -8,18 +8,28 @@ import {
   Ban,
   ExternalLink,
   RotateCcw,
+  Users,
+  ChevronDown,
+  ChevronUp,
+  KeyRound,
 } from "lucide-react";
 import {
+  blockGuestLinkUser,
   createGuestBulkInvite,
   fetchGuestBulkInvites,
   fetchGuestBulkSubmissions,
+  fetchGuestLinkUsers,
   guestBulkShareUrl,
   revokeGuestBulkInvite,
+  rotateGuestBulkInviteToken,
+  unblockGuestLinkUser,
   unrevokeGuestBulkInvite,
   updateGuestBulkInvite,
   type GuestBulkInvite,
   type GuestBulkSubmission,
+  type GuestLinkUser,
 } from "../api";
+import { fetchAllAgencies, type Agency } from "../../bulk-entry/api";
 import { DateTimePicker } from "../../../components/ui/DateTimePicker";
 
 function toLocalInputValue(iso?: string | null) {
@@ -45,11 +55,20 @@ export function GuestInvitesPanel({
   const [error, setError] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
+  const [createScope, setCreateScope] = useState<"driver" | "agency">("driver");
   const [driverName, setDriverName] = useState("");
   const [driverPhone, setDriverPhone] = useState("");
+  const [agencyId, setAgencyId] = useState("");
+  const [agencies, setAgencies] = useState<Agency[]>([]);
   const [expiresInDays, setExpiresInDays] = useState(0);
   const [creating, setCreating] = useState(false);
   const [actionId, setActionId] = useState<string | null>(null);
+
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [usersByInvite, setUsersByInvite] = useState<
+    Record<string, GuestLinkUser[]>
+  >({});
+  const [usersLoadingId, setUsersLoadingId] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -69,7 +88,16 @@ export function GuestInvitesPanel({
   }, []);
 
   useEffect(() => {
-    if (open) refresh();
+    if (!open) return;
+    refresh();
+    void (async () => {
+      try {
+        const { agencies: list } = await fetchAllAgencies();
+        setAgencies(list);
+      } catch {
+        /* optional for agency links */
+      }
+    })();
   }, [open, refresh]);
 
   if (!open) return null;
@@ -83,27 +111,41 @@ export function GuestInvitesPanel({
     window.open(guestBulkShareUrl(inv.token), "_blank", "noopener,noreferrer");
   };
 
+  const apiErr = (e: unknown, fallback: string) => {
+    const msg =
+      e && typeof e === "object" && "response" in e
+        ? (e as { response?: { data?: { message?: string } } }).response?.data
+            ?.message
+        : null;
+    return msg || (e instanceof Error ? e.message : fallback);
+  };
+
   const onCreate = async () => {
+    if (createScope === "agency" && !agencyId) {
+      setError("Select an agency for the shared link");
+      return;
+    }
     setCreating(true);
     setError(null);
     try {
       const inv = await createGuestBulkInvite({
-        driverName: driverName.trim(),
-        driverPhone: driverPhone.trim(),
+        scope: createScope,
+        ...(createScope === "agency"
+          ? { agencyId }
+          : {
+              driverName: driverName.trim(),
+              driverPhone: driverPhone.trim(),
+            }),
         ...(expiresInDays > 0 ? { expiresInDays } : {}),
       });
       setDriverName("");
       setDriverPhone("");
+      setAgencyId("");
       await refresh();
       setTab("invites");
       openInNewTab(inv);
     } catch (e: unknown) {
-      const msg =
-        e && typeof e === "object" && "response" in e
-          ? (e as { response?: { data?: { message?: string } } }).response?.data
-              ?.message
-          : null;
-      setError(msg || (e instanceof Error ? e.message : "Create failed"));
+      setError(apiErr(e, "Create failed"));
     } finally {
       setCreating(false);
     }
@@ -118,10 +160,6 @@ export function GuestInvitesPanel({
     } catch {
       window.prompt("Copy this link:", url);
     }
-  };
-
-  const openLink = (inv: GuestBulkInvite) => {
-    openInNewTab(inv);
   };
 
   const onRevoke = async (id: string) => {
@@ -150,6 +188,67 @@ export function GuestInvitesPanel({
     }
   };
 
+  const onRotate = async (id: string) => {
+    if (
+      !window.confirm(
+        "Rotate URL? The old link stops working. Active users must get the new link.",
+      )
+    ) {
+      return;
+    }
+    setActionId(id);
+    setError(null);
+    try {
+      const inv = await rotateGuestBulkInviteToken(id);
+      await refresh();
+      openInNewTab(inv);
+    } catch (e: unknown) {
+      setError(apiErr(e, "Rotate failed"));
+    } finally {
+      setActionId(null);
+    }
+  };
+
+  const toggleUsers = async (inv: GuestBulkInvite) => {
+    if (expandedId === inv.id) {
+      setExpandedId(null);
+      return;
+    }
+    setExpandedId(inv.id);
+    if (usersByInvite[inv.id]) return;
+    setUsersLoadingId(inv.id);
+    try {
+      const users = await fetchGuestLinkUsers(inv.id);
+      setUsersByInvite((prev) => ({ ...prev, [inv.id]: users }));
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Failed to load users");
+    } finally {
+      setUsersLoadingId(null);
+    }
+  };
+
+  const onBlockUser = async (inviteId: string, user: GuestLinkUser) => {
+    setActionId(`${inviteId}:${user.id}`);
+    setError(null);
+    try {
+      const updated =
+        user.status === "blocked"
+          ? await unblockGuestLinkUser(inviteId, user.id)
+          : await blockGuestLinkUser(inviteId, user.id);
+      setUsersByInvite((prev) => ({
+        ...prev,
+        [inviteId]: (prev[inviteId] ?? []).map((u) =>
+          u.id === user.id ? { ...u, ...updated } : u,
+        ),
+      }));
+      await refresh();
+    } catch (e: unknown) {
+      setError(apiErr(e, "Update user failed"));
+    } finally {
+      setActionId(null);
+    }
+  };
+
   const onExpiryChange = async (id: string, localValue: string) => {
     setActionId(id);
     setError(null);
@@ -162,12 +261,7 @@ export function GuestInvitesPanel({
       );
       await refresh();
     } catch (e: unknown) {
-      const msg =
-        e && typeof e === "object" && "response" in e
-          ? (e as { response?: { data?: { message?: string } } }).response?.data
-              ?.message
-          : null;
-      setError(msg || (e instanceof Error ? e.message : "Update failed"));
+      setError(apiErr(e, "Update failed"));
     } finally {
       setActionId(null);
     }
@@ -182,10 +276,10 @@ export function GuestInvitesPanel({
         <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4 shrink-0 dark:border-[#1e2638]">
           <div>
             <h3 className="text-base font-semibold text-slate-900 dark:text-white">
-              Driver guest links
+              Guest links
             </h3>
             <p className="text-xs text-slate-400 mt-0.5 dark:text-slate-500">
-              Share with driver · autosaves · open same link to Approve
+              Driver or agency · autosaves · Approve on the same page
             </p>
           </div>
           <button
@@ -245,24 +339,77 @@ export function GuestInvitesPanel({
             <>
               <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 space-y-3 dark:border-[#1e2638] dark:bg-white/[0.03]">
                 <p className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                  New driver link
+                  New link
                 </p>
-                <p className="text-xs text-slate-500 dark:text-slate-400">
-                  Optional name/phone now, or leave blank for the driver to
-                  fill. Multi-agency · autosave · you Approve on the same page.
-                </p>
-                <input
-                  value={driverName}
-                  onChange={(e) => setDriverName(e.target.value)}
-                  placeholder="Driver name (optional)"
-                  className="w-full rounded-lg border border-slate-200 bg-[var(--bg-elevated)] px-3 py-2 text-sm outline-none focus:border-indigo-400 dark:border-[#1e2638] dark:text-slate-100 dark:placeholder:text-slate-500"
-                />
-                <input
-                  value={driverPhone}
-                  onChange={(e) => setDriverPhone(e.target.value)}
-                  placeholder="Phone (optional)"
-                  className="w-full rounded-lg border border-slate-200 bg-[var(--bg-elevated)] px-3 py-2 text-sm outline-none focus:border-indigo-400 dark:border-[#1e2638] dark:text-slate-100 dark:placeholder:text-slate-500"
-                />
+                <div className="flex rounded-lg border border-slate-200 p-0.5 dark:border-[#1e2638]">
+                  <button
+                    type="button"
+                    onClick={() => setCreateScope("driver")}
+                    className={`flex-1 rounded-md px-2 py-1.5 text-xs font-semibold transition ${
+                      createScope === "driver"
+                        ? "bg-indigo-600 text-white"
+                        : "text-slate-500 dark:text-slate-400"
+                    }`}
+                  >
+                    Driver
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setCreateScope("agency")}
+                    className={`flex-1 rounded-md px-2 py-1.5 text-xs font-semibold transition ${
+                      createScope === "agency"
+                        ? "bg-indigo-600 text-white"
+                        : "text-slate-500 dark:text-slate-400"
+                    }`}
+                  >
+                    Agency
+                  </button>
+                </div>
+
+                {createScope === "driver" ? (
+                  <>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                      One private workspace for a driver. Optional name/phone
+                      now, or leave blank for them to fill.
+                    </p>
+                    <input
+                      value={driverName}
+                      onChange={(e) => setDriverName(e.target.value)}
+                      placeholder="Driver name (optional)"
+                      className="w-full rounded-lg border border-slate-200 bg-[var(--bg-elevated)] px-3 py-2 text-sm outline-none focus:border-indigo-400 dark:border-[#1e2638] dark:text-slate-100 dark:placeholder:text-slate-500"
+                    />
+                    <input
+                      value={driverPhone}
+                      onChange={(e) => setDriverPhone(e.target.value)}
+                      placeholder="Phone (optional)"
+                      className="w-full rounded-lg border border-slate-200 bg-[var(--bg-elevated)] px-3 py-2 text-sm outline-none focus:border-indigo-400 dark:border-[#1e2638] dark:text-slate-100 dark:placeholder:text-slate-500"
+                    />
+                  </>
+                ) : (
+                  <>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                      Shared agency URL. Each person enters name + phone and
+                      gets a private draft. Agency is locked.
+                    </p>
+                    <select
+                      value={agencyId}
+                      onChange={(e) => setAgencyId(e.target.value)}
+                      className="w-full rounded-lg border border-slate-200 bg-[var(--bg-elevated)] px-3 py-2 text-sm outline-none focus:border-indigo-400 dark:border-[#1e2638] dark:text-slate-100"
+                    >
+                      <option value="">Select agency…</option>
+                      {agencies.map((a) => {
+                        const id = String(a._id ?? a.id ?? "");
+                        return (
+                          <option key={id} value={id}>
+                            {a.name}
+                            {a.phone ? ` · ${a.phone}` : ""}
+                          </option>
+                        );
+                      })}
+                    </select>
+                  </>
+                )}
+
                 <label className="text-sm text-slate-600 flex items-center gap-2 dark:text-slate-300">
                   Expires (optional)
                   <select
@@ -300,6 +447,9 @@ export function GuestInvitesPanel({
                         new Date(inv.expiresAt).getTime() < Date.now());
                     const revoked = inv.status === "revoked";
                     const pending = inv.pendingSubmissions ?? 0;
+                    const isAgency = inv.scope === "agency";
+                    const expanded = expandedId === inv.id;
+                    const users = usersByInvite[inv.id] ?? inv.guestUsers ?? [];
                     return (
                       <li
                         key={inv.id}
@@ -311,10 +461,15 @@ export function GuestInvitesPanel({
                       >
                         <div className="flex items-start justify-between gap-2">
                           <div className="min-w-0">
-                            <div className="flex items-center gap-2 min-w-0">
+                            <div className="flex items-center gap-2 min-w-0 flex-wrap">
                               <p className="text-sm font-semibold text-slate-800 truncate dark:text-slate-100">
-                                {inv.driverName || inv.label}
+                                {isAgency
+                                  ? inv.agencyName || inv.label
+                                  : inv.driverName || inv.label}
                               </p>
+                              <span className="shrink-0 rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-slate-500 dark:bg-white/10 dark:text-slate-400">
+                                {isAgency ? "Agency" : "Driver"}
+                              </span>
                               {pending > 0 && (
                                 <span
                                   className="shrink-0 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-orange-500 px-1.5 text-[10px] font-bold text-white"
@@ -325,14 +480,17 @@ export function GuestInvitesPanel({
                               )}
                             </div>
                             <p className="text-xs text-slate-400 mt-0.5 dark:text-slate-500">
-                              {inv.driverPhone
+                              {!isAgency && inv.driverPhone
                                 ? `${inv.driverPhone} · `
                                 : ""}
+                              {isAgency && (inv.guestUserCount ?? 0) > 0
+                                ? `${inv.guestUserCount} user${inv.guestUserCount === 1 ? "" : "s"} · `
+                                : ""}
                               {revoked
-                                ? "Revoked (drivers blocked)"
+                                ? "Revoked (guests blocked)"
                                 : expired
-                                  ? "Expired (drivers blocked)"
-                                  : "Active for drivers"}
+                                  ? "Expired (guests blocked)"
+                                  : "Active"}
                               {pending > 0
                                 ? ` · ${pending} with trips to Approve`
                                 : ""}
@@ -341,15 +499,15 @@ export function GuestInvitesPanel({
                           <div className="flex items-center gap-1 shrink-0">
                             <button
                               type="button"
-                              title="Open in new tab (owner always)"
-                              onClick={() => openLink(inv)}
+                              title="Open in new tab"
+                              onClick={() => openInNewTab(inv)}
                               className="rounded-lg p-2 text-emerald-600 hover:bg-emerald-50 dark:text-emerald-400 dark:hover:bg-emerald-500/10"
                             >
                               <ExternalLink className="h-4 w-4" />
                             </button>
                             <button
                               type="button"
-                              title="Copy link for driver"
+                              title="Copy link"
                               onClick={() => copyLink(inv)}
                               className="rounded-lg p-2 text-indigo-600 hover:bg-indigo-50 dark:text-indigo-300 dark:hover:bg-indigo-500/15"
                             >
@@ -359,10 +517,21 @@ export function GuestInvitesPanel({
                                 <Copy className="h-4 w-4" />
                               )}
                             </button>
+                            {isAgency && (
+                              <button
+                                type="button"
+                                title="Rotate URL"
+                                disabled={actionId === inv.id}
+                                onClick={() => onRotate(inv.id)}
+                                className="rounded-lg p-2 text-amber-600 hover:bg-amber-50 dark:text-amber-400 dark:hover:bg-amber-500/10"
+                              >
+                                <KeyRound className="h-4 w-4" />
+                              </button>
+                            )}
                             {revoked ? (
                               <button
                                 type="button"
-                                title="Unrevoke — allow drivers again"
+                                title="Unrevoke"
                                 disabled={actionId === inv.id}
                                 onClick={() => onUnrevoke(inv.id)}
                                 className="rounded-lg p-2 text-emerald-600 hover:bg-emerald-50 dark:text-emerald-400 dark:hover:bg-emerald-500/10"
@@ -372,7 +541,7 @@ export function GuestInvitesPanel({
                             ) : (
                               <button
                                 type="button"
-                                title="Revoke — block drivers"
+                                title="Revoke"
                                 disabled={actionId === inv.id}
                                 onClick={() => onRevoke(inv.id)}
                                 className="rounded-lg p-2 text-slate-400 hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-500/10"
@@ -382,6 +551,82 @@ export function GuestInvitesPanel({
                             )}
                           </div>
                         </div>
+
+                        {isAgency && (
+                          <button
+                            type="button"
+                            onClick={() => void toggleUsers(inv)}
+                            className="flex w-full items-center justify-between rounded-lg border border-slate-100 bg-slate-50/80 px-2.5 py-1.5 text-xs font-semibold text-slate-600 dark:border-[#1e2638] dark:bg-white/[0.03] dark:text-slate-300"
+                          >
+                            <span className="inline-flex items-center gap-1.5">
+                              <Users className="h-3.5 w-3.5" />
+                              Link users
+                              {(inv.guestUserCount ?? users.length) > 0
+                                ? ` (${inv.guestUserCount ?? users.length})`
+                                : ""}
+                            </span>
+                            {expanded ? (
+                              <ChevronUp className="h-3.5 w-3.5" />
+                            ) : (
+                              <ChevronDown className="h-3.5 w-3.5" />
+                            )}
+                          </button>
+                        )}
+
+                        {isAgency && expanded && (
+                          <div className="space-y-1.5 rounded-lg border border-slate-100 p-2 dark:border-[#1e2638]">
+                            {usersLoadingId === inv.id ? (
+                              <div className="flex justify-center py-3">
+                                <Loader2 className="h-4 w-4 animate-spin text-indigo-500" />
+                              </div>
+                            ) : users.length === 0 ? (
+                              <p className="py-2 text-center text-xs text-slate-400">
+                                No one has joined yet
+                              </p>
+                            ) : (
+                              users.map((u) => (
+                                <div
+                                  key={u.id}
+                                  className="flex items-center justify-between gap-2 rounded-md px-2 py-1.5 text-xs"
+                                >
+                                  <div className="min-w-0">
+                                    <p className="truncate font-semibold text-slate-700 dark:text-slate-200">
+                                      {u.name}
+                                      {u.status === "blocked" && (
+                                        <span className="ml-1.5 text-rose-500">
+                                          blocked
+                                        </span>
+                                      )}
+                                    </p>
+                                    <p className="truncate text-slate-400">
+                                      {u.phone}
+                                      {(u.pendingSubmissions ?? 0) > 0
+                                        ? ` · ${u.pendingSubmissions} pending`
+                                        : ""}
+                                    </p>
+                                  </div>
+                                  <button
+                                    type="button"
+                                    disabled={
+                                      actionId === `${inv.id}:${u.id}`
+                                    }
+                                    onClick={() => onBlockUser(inv.id, u)}
+                                    className={`shrink-0 rounded-md px-2 py-1 text-[11px] font-semibold ${
+                                      u.status === "blocked"
+                                        ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300"
+                                        : "bg-rose-50 text-rose-600 dark:bg-rose-500/10 dark:text-rose-300"
+                                    }`}
+                                  >
+                                    {u.status === "blocked"
+                                      ? "Unblock"
+                                      : "Block"}
+                                  </button>
+                                </div>
+                              ))
+                            )}
+                          </div>
+                        )}
+
                         <label className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
                           <span className="shrink-0">Expires</span>
                           <DateTimePicker
@@ -449,16 +694,21 @@ export function GuestInvitesPanel({
 export function GuestLinkButton({
   pendingCount,
   onClick,
+  disabled,
+  title,
 }: {
   pendingCount?: number;
   onClick: () => void;
+  disabled?: boolean;
+  title?: string;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      title="Driver guest links"
-      className="relative flex items-center gap-1 rounded-md border border-slate-200 bg-[var(--bg-elevated)] px-2 py-1 text-[11px] font-semibold text-slate-600 shadow-sm transition hover:border-indigo-300 hover:text-indigo-600 shrink-0 sm:gap-1.5 sm:rounded-lg sm:px-3 sm:py-2 sm:text-xs dark:border-[#1e2638] dark:text-slate-300 dark:hover:border-indigo-400 dark:hover:text-indigo-300"
+      disabled={disabled}
+      title={title ?? "Open agency guest link"}
+      className="relative flex items-center gap-1 rounded-md border border-slate-200 bg-[var(--bg-elevated)] px-2 py-1 text-[11px] font-semibold text-slate-600 shadow-sm transition hover:border-indigo-300 hover:text-indigo-600 shrink-0 disabled:cursor-not-allowed disabled:opacity-50 sm:gap-1.5 sm:rounded-lg sm:px-3 sm:py-2 sm:text-xs dark:border-[#1e2638] dark:text-slate-300 dark:hover:border-indigo-400 dark:hover:text-indigo-300"
     >
       <Link2 className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
       <span className="hidden sm:inline">Guest link</span>

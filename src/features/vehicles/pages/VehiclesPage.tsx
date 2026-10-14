@@ -1803,12 +1803,21 @@ function VehicleHistoryTab({
         </div>
       </div>
 
-      {/* Statistics banner — even 3×2 grid */}
+      {/* Statistics banner */}
       {financialStats && (
         <section>
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
             {(
               [
+                {
+                  label: "Total trips",
+                  value: String(
+                    financialStats.completedTrips ??
+                      tripStats?.completed ??
+                      tripStats?.total ??
+                      0,
+                  ),
+                },
                 {
                   label: "Total agency cost",
                   value: formatMoney0(

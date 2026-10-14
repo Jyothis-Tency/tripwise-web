@@ -8,6 +8,13 @@ export const ApiEndpoints = {
   ownerResetPassword: '/auth/owner/reset-password',
   adminLogin: '/admin/auth/login',
   adminLogout: '/admin/auth/logout',
+  adminMe: '/admin/auth/me',
+  adminDashboardStats: '/admin/dashboard/stats',
+  adminOwners: '/admin/owners',
+  adminOwnerById: (id: string) => `/admin/owners/${id}`,
+  adminOwnerCredentials: (id: string) => `/admin/owners/${id}/credentials`,
+  adminDrivers: '/admin/drivers',
+  adminDriverById: (id: string) => `/admin/drivers/${id}`,
 
   // OWNER PROFILE
   ownerProfile: '/owners/profile',

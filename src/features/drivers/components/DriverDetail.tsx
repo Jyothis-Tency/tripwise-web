@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
+import * as Popover from "@radix-ui/react-popover";
 import {
   Phone,
   Pencil,
@@ -53,7 +54,7 @@ function fmtCurrency(v: number | undefined | null): string {
 }
 
 function monthOptions() {
-  const opts = [{ value: "all_time", label: "All time" }];
+  const opts: { value: string; label: string }[] = [];
   const now = new Date();
   for (let i = 0; i < 24; i++) {
     const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
@@ -64,6 +65,9 @@ function monthOptions() {
   }
   return opts;
 }
+
+const MONTH_SELECT_CLS =
+  "rounded-[10px] border border-slate-200 bg-white px-2.5 py-2 text-xs font-semibold text-slate-800 outline-none dark:border-[#252c4d] dark:bg-[#161a29] dark:text-[#eef0ff] dark:[color-scheme:dark]";
 
 function parseSafeDate(date: string | null | undefined): Date | null {
   if (!date) return null;
@@ -355,7 +359,7 @@ function SalaryTableToolbar({
         value={typeFilter}
         onChange={(e) => onTypeFilter(e.target.value as TxTypeFilter)}
         aria-label="Transaction type"
-        className="rounded-[10px] border border-slate-200 bg-[var(--bg-main)] px-2.5 py-2 text-xs font-semibold text-slate-700 outline-none dark:border-[#252c4d] dark:text-[#eef0ff]"
+        className={MONTH_SELECT_CLS}
       >
         <option value="all">All types</option>
         <option value="vehicle">Vehicle</option>
@@ -433,7 +437,6 @@ function SalaryPeriodMenu({
   menuOpen: boolean;
   onMenuOpen: (open: boolean) => void;
 }) {
-  const wrapRef = useRef<HTMLDivElement>(null);
   const [draftFrom, setDraftFrom] = useState(dateFrom);
   const [draftTo, setDraftTo] = useState(dateTo);
 
@@ -444,95 +447,88 @@ function SalaryPeriodMenu({
     }
   }, [menuOpen, dateFrom, dateTo]);
 
-  useEffect(() => {
-    const onDoc = (e: MouseEvent) => {
-      if (!wrapRef.current?.contains(e.target as Node)) onMenuOpen(false);
-    };
-    document.addEventListener("mousedown", onDoc);
-    return () => document.removeEventListener("mousedown", onDoc);
-  }, [onMenuOpen]);
-
   const label = formatPeriodButtonLabel(period, dateFrom, dateTo);
   const periodActive = period !== "all_time";
 
+  const pickPeriod = (value: string) => {
+    onPeriod(value);
+    onDateFrom("");
+    onDateTo("");
+    onMenuOpen(false);
+  };
+
+  const itemCls = (active: boolean) =>
+    `w-full rounded-lg px-3 py-2 text-left text-xs font-semibold transition hover:bg-slate-100 dark:hover:bg-white/10 ${
+      active
+        ? "bg-indigo-50 text-indigo-700 dark:bg-[#242a57] dark:text-[#a5b4fc]"
+        : "text-slate-800 dark:text-[#eef0ff]"
+    }`;
+
   return (
-    <div ref={wrapRef} className="relative max-w-[min(100%,16rem)]">
-      <button
-        type="button"
-        onClick={() => onMenuOpen(!menuOpen)}
-        className={`inline-flex max-w-full items-center gap-1.5 truncate rounded-[10px] border px-3 py-2 text-xs font-semibold transition ${
-          menuOpen || periodActive
-            ? "border-indigo-300 bg-indigo-50 text-indigo-700 dark:border-indigo-500/40 dark:bg-[#242a57] dark:text-[#a5b4fc]"
-            : "border-slate-200 text-slate-600 hover:bg-[var(--bg-main)] dark:border-[#252c4d] dark:text-[#8d94b8]"
-        }`}
-      >
-        <Calendar className="h-3.5 w-3.5 shrink-0 opacity-80" />
-        <span className="truncate">{label}</span>
-      </button>
-      {menuOpen && (
-        <div
-          className="absolute right-0 top-full z-30 mt-1 flex w-[min(100vw-2rem,17rem)] max-h-[min(70vh,22rem)] flex-col overflow-hidden rounded-xl border border-slate-200 bg-[var(--bg-card)] shadow-lg dark:border-[#252c4d]"
+    <Popover.Root open={menuOpen} onOpenChange={onMenuOpen}>
+      <Popover.Trigger asChild>
+        <button
+          type="button"
+          className={`inline-flex max-w-[min(100%,16rem)] items-center gap-1.5 truncate rounded-[10px] border px-3 py-2 text-xs font-semibold transition ${
+            menuOpen || periodActive
+              ? "border-indigo-300 bg-indigo-50 text-indigo-700 dark:border-indigo-500/40 dark:bg-[#242a57] dark:text-[#a5b4fc]"
+              : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-[#252c4d] dark:bg-[#161a29] dark:text-[#8d94b8] dark:hover:bg-[#1c2236]"
+          }`}
         >
-          <div className="overflow-y-auto p-2">
+          <Calendar className="h-3.5 w-3.5 shrink-0 opacity-80" />
+          <span className="truncate">{label}</span>
+        </button>
+      </Popover.Trigger>
+      <Popover.Portal>
+        <Popover.Content
+          side="bottom"
+          align="end"
+          sideOffset={6}
+          collisionPadding={12}
+          className="z-[200] flex w-[min(100vw-2rem,17rem)] max-h-[min(70vh,22rem)] flex-col overflow-hidden rounded-xl border border-slate-200 bg-white text-slate-900 shadow-xl outline-none dark:border-[#252c4d] dark:bg-[#161a29] dark:text-[#eef0ff]"
+        >
+          <div className="min-h-0 flex-1 overflow-y-auto p-2">
             <button
               type="button"
-              onClick={() => {
-                onPeriod("all_time");
-                onDateFrom("");
-                onDateTo("");
-                onMenuOpen(false);
-              }}
-              className={`mb-1 w-full rounded-lg px-3 py-2 text-left text-xs font-semibold hover:bg-[var(--bg-main)] ${
-                period === "all_time"
-                  ? "text-indigo-600 dark:text-[#a5b4fc]"
-                  : "text-slate-700 dark:text-[#eef0ff]"
-              }`}
+              onClick={() => pickPeriod("all_time")}
+              className={`mb-1 ${itemCls(period === "all_time")}`}
             >
               All time
             </button>
-            <p className="px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-slate-400">
+            <p className="px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-slate-400 dark:text-slate-500">
               Month
             </p>
             {MONTH_OPTIONS.map((o) => (
               <button
                 key={o.value}
                 type="button"
-                onClick={() => {
-                  onPeriod(o.value);
-                  onDateFrom("");
-                  onDateTo("");
-                  onMenuOpen(false);
-                }}
-                className={`w-full rounded-lg px-3 py-2 text-left text-xs font-semibold hover:bg-[var(--bg-main)] ${
-                  period === o.value
-                    ? "text-indigo-600 dark:text-[#a5b4fc]"
-                    : "text-slate-700 dark:text-[#eef0ff]"
-                }`}
+                onClick={() => pickPeriod(o.value)}
+                className={itemCls(period === o.value)}
               >
                 {o.label}
               </button>
             ))}
           </div>
-          <div className="border-t border-slate-200 p-3 dark:border-[#252c4d]">
-            <p className="mb-2 text-[10px] font-bold uppercase tracking-wide text-slate-400">
+          <div className="shrink-0 border-t border-slate-200 bg-white p-3 dark:border-[#252c4d] dark:bg-[#161a29]">
+            <p className="mb-2 text-[10px] font-bold uppercase tracking-wide text-slate-400 dark:text-slate-500">
               Custom range
             </p>
             <div className="flex flex-col gap-2">
-              <label className="flex flex-col gap-0.5 text-[10px] font-semibold text-slate-500">
+              <label className="flex flex-col gap-0.5 text-[10px] font-semibold text-slate-500 dark:text-slate-400">
                 From
                 <DatePicker
-              value={draftFrom}
-              onChange={setDraftFrom}
-              className="rounded-[10px] border border-slate-200 bg-[var(--bg-main)] px-2 py-1.5 text-xs text-slate-800 dark:border-[#252c4d] dark:text-[#eef0ff]"
-            />
+                  value={draftFrom}
+                  onChange={setDraftFrom}
+                  className="rounded-[10px] border border-slate-200 bg-slate-50 px-2 py-1.5 text-xs text-slate-800 dark:border-[#252c4d] dark:bg-[#111420] dark:text-[#eef0ff]"
+                />
               </label>
-              <label className="flex flex-col gap-0.5 text-[10px] font-semibold text-slate-500">
+              <label className="flex flex-col gap-0.5 text-[10px] font-semibold text-slate-500 dark:text-slate-400">
                 To
                 <DatePicker
-              value={draftTo}
-              onChange={setDraftTo}
-              className="rounded-[10px] border border-slate-200 bg-[var(--bg-main)] px-2 py-1.5 text-xs text-slate-800 dark:border-[#252c4d] dark:text-[#eef0ff]"
-            />
+                  value={draftTo}
+                  onChange={setDraftTo}
+                  className="rounded-[10px] border border-slate-200 bg-slate-50 px-2 py-1.5 text-xs text-slate-800 dark:border-[#252c4d] dark:bg-[#111420] dark:text-[#eef0ff]"
+                />
               </label>
               <button
                 type="button"
@@ -548,9 +544,9 @@ function SalaryPeriodMenu({
               </button>
             </div>
           </div>
-        </div>
-      )}
-    </div>
+        </Popover.Content>
+      </Popover.Portal>
+    </Popover.Root>
   );
 }
 

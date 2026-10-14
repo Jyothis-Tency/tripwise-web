@@ -1,5 +1,6 @@
 import { Route, Routes, Navigate } from "react-router-dom";
 import { ProtectedRoute } from "./components/ProtectedRoute";
+import { AdminProtectedRoute } from "./components/AdminProtectedRoute";
 import { LoginPage } from "./features/auth/pages/Login";
 import { ForgotPasswordPage } from "./features/auth/pages/ForgotPasswordPage";
 import { ProfilePage } from "./features/auth/pages/ProfilePage";
@@ -23,6 +24,10 @@ import { TripConfirmationPage } from "./features/trip-confirmation/pages/TripCon
 import { TripConfirmationTemplatePage } from "./features/trip-confirmation/pages/TripConfirmationTemplatePage";
 import { ComingSoonPage } from "./components/ui/ComingSoonPage";
 import { ReportsPage } from "./features/reports/pages/ReportsPage";
+import { AdminLayout } from "./features/admin/components/AdminLayout";
+import { AdminOverviewPage } from "./features/admin/pages/AdminOverviewPage";
+import { AdminOwnersPage } from "./features/admin/pages/AdminOwnersPage";
+import { AdminDriversPage } from "./features/admin/pages/AdminDriversPage";
 
 function App() {
   return (
@@ -30,6 +35,19 @@ function App() {
       <Route path="/login" element={<LoginPage />} />
       <Route path="/forgot-password" element={<ForgotPasswordPage />} />
       <Route path="/guest-bulk/:token" element={<GuestBulkEntryPage />} />
+
+      <Route
+        path="/admin"
+        element={
+          <AdminProtectedRoute>
+            <AdminLayout />
+          </AdminProtectedRoute>
+        }
+      >
+        <Route index element={<AdminOverviewPage />} />
+        <Route path="owners" element={<AdminOwnersPage />} />
+        <Route path="drivers" element={<AdminDriversPage />} />
+      </Route>
 
       <Route
         path="/"
@@ -93,16 +111,6 @@ function App() {
           }
         />
         <Route path="tracking" element={<TrackingPage />} />
-        <Route
-          path="admin"
-          element={
-            <ComingSoonPage
-              title="Admin Panel"
-              description="User management, roles, permissions, and system configuration."
-              icon="⚙️"
-            />
-          }
-        />
       </Route>
 
       <Route path="*" element={<Navigate to="/" replace />} />

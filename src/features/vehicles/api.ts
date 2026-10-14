@@ -330,6 +330,7 @@ export interface VehicleHistoryResponse {
     ownerRevenue?: number;
     totalExpenses?: number;
     vehicleExpenses?: number;
+    completedTrips?: number;
   };
   pagination?: {
     current?: number;

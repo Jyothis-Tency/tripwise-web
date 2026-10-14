@@ -13,31 +13,73 @@ export type OwnerProfile = {
   lastLogin?: string;
 };
 
-export const authApi = {
-  async login(emailOrPhone: string, password: string) {
-    const res = await apiClient.post(ApiEndpoints.ownerLogin, {
-      email: emailOrPhone,
-      password,
-    });
-    const raw: any = res.data ?? {};
-    const data = raw.data ?? raw;
-    const user = data.owner ?? data.user ?? {};
+function mapAuthUser(user: any, fallbackRole: string) {
+  return {
+    _id: user._id ?? user.id ?? '',
+    id: user._id ?? user.id ?? '',
+    name: user.name ?? user.fullName ?? '',
+    email: user.email ?? '',
+    role: (user.role as string) ?? fallbackRole,
+    company: user.company ?? '',
+    phone: user.phone ?? '',
+  };
+}
 
-    return {
-      token: data.token ?? '',
-      user: {
-        _id: user._id ?? user.id ?? '',
-        name: user.name ?? user.fullName ?? '',
-        email: user.email ?? '',
-        role: (user.role as string) ?? 'owner',
-        company: user.company ?? '',
-        phone: user.phone ?? '',
-      },
-    };
+export const authApi = {
+  /**
+   * Same login form for owners and admins.
+   * Tries owner login first; on failure tries admin — no UI mention of admin.
+   */
+  async login(emailOrPhone: string, password: string) {
+    try {
+      const res = await apiClient.post(ApiEndpoints.ownerLogin, {
+        email: emailOrPhone,
+        password,
+      });
+      const raw: any = res.data ?? {};
+      const data = raw.data ?? raw;
+      const user = data.owner ?? data.user ?? {};
+      return {
+        token: data.token ?? '',
+        user: mapAuthUser(user, 'owner'),
+      };
+    } catch (ownerErr: any) {
+      const status = ownerErr?.response?.status;
+      // Only fall through to admin for auth failures
+      if (status && status !== 401 && status !== 403 && status !== 404) {
+        throw ownerErr;
+      }
+      try {
+        const res = await apiClient.post(ApiEndpoints.adminLogin, {
+          email: emailOrPhone,
+          password,
+        });
+        const raw: any = res.data ?? {};
+        const data = raw.data ?? raw;
+        const user = data.user ?? data.admin ?? {};
+        return {
+          token: data.token ?? '',
+          user: mapAuthUser(user, 'admin'),
+        };
+      } catch {
+        throw ownerErr;
+      }
+    }
   },
 
   async logout() {
-    await apiClient.post(ApiEndpoints.ownerLogout);
+    const raw = localStorage.getItem('userData');
+    let role = 'owner';
+    try {
+      role = raw ? (JSON.parse(raw)?.role as string) || 'owner' : 'owner';
+    } catch {
+      /* ignore */
+    }
+    const path =
+      role === 'admin' || role === 'super_admin'
+        ? ApiEndpoints.adminLogout
+        : ApiEndpoints.ownerLogout;
+    await apiClient.post(path);
   },
 
   async requestPasswordResetOtp(email: string) {

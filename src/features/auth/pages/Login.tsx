@@ -15,6 +15,7 @@ import {
 import { useAuth } from "../../../hooks/useAuth";
 import { useTheme } from "../../../hooks/useTheme";
 import { TripwiseLogo } from "../../../components/brand/TripwiseLogo";
+import { isAdminRole } from "../../../store/types/auth.types";
 
 const validationSchema = Yup.object({
   email: Yup.string()
@@ -49,7 +50,14 @@ export function LoginPage() {
     onSubmit: async (values) => {
       try {
         await login(values.email.trim(), values.password);
-        navigate("/", { replace: true });
+        const raw = localStorage.getItem("userData");
+        let role = "owner";
+        try {
+          role = raw ? (JSON.parse(raw)?.role as string) || "owner" : "owner";
+        } catch {
+          /* ignore */
+        }
+        navigate(isAdminRole(role) ? "/admin" : "/", { replace: true });
       } catch {
         // handled via error state
       }

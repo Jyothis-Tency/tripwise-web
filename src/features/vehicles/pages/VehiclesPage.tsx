@@ -1865,7 +1865,7 @@ function VehicleHistoryTab({
               </div>
             ))}
           </div>
-        </section>
+      </section>
       )}
 
       {/* Content */}
@@ -3095,7 +3095,7 @@ export function VehiclesPage() {
         setSelectedIdx(idx >= 0 ? idx : null);
         if (idx < 0) selectedIdRef.current = null;
       } else {
-        setSelectedIdx(null);
+      setSelectedIdx(null);
       }
     } catch (e: any) {
       setError(e?.response?.data?.message ?? "Failed to load vehicles");

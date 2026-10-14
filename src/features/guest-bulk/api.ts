@@ -40,6 +40,8 @@ export interface GuestBulkInvite {
   scope?: "driver" | "agency";
   agencyId?: string | null;
   agencyName?: string;
+  ownerName?: string;
+  ownerCompany?: string;
   status: "active" | "revoked";
   expiresAt?: string | null;
   expired?: boolean;

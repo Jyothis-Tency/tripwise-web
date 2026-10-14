@@ -52,14 +52,12 @@ import {
   syncGuestBulk,
   unblockGuestLinkUser,
   unrevokeGuestBulkInvite,
-  updateGuestBulkInvite,
   type GuestAgencyBlock,
   type GuestBulkInvite,
   type GuestLinkUser,
 } from "../api";
 import type { Agency, BulkTripRow, DriverGroup } from "../../bulk-entry/api";
 import { formatAgencyLabel } from "../../bulk-entry/api";
-import { DateTimePicker } from "../../../components/ui/DateTimePicker";
 import { TimePicker12h } from "../../../components/ui/TimePicker12h";
 import { normalizeHHmm } from "../../../lib/timePickerUtils";
 import { useTheme } from "../../../hooks/useTheme";
@@ -893,6 +891,7 @@ function VehicleGroupsEditor({
   onChange,
   readOnly,
   toolbarStart,
+  toolbarEnd,
   sessionPlate = "",
   onSessionPlateChange,
 }: {
@@ -900,6 +899,8 @@ function VehicleGroupsEditor({
   onChange: Dispatch<SetStateAction<DriverGroup[]>>;
   readOnly?: boolean;
   toolbarStart?: ReactNode;
+  /** Rendered after plate (e.g. Approve on the right) */
+  toolbarEnd?: ReactNode;
   /** Pre-fill plate from another block on the same guest link */
   sessionPlate?: string;
   onSessionPlateChange?: (plate: string) => void;
@@ -1082,6 +1083,9 @@ function VehicleGroupsEditor({
             className={`mt-0.5 min-w-0 ${inputCls}`}
           />
         </label>
+        {toolbarEnd ? (
+          <div className="ml-auto flex shrink-0 items-end">{toolbarEnd}</div>
+        ) : null}
       </div>
 
       <div className="overflow-hidden rounded-lg border border-slate-200 bg-[var(--bg-card)] dark:border-[#1e2638]">
@@ -1663,7 +1667,7 @@ export function GuestBulkEntryPage() {
     if (!invite?.id) return;
     if (
       !window.confirm(
-        "Rotate URL? The old link stops working. Share the new link with drivers.",
+        "Change URL? The old link stops working. Share the new link with drivers.",
       )
     ) {
       return;
@@ -1995,40 +1999,6 @@ export function GuestBulkEntryPage() {
     }
   };
 
-  const onOwnerExpiryChange = async (localValue: string) => {
-    if (!invite?.id) return;
-    setOwnerBusy(true);
-    setApproveError(null);
-    try {
-      const data = await updateGuestBulkInvite(
-        invite.id,
-        localValue
-          ? { expiresAt: new Date(localValue).toISOString() }
-          : { expiresAt: null },
-      );
-      applyInviteUpdate(data);
-    } catch (e: unknown) {
-      const msg =
-        e && typeof e === "object" && "response" in e
-          ? (e as { response?: { data?: { message?: string } } }).response?.data
-              ?.message
-          : null;
-      setApproveError(
-        msg || (e instanceof Error ? e.message : "Update failed"),
-      );
-    } finally {
-      setOwnerBusy(false);
-    }
-  };
-
-  const toLocalInputValue = (iso?: string | null) => {
-    if (!iso) return "";
-    const d = new Date(iso);
-    if (Number.isNaN(d.getTime())) return "";
-    const pad = (n: number) => String(n).padStart(2, "0");
-    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-  };
-
   const ownerOverviewMode = Boolean(isOwner && invite?.scope === "agency");
   const displayBlocks = useMemo(() => {
     if (!ownerOverviewMode || !focusedGuestUserId) return blocks;
@@ -2231,6 +2201,17 @@ export function GuestBulkEntryPage() {
             <h1 className="mt-1 text-lg font-bold text-slate-800 dark:text-white">
               {invite.agencyName || invite.label}
             </h1>
+            {invite.ownerName ? (
+              <p className="mt-1 text-sm font-medium text-slate-600 dark:text-slate-300">
+                Owner · {invite.ownerName}
+                {invite.ownerCompany ? (
+                  <span className="font-normal text-slate-400">
+                    {" "}
+                    · {invite.ownerCompany}
+                  </span>
+                ) : null}
+              </p>
+            ) : null}
             <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
               Enter your name and phone to open your private workspace. Use the
               same phone later to resume.
@@ -2269,9 +2250,6 @@ export function GuestBulkEntryPage() {
     );
   }
 
-  const expiresLabel = invite.expiresAt
-    ? new Date(invite.expiresAt).toLocaleString()
-    : "";
   const isAgencyScope = invite.scope === "agency";
   const agencyLocked = isAgencyScope;
   const viewBlock = ownerOverviewMode ? displayActiveBlock : activeBlock;
@@ -2303,25 +2281,26 @@ export function GuestBulkEntryPage() {
           <span className="rounded bg-emerald-600 px-1.5 py-0.5 text-[10px] font-bold uppercase text-white dark:bg-emerald-500">
             Owner
           </span>
-          {(invite.status === "revoked" || invite.expired) && (
+          {invite.status === "revoked" && (
             <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-800 dark:bg-amber-500/20 dark:text-amber-200">
-              {invite.status === "revoked" ? "Revoked" : "Expired"}
+              Link blocked
             </span>
           )}
         </div>
-        <label className="flex flex-col gap-1 text-[11px] font-medium text-slate-500 dark:text-slate-400">
-          Expires
-          <DateTimePicker
-            compact
-            disabled={ownerBusy}
-            value={toLocalInputValue(invite.expiresAt)}
-            onChange={(next) => {
-              const prev = toLocalInputValue(invite.expiresAt);
-              if (next !== prev) void onOwnerExpiryChange(next);
-            }}
-            className="w-full rounded-lg border border-slate-200 bg-[var(--bg-elevated)] px-2 py-1.5 text-[11px] text-slate-700 dark:border-[#1e2638] dark:text-slate-200"
-          />
-        </label>
+        {(invite.ownerName || invite.ownerCompany) && (
+          <div className="min-w-0">
+            {invite.ownerName ? (
+              <p className="truncate text-sm font-semibold text-slate-800 dark:text-slate-100">
+                {invite.ownerName}
+              </p>
+            ) : null}
+            {invite.ownerCompany ? (
+              <p className="truncate text-[11px] text-slate-400">
+                {invite.ownerCompany}
+              </p>
+            ) : null}
+          </div>
+        )}
         <div className="relative">
           <Search className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
           <input
@@ -2679,11 +2658,12 @@ export function GuestBulkEntryPage() {
                 ? invite.agencyName
                 : invite.label}
             </h1>
-            {expiresLabel && (
-              <p className="mt-0.5 text-[11px] text-slate-400 dark:text-slate-500 sm:text-xs">
-                Expires {expiresLabel}
+            {invite.ownerName ? (
+              <p className="mt-0.5 truncate text-[11px] text-slate-400 dark:text-slate-500 sm:text-xs">
+                Owner · {invite.ownerName}
+                {invite.ownerCompany ? ` · ${invite.ownerCompany}` : ""}
               </p>
-            )}
+            ) : null}
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
@@ -2725,8 +2705,8 @@ export function GuestBulkEntryPage() {
                 onClick={onToggleRevoke}
                 title={
                   invite.status === "revoked"
-                    ? "Unrevoke — allow drivers"
-                    : "Revoke — block drivers"
+                    ? "Unblock link — allow guests again"
+                    : "Block link — stop guest access"
                 }
                 className={`${btnOutlineCls} disabled:opacity-60 sm:text-sm ${
                   invite.status === "revoked"
@@ -2740,7 +2720,7 @@ export function GuestBulkEntryPage() {
                   <Ban className="h-4 w-4" />
                 )}
                 <span>
-                  {invite.status === "revoked" ? "Unrevoke" : "Revoke"}
+                  {invite.status === "revoked" ? "Unblock link" : "Block link"}
                 </span>
               </button>
             )}
@@ -2749,11 +2729,11 @@ export function GuestBulkEntryPage() {
                 type="button"
                 disabled={ownerBusy}
                 onClick={() => void onRotateToken()}
-                title="Rotate URL"
+                title="Change URL — old link stops working"
                 className={`${btnOutlineCls} border-amber-200 bg-[var(--bg-elevated)] text-amber-700 hover:bg-amber-50 disabled:opacity-60 dark:border-amber-500/30 dark:text-amber-300 dark:hover:bg-amber-500/10 sm:text-sm`}
               >
                 <KeyRound className="h-4 w-4" />
-                <span className="hidden sm:inline">Rotate</span>
+                <span className="hidden sm:inline">Change URL</span>
               </button>
             )}
             {isOwner && canApproveAll && (
@@ -3009,56 +2989,56 @@ export function GuestBulkEntryPage() {
               sessionPlate={sessionVehiclePlate}
               onSessionPlateChange={handleSessionPlateChange}
               toolbarStart={
-                <>
-                  {agencyLocked ? (
-                    <div className="min-w-0">
-                      <span className={mobileLabelCls}>Agency</span>
-                      <div
-                        className={`mt-0.5 flex min-h-8 items-center gap-1.5 text-sm font-semibold text-slate-800 sm:min-h-10 dark:text-slate-100`}
-                      >
-                        <Building2 className="h-3.5 w-3.5 shrink-0 text-indigo-500/80" />
-                        <span className="truncate">
-                          {viewBlock.agencyName ||
-                            invite.agencyName ||
-                            "Agency"}
-                        </span>
-                      </div>
-                    </div>
-                  ) : (
-                    <label className="min-w-0">
-                      <span className={mobileLabelCls}>Agency *</span>
-                      <div className="mt-0.5">
-                        <GuestAgencyPicker
-                          agencies={agencies}
-                          value={viewBlock.agencyId ?? ""}
-                          fallbackName={viewBlock.agencyName}
-                          disabled={viewBlock.status === "accepted"}
-                          onChange={selectAgency}
-                          onCreateNew={
-                            showNewAgency
-                              ? () => setShowCreateAgency(true)
-                              : undefined
-                          }
-                        />
-                      </div>
-                    </label>
-                  )}
-                  {showApproveBtn && (
-                    <button
-                      type="button"
-                      disabled={Boolean(approving) || !activeApproveReady}
-                      title={activeApproveHint ?? undefined}
-                      onClick={() => onApprove(viewBlock.clientId)}
-                      className={`${btnSolidCls} shrink-0 self-end px-2.5 text-white transition disabled:cursor-not-allowed dark:bg-emerald-500 ${
-                        activeApproveReady
-                          ? "bg-emerald-600 shadow-sm ring-2 ring-emerald-400/50 hover:bg-emerald-700 dark:ring-emerald-400/40"
-                          : "bg-emerald-600/50 opacity-70"
-                      }`}
+                agencyLocked ? (
+                  <div className="min-w-0">
+                    <span className={mobileLabelCls}>Agency</span>
+                    <div
+                      className={`mt-0.5 flex min-h-8 items-center gap-1.5 text-sm font-semibold text-slate-800 sm:min-h-10 dark:text-slate-100`}
                     >
-                      {approving === viewBlock.clientId ? "…" : "Approve"}
-                    </button>
-                  )}
-                </>
+                      <Building2 className="h-3.5 w-3.5 shrink-0 text-indigo-500/80" />
+                      <span className="truncate">
+                        {viewBlock.agencyName ||
+                          invite.agencyName ||
+                          "Agency"}
+                      </span>
+                    </div>
+                  </div>
+                ) : (
+                  <label className="min-w-0">
+                    <span className={mobileLabelCls}>Agency *</span>
+                    <div className="mt-0.5">
+                      <GuestAgencyPicker
+                        agencies={agencies}
+                        value={viewBlock.agencyId ?? ""}
+                        fallbackName={viewBlock.agencyName}
+                        disabled={viewBlock.status === "accepted"}
+                        onChange={selectAgency}
+                        onCreateNew={
+                          showNewAgency
+                            ? () => setShowCreateAgency(true)
+                            : undefined
+                        }
+                      />
+                    </div>
+                  </label>
+                )
+              }
+              toolbarEnd={
+                showApproveBtn ? (
+                  <button
+                    type="button"
+                    disabled={Boolean(approving) || !activeApproveReady}
+                    title={activeApproveHint ?? undefined}
+                    onClick={() => onApprove(viewBlock.clientId)}
+                    className={`${btnSolidCls} shrink-0 px-3 text-white transition disabled:cursor-not-allowed dark:bg-emerald-500 ${
+                      activeApproveReady
+                        ? "bg-emerald-600 shadow-sm ring-2 ring-emerald-400/50 hover:bg-emerald-700 dark:ring-emerald-400/40"
+                        : "bg-emerald-600/50 opacity-70"
+                    }`}
+                  >
+                    {approving === viewBlock.clientId ? "…" : "Approve"}
+                  </button>
+                ) : null
               }
               onChange={(updater) => {
                 setBlocks((prev) =>

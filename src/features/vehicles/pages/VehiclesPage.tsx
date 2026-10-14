@@ -1843,6 +1843,10 @@ function VehicleHistoryTab({
                   value: formatMoney0(financialStats.totalExpenses),
                 },
                 {
+                  label: "Fuel Expense",
+                  value: formatMoney0(financialStats.fuelExpense ?? 0),
+                },
+                {
                   label: "Vehicle Expenses",
                   value: formatMoney0(financialStats.vehicleExpenses ?? 0),
                 },

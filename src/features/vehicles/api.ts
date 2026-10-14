@@ -329,6 +329,7 @@ export interface VehicleHistoryResponse {
     totalDriverSalary?: number;
     ownerRevenue?: number;
     totalExpenses?: number;
+    fuelExpense?: number;
     vehicleExpenses?: number;
     completedTrips?: number;
   };

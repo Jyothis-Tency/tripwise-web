@@ -20,6 +20,7 @@ import {
   isDateBeforeMin,
   normalizeIsoDate,
   parseIsoDateLocal,
+  todayIsoInAppTz,
 } from "../../lib/datePickerUtils";
 
 const WEEKDAYS = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"] as const;
@@ -250,7 +251,7 @@ export function DatePicker({
               setOpen(false);
             }}
             onToday={() => {
-              const today = format(new Date(), "yyyy-MM-dd");
+              const today = todayIsoInAppTz();
               if (!isDateBeforeMin(today, min) && !isDateAfterMax(today, max)) {
                 pick(today);
               }

@@ -27,6 +27,7 @@ import { resolveAgencyLabelFromName } from "../../../lib/agencyDisplay";
 import { fetchAgencies, type Agency } from "../../bulk-entry/api";
 import { DatePicker } from "../../../components/ui/DatePicker";
 import { TimePicker12h } from "../../../components/ui/TimePicker12h";
+import { todayIsoInAppTz } from "../../../lib/datePickerUtils";
 import { isoToHHmmInTz } from "../../../lib/timePickerUtils";
 import { computeAgencyProfitPreview } from "../../history/tripExpenseBreakdown";
 import {
@@ -104,7 +105,32 @@ function canSwitchTripVehicle(status?: string) {
 function formatDate(d?: string) {
   if (!d) return "—";
   try {
+    const raw = String(d).trim();
+    const isoDay = raw.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    const dmy = raw.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{2,4})$/);
+    if (isoDay) {
+      const y = Number(isoDay[1]);
+      const m = Number(isoDay[2]);
+      const day = Number(isoDay[3]);
+      return new Date(y, m - 1, day).toLocaleDateString("en-IN", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+      });
+    }
+    if (dmy) {
+      let year = Number(dmy[3]);
+      if (year < 100) year += 2000;
+      const day = Number(dmy[1]);
+      const m = Number(dmy[2]);
+      return new Date(year, m - 1, day).toLocaleDateString("en-IN", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+      });
+    }
     return new Date(d).toLocaleDateString("en-IN", {
+      timeZone: "Asia/Kolkata",
       day: "2-digit",
       month: "short",
       year: "numeric",
@@ -797,7 +823,15 @@ export function TripFormModal({
                 id="tstartdate"
                 value={form.startDate}
                 onChange={(v) =>
-                  setForm((prev) => ({ ...prev, startDate: v }))
+                  setForm((prev) => {
+                    const expectedEndDate =
+                      prev.expectedEndDate &&
+                      v &&
+                      prev.expectedEndDate < v
+                        ? v
+                        : prev.expectedEndDate;
+                    return { ...prev, startDate: v, expectedEndDate };
+                  })
                 }
                 className={inputCls}
               />
@@ -806,6 +840,7 @@ export function TripFormModal({
               <DatePicker
                 id="tenddate"
                 value={form.expectedEndDate}
+                min={form.startDate || undefined}
                 onChange={(v) =>
                   setForm((prev) => ({ ...prev, expectedEndDate: v }))
                 }
@@ -1342,13 +1377,7 @@ function TripCashInModal({
 
   const [amount, setAmount] = useState("");
   const [amountReady, setAmountReady] = useState(false);
-  const [paymentDate, setPaymentDate] = useState(() => {
-    const d = new Date();
-    const y = d.getFullYear();
-    const m = String(d.getMonth() + 1).padStart(2, "0");
-    const day = String(d.getDate()).padStart(2, "0");
-    return `${y}-${m}-${day}`;
-  });
+  const [paymentDate, setPaymentDate] = useState(() => todayIsoInAppTz());
   const [paymentMethod, setPaymentMethod] =
     useState<(typeof TRIP_CASH_IN_METHODS)[number]>("cash");
   const [notes, setNotes] = useState(defaultNotes);
@@ -1771,8 +1800,7 @@ function VehicleHistoryTab({
                 onChange={(v) => {
                   setStartDate(v);
                   setPage(1);
-                  if (v && endDate && new Date(endDate) < new Date(v))
-                    setEndDate("");
+                  if (v && endDate && endDate < v) setEndDate("");
                 }}
                 className={inputCls}
               />
@@ -1784,11 +1812,11 @@ function VehicleHistoryTab({
               </label>
               <DatePicker
                 value={endDate}
+                min={startDate || undefined}
                 onChange={(v) => {
                   setEndDate(v);
                   setPage(1);
-                  if (v && startDate && new Date(v) < new Date(startDate))
-                    setStartDate("");
+                  if (v && startDate && v < startDate) setStartDate("");
                 }}
                 className={inputCls}
               />

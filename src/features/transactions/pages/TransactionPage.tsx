@@ -39,6 +39,10 @@ import {
 } from "../agencyLedgerMetrics";
 import { sumVehicleAgencyCost } from "../vehicleAgencyLedgerMargin";
 import { DatePicker } from "../../../components/ui/DatePicker";
+import {
+  addDaysIso,
+  todayIsoInAppTz,
+} from "../../../lib/datePickerUtils";
 
 type EntityType = "agency" | "driver";
 type CashKind = "cash_in" | "cash_out";
@@ -166,10 +170,9 @@ function BalanceStat({
   );
 }
 
+/** Calendar day offset in app TZ (IST) — never use UTC `toISOString` date. */
 function isoDateOffset(days: number) {
-  const d = new Date();
-  d.setDate(d.getDate() + days);
-  return d.toISOString().slice(0, 10);
+  return addDaysIso(todayIsoInAppTz(), days);
 }
 
 export function TransactionPage() {
@@ -193,7 +196,7 @@ export function TransactionPage() {
     prefillEntity === "driver" ? "cash_out" : "cash_in",
   );
   const [amount, setAmount] = useState("");
-  const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [date, setDate] = useState(() => todayIsoInAppTz());
   const [method, setMethod] = useState("cash");
   const [notes, setNotes] = useState("");
   const [agencies, setAgencies] = useState<Agency[]>([]);

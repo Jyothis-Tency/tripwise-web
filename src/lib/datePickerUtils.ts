@@ -1,4 +1,5 @@
 import {
+  addDays,
   format,
   isValid,
   parse,
@@ -6,6 +7,26 @@ import {
   isBefore,
   isAfter,
 } from "date-fns";
+import { APP_TIMEZONE } from "./timePickerUtils";
+
+/** Calendar "today" in app business timezone (IST). */
+export function todayIsoInAppTz(timeZone = APP_TIMEZONE): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
+}
+
+/** Add whole days to a `YYYY-MM-DD` calendar date (no TZ shift). */
+export function addDaysIso(iso: string, days: number): string {
+  const n = normalizeIsoDate(iso);
+  if (!n) return "";
+  const d = parse(n, "yyyy-MM-dd", new Date());
+  if (!isValid(d)) return "";
+  return format(addDays(d, days), "yyyy-MM-dd");
+}
 
 /** Normalize to `YYYY-MM-DD` or empty string. */
 export function normalizeIsoDate(value: string | null | undefined): string {
@@ -14,7 +35,13 @@ export function normalizeIsoDate(value: string | null | undefined): string {
   if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
   const d = new Date(s);
   if (!isValid(d)) return "";
-  return format(d, "yyyy-MM-dd");
+  // Prefer IST calendar day for absolute instants (matches APP_TIMEZONE).
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: APP_TIMEZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(d);
 }
 
 export function parseIsoDateLocal(iso: string): Date | null {

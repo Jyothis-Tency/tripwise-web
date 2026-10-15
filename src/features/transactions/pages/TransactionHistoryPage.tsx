@@ -45,6 +45,8 @@ import {
   type AgencyTxPdfSectionVisibility,
 } from "../agencyTransactionHistoryPdf";
 import { DatePicker } from "../../../components/ui/DatePicker";
+import { todayIsoInAppTz } from "../../../lib/datePickerUtils";
+import { APP_TIMEZONE } from "../../../lib/timePickerUtils";
 import { authApi } from "../../auth/api";
 import { useAuth } from "../../../hooks/useAuth";
 
@@ -151,11 +153,32 @@ function sortTime(date?: string | null, id?: string) {
   return mongoIdTime(id);
 }
 
+function isDateOnlyString(raw: string) {
+  return (
+    /^\d{4}-\d{2}-\d{2}$/.test(raw) ||
+    /^\d{1,2}[-/]\d{1,2}[-/]\d{4}$/.test(raw)
+  );
+}
+
 function formatDate(d?: string | null) {
   if (!d) return "—";
-  const x = parseSafeDate(d);
-  if (!x || Number.isNaN(x.getTime())) return "—";
+  const raw = String(d).trim();
+  if (!raw) return "—";
+  // Calendar-only strings: keep the written day (no TZ shift).
+  if (isDateOnlyString(raw)) {
+    const x = parseSafeDate(raw);
+    if (!x || Number.isNaN(x.getTime())) return "—";
+    return x.toLocaleDateString("en-IN", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    });
+  }
+  // Absolute instants → Indian calendar day.
+  const x = new Date(raw);
+  if (Number.isNaN(x.getTime())) return "—";
   return x.toLocaleDateString("en-IN", {
+    timeZone: APP_TIMEZONE,
     day: "numeric",
     month: "short",
     year: "numeric",
@@ -165,12 +188,14 @@ function formatDate(d?: string | null) {
 function formatTime(d?: string | null) {
   if (!d) return "—";
   const raw = String(d).trim();
-  if (!raw.includes("T") && !raw.includes(":") && !raw.includes(" ")) {
-    return "—";
-  }
-  const x = parseSafeDate(d);
-  if (!x || Number.isNaN(x.getTime())) return "—";
+  if (!raw) return "—";
+  // No wall-clock time on date-only values.
+  if (isDateOnlyString(raw)) return "—";
+  if (!/T|\d:\d/.test(raw)) return "—";
+  const x = new Date(raw);
+  if (Number.isNaN(x.getTime())) return "—";
   return x.toLocaleTimeString("en-IN", {
+    timeZone: APP_TIMEZONE,
     hour: "2-digit",
     minute: "2-digit",
   });
@@ -178,20 +203,39 @@ function formatTime(d?: string | null) {
 
 function formatMonth(d?: string | null) {
   if (!d) return "—";
-  const x = parseSafeDate(d);
-  if (!x || Number.isNaN(x.getTime())) return "—";
-  return x.toLocaleString("en-IN", { month: "short", year: "numeric" });
+  const raw = String(d).trim();
+  if (!raw) return "—";
+  if (isDateOnlyString(raw)) {
+    const x = parseSafeDate(raw);
+    if (!x || Number.isNaN(x.getTime())) return "—";
+    return x.toLocaleString("en-IN", { month: "short", year: "numeric" });
+  }
+  const x = new Date(raw);
+  if (Number.isNaN(x.getTime())) return "—";
+  return x.toLocaleString("en-IN", {
+    timeZone: APP_TIMEZONE,
+    month: "short",
+    year: "numeric",
+  });
 }
 
 function monthOptions() {
   const opts = [{ value: "all_time", label: "All time" }];
-  const now = new Date();
+  const ist = todayIsoInAppTz();
+  const [y0, m0] = ist.split("-").map(Number);
   for (let i = 0; i < 24; i++) {
-    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    opts.push({
-      value: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`,
-      label: d.toLocaleString("en-IN", { month: "long", year: "numeric" }),
+    let year = y0;
+    let month = m0 - i;
+    while (month <= 0) {
+      month += 12;
+      year -= 1;
+    }
+    const value = `${year}-${String(month).padStart(2, "0")}`;
+    const label = new Date(year, month - 1, 1).toLocaleString("en-IN", {
+      month: "long",
+      year: "numeric",
     });
+    opts.push({ value, label });
   }
   return opts;
 }
@@ -349,15 +393,19 @@ function inDateRange(date: string | null, from: string, to: string) {
 function monthKeyFromTripDate(date: string | null): string | null {
   if (!date) return null;
   const s = String(date).trim();
-  const iso = s.match(/^(\d{4})-(\d{2})-\d{2}/);
-  if (iso) return `${iso[1]}-${iso[2]}`;
-  const dmy = s.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})/);
+  if (!s) return null;
+  // Pure calendar date → written month.
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s.slice(0, 7);
+  const dmy = s.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})$/);
   if (dmy) {
     return `${dmy[3]}-${String(Number(dmy[2])).padStart(2, "0")}`;
   }
+  // Instants (incl. ISO with time) → IST calendar month.
   const d = new Date(s);
   if (Number.isNaN(d.getTime())) return null;
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+  return d
+    .toLocaleDateString("en-CA", { timeZone: APP_TIMEZONE })
+    .slice(0, 7);
 }
 
 /** Month filter for the transactions table only (`YYYY-MM` or all_time). */
@@ -644,7 +692,10 @@ function AgencyTxPdfExportDialog({
                 From
                 <DatePicker
                   value={dateFrom}
-                  onChange={setDateFrom}
+                  onChange={(v) => {
+                    setDateFrom(v);
+                    if (v && dateTo && dateTo < v) setDateTo("");
+                  }}
                   className={`${fieldCls} mt-1`}
                 />
               </label>
@@ -652,7 +703,11 @@ function AgencyTxPdfExportDialog({
                 To
                 <DatePicker
                   value={dateTo}
-                  onChange={setDateTo}
+                  min={dateFrom || undefined}
+                  onChange={(v) => {
+                    setDateTo(v);
+                    if (v && dateFrom && v < dateFrom) setDateFrom("");
+                  }}
                   className={`${fieldCls} mt-1`}
                 />
               </label>
@@ -1036,6 +1091,7 @@ export function TransactionHistoryPage() {
     rows = [...rows].sort((a, b) =>
       sortDir === "desc" ? b.sortTime - a.sortTime : a.sortTime - b.sortTime,
     );
+
     return rows;
   }, [
     tab,
@@ -1577,14 +1633,21 @@ export function TransactionHistoryPage() {
                     <div className="flex items-center gap-1.5 text-slate-400">
                       <DatePicker
                         value={dateFrom}
-                        onChange={setDateFrom}
+                        onChange={(v) => {
+                          setDateFrom(v);
+                          if (v && dateTo && dateTo < v) setDateTo("");
+                        }}
                         aria-label="From date"
                         className={fieldCls}
                       />
                       <span>→</span>
                       <DatePicker
                         value={dateTo}
-                        onChange={setDateTo}
+                        min={dateFrom || undefined}
+                        onChange={(v) => {
+                          setDateTo(v);
+                          if (v && dateFrom && v < dateFrom) setDateFrom("");
+                        }}
                         aria-label="To date"
                         className={fieldCls}
                       />

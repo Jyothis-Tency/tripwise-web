@@ -30,6 +30,10 @@ import {
 } from "../../vehicles/api";
 import { fetchAgencies, type Agency } from "../../bulk-entry/api";
 import { DatePicker } from "../../../components/ui/DatePicker";
+import {
+  addDaysIso,
+  todayIsoInAppTz,
+} from "../../../lib/datePickerUtils";
 import { computeAgencyProfitPreview } from "../../history/tripExpenseBreakdown";
 
 const inputCls =
@@ -88,19 +92,6 @@ function driverShortName(d: DriverItem): string {
   const parts = name.split(/\s+/);
   if (parts.length === 1) return parts[0].slice(0, 12);
   return `${parts[0]} ${parts[1][0]}.`;
-}
-
-function toDateInputValue(d: Date): string {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
-}
-
-function addDays(base: Date, days: number): Date {
-  const d = new Date(base);
-  d.setDate(d.getDate() + days);
-  return d;
 }
 
 export function CreateNewTripPage() {
@@ -239,22 +230,22 @@ export function CreateNewTripPage() {
   };
 
   const setStartRelative = (daysFromToday: number) => {
-    const d = addDays(new Date(), daysFromToday);
-    setForm((prev) => ({ ...prev, startDate: toDateInputValue(d) }));
+    const next = addDaysIso(todayIsoInAppTz(), daysFromToday);
+    setForm((prev) => {
+      const expectedEndDate =
+        prev.expectedEndDate && next && prev.expectedEndDate < next
+          ? next
+          : prev.expectedEndDate;
+      return { ...prev, startDate: next, expectedEndDate };
+    });
   };
 
   const setEndRelative = (mode: "same" | "plus2") => {
     setForm((prev) => {
-      const base = prev.startDate
-        ? new Date(prev.startDate + "T12:00:00")
-        : new Date();
-      if (mode === "same") {
-        return { ...prev, expectedEndDate: toDateInputValue(base) };
-      }
-      return {
-        ...prev,
-        expectedEndDate: toDateInputValue(addDays(base, 2)),
-      };
+      const base = prev.startDate || todayIsoInAppTz();
+      const expectedEndDate =
+        mode === "same" ? base : addDaysIso(base, 2);
+      return { ...prev, expectedEndDate };
     });
   };
 
@@ -617,9 +608,17 @@ export function CreateNewTripPage() {
                       <DatePicker
                         id="c-startdate"
                         value={form.startDate}
-                        onChange={(v) =>
-                          setForm((prev) => ({ ...prev, startDate: v }))
-                        }
+                        onChange={(v) => {
+                          setForm((prev) => {
+                            const expectedEndDate =
+                              prev.expectedEndDate &&
+                              v &&
+                              prev.expectedEndDate < v
+                                ? v
+                                : prev.expectedEndDate;
+                            return { ...prev, startDate: v, expectedEndDate };
+                          });
+                        }}
                         className={inputCls}
                       />
                     </Field>
@@ -648,8 +647,12 @@ export function CreateNewTripPage() {
                       <DatePicker
                         id="c-enddate"
                         value={form.expectedEndDate}
+                        min={form.startDate || undefined}
                         onChange={(v) =>
-                          setForm((prev) => ({ ...prev, expectedEndDate: v }))
+                          setForm((prev) => ({
+                            ...prev,
+                            expectedEndDate: v,
+                          }))
                         }
                         className={inputCls}
                       />

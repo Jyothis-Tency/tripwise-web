@@ -1347,6 +1347,8 @@ export function GuestBulkEntryPage() {
   const syncGenerationRef = useRef(0);
   const syncInFlightRef = useRef(false);
   const pendingSyncRef = useRef(false);
+  /** Owner overview: only autosave after a real local edit (avoids wipe races). */
+  const ownerDraftDirtyRef = useRef(false);
   const editingDepthRef = useRef(0);
   const pendingAcceptedDraftRef = useRef<GuestAgencyBlock[] | null>(null);
   const blurFlushTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -1421,6 +1423,7 @@ export function GuestBulkEntryPage() {
       );
       skipNextSync.current = true;
       lastBackendHash.current = "";
+      ownerDraftDirtyRef.current = false;
       return;
     }
 
@@ -1568,10 +1571,11 @@ export function GuestBulkEntryPage() {
         guestUserId: b.guestUserId ?? null,
         guestName: b.guestName,
         guestPhone: b.guestPhone,
+        // Prefer per-block guest identity (owner overview has empty page name/phone)
         driverGroups: stampGuestDriverOnGroups(
           b.driverGroups,
-          driverName,
-          driverPhone,
+          b.guestName || driverName,
+          b.guestPhone || driverPhone,
         ),
         status: b.status,
       })),
@@ -1589,9 +1593,19 @@ export function GuestBulkEntryPage() {
     const ownerOverview = Boolean(
       invite.isOwner && invite.scope === "agency",
     );
+    // Owner must actually edit before we push (prevents load-race wipes).
+    if (ownerOverview && !ownerDraftDirtyRef.current) return;
+
     // Owner edits the focused guest's open draft (not the whole merged list)
+    const activeGuestFromBlock =
+      ownerOverview && activeClientId
+        ? syncPayloadRef.current.blocks.find(
+            (b) => b.clientId === activeClientId,
+          )?.guestUserId
+        : null;
     const editGuestUserId = ownerOverview
-      ? focusedGuestUserId
+      ? focusedGuestUserId ||
+        (activeGuestFromBlock ? String(activeGuestFromBlock) : null)
       : guestUserId ?? invite.guestUserId ?? null;
     if (ownerOverview && !editGuestUserId) return;
 
@@ -1656,6 +1670,18 @@ export function GuestBulkEntryPage() {
               phoneForSync,
             ),
           }));
+
+        // Never push an empty open list for a user that still has local open
+        // entries — that used to wipe yesterday's unapproved trips on the server.
+        if (
+          openBlocks.length === 0 &&
+          sourceBlocks.some((b) => b.status !== "accepted")
+        ) {
+          lastBackendHash.current = quickHash(JSON.stringify(syncKey));
+          setSyncStatus("idle");
+          return;
+        }
+
         const data = await syncGuestBulk(token, {
           driverName: nameForSync,
           driverPhone: phoneForSync,
@@ -1672,9 +1698,12 @@ export function GuestBulkEntryPage() {
             }
           : syncPayloadRef.current;
         lastBackendHash.current = quickHash(JSON.stringify(nextKey));
+        // Clear prior autosave/network errors after a successful save
         setApproveError((prev) =>
           prev &&
-          /phone number already exists|guest link with this phone/i.test(prev)
+          /phone number already exists|guest link with this phone|network error|autosave failed|guest session|failed to fetch|too many guest/i.test(
+            prev,
+          )
             ? null
             : prev,
         );
@@ -1705,6 +1734,7 @@ export function GuestBulkEntryPage() {
         ) !== lastBackendHash.current
       );
       if (!mountedRef.current || gen !== syncGenerationRef.current) return;
+      if (ownerOverview) ownerDraftDirtyRef.current = false;
       setSyncStatus("saved");
       setTimeout(() => {
         if (mountedRef.current) setSyncStatus("idle");
@@ -1712,16 +1742,17 @@ export function GuestBulkEntryPage() {
     } catch (e: unknown) {
       if (!mountedRef.current) return;
       setSyncStatus("error");
-      const msg = e instanceof Error ? e.message : "";
-      if (
-        msg &&
-        /phone number already exists|guest link with this phone/i.test(msg)
-      ) {
+      const msg = e instanceof Error ? e.message : "Autosave failed";
+      if (msg) {
         setApproveError(msg);
-        // Stop retry storms until the guest changes name/phone/blocks again.
-        lastBackendHash.current = quickHash(
-          JSON.stringify(syncPayloadRef.current),
-        );
+        if (
+          /phone number already exists|guest link with this phone/i.test(msg)
+        ) {
+          // Stop retry storms until the guest changes name/phone/blocks again.
+          lastBackendHash.current = quickHash(
+            JSON.stringify(syncPayloadRef.current),
+          );
+        }
       }
     } finally {
       syncInFlightRef.current = false;
@@ -1731,6 +1762,7 @@ export function GuestBulkEntryPage() {
     invite,
     guestUserId,
     focusedGuestUserId,
+    activeClientId,
     agencyGuestUsers,
   ]);
 
@@ -1841,6 +1873,7 @@ export function GuestBulkEntryPage() {
     if (!(invite?.isOwner && invite.scope === "agency")) return;
     if (!focusedGuestUserId) return;
     skipNextSync.current = true;
+    ownerDraftDirtyRef.current = false;
     lastBackendHash.current = quickHash(
       JSON.stringify({
         guestUserId: focusedGuestUserId,
@@ -3173,6 +3206,9 @@ export function GuestBulkEntryPage() {
                 ) : null
               }
               onChange={(updater) => {
+                if (ownerOverviewMode && viewBlock.status !== "accepted") {
+                  ownerDraftDirtyRef.current = true;
+                }
                 setBlocks((prev) =>
                   prev.map((b) => {
                     if (b.clientId !== viewBlock.clientId) return b;

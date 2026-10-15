@@ -55,9 +55,6 @@ export function GuestInvitesPanel({
   const [error, setError] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
-  const [createScope, setCreateScope] = useState<"driver" | "agency">("driver");
-  const [driverName, setDriverName] = useState("");
-  const [driverPhone, setDriverPhone] = useState("");
   const [agencyId, setAgencyId] = useState("");
   const [agencies, setAgencies] = useState<Agency[]>([]);
   const [expiresInDays, setExpiresInDays] = useState(0);
@@ -121,7 +118,7 @@ export function GuestInvitesPanel({
   };
 
   const onCreate = async () => {
-    if (createScope === "agency" && !agencyId) {
+    if (!agencyId) {
       setError("Select an agency for the shared link");
       return;
     }
@@ -129,17 +126,10 @@ export function GuestInvitesPanel({
     setError(null);
     try {
       const inv = await createGuestBulkInvite({
-        scope: createScope,
-        ...(createScope === "agency"
-          ? { agencyId }
-          : {
-              driverName: driverName.trim(),
-              driverPhone: driverPhone.trim(),
-            }),
+        scope: "agency",
+        agencyId,
         ...(expiresInDays > 0 ? { expiresInDays } : {}),
       });
-      setDriverName("");
-      setDriverPhone("");
       setAgencyId("");
       await refresh();
       setTab("invites");
@@ -279,7 +269,7 @@ export function GuestInvitesPanel({
               Guest links
             </h3>
             <p className="text-xs text-slate-400 mt-0.5 dark:text-slate-500">
-              Driver or agency · autosaves · Approve on the same page
+              Agency links · autosaves · Approve on the same page
             </p>
           </div>
           <button
@@ -339,76 +329,29 @@ export function GuestInvitesPanel({
             <>
               <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 space-y-3 dark:border-[#1e2638] dark:bg-white/[0.03]">
                 <p className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                  New link
+                  New agency link
                 </p>
-                <div className="flex rounded-lg border border-slate-200 p-0.5 dark:border-[#1e2638]">
-                  <button
-                    type="button"
-                    onClick={() => setCreateScope("driver")}
-                    className={`flex-1 rounded-md px-2 py-1.5 text-xs font-semibold transition ${
-                      createScope === "driver"
-                        ? "bg-indigo-600 text-white"
-                        : "text-slate-500 dark:text-slate-400"
-                    }`}
-                  >
-                    Driver
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setCreateScope("agency")}
-                    className={`flex-1 rounded-md px-2 py-1.5 text-xs font-semibold transition ${
-                      createScope === "agency"
-                        ? "bg-indigo-600 text-white"
-                        : "text-slate-500 dark:text-slate-400"
-                    }`}
-                  >
-                    Agency
-                  </button>
-                </div>
-
-                {createScope === "driver" ? (
-                  <>
-                    <p className="text-xs text-slate-500 dark:text-slate-400">
-                      One private workspace for a driver. Optional name/phone
-                      now, or leave blank for them to fill.
-                    </p>
-                    <input
-                      value={driverName}
-                      onChange={(e) => setDriverName(e.target.value)}
-                      placeholder="Driver name (optional)"
-                      className="w-full rounded-lg border border-slate-200 bg-[var(--bg-elevated)] px-3 py-2 text-sm outline-none focus:border-indigo-400 dark:border-[#1e2638] dark:text-slate-100 dark:placeholder:text-slate-500"
-                    />
-                    <input
-                      value={driverPhone}
-                      onChange={(e) => setDriverPhone(e.target.value)}
-                      placeholder="Phone (optional)"
-                      className="w-full rounded-lg border border-slate-200 bg-[var(--bg-elevated)] px-3 py-2 text-sm outline-none focus:border-indigo-400 dark:border-[#1e2638] dark:text-slate-100 dark:placeholder:text-slate-500"
-                    />
-                  </>
-                ) : (
-                  <>
-                    <p className="text-xs text-slate-500 dark:text-slate-400">
-                      Shared agency URL. Each person enters name + phone and
-                      gets a private draft. Agency is locked.
-                    </p>
-                    <select
-                      value={agencyId}
-                      onChange={(e) => setAgencyId(e.target.value)}
-                      className="w-full rounded-lg border border-slate-200 bg-[var(--bg-elevated)] px-3 py-2 text-sm outline-none focus:border-indigo-400 dark:border-[#1e2638] dark:text-slate-100"
-                    >
-                      <option value="">Select agency…</option>
-                      {agencies.map((a) => {
-                        const id = String(a._id ?? a.id ?? "");
-                        return (
-                          <option key={id} value={id}>
-                            {a.name}
-                            {a.phone ? ` · ${a.phone}` : ""}
-                          </option>
-                        );
-                      })}
-                    </select>
-                  </>
-                )}
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  Shared agency URL. Each person enters name + phone and gets a
+                  private draft. Agency is locked. (Old driver links are
+                  retired.)
+                </p>
+                <select
+                  value={agencyId}
+                  onChange={(e) => setAgencyId(e.target.value)}
+                  className="w-full rounded-lg border border-slate-200 bg-[var(--bg-elevated)] px-3 py-2 text-sm outline-none focus:border-indigo-400 dark:border-[#1e2638] dark:text-slate-100"
+                >
+                  <option value="">Select agency…</option>
+                  {agencies.map((a) => {
+                    const id = String(a._id ?? a.id ?? "");
+                    return (
+                      <option key={id} value={id}>
+                        {a.name}
+                        {a.phone ? ` · ${a.phone}` : ""}
+                      </option>
+                    );
+                  })}
+                </select>
 
                 <label className="text-sm text-slate-600 flex items-center gap-2 dark:text-slate-300">
                   Expires (optional)
@@ -486,11 +429,13 @@ export function GuestInvitesPanel({
                               {isAgency && (inv.guestUserCount ?? 0) > 0
                                 ? `${inv.guestUserCount} user${inv.guestUserCount === 1 ? "" : "s"} · `
                                 : ""}
-                              {revoked
-                                ? "Revoked (guests blocked)"
-                                : expired
-                                  ? "Expired (guests blocked)"
-                                  : "Active"}
+                              {!isAgency
+                                ? "Retired (guests blocked)"
+                                : revoked
+                                  ? "Revoked (guests blocked)"
+                                  : expired
+                                    ? "Expired (guests blocked)"
+                                    : "Active"}
                               {pending > 0
                                 ? ` · ${pending} with trips to Approve`
                                 : ""}

@@ -121,13 +121,20 @@ async function guestFetch<T>(
   init?: RequestInit,
   guestUserId?: string | null,
 ): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`, {
-    ...init,
-    headers: {
-      ...authHeaders(guestUserId),
-      ...(init?.headers ?? {}),
-    },
-  });
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE}${path}`, {
+      ...init,
+      headers: {
+        ...authHeaders(guestUserId),
+        ...(init?.headers ?? {}),
+      },
+    });
+  } catch {
+    throw new Error(
+      "Network error — check your connection or try again in a moment.",
+    );
+  }
   const raw = await res.json().catch(() => ({}));
   if (!res.ok) {
     const msg =

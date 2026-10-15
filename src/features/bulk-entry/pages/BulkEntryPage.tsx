@@ -744,7 +744,7 @@ const LS_BULK_PREFIX = "tripwise_bulk_";
 const LS_NORMAL_PREFIX = "tripwise_normal_";
 const LS_SELECTED_AGENCY = "tripwise_bulk_selected_agency";
 const LS_ENTRY_MODE = "tripwise_bulk_entry_mode"; // 'bulk' | 'normal'
-const AUTOSAVE_DELAY = 800; // ms after last keystroke
+const AUTOSAVE_DELAY = 1400; // ms after last keystroke (avoids sync storms)
 
 // Mirror of backend AgencyTrip.calculateBalance (non-negative balance)
 function calculateBalanceAmount(
@@ -777,6 +777,8 @@ function useAutosave<T>(
   data: T,
   serialize: (d: T) => string,
   onBackendSync: (d: T) => Promise<void>,
+  /** When false, still write localStorage but skip backend sync. */
+  backendEnabled = true,
 ) {
   const [status, setStatus] = useState<SyncStatus>("idle");
   const lastLocalHash = useRef<string>("");
@@ -785,6 +787,8 @@ function useAutosave<T>(
   const mountedRef = useRef(true);
   const dataRef = useRef(data);
   dataRef.current = data;
+  const syncInFlightRef = useRef(false);
+  const pendingAfterSyncRef = useRef(false);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -797,6 +801,8 @@ function useAutosave<T>(
   useEffect(() => {
     lastLocalHash.current = "";
     lastBackendHash.current = "";
+    syncInFlightRef.current = false;
+    pendingAfterSyncRef.current = false;
     setStatus("idle");
   }, [key]);
 
@@ -817,19 +823,31 @@ function useAutosave<T>(
       lastLocalHash.current = hash;
     }
 
-    // 2. Debounced backend sync
+    // 2. Debounced backend sync (wait until server trips hydrated)
     if (timerRef.current) clearTimeout(timerRef.current);
+    if (!backendEnabled) return;
 
     if (hash !== lastBackendHash.current) {
       timerRef.current = setTimeout(async () => {
         if (!mountedRef.current) return;
+        if (syncInFlightRef.current) {
+          pendingAfterSyncRef.current = true;
+          return;
+        }
+        syncInFlightRef.current = true;
         setStatus("saving");
         try {
-          await onBackendSync(dataRef.current);
-          if (mountedRef.current) {
+          do {
+            pendingAfterSyncRef.current = false;
+            await onBackendSync(dataRef.current);
+            if (!mountedRef.current) return;
             lastBackendHash.current = quickHash(serialize(dataRef.current));
+          } while (
+            pendingAfterSyncRef.current &&
+            quickHash(serialize(dataRef.current)) !== lastBackendHash.current
+          );
+          if (mountedRef.current) {
             setStatus("saved");
-            // Fade back to idle after 2s
             setTimeout(() => {
               if (mountedRef.current) setStatus("idle");
             }, 2000);
@@ -839,6 +857,8 @@ function useAutosave<T>(
             setStatus("error");
             // Retry on next edit by not updating backend hash
           }
+        } finally {
+          syncInFlightRef.current = false;
         }
       }, AUTOSAVE_DELAY);
     }
@@ -846,7 +866,7 @@ function useAutosave<T>(
     return () => {
       if (timerRef.current) clearTimeout(timerRef.current);
     };
-  }, [key, data, serialize, onBackendSync]);
+  }, [key, data, serialize, onBackendSync, backendEnabled]);
 
   return status;
 }
@@ -4358,6 +4378,8 @@ export function BulkEntryPage() {
   const [guestLinkOpening, setGuestLinkOpening] = useState(false);
   const [guestLinkError, setGuestLinkError] = useState<string | null>(null);
   const [tripLoadNotice, setTripLoadNotice] = useState<string | null>(null);
+  /** Block backend autosave until first loadTrips for this agency/mode finishes. */
+  const [tripsHydrated, setTripsHydrated] = useState(false);
 
   // Delete confirmations (prevents rapid double-deletes & gives server time)
   type PendingDelete = { ids: string[]; title: string; message: string };
@@ -4549,12 +4571,14 @@ export function BulkEntryPage() {
     bulkGroups,
     serializeBulk,
     syncBulkToBackend,
+    Boolean(bulkLsKey && tripsHydrated),
   );
   const normalSyncStatus = useAutosave(
     normalLsKey,
     normalEntries,
     serializeNormal,
     syncNormalToBackend,
+    Boolean(normalLsKey && tripsHydrated),
   );
 
   const currentSyncStatus = isBulkMode ? bulkSyncStatus : normalSyncStatus;
@@ -4704,6 +4728,7 @@ export function BulkEntryPage() {
   const loadTrips = useCallback(async () => {
     if (!selectedId || !selectedAgency) return;
     setTripLoadNotice(null);
+    setTripsHydrated(false);
     try {
       if (isBulkMode) {
         const { trips, complete, loadedCount, expectedTotal } =
@@ -5032,6 +5057,8 @@ export function BulkEntryPage() {
       }
     } catch {
       /* silent */
+    } finally {
+      setTripsHydrated(true);
     }
   }, [selectedId, isBulkMode, selectedAgency]);
 
@@ -5188,11 +5215,13 @@ export function BulkEntryPage() {
   );
 
   useEffect(() => {
+    setTripsHydrated(false);
     loadTrips();
   }, [loadTrips]);
 
   // ── Agency selection ──
   const selectAgency = useCallback((id: string) => {
+    setTripsHydrated(false);
     setSelectedId(id);
     setShowDropdown(false);
     try {

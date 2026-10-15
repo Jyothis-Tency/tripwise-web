@@ -64,7 +64,7 @@ import { useTheme } from "../../../hooks/useTheme";
 import { TripwiseLogo } from "../../../components/brand/TripwiseLogo";
 
 type SyncStatus = "idle" | "saving" | "saved" | "error";
-const AUTOSAVE_DELAY = 800;
+const AUTOSAVE_DELAY = 1200;
 
 function storedGuestSessionError(msg: string) {
   return /guest session not found|enter your phone again|blocked from this link/i.test(
@@ -1345,6 +1345,8 @@ export function GuestBulkEntryPage() {
     blocks: [] as GuestAgencyBlock[],
   });
   const syncGenerationRef = useRef(0);
+  const syncInFlightRef = useRef(false);
+  const pendingSyncRef = useRef(false);
   const editingDepthRef = useRef(0);
   const pendingAcceptedDraftRef = useRef<GuestAgencyBlock[] | null>(null);
   const blurFlushTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -1381,7 +1383,7 @@ export function GuestBulkEntryPage() {
       return;
     }
 
-    // Owner agency overview: show every link user's blocks (read-only)
+    // Owner agency overview: all link users; open trips are editable + autosaved
     if (ownerOverview) {
       const raw = data.draft?.blocks ?? [];
       const loaded = raw.length
@@ -1400,12 +1402,20 @@ export function GuestBulkEntryPage() {
         : [];
       setBlocks(loaded);
       setPreferredGuestPlate(guestSessionVehiclePlate(loaded));
+      const firstOpen = loaded.find(
+        (b) => b.status !== "accepted" && b.guestUserId,
+      );
       setFocusedGuestUserId((prev) => {
         if (prev && data.guestUsers?.some((u) => u.id === prev)) return prev;
-        return null;
+        return firstOpen?.guestUserId
+          ? String(firstOpen.guestUserId)
+          : loaded[0]?.guestUserId
+            ? String(loaded[0].guestUserId)
+            : null;
       });
       setActiveClientId(
-        loaded.find((b) => b.status !== "accepted")?.clientId ||
+        firstOpen?.clientId ||
+          loaded.find((b) => b.status !== "accepted")?.clientId ||
           loaded[0]?.clientId ||
           "",
       );
@@ -1467,13 +1477,15 @@ export function GuestBulkEntryPage() {
     let cancelled = false;
     (async () => {
       try {
-        const stored = loadStoredGuestUserId(token);
-        let data = await fetchGuestInvite(token, stored);
-        // Logged-in owner always gets the full agency overview (all users)
-        if (data.isOwner && data.scope === "agency" && stored) {
+        const hasOwnerSession =
+          typeof localStorage !== "undefined" &&
+          Boolean(localStorage.getItem("accessToken"));
+        // Logged-in owners: never send stale guestUserId (backend also ignores it).
+        const stored = hasOwnerSession ? null : loadStoredGuestUserId(token);
+        if (hasOwnerSession && loadStoredGuestUserId(token)) {
           clearStoredGuestUserId(token);
-          data = await fetchGuestInvite(token, null);
         }
+        const data = await fetchGuestInvite(token, stored);
         if (cancelled) return;
         applyInviteData(data);
       } catch (e: unknown) {
@@ -1553,6 +1565,9 @@ export function GuestBulkEntryPage() {
         clientId: b.clientId,
         agencyId: b.agencyId ?? null,
         agencyName: b.agencyName,
+        guestUserId: b.guestUserId ?? null,
+        guestName: b.guestName,
+        guestPhone: b.guestPhone,
         driverGroups: stampGuestDriverOnGroups(
           b.driverGroups,
           driverName,
@@ -1570,55 +1585,127 @@ export function GuestBulkEntryPage() {
     if (!token || !invite) return;
     if (invite.token && invite.token !== token) return;
     if (invite.joinRequired && !invite.isOwner) return;
-    // Owner overview is read-only (merged drafts from all link users)
-    if (invite.isOwner && invite.scope === "agency") return;
+
+    const ownerOverview = Boolean(
+      invite.isOwner && invite.scope === "agency",
+    );
+    // Owner edits the focused guest's open draft (not the whole merged list)
+    const editGuestUserId = ownerOverview
+      ? focusedGuestUserId
+      : guestUserId ?? invite.guestUserId ?? null;
+    if (ownerOverview && !editGuestUserId) return;
+
     const payload = syncPayloadRef.current;
-    const hash = quickHash(JSON.stringify(payload));
+    const syncKey = ownerOverview
+      ? {
+          guestUserId: editGuestUserId,
+          blocks: payload.blocks.filter(
+            (b) => String(b.guestUserId) === String(editGuestUserId),
+          ),
+        }
+      : payload;
+    const hash = quickHash(JSON.stringify(syncKey));
     if (hash === lastBackendHash.current) return;
+
+    if (syncInFlightRef.current) {
+      pendingSyncRef.current = true;
+      return;
+    }
+    syncInFlightRef.current = true;
 
     const gen = ++syncGenerationRef.current;
     setSyncStatus("saving");
     try {
-      const openBlocks = payload.blocks
-        .filter((b) => b.status !== "accepted")
-        .map((b) => ({
-          clientId: b.clientId,
-          agencyId: b.agencyId,
-          agencyName: b.agencyName,
-          driverGroups: b.driverGroups,
-        }));
-      const accepted = payload.blocks.filter((b) => b.status === "accepted");
-      const data = await syncGuestBulk(token, {
-        driverName: payload.driverName,
-        driverPhone: payload.driverPhone,
-        guestUserId: guestUserId ?? invite.guestUserId,
-        blocks: [
-          ...openBlocks,
-          ...accepted.map((b) => ({
+      do {
+        pendingSyncRef.current = false;
+        const latest = syncPayloadRef.current;
+        const guestMeta = ownerOverview
+          ? agencyGuestUsers.find(
+              (u) => String(u.id) === String(editGuestUserId),
+            )
+          : null;
+        const nameForSync =
+          guestMeta?.name ||
+          latest.blocks.find(
+            (b) => String(b.guestUserId) === String(editGuestUserId),
+          )?.guestName ||
+          latest.driverName;
+        const phoneForSync =
+          guestMeta?.phone ||
+          latest.blocks.find(
+            (b) => String(b.guestUserId) === String(editGuestUserId),
+          )?.guestPhone ||
+          latest.driverPhone;
+
+        const sourceBlocks = ownerOverview
+          ? latest.blocks.filter(
+              (b) => String(b.guestUserId) === String(editGuestUserId),
+            )
+          : latest.blocks;
+
+        // Server keeps accepted history; only ship open blocks (much faster).
+        const openBlocks = sourceBlocks
+          .filter((b) => b.status !== "accepted")
+          .map((b) => ({
             clientId: b.clientId,
             agencyId: b.agencyId,
             agencyName: b.agencyName,
-            driverGroups: b.driverGroups,
-          })),
-        ],
-      });
-      if (!mountedRef.current || gen !== syncGenerationRef.current) return;
-      lastBackendHash.current = quickHash(JSON.stringify(syncPayloadRef.current));
-      setSyncStatus("saved");
-      setApproveError((prev) =>
-        prev && /phone number already exists|guest link with this phone/i.test(prev)
-          ? null
-          : prev,
-      );
-      if (data.draft?.blocks) {
-        if (editingDepthRef.current > 0) {
-          pendingAcceptedDraftRef.current = data.draft.blocks;
-        } else {
-          setBlocks((prev) =>
-            mergeAcceptedBlocksFromServer(prev, data.draft!.blocks),
-          );
+            driverGroups: stampGuestDriverOnGroups(
+              b.driverGroups,
+              nameForSync,
+              phoneForSync,
+            ),
+          }));
+        const data = await syncGuestBulk(token, {
+          driverName: nameForSync,
+          driverPhone: phoneForSync,
+          guestUserId: editGuestUserId,
+          blocks: openBlocks,
+        });
+        if (!mountedRef.current || gen !== syncGenerationRef.current) return;
+        const nextKey = ownerOverview
+          ? {
+              guestUserId: editGuestUserId,
+              blocks: syncPayloadRef.current.blocks.filter(
+                (b) => String(b.guestUserId) === String(editGuestUserId),
+              ),
+            }
+          : syncPayloadRef.current;
+        lastBackendHash.current = quickHash(JSON.stringify(nextKey));
+        setApproveError((prev) =>
+          prev &&
+          /phone number already exists|guest link with this phone/i.test(prev)
+            ? null
+            : prev,
+        );
+        // Guest workspace: merge server accepted history.
+        // Owner overview: keep local merged list (single-user response would wipe others).
+        if (data.draft?.blocks && !ownerOverview) {
+          if (editingDepthRef.current > 0) {
+            pendingAcceptedDraftRef.current = data.draft.blocks;
+          } else {
+            setBlocks((prev) =>
+              mergeAcceptedBlocksFromServer(prev, data.draft!.blocks),
+            );
+          }
         }
-      }
+      } while (
+        pendingSyncRef.current &&
+        quickHash(
+          JSON.stringify(
+            ownerOverview
+              ? {
+                  guestUserId: editGuestUserId,
+                  blocks: syncPayloadRef.current.blocks.filter(
+                    (b) => String(b.guestUserId) === String(editGuestUserId),
+                  ),
+                }
+              : syncPayloadRef.current,
+          ),
+        ) !== lastBackendHash.current
+      );
+      if (!mountedRef.current || gen !== syncGenerationRef.current) return;
+      setSyncStatus("saved");
       setTimeout(() => {
         if (mountedRef.current) setSyncStatus("idle");
       }, 2000);
@@ -1636,8 +1723,16 @@ export function GuestBulkEntryPage() {
           JSON.stringify(syncPayloadRef.current),
         );
       }
+    } finally {
+      syncInFlightRef.current = false;
     }
-  }, [token, invite, guestUserId]);
+  }, [
+    token,
+    invite,
+    guestUserId,
+    focusedGuestUserId,
+    agencyGuestUsers,
+  ]);
 
   const onJoin = async () => {
     if (!token) return;
@@ -1741,17 +1836,48 @@ export function GuestBulkEntryPage() {
     }, 150);
   };
 
+  // When owner switches guest user, treat current draft as already synced
+  useEffect(() => {
+    if (!(invite?.isOwner && invite.scope === "agency")) return;
+    if (!focusedGuestUserId) return;
+    skipNextSync.current = true;
+    lastBackendHash.current = quickHash(
+      JSON.stringify({
+        guestUserId: focusedGuestUserId,
+        blocks: syncPayloadRef.current.blocks.filter(
+          (b) => String(b.guestUserId) === String(focusedGuestUserId),
+        ),
+      }),
+    );
+  }, [focusedGuestUserId, invite?.isOwner, invite?.scope]);
+
   useEffect(() => {
     if (!token || !invite || loading) return;
     if (joinRequired) return;
-    if (invite.isOwner && invite.scope === "agency") return;
+    if (
+      invite.isOwner &&
+      invite.scope === "agency" &&
+      !focusedGuestUserId
+    ) {
+      return;
+    }
     if (skipNextSync.current) {
       skipNextSync.current = false;
       return;
     }
 
-    const json = JSON.stringify(syncPayload);
-    const hash = quickHash(json);
+    const ownerOverview = Boolean(
+      invite.isOwner && invite.scope === "agency",
+    );
+    const syncKey = ownerOverview
+      ? {
+          guestUserId: focusedGuestUserId,
+          blocks: syncPayload.blocks.filter(
+            (b) => String(b.guestUserId) === String(focusedGuestUserId),
+          ),
+        }
+      : syncPayload;
+    const hash = quickHash(JSON.stringify(syncKey));
     if (hash === lastBackendHash.current) return;
 
     if (timerRef.current) clearTimeout(timerRef.current);
@@ -1762,7 +1888,15 @@ export function GuestBulkEntryPage() {
     return () => {
       if (timerRef.current) clearTimeout(timerRef.current);
     };
-  }, [token, invite, loading, syncPayload, persistGuestDraft, joinRequired]);
+  }, [
+    token,
+    invite,
+    loading,
+    syncPayload,
+    persistGuestDraft,
+    joinRequired,
+    focusedGuestUserId,
+  ]);
 
   useEffect(() => {
     const flushOnHide = () => {
@@ -2667,7 +2801,7 @@ export function GuestBulkEntryPage() {
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
-            {!isOwner && <SyncBadge status={syncStatus} />}
+            <SyncBadge status={syncStatus} />
             <button
               type="button"
               onClick={toggleTheme}
@@ -2983,9 +3117,7 @@ export function GuestBulkEntryPage() {
 
             <VehicleGroupsEditor
               groups={viewBlock.driverGroups}
-              readOnly={
-                viewBlock.status === "accepted" || ownerOverviewMode
-              }
+              readOnly={viewBlock.status === "accepted"}
               sessionPlate={sessionVehiclePlate}
               onSessionPlateChange={handleSessionPlateChange}
               toolbarStart={
@@ -3066,7 +3198,7 @@ export function GuestBulkEntryPage() {
 
         <p className="pb-2 text-center text-xs text-slate-400 dark:text-slate-500">
           {isOwner
-            ? "Users left · entries right · Approve when ready"
+            ? "Users left · entries right · Edit open trips · Approve when ready"
             : "Autosaves as you type · no submit needed"}
           {invite.maxRows ? ` · max ${invite.maxRows} rows` : ""}
         </p>

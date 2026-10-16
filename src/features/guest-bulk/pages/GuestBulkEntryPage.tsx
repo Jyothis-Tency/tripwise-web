@@ -67,9 +67,14 @@ type SyncStatus = "idle" | "saving" | "saved" | "error";
 const AUTOSAVE_DELAY = 1200;
 
 function storedGuestSessionError(msg: string) {
-  return /guest session not found|enter your phone again|blocked from this link/i.test(
+  return /guest session not found|enter your phone again|session expired|blocked from this link/i.test(
     msg,
   );
+}
+
+/** Invite may still be valid — guest should open the name/phone form again. */
+function canRejoinAfterLoadError(msg: string) {
+  return storedGuestSessionError(msg);
 }
 
 const inputCls =
@@ -1553,12 +1558,10 @@ export function GuestBulkEntryPage() {
         if (!cancelled) {
           const msg =
             e instanceof Error ? e.message : "Failed to load invite";
-          // Stale guest session — clear and retry as join
-          if (
-            storedGuestSessionError(msg) &&
-            loadStoredGuestUserId(token)
-          ) {
+          // Stale / expired guest session — clear and load join screen
+          if (storedGuestSessionError(msg)) {
             clearStoredGuestUserId(token);
+            setGuestUserId(null);
             try {
               const data = await fetchGuestInvite(token, null);
               if (!cancelled) applyInviteData(data);
@@ -2467,17 +2470,47 @@ export function GuestBulkEntryPage() {
   }
 
   if (loadError || !invite) {
+    const rejoin = canRejoinAfterLoadError(loadError || "");
     return (
       <div className="flex min-h-screen items-center justify-center bg-[var(--bg-main)] p-6">
         <div className="w-full max-w-md rounded-2xl border border-rose-200 bg-[var(--bg-card)] p-6 text-center shadow-sm dark:border-rose-500/30">
           <TripwiseLogo variant="auto" className="mx-auto mb-4 h-16 w-16" />
           <AlertCircle className="mx-auto mb-3 h-10 w-10 text-rose-400" />
           <h1 className="text-lg font-bold text-slate-800 dark:text-white">
-            Link unavailable
+            {rejoin ? "Session ended" : "Link unavailable"}
           </h1>
           <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
-            {loadError}
+            {loadError || "This guest link could not be opened."}
           </p>
+          <div className="mt-5 flex flex-col gap-2">
+            <button
+              type="button"
+              disabled={!token || loading}
+              className={`${btnSolidCls} w-full bg-indigo-600 text-white dark:bg-indigo-500`}
+              onClick={() => {
+                if (!token) return;
+                clearStoredGuestUserId(token);
+                setGuestUserId(null);
+                setLoadError(null);
+                setInvite(null);
+                setLoading(true);
+                void (async () => {
+                  try {
+                    const data = await fetchGuestInvite(token, null);
+                    applyInviteData(data);
+                  } catch (e: unknown) {
+                    setLoadError(
+                      e instanceof Error ? e.message : "Failed to load invite",
+                    );
+                  } finally {
+                    setLoading(false);
+                  }
+                })();
+              }}
+            >
+              {rejoin ? "Continue with name & phone" : "Try again"}
+            </button>
+          </div>
         </div>
       </div>
     );

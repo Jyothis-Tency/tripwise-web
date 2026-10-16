@@ -130,9 +130,15 @@ async function guestFetch<T>(
         ...(init?.headers ?? {}),
       },
     });
-  } catch {
+  } catch (err) {
+    // fetch() throws on CORS preflight failures and unreachable hosts — not only
+    // offline. Agency guest links send X-Guest-User; if the API CORS allow-list
+    // omits it, the browser blocks the call and looks like "no internet".
+    const detail = err instanceof Error ? err.message : "";
     throw new Error(
-      "Network error — check your connection or try again in a moment.",
+      detail && /failed to fetch|networkerror|load failed/i.test(detail)
+        ? "Could not reach the server (often a CORS or API URL issue). Check your connection, or ask support if this guest link keeps failing."
+        : "Network error — check your connection or try again in a moment.",
     );
   }
   const raw = await res.json().catch(() => ({}));

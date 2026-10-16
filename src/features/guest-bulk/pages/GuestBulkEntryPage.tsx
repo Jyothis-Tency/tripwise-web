@@ -1637,7 +1637,7 @@ export function GuestBulkEntryPage() {
 
   syncPayloadRef.current = syncPayload;
 
-  const persistGuestDraft = useCallback(async () => {
+  const persistGuestDraft = useCallback(async (opts?: { force?: boolean }) => {
     if (!token || !invite) return;
     if (invite.token && invite.token !== token) return;
     if (invite.joinRequired && !invite.isOwner) return;
@@ -1646,7 +1646,8 @@ export function GuestBulkEntryPage() {
       invite.isOwner && invite.scope === "agency",
     );
     // Owner must actually edit before we push (prevents load-race wipes).
-    if (ownerOverview && !ownerDraftDirtyRef.current) return;
+    // Approve passes force so unsaved plate/dates are not skipped.
+    if (ownerOverview && !ownerDraftDirtyRef.current && !opts?.force) return;
 
     // Owner edits the focused guest's open draft (not the whole merged list)
     const activeGuestFromBlock =
@@ -1675,7 +1676,15 @@ export function GuestBulkEntryPage() {
 
     if (syncInFlightRef.current) {
       pendingSyncRef.current = true;
-      return;
+      if (!opts?.force) return;
+      const waitStart = Date.now();
+      while (syncInFlightRef.current && Date.now() - waitStart < 15000) {
+        await new Promise((r) => setTimeout(r, 40));
+      }
+      if (quickHash(JSON.stringify(syncKey)) === lastBackendHash.current) {
+        return;
+      }
+      if (syncInFlightRef.current) return;
     }
     syncInFlightRef.current = true;
 
@@ -2140,6 +2149,45 @@ export function GuestBulkEntryPage() {
     }
     setApproving(clientId ?? "__all__");
     try {
+      // Approve reads the server draft — flush local edits first (plate/dates
+      // can sit only in the UI until the 1.2s autosave fires).
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+        timerRef.current = null;
+      }
+      if (ownerOverview) ownerDraftDirtyRef.current = true;
+      // Session "last used" plate can show in the input while group.vehicleNumber
+      // is still empty — stamp it into targets before flush/approve.
+      const sessionPlate = normalizeGuestPlate(
+        preferredGuestPlate || sessionVehiclePlate || "",
+      );
+      const targetIds = new Set(targets.map((t) => t.clientId));
+      if (sessionPlate) {
+        const stampGroups = (groups: DriverGroup[]) =>
+          groups.map((g) =>
+            normalizeGuestPlate(g.vehicleNumber || "")
+              ? g
+              : { ...g, vehicleNumber: sessionPlate },
+          );
+        setBlocks((prev) =>
+          prev.map((b) =>
+            targetIds.has(b.clientId)
+              ? { ...b, driverGroups: stampGroups(b.driverGroups) }
+              : b,
+          ),
+        );
+        syncPayloadRef.current = {
+          ...syncPayloadRef.current,
+          blocks: syncPayloadRef.current.blocks.map((b) =>
+            targetIds.has(b.clientId)
+              ? { ...b, driverGroups: stampGroups(b.driverGroups || []) }
+              : b,
+          ),
+        };
+        lastBackendHash.current = "";
+      }
+      await persistGuestDraft({ force: true });
+
       if (ownerOverview) {
         const warnings: string[] = [];
         if (clientId) {

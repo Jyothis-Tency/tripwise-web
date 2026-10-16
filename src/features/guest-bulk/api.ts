@@ -226,7 +226,7 @@ export async function syncGuestBulk(
 export async function approveGuestBulk(
   token: string,
   body: { clientId?: string; all?: boolean; guestUserId?: string | null },
-): Promise<GuestBulkInvite & { approved?: unknown[] }> {
+): Promise<GuestBulkInvite & { approved?: unknown[]; warning?: string | null }> {
   const guestUserId =
     body.guestUserId ?? loadStoredGuestUserId(token) ?? undefined;
   return guestFetch(

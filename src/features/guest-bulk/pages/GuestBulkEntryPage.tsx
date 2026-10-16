@@ -656,7 +656,15 @@ function rowReadyForGuestApprove(row: BulkTripRow): boolean {
     String(row.startDate ?? "").trim() || String(dateFallback ?? "").trim(),
   );
   const hasEnd = Boolean(String(row.endDate ?? "").trim());
-  return hasStart && hasEnd;
+  return hasStart && hasEnd && !rowEndBeforeStart(row);
+}
+
+function rowEndBeforeStart(row: BulkTripRow): boolean {
+  const start = String(
+    row.startDate || (row as BulkTripRow & { date?: string }).date || "",
+  ).slice(0, 10);
+  const end = String(row.endDate ?? "").slice(0, 10);
+  return Boolean(start && end && end < start);
 }
 
 function blockHasApproveReadyTrips(
@@ -702,6 +710,9 @@ function guestApproveBlockError(
     return "Enter driver phone before Approve.";
   }
   for (const g of block.driverGroups) {
+    if ((g.rows ?? []).some(rowEndBeforeStart)) {
+      return `End date is before start date on a trip (${agencyLabel}).`;
+    }
     const ready = (g.rows ?? []).some(rowReadyForGuestApprove);
     if (ready && !normalizeGuestPlate(g.vehicleNumber ?? "")) {
       return `Enter vehicle plate before Approve (${agencyLabel}).`;
@@ -824,15 +835,20 @@ function quickHash(s: string) {
   return `${s.length}_${h}`;
 }
 
-/** Merge only accepted agency blocks from server (never overwrite open drafts). */
+/**
+ * Merge accepted agency blocks from server (never overwrite open drafts).
+ * Blocks the server created itself (trips moved out of an approved entry,
+ * or trips that failed approve) are appended; `sentIds` are blocks this
+ * client shipped, so locally deleted ones are not resurrected.
+ */
 function mergeAcceptedBlocksFromServer(
   prev: GuestAgencyBlock[],
   serverBlocks: GuestAgencyBlock[],
+  sentIds?: Set<string>,
 ): GuestAgencyBlock[] {
-  const serverMap = new Map(
-    normalizeGuestBlocks(serverBlocks).map((b) => [b.clientId, b]),
-  );
-  return prev.map((b) => {
+  const normalized = normalizeGuestBlocks(serverBlocks);
+  const serverMap = new Map(normalized.map((b) => [b.clientId, b]));
+  const merged = prev.map((b) => {
     const s = serverMap.get(b.clientId);
     if (s?.status === "accepted") return s;
     if (s) {
@@ -844,6 +860,22 @@ function mergeAcceptedBlocksFromServer(
     }
     return b;
   });
+  // Refresh agency / open metadata from server without clobbering local rows.
+  const withMeta = merged.map((b) => {
+    const s = serverMap.get(b.clientId);
+    if (!s || s.status === "accepted") return b;
+    return {
+      ...b,
+      agencyId: b.agencyId || s.agencyId,
+      agencyName: b.agencyName || s.agencyName,
+    };
+  });
+  if (!sentIds) return withMeta;
+  const localIds = new Set(prev.map((b) => b.clientId));
+  const added = normalized.filter(
+    (s) => !localIds.has(s.clientId) && !sentIds.has(s.clientId),
+  );
+  return added.length ? [...withMeta, ...added] : withMeta;
 }
 
 function SyncBadge({ status }: { status: SyncStatus }) {
@@ -1350,7 +1382,10 @@ export function GuestBulkEntryPage() {
   /** Owner overview: only autosave after a real local edit (avoids wipe races). */
   const ownerDraftDirtyRef = useRef(false);
   const editingDepthRef = useRef(0);
-  const pendingAcceptedDraftRef = useRef<GuestAgencyBlock[] | null>(null);
+  const pendingAcceptedDraftRef = useRef<{
+    blocks: GuestAgencyBlock[];
+    sentIds: Set<string>;
+  } | null>(null);
   const blurFlushTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -1427,10 +1462,27 @@ export function GuestBulkEntryPage() {
       return;
     }
 
+    // Agency links lock the agency — stamp it onto blanks so pending/approve
+    // checks match the server (emptyBlock() has null agencyId).
+    const withAgency =
+      data.scope === "agency" && (data.agencyId || data.agencyName)
+        ? (list: GuestAgencyBlock[]) =>
+            list.map((b) =>
+              b.status === "accepted" || b.agencyId || b.agencyName?.trim()
+                ? b
+                : {
+                    ...b,
+                    agencyId: data.agencyId ?? b.agencyId,
+                    agencyName: data.agencyName || b.agencyName || "",
+                  },
+            )
+        : (list: GuestAgencyBlock[]) => list;
     const loaded = stampGuestDriverOnBlocks(
-      ensureEditableWorkspace(
-        normalizeGuestBlocks(
-          data.draft?.blocks?.length ? data.draft.blocks : [emptyBlock()],
+      withAgency(
+        ensureEditableWorkspace(
+          normalizeGuestBlocks(
+            data.draft?.blocks?.length ? data.draft.blocks : [emptyBlock()],
+          ),
         ),
       ),
       data.driverName || "",
@@ -1710,11 +1762,15 @@ export function GuestBulkEntryPage() {
         // Guest workspace: merge server accepted history.
         // Owner overview: keep local merged list (single-user response would wipe others).
         if (data.draft?.blocks && !ownerOverview) {
+          const sentIds = new Set(openBlocks.map((b) => b.clientId));
           if (editingDepthRef.current > 0) {
-            pendingAcceptedDraftRef.current = data.draft.blocks;
+            pendingAcceptedDraftRef.current = {
+              blocks: data.draft.blocks,
+              sentIds,
+            };
           } else {
             setBlocks((prev) =>
-              mergeAcceptedBlocksFromServer(prev, data.draft!.blocks),
+              mergeAcceptedBlocksFromServer(prev, data.draft!.blocks, sentIds),
             );
           }
         }
@@ -1848,7 +1904,9 @@ export function GuestBulkEntryPage() {
     const pending = pendingAcceptedDraftRef.current;
     if (!pending) return;
     pendingAcceptedDraftRef.current = null;
-    setBlocks((prev) => mergeAcceptedBlocksFromServer(prev, pending));
+    setBlocks((prev) =>
+      mergeAcceptedBlocksFromServer(prev, pending.blocks, pending.sentIds),
+    );
   };
 
   const handleFormFocusIn = () => {
@@ -2049,16 +2107,23 @@ export function GuestBulkEntryPage() {
             (b) => String(b.guestUserId) === String(focusedGuestUserId),
           )
         : blocks;
+    const identity = (b: GuestAgencyBlock) => ({
+      name: ownerOverview ? b.guestName || guestDriverName : guestDriverName,
+      phone: ownerOverview ? b.guestPhone || guestDriverPhone : guestDriverPhone,
+    });
+    const openPool = pool.filter((b) => b.status !== "accepted");
+    // "Approve all" skips empty / unfinished entries (every guest has a blank one).
+    const readyPool = openPool.filter((b) => {
+      const { name, phone } = identity(b);
+      return guestApproveBlockError(b, name, phone) === null;
+    });
     const targets = clientId
-      ? pool.filter((b) => b.clientId === clientId && b.status !== "accepted")
-      : pool.filter((b) => b.status !== "accepted");
+      ? openPool.filter((b) => b.clientId === clientId)
+      : readyPool.length
+        ? readyPool
+        : openPool.slice(0, 1);
     for (const b of targets) {
-      const name = ownerOverview
-        ? b.guestName || guestDriverName
-        : guestDriverName;
-      const phone = ownerOverview
-        ? b.guestPhone || guestDriverPhone
-        : guestDriverPhone;
+      const { name, phone } = identity(b);
       const err = guestApproveBlockError(b, name, phone);
       if (err) {
         setApproveError(err);
@@ -2076,12 +2141,14 @@ export function GuestBulkEntryPage() {
     setApproving(clientId ?? "__all__");
     try {
       if (ownerOverview) {
+        const warnings: string[] = [];
         if (clientId) {
           const block = targets[0];
-          await approveGuestBulk(token, {
+          const data = await approveGuestBulk(token, {
             clientId,
             guestUserId: block.guestUserId,
           });
+          if (data.warning) warnings.push(data.warning);
         } else {
           const byUser = new Map<string, GuestAgencyBlock[]>();
           for (const b of targets) {
@@ -2090,16 +2157,22 @@ export function GuestBulkEntryPage() {
             byUser.get(uid)!.push(b);
           }
           for (const [uid] of byUser) {
-            await approveGuestBulk(token, { all: true, guestUserId: uid });
+            const data = await approveGuestBulk(token, {
+              all: true,
+              guestUserId: uid,
+            });
+            if (data.warning) warnings.push(data.warning);
           }
         }
         skipNextSync.current = true;
         await reloadOwnerOverview();
+        if (warnings.length) setApproveError(warnings.join(" "));
       } else {
         const data = await approveGuestBulk(token, {
           ...(clientId ? { clientId } : { all: true }),
           guestUserId: guestUserId ?? invite?.guestUserId,
         });
+        if (data.warning) setApproveError(data.warning);
         skipNextSync.current = true;
         if (data.draft?.blocks) {
           const next = ensureEditableWorkspace(
@@ -3212,13 +3285,12 @@ export function GuestBulkEntryPage() {
                 setBlocks((prev) =>
                   prev.map((b) => {
                     if (b.clientId !== viewBlock.clientId) return b;
+                    // Approved history is read-only — never mutate trip rows locally.
+                    if (b.status === "accepted") return b;
                     const nextGroups =
                       typeof updater === "function"
                         ? updater(b.driverGroups)
                         : updater;
-                    if (b.status === "accepted") {
-                      return { ...b, driverGroups: nextGroups };
-                    }
                     return {
                       ...b,
                       driverGroups: nextGroups,

@@ -960,25 +960,8 @@ function VehicleGroupsEditor({
   const sessionPlateNorm = normalizeGuestPlate(sessionPlate);
   const groupPlateNorm = normalizeGuestPlate(g.vehicleNumber ?? "");
 
-  useEffect(() => {
-    if (readOnly || !sessionPlateNorm || groupPlateNorm) return;
-    onChange((prev) => {
-      const next = [...prev];
-      const idx = Math.max(
-        0,
-        next.findIndex((x) => x.clientGroupId === g.clientGroupId),
-      );
-      if (normalizeGuestPlate(next[idx]?.vehicleNumber ?? "")) return prev;
-      next[idx] = { ...next[idx], vehicleNumber: sessionPlateNorm };
-      return next;
-    });
-  }, [
-    sessionPlateNorm,
-    groupPlateNorm,
-    g.clientGroupId,
-    readOnly,
-    onChange,
-  ]);
+  // Do not auto-write last-used plate into the field — that looked like a
+  // saved plate and caused Approve to fail. Drivers tap "Use last plate".
 
   const addTripBtnCls =
     "w-full rounded-md py-1.5 text-xs font-semibold text-indigo-600 transition hover:bg-indigo-50 dark:text-indigo-300 dark:hover:bg-indigo-500/10 sm:w-auto sm:rounded-lg sm:py-2";
@@ -1077,11 +1060,7 @@ function VehicleGroupsEditor({
             type="text"
             disabled={readOnly}
             value={groupPlateNorm}
-            placeholder={
-              sessionPlateNorm
-                ? `Last used: ${sessionPlateNorm}`
-                : "Vehicle number"
-            }
+            placeholder="Vehicle number"
             autoCapitalize="characters"
             spellCheck={false}
             onChange={(e) => {
@@ -1114,6 +1093,33 @@ function VehicleGroupsEditor({
             }}
             className={`mt-0.5 min-w-0 ${inputCls}`}
           />
+          {!readOnly && !groupPlateNorm && sessionPlateNorm ? (
+            <button
+              type="button"
+              className="mt-1 text-left text-[10px] font-semibold text-indigo-600 hover:underline dark:text-indigo-300"
+              onClick={() => {
+                onSessionPlateChange?.(sessionPlateNorm);
+                onChange((prev) => {
+                  const next = [...prev];
+                  const idx = Math.max(
+                    0,
+                    next.findIndex((x) => x.clientGroupId === g.clientGroupId),
+                  );
+                  next[idx] = {
+                    ...next[idx],
+                    vehicleNumber: sessionPlateNorm,
+                  };
+                  return next;
+                });
+              }}
+            >
+              Use last plate {sessionPlateNorm}
+            </button>
+          ) : !readOnly && groupPlateNorm && sessionPlateNorm && groupPlateNorm === sessionPlateNorm ? (
+            <p className="mt-1 text-[10px] text-slate-400 dark:text-slate-500">
+              Same plate as your other open entry
+            </p>
+          ) : null}
         </label>
         {toolbarEnd ? (
           <div className="ml-auto flex shrink-0 items-end">{toolbarEnd}</div>
@@ -2501,8 +2507,8 @@ export function GuestBulkEntryPage() {
               </p>
             ) : null}
             <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
-              Enter your name and phone to open your private workspace. Use the
-              same phone later to resume.
+              This is a trip-entry link only — not the owner app. Enter your name
+              and phone for your private workspace. Same phone resumes later.
             </p>
           </div>
           {joinError && (

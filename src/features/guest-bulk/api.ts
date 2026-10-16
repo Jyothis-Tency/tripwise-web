@@ -116,6 +116,53 @@ function authHeaders(guestUserId?: string | null): HeadersInit {
   };
 }
 
+/** Map API / network failures to clear guest-link messages (no technical jargon). */
+export function formatGuestApiError(
+  status: number | null,
+  serverMessage?: string | null,
+  networkDetail?: string | null,
+): string {
+  if (status == null) {
+    const detail = String(networkDetail || "");
+    if (/failed to fetch|networkerror|load failed/i.test(detail)) {
+      return "Could not reach the server. Check your internet connection. If it keeps failing, ask the owner — the link may need a server update.";
+    }
+    return "Network error — check your connection and try again.";
+  }
+  const msg = String(serverMessage || "").trim();
+  if (status === 429) {
+    return msg || "Too many saves. Wait a moment and try again.";
+  }
+  if (status === 410) {
+    return (
+      msg ||
+      "This guest link is no longer active. Ask the owner for a new agency guest link."
+    );
+  }
+  if (status === 403) {
+    if (/not authorized for this invite/i.test(msg)) {
+      return "This link belongs to a different owner account. Log in with the owner who created the link, or open it in a private window as a driver.";
+    }
+    return (
+      msg ||
+      "You cannot use this link right now (revoked, expired, or blocked)."
+    );
+  }
+  if (status === 404) {
+    if (/guest session|enter your phone/i.test(msg)) {
+      return "Session expired. Enter your name and phone again to continue.";
+    }
+    return msg || "This guest link was not found. Check the URL from the owner.";
+  }
+  if (status === 409) {
+    return msg || "That phone number is already in use. Try a different number.";
+  }
+  if (status >= 500) {
+    return "Server error — please try again in a moment. If it continues, tell the owner.";
+  }
+  return msg || `Request failed (${status})`;
+}
+
 async function guestFetch<T>(
   path: string,
   init?: RequestInit,
@@ -135,19 +182,15 @@ async function guestFetch<T>(
     // offline. Agency guest links send X-Guest-User; if the API CORS allow-list
     // omits it, the browser blocks the call and looks like "no internet".
     const detail = err instanceof Error ? err.message : "";
-    throw new Error(
-      detail && /failed to fetch|networkerror|load failed/i.test(detail)
-        ? "Could not reach the server (often a CORS or API URL issue). Check your connection, or ask support if this guest link keeps failing."
-        : "Network error — check your connection or try again in a moment.",
-    );
+    throw new Error(formatGuestApiError(null, null, detail));
   }
   const raw = await res.json().catch(() => ({}));
   if (!res.ok) {
-    const msg =
-      (raw && typeof raw === "object" && "message" in raw
-        ? String((raw as { message?: string }).message)
-        : null) || `Request failed (${res.status})`;
-    throw new Error(msg);
+    const serverMessage =
+      raw && typeof raw === "object" && "message" in raw
+        ? String((raw as { message?: string }).message || "")
+        : "";
+    throw new Error(formatGuestApiError(res.status, serverMessage));
   }
   const data =
     raw && typeof raw === "object" && "data" in raw

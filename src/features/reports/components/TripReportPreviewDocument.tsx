@@ -84,8 +84,15 @@ export function TripReportPreviewDocument({
   reportTotals?: TripReportTotals | null;
 }) {
   const generatedOn = (() => {
-    const d = new Date();
-    return `${d.getDate()}/${d.getMonth() + 1}/${d.getFullYear()}`;
+    const [y, m, d] = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Asia/Kolkata",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    })
+      .format(new Date())
+      .split("-");
+    return `${Number(d)}/${Number(m)}/${Number(y)}`;
   })();
   const totalLines = reportTotals ? tripReportTotalLines(reportTotals) : [];
 

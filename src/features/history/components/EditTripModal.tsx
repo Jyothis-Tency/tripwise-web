@@ -386,6 +386,7 @@ export function EditTripModal({
                     </label>
                     <DatePicker
                       value={fields.expectedEndDate}
+                      min={fields.startDate || undefined}
                       onChange={(v) => handleChange("expectedEndDate", v)}
                       className={inputCls}
                     />

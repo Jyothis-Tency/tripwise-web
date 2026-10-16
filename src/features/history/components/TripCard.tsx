@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { DatePicker } from "../../../components/ui/DatePicker";
+import { todayIsoInAppTz } from "../../../lib/datePickerUtils";
 import {
   Trash2,
   Car,
@@ -388,7 +389,7 @@ export function RecordPaymentModal({
   const [method, setMethod] = useState("cash");
   const [reference, setReference] = useState("");
   const [notes, setNotes] = useState("");
-  const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
+  const [date, setDate] = useState(() => todayIsoInAppTz());
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 

@@ -44,6 +44,8 @@ import {
 } from "./DriverCard";
 import { useAuth } from "../../../hooks/useAuth";
 import { DatePicker } from "../../../components/ui/DatePicker";
+import { todayIsoInAppTz } from "../../../lib/datePickerUtils";
+import { APP_TIMEZONE } from "../../../lib/timePickerUtils";
 
 function fmtCurrency(v: number | undefined | null): string {
   const n = v ?? 0;
@@ -53,14 +55,30 @@ function fmtCurrency(v: number | undefined | null): string {
   })}`;
 }
 
+function isDateOnlyString(raw: string) {
+  return (
+    /^\d{4}-\d{2}-\d{2}$/.test(raw) ||
+    /^\d{1,2}[-/]\d{1,2}[-/]\d{4}$/.test(raw)
+  );
+}
+
 function monthOptions() {
   const opts: { value: string; label: string }[] = [];
-  const now = new Date();
+  const ist = todayIsoInAppTz();
+  const [y0, m0] = ist.split("-").map(Number);
   for (let i = 0; i < 24; i++) {
-    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    let year = y0;
+    let month = m0 - i;
+    while (month <= 0) {
+      month += 12;
+      year -= 1;
+    }
     opts.push({
-      value: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`,
-      label: d.toLocaleString("en-IN", { month: "long", year: "numeric" }),
+      value: `${year}-${String(month).padStart(2, "0")}`,
+      label: new Date(year, month - 1, 1).toLocaleString("en-IN", {
+        month: "long",
+        year: "numeric",
+      }),
     });
   }
   return opts;
@@ -100,13 +118,24 @@ function parseSafeDate(date: string | null | undefined): Date | null {
 
 const MONTH_OPTIONS = monthOptions();
 
+function monthKeyFromDate(date: string | null | undefined): string | null {
+  if (!date) return null;
+  const s = String(date).trim();
+  if (!s) return null;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s.slice(0, 7);
+  const dmy = s.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})$/);
+  if (dmy) {
+    return `${dmy[3]}-${String(Number(dmy[2])).padStart(2, "0")}`;
+  }
+  const d = new Date(s);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toLocaleDateString("en-CA", { timeZone: APP_TIMEZONE }).slice(0, 7);
+}
+
 function txInMonth(date: string | null | undefined, month: string) {
   if (!month || month === "all_time") return true;
   if (!date) return false;
-  const d = parseSafeDate(date);
-  if (!d) return false;
-  const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-  return key === month;
+  return monthKeyFromDate(date) === month;
 }
 
 function txInPeriod(
@@ -192,9 +221,21 @@ type PaymentRow = {
 
 function formatTxDisplayDate(date?: string | null): string {
   if (!date) return "—";
-  const d = parseSafeDate(date);
-  if (!d) return date;
+  const raw = String(date).trim();
+  if (!raw) return "—";
+  if (isDateOnlyString(raw)) {
+    const d = parseSafeDate(raw);
+    if (!d) return raw;
+    return d.toLocaleDateString("en-IN", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    });
+  }
+  const d = new Date(raw);
+  if (Number.isNaN(d.getTime())) return raw;
   return d.toLocaleDateString("en-IN", {
+    timeZone: APP_TIMEZONE,
     day: "2-digit",
     month: "short",
     year: "numeric",
@@ -518,7 +559,10 @@ function SalaryPeriodMenu({
                 From
                 <DatePicker
                   value={draftFrom}
-                  onChange={setDraftFrom}
+                  onChange={(v) => {
+                    setDraftFrom(v);
+                    if (v && draftTo && draftTo < v) setDraftTo("");
+                  }}
                   className="rounded-[10px] border border-slate-200 bg-slate-50 px-2 py-1.5 text-xs text-slate-800 dark:border-[#252c4d] dark:bg-[#111420] dark:text-[#eef0ff]"
                 />
               </label>
@@ -526,7 +570,11 @@ function SalaryPeriodMenu({
                 To
                 <DatePicker
                   value={draftTo}
-                  onChange={setDraftTo}
+                  min={draftFrom || undefined}
+                  onChange={(v) => {
+                    setDraftTo(v);
+                    if (v && draftFrom && v < draftFrom) setDraftFrom("");
+                  }}
                   className="rounded-[10px] border border-slate-200 bg-slate-50 px-2 py-1.5 text-xs text-slate-800 dark:border-[#252c4d] dark:bg-[#111420] dark:text-[#eef0ff]"
                 />
               </label>

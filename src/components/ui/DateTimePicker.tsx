@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import * as Popover from "@radix-ui/react-popover";
-import { format } from "date-fns";
 import { CalendarClock } from "lucide-react";
 import { cn } from "../../lib/utils";
 import {
@@ -11,6 +10,7 @@ import {
   splitDateTimeLocal,
   isDateBeforeMin,
   isDateAfterMax,
+  todayIsoInAppTz,
 } from "../../lib/datePickerUtils";
 import { CalendarPanel, datePickerTriggerCls } from "./DatePicker";
 import { TimePicker12h } from "./TimePicker12h";
@@ -114,7 +114,7 @@ export function DateTimePicker({
               onSelect={setDraftDate}
               onClear={() => setDraftDate("")}
               onToday={() => {
-                const today = format(new Date(), "yyyy-MM-dd");
+                const today = todayIsoInAppTz();
                 if (
                   !isDateBeforeMin(today, min) &&
                   !isDateAfterMax(today, max)

@@ -21,8 +21,8 @@ const CreateReminderModal: React.FC<Props> = ({ open, onClose, onCreated }) => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.customerName || !form.fromLocation || !form.toLocation || !form.tripDate) {
-      setError('Please fill required fields'); return;
+    if (!form.customerName || !form.customerPhone || !form.fromLocation || !form.toLocation || !form.tripDate) {
+      setError('Please fill required fields (including phone)'); return;
     }
     setSaving(true); setError('');
     try {
@@ -54,7 +54,7 @@ const CreateReminderModal: React.FC<Props> = ({ open, onClose, onCreated }) => {
         <form onSubmit={handleSubmit} className="p-5">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div><label className={labelCls}>Customer Name *</label><input className={inputCls} value={form.customerName} onChange={e => set('customerName', e.target.value)} /></div>
-            <div><label className={labelCls}>Phone</label><input className={inputCls} value={form.customerPhone} onChange={e => set('customerPhone', e.target.value)} /></div>
+            <div><label className={labelCls}>Phone *</label><input className={inputCls} value={form.customerPhone} onChange={e => set('customerPhone', e.target.value)} /></div>
             <div><label className={labelCls}>From *</label><input className={inputCls} value={form.fromLocation} onChange={e => set('fromLocation', e.target.value)} /></div>
             <div><label className={labelCls}>To *</label><input className={inputCls} value={form.toLocation} onChange={e => set('toLocation', e.target.value)} /></div>
             <div><label className={labelCls}>Trip Date *</label><DatePicker value={form.tripDate} onChange={(v) => set('tripDate', v)} className={inputCls} /></div>

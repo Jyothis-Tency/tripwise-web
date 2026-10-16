@@ -12,6 +12,7 @@ import { TripCard } from '../components/TripCard';
 import { fetchAgencies, type Agency } from '../../bulk-entry/api';
 import { resolveAgencyLabelFromName } from '../../../lib/agencyDisplay';
 import { DatePicker } from "../../../components/ui/DatePicker";
+import { todayIsoInAppTz } from "../../../lib/datePickerUtils";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -26,9 +27,9 @@ const STATUS_OPTIONS = [
   { value: 'unpaid',      label: 'Unpaid' },
 ];
 
+/** Current YYYY-MM in app business timezone (IST). */
 function getCurrentMonthValue(): string {
-  const now = new Date();
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  return todayIsoInAppTz().slice(0, 7);
 }
 
 const CUSTOM_DATE_VALUE = 'custom_date';
@@ -38,12 +39,22 @@ function monthOptions(): { value: string; label: string }[] {
     { value: 'all_time', label: 'All Time' },
     { value: CUSTOM_DATE_VALUE, label: 'Custom date' },
   ];
-  const now = new Date();
+  const current = getCurrentMonthValue();
+  const [y0, m0] = current.split('-').map(Number);
+  let year = y0;
+  let month = m0;
   for (let i = 0; i < 24; i++) {
-    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    const value = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-    const label = d.toLocaleString('en-IN', { month: 'short', year: 'numeric' });
+    const value = `${year}-${String(month).padStart(2, '0')}`;
+    const label = new Date(year, month - 1, 1).toLocaleString('en-IN', {
+      month: 'short',
+      year: 'numeric',
+    });
     opts.push({ value, label });
+    month -= 1;
+    if (month <= 0) {
+      month += 12;
+      year -= 1;
+    }
   }
   return opts;
 }
@@ -218,6 +229,7 @@ export function HistoryPage() {
 
   const handleStartDateChange = (val: string) => {
     setStartDate(val);
+    if (endDate && val && endDate < val) setEndDate(val);
     setFilterMode('daterange');
     setMonth('');
     setPage(1);
@@ -347,9 +359,23 @@ export function HistoryPage() {
     let y = 16;
 
     const fmtDate = (raw: any): string => {
-      const dt = raw ? new Date(raw) : null;
-      if (!dt || Number.isNaN(dt.getTime())) return 'N/A';
-      return `${dt.getDate()}/${dt.getMonth() + 1}/${dt.getFullYear()}`;
+      const s = raw == null ? '' : String(raw).trim();
+      if (!s) return 'N/A';
+      const ymd = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+      if (ymd) {
+        return `${Number(ymd[3])}/${Number(ymd[2])}/${Number(ymd[1])}`;
+      }
+      const dt = raw instanceof Date ? raw : new Date(s);
+      if (Number.isNaN(dt.getTime())) return 'N/A';
+      const [y, m, d] = new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'Asia/Kolkata',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+      })
+        .format(dt)
+        .split('-');
+      return `${Number(d)}/${Number(m)}/${Number(y)}`;
     };
 
     const fmtRs = (raw: any): string => {
@@ -642,6 +668,7 @@ export function HistoryPage() {
               <span className="text-[10px] font-medium text-slate-400">–</span>
               <DatePicker
                 value={endDate}
+                min={startDate || undefined}
                 onChange={handleEndDateChange}
                 className={`${filterInputCls} w-[8.25rem] font-mono`}
               />

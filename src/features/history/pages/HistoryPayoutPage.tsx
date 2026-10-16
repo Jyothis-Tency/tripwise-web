@@ -24,6 +24,7 @@ import {
   type TripPayment,
 } from "../api";
 import { formatAgencyLabel } from "../../../lib/agencyDisplay";
+import { todayIsoInAppTz } from "../../../lib/datePickerUtils";
 
 function fmtCurrency(v: number): string {
   return `₹${v.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
@@ -100,7 +101,7 @@ function AgencyPayoutManager({
     try {
       await recordPayment(tripId, {
         amount: amt,
-        paymentDate: new Date().toISOString().split("T")[0],
+        paymentDate: todayIsoInAppTz(),
         paymentMethod: "cash",
       });
       setTripPayAmount((prev) => ({ ...prev, [tripId]: "" }));

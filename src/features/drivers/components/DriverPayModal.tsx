@@ -11,6 +11,7 @@ import {
 } from "../../bulk-entry/api";
 import { createSalaryTransaction } from "../api";
 import { DatePicker } from "../../../components/ui/DatePicker";
+import { todayIsoInAppTz } from "../../../lib/datePickerUtils";
 
 const PAYMENT_METHODS = [
   "cash",
@@ -88,9 +89,7 @@ export function DriverPayModal({
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [paymentKind, setPaymentKind] = useState<PaymentKind>("pay");
   const [payAmount, setPayAmount] = useState("");
-  const [payDate, setPayDate] = useState(() =>
-    new Date().toISOString().split("T")[0],
-  );
+  const [payDate, setPayDate] = useState(() => todayIsoInAppTz());
   const [payMethod, setPayMethod] = useState("cash");
   const [payNotes, setPayNotes] = useState("");
   const [payMessage, setPayMessage] = useState<string | null>(null);
@@ -100,7 +99,7 @@ export function DriverPayModal({
     if (!open) return;
     setPaymentKind("pay");
     setPayAmount("");
-    setPayDate(new Date().toISOString().split("T")[0]);
+    setPayDate(todayIsoInAppTz());
     setPayMethod("cash");
     setPayNotes("");
     setPayMessage(null);

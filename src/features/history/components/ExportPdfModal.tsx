@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { X, FileDown, Loader2 } from 'lucide-react';
 import { DatePicker } from '../../../components/ui/DatePicker';
+import { todayIsoInAppTz } from '../../../lib/datePickerUtils';
 
 interface Props {
   open: boolean;
@@ -8,13 +9,19 @@ interface Props {
   onExport: (start: string, end: string) => Promise<void>;
 }
 
-export function ExportPdfModal({ open, onClose, onExport }: Props) {
-  const now = new Date();
-  const firstDay = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
-  const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
+function istMonthBounds(): { first: string; last: string } {
+  const ym = todayIsoInAppTz().slice(0, 7);
+  const [y, m] = ym.split('-').map(Number);
+  const first = `${y}-${String(m).padStart(2, '0')}-01`;
+  const last = `${y}-${String(m).padStart(2, '0')}-${String(new Date(y, m, 0).getDate()).padStart(2, '0')}`;
+  return { first, last };
+}
 
-  const [startDate, setStartDate] = useState(firstDay);
-  const [endDate, setEndDate] = useState(lastDay);
+export function ExportPdfModal({ open, onClose, onExport }: Props) {
+  const bounds = istMonthBounds();
+
+  const [startDate, setStartDate] = useState(bounds.first);
+  const [endDate, setEndDate] = useState(bounds.last);
   const [exporting, setExporting] = useState(false);
 
   if (!open) return null;
@@ -59,7 +66,10 @@ export function ExportPdfModal({ open, onClose, onExport }: Props) {
               <label className="block text-xs font-medium text-slate-700 mb-1 dark:text-slate-300">Start Date</label>
               <DatePicker
                 value={startDate}
-                onChange={setStartDate}
+                onChange={(v) => {
+                  setStartDate(v);
+                  if (endDate && v && endDate < v) setEndDate(v);
+                }}
                 disabled={exporting}
                 className="w-full rounded-lg border border-slate-200 bg-[var(--bg-elevated)] px-3 py-2 text-sm text-slate-800 outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-200 dark:border-[#1e2638] dark:text-slate-100"
               />
@@ -68,6 +78,7 @@ export function ExportPdfModal({ open, onClose, onExport }: Props) {
               <label className="block text-xs font-medium text-slate-700 mb-1 dark:text-slate-300">End Date</label>
               <DatePicker
                 value={endDate}
+                min={startDate || undefined}
                 onChange={setEndDate}
                 disabled={exporting}
                 className="w-full rounded-lg border border-slate-200 bg-[var(--bg-elevated)] px-3 py-2 text-sm text-slate-800 outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-200 dark:border-[#1e2638] dark:text-slate-100"
@@ -88,16 +99,10 @@ export function ExportPdfModal({ open, onClose, onExport }: Props) {
           <button
             onClick={handleExport}
             disabled={exporting || !startDate || !endDate}
-            className="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium transition flex items-center gap-2 disabled:opacity-60"
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold transition disabled:opacity-50"
           >
-            {exporting ? (
-              <>
-                <Loader2 className="h-4 w-4 animate-spin" />
-                Generating...
-              </>
-            ) : (
-              'Generate PDF'
-            )}
+            {exporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileDown className="h-4 w-4" />}
+            {exporting ? 'Exporting…' : 'Export PDF'}
           </button>
         </div>
       </div>

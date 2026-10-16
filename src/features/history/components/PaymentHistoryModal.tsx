@@ -7,12 +7,22 @@ function fmtCurrency(v: number): string {
 
 function fmtDate(d: string): string {
   if (!d) return '—';
-  // Attempt to parse ISO to clean string
   try {
-    const date = new Date(d);
-    return date.toLocaleDateString('en-IN', {
-      year: 'numeric', month: 'short', day: 'numeric',
-      hour: '2-digit', minute: '2-digit'
+    const raw = String(d).trim();
+    const ymd = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (ymd) {
+      return new Date(Number(ymd[1]), Number(ymd[2]) - 1, Number(ymd[3])).toLocaleDateString(
+        'en-IN',
+        { year: 'numeric', month: 'short', day: 'numeric' },
+      );
+    }
+    return new Date(raw).toLocaleDateString('en-IN', {
+      timeZone: 'Asia/Kolkata',
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
     });
   } catch {
     return d.split('T')[0];

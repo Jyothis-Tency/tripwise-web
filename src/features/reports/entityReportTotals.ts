@@ -33,9 +33,17 @@ function tripDurationMs(t: HistoryTrip): number {
 function tripDayKey(t: HistoryTrip): string | null {
   const raw = t.startDate ?? t.date ?? t.createdAt;
   if (!raw) return null;
-  const d = new Date(String(raw));
+  const s = String(raw).trim();
+  const ymd = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (ymd) return `${ymd[1]}-${ymd[2]}-${ymd[3]}`;
+  const d = new Date(s);
   if (Number.isNaN(d.getTime())) return null;
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Kolkata",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(d);
 }
 
 export function formatReportDuration(totalMs: number): string {

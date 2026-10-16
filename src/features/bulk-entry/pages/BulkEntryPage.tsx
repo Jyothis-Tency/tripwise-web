@@ -38,6 +38,7 @@ import { useAuth } from "../../../hooks/useAuth";
 import { authApi } from "../../auth/api";
 import { TimePicker12h } from "../../../components/ui/TimePicker12h";
 import { DatePicker } from "../../../components/ui/DatePicker";
+import { todayIsoInAppTz } from "../../../lib/datePickerUtils";
 import { normalizeHHmm } from "../../../lib/timePickerUtils";
 import { CreateAgencyModal } from "../../../components/AgencyNameCombobox";
 import { DriverNameCombobox } from "../../../components/DriverNameCombobox";
@@ -480,7 +481,10 @@ function EntryFiltersBar({
             <div className="flex items-center gap-1.5 text-slate-400">
               <DatePicker
                 value={dateFrom}
-                onChange={onDateFromChange}
+                onChange={(v) => {
+                  onDateFromChange(v);
+                  if (v && dateTo && dateTo < v) onDateToChange("");
+                }}
                 aria-label="From date"
                 compact
                 className={entryFilterFieldCls}
@@ -488,7 +492,11 @@ function EntryFiltersBar({
               <span>→</span>
               <DatePicker
                 value={dateTo}
-                onChange={onDateToChange}
+                min={dateFrom || undefined}
+                onChange={(v) => {
+                  onDateToChange(v);
+                  if (v && dateFrom && v < dateFrom) onDateFromChange("");
+                }}
                 aria-label="To date"
                 compact
                 className={entryFilterFieldCls}
@@ -586,13 +594,25 @@ function rowMatchesLocalSearch(r: BulkTripRow, q: string): boolean {
   return hay.includes(q);
 }
 
-/** Day segment for bulk advance rules (matches backend `bulkEntryGroupKey`). */
+/**
+ * Day segment for bulk advance rules (matches backend `bulkEntryGroupKey`).
+ * Keep YYYY-MM-DD as written — never UTC-shift via toISOString (breaks IST).
+ */
 function bulkRowDayKey(startDate: string): string {
   const raw = String(startDate ?? "").trim();
   if (!raw) return "";
-  const t = new Date(`${raw}T00:00:00`).getTime();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw;
+  const iso = raw.match(/^(\d{4}-\d{2}-\d{2})/);
+  if (iso) return iso[1];
+  const dmy = raw.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})$/);
+  if (dmy) {
+    return `${dmy[3]}-${String(Number(dmy[2])).padStart(2, "0")}-${String(Number(dmy[1])).padStart(2, "0")}`;
+  }
+  const t = Date.parse(raw);
   if (!Number.isFinite(t)) return raw;
-  return new Date(t).toISOString().slice(0, 10);
+  return new Date(t).toLocaleDateString("en-CA", {
+    timeZone: "Asia/Kolkata",
+  });
 }
 
 function bulkRowDateMs(startDate: string): number {
@@ -1185,7 +1205,7 @@ function generateAgencyPayoutPDF(
   drawFooter(doc);
   const periodTag = (data.month || "all_time").replace(/\s+/g, "_");
   doc.save(
-    `Payout_${agencyName.replace(/\s+/g, "_")}_${periodTag}_${new Date().toISOString().split("T")[0]}.pdf`,
+    `Payout_${agencyName.replace(/\s+/g, "_")}_${periodTag}_${todayIsoInAppTz()}.pdf`,
   );
 }
 
@@ -1253,7 +1273,7 @@ function generateDriverPayoutPDF(
 
   drawFooter(doc);
   doc.save(
-    `DriverPayout_${driverName.replace(/\s+/g, "_")}_${new Date().toISOString().split("T")[0]}.pdf`,
+    `DriverPayout_${driverName.replace(/\s+/g, "_")}_${todayIsoInAppTz()}.pdf`,
   );
 }
 
@@ -1494,11 +1514,20 @@ function payoutMonthOptions(): { value: string; label: string }[] {
   const opts: { value: string; label: string }[] = [
     { value: "all_time", label: "All time" },
   ];
-  const now = new Date();
+  const ist = todayIsoInAppTz();
+  const [y0, m0] = ist.split("-").map(Number);
   for (let i = 0; i < 24; i++) {
-    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    const value = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-    const label = d.toLocaleString("en-IN", { month: "long", year: "numeric" });
+    let year = y0;
+    let month = m0 - i;
+    while (month <= 0) {
+      month += 12;
+      year -= 1;
+    }
+    const value = `${year}-${String(month).padStart(2, "0")}`;
+    const label = new Date(year, month - 1, 1).toLocaleString("en-IN", {
+      month: "long",
+      year: "numeric",
+    });
     opts.push({ value, label });
   }
   return opts;
@@ -1520,9 +1549,7 @@ export function AgencyPayoutTab({
   const [amount, setAmount] = useState("");
   const [paymentMethod, setPaymentMethod] = useState("cash");
   const [notes, setNotes] = useState("");
-  const [paymentDate, setPaymentDate] = useState(
-    new Date().toISOString().split("T")[0],
-  );
+  const [paymentDate, setPaymentDate] = useState(() => todayIsoInAppTz());
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [month, setMonth] = useState("all_time");
@@ -1864,9 +1891,7 @@ export function DriverPayoutPanel({
   const [data, setData] = useState<DriverPayoutSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [amount, setAmount] = useState("");
-  const [paymentDate, setPaymentDate] = useState(
-    new Date().toISOString().split("T")[0],
-  );
+  const [paymentDate, setPaymentDate] = useState(() => todayIsoInAppTz());
   const [paymentMethod, setPaymentMethod] = useState("cash");
   const [notes, setNotes] = useState("");
   const [saving, setSaving] = useState(false);
@@ -2410,7 +2435,7 @@ const BulkEntryTable = forwardRef<
 
   const buildDefaultBulkPdfFileName = useCallback(
     (start: string, end: string) => {
-      const today = new Date().toISOString().split("T")[0];
+      const today = todayIsoInAppTz();
       const agencyPart = (agencyName || "Agency").replace(/\s+/g, "_");
       const rangePart =
         start || end ? `${start || "from"}_${end || "to"}` : "all";
@@ -4324,7 +4349,7 @@ function NormalEntryTable({
           <button
             type="button"
             onClick={() => {
-              const defaultName = `NormalTrips_${(agencyName || "Agency").replace(/\s+/g, "_")}_${new Date().toISOString().split("T")[0]}.pdf`;
+              const defaultName = `NormalTrips_${(agencyName || "Agency").replace(/\s+/g, "_")}_${todayIsoInAppTz()}.pdf`;
               const fileName = window.prompt(
                 "Enter file name for Report:",
                 defaultName,

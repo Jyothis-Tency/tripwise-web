@@ -25,6 +25,7 @@ import {
 import { TripReportPreviewDocument } from "../components/TripReportPreviewDocument";
 import { fetchAgencies, type Agency } from "../../bulk-entry/api";
 import { DatePicker } from "../../../components/ui/DatePicker";
+import { todayIsoInAppTz } from "../../../lib/datePickerUtils";
 import { resolveAgencyLabelFromName } from "../../../lib/agencyDisplay";
 import { fetchDrivers, type Driver } from "../../drivers/api";
 import { fetchVehicles, type Vehicle } from "../../vehicles/api";
@@ -82,9 +83,9 @@ const fieldCls =
 const labelCls =
   "mb-1.5 block text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400";
 
+/** Current YYYY-MM in app business timezone (IST). */
 function getCurrentMonthValue(): string {
-  const now = new Date();
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  return todayIsoInAppTz().slice(0, 7);
 }
 
 function monthLabel(ym: string): string {
@@ -105,12 +106,13 @@ function monthShortLabel(ym: string): string {
 
 function buildMonthOptions(count = 36): { value: string; label: string }[] {
   const opts: { value: string; label: string }[] = [];
-  const now = new Date();
   const current = getCurrentMonthValue();
+  const [y0, m0] = current.split("-").map(Number);
+  let year = y0;
+  let month = m0;
   for (let i = 0; i < count; i++) {
-    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    const value = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-    const label = d.toLocaleString("en-IN", {
+    const value = `${year}-${String(month).padStart(2, "0")}`;
+    const label = new Date(year, month - 1, 1).toLocaleString("en-IN", {
       month: "long",
       year: "numeric",
     });
@@ -118,6 +120,11 @@ function buildMonthOptions(count = 36): { value: string; label: string }[] {
       value,
       label: value === current ? `${label} · Current` : label,
     });
+    month -= 1;
+    if (month <= 0) {
+      month += 12;
+      year -= 1;
+    }
   }
   return opts;
 }
@@ -875,6 +882,7 @@ export function ReportsPage() {
                         value={startDate}
                         onChange={(v) => {
                           setStartDate(v);
+                          if (endDate && v && endDate < v) setEndDate(v);
                           setFilterMode("daterange");
                           setMonth("");
                           bumpFilters();
@@ -886,6 +894,7 @@ export function ReportsPage() {
                       <label className={labelCls}>To</label>
                       <DatePicker
                         value={endDate}
+                        min={startDate || undefined}
                         onChange={(v) => {
                           setEndDate(v);
                           setFilterMode("daterange");

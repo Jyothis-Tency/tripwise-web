@@ -4,6 +4,7 @@ import type { Driver } from "../api";
 import { fetchDriverHistoryDetailed } from "../api";
 import type { HistoryTripItem } from "../../vehicles/api";
 import { DatePicker } from "../../../components/ui/DatePicker";
+import { APP_TIMEZONE } from "../../../lib/timePickerUtils";
 
 const inputCls =
   "w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20 dark:border-white/10 dark:bg-white/5 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-indigo-400 dark:focus:ring-indigo-500/30";
@@ -16,7 +17,30 @@ function driverName(d: Driver): string {
 function formatDate(d?: string) {
   if (!d) return "—";
   try {
-    return new Date(d).toLocaleDateString("en-IN", {
+    const raw = String(d).trim();
+    const isoDay = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    const dmy = raw.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{2,4})$/);
+    if (isoDay) {
+      return new Date(
+        Number(isoDay[1]),
+        Number(isoDay[2]) - 1,
+        Number(isoDay[3]),
+      ).toLocaleDateString("en-IN", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+      });
+    }
+    if (dmy) {
+      let year = Number(dmy[3]);
+      if (year < 100) year += 2000;
+      return new Date(year, Number(dmy[2]) - 1, Number(dmy[1])).toLocaleDateString(
+        "en-IN",
+        { day: "2-digit", month: "short", year: "numeric" },
+      );
+    }
+    return new Date(raw).toLocaleDateString("en-IN", {
+      timeZone: APP_TIMEZONE,
       day: "2-digit",
       month: "short",
       year: "numeric",
@@ -227,8 +251,7 @@ export function DriverHistoryModal({
                 onChange={(v) => {
                   setStartDate(v);
                   setPage(1);
-                  if (v && endDate && new Date(endDate) < new Date(v))
-                    setEndDate("");
+                  if (v && endDate && endDate < v) setEndDate("");
                 }}
                 className={inputCls}
               />
@@ -240,11 +263,11 @@ export function DriverHistoryModal({
               </label>
               <DatePicker
                 value={endDate}
+                min={startDate || undefined}
                 onChange={(v) => {
                   setEndDate(v);
                   setPage(1);
-                  if (v && startDate && new Date(v) < new Date(startDate))
-                    setStartDate("");
+                  if (v && startDate && v < startDate) setStartDate("");
                 }}
                 className={inputCls}
               />

@@ -5,7 +5,18 @@ import { completeReminder, deleteReminder } from '../api';
 /* ── Helpers ───────────────────────────────────────── */
 function fmtDate(iso?: string) {
   if (!iso) return 'N/A';
-  try { return new Date(iso).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }); } catch { return iso; }
+  try {
+    const raw = String(iso).trim();
+    const ymd = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (ymd) {
+      return new Date(Number(ymd[1]), Number(ymd[2]) - 1, Number(ymd[3])).toLocaleDateString('en-IN', {
+        day: '2-digit', month: 'short', year: 'numeric',
+      });
+    }
+    return new Date(raw).toLocaleDateString('en-IN', {
+      timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric',
+    });
+  } catch { return iso; }
 }
 
 function priorityStyle(r: Reminder) {

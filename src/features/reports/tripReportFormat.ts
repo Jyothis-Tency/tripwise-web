@@ -8,9 +8,23 @@ import {
 import type { ReportFieldId } from "./reportFieldConfig";
 
 export function reportFmtDate(raw: unknown): string {
-  const dt = raw ? new Date(String(raw)) : null;
-  if (!dt || Number.isNaN(dt.getTime())) return "N/A";
-  return `${dt.getDate()}/${dt.getMonth() + 1}/${dt.getFullYear()}`;
+  const s = raw == null ? "" : String(raw).trim();
+  if (!s) return "N/A";
+  const ymd = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (ymd) {
+    return `${Number(ymd[3])}/${Number(ymd[2])}/${Number(ymd[1])}`;
+  }
+  const dt = new Date(s);
+  if (Number.isNaN(dt.getTime())) return "N/A";
+  const [y, m, d] = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Kolkata",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  })
+    .format(dt)
+    .split("-");
+  return `${Number(d)}/${Number(m)}/${Number(y)}`;
 }
 
 export function reportFmtRs(raw: unknown): string {

@@ -1,4 +1,5 @@
 import type { HistoryTrip } from "../history/api";
+import { todayIsoInAppTz } from "../../lib/datePickerUtils";
 import type { ReportHeader, ReportRunResult } from "./api";
 import {
   type ReportFieldSelection,
@@ -19,9 +20,23 @@ function formatCellValue(
   if (value == null || value === "") return "";
   if (type === "date" && typeof value === "string") {
     try {
-      const d = new Date(value);
+      const raw = value.trim();
+      const ymd = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+      if (ymd) {
+        return new Date(
+          Number(ymd[1]),
+          Number(ymd[2]) - 1,
+          Number(ymd[3]),
+        ).toLocaleDateString("en-IN", {
+          day: "2-digit",
+          month: "short",
+          year: "numeric",
+        });
+      }
+      const d = new Date(raw);
       if (!Number.isNaN(d.getTime())) {
         return d.toLocaleDateString("en-IN", {
+          timeZone: "Asia/Kolkata",
           day: "2-digit",
           month: "short",
           year: "numeric",
@@ -70,7 +85,7 @@ export function downloadReportCsv(
   });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
-  const stamp = new Date().toISOString().slice(0, 10);
+  const stamp = todayIsoInAppTz();
   a.href = url;
   a.download = filename ?? `tripwise-report-${result.dataSource}-${stamp}.csv`;
   a.click();
@@ -116,7 +131,7 @@ export function downloadTripReportCsv(
   });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
-  const stamp = new Date().toISOString().slice(0, 10);
+  const stamp = todayIsoInAppTz();
   a.href = url;
   a.download = opts?.filename ?? `tripwise-trips-${stamp}.csv`;
   a.click();

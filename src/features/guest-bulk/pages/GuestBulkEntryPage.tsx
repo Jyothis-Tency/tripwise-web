@@ -67,9 +67,13 @@ type SyncStatus = "idle" | "saving" | "saved" | "error";
 const AUTOSAVE_DELAY = 1200;
 
 function storedGuestSessionError(msg: string) {
-  return /guest session not found|enter your phone again|session expired|blocked from this link/i.test(
+  return /guest session not found|enter your phone again|session expired/i.test(
     msg,
   );
+}
+
+function isGuestBlockedError(msg: string) {
+  return /blocked from this link/i.test(msg);
 }
 
 /** Invite may still be valid — guest should open the name/phone form again. */
@@ -1558,6 +1562,13 @@ export function GuestBulkEntryPage() {
         if (!cancelled) {
           const msg =
             e instanceof Error ? e.message : "Failed to load invite";
+          // Blocked: clear session and show a terminal message (not the join form).
+          if (isGuestBlockedError(msg)) {
+            clearStoredGuestUserId(token);
+            setGuestUserId(null);
+            setLoadError(msg);
+            return;
+          }
           // Stale / expired guest session — clear and load join screen
           if (storedGuestSessionError(msg)) {
             clearStoredGuestUserId(token);
@@ -1646,17 +1657,21 @@ export function GuestBulkEntryPage() {
 
   syncPayloadRef.current = syncPayload;
 
-  const persistGuestDraft = useCallback(async (opts?: { force?: boolean }) => {
-    if (!token || !invite) return;
-    if (invite.token && invite.token !== token) return;
-    if (invite.joinRequired && !invite.isOwner) return;
+  const persistGuestDraft = useCallback(async (opts?: {
+    force?: boolean;
+  }): Promise<boolean> => {
+    if (!token || !invite) return true;
+    if (invite.token && invite.token !== token) return true;
+    if (invite.joinRequired && !invite.isOwner) return true;
 
     const ownerOverview = Boolean(
       invite.isOwner && invite.scope === "agency",
     );
     // Owner must actually edit before we push (prevents load-race wipes).
     // Approve passes force so unsaved plate/dates are not skipped.
-    if (ownerOverview && !ownerDraftDirtyRef.current && !opts?.force) return;
+    if (ownerOverview && !ownerDraftDirtyRef.current && !opts?.force) {
+      return true;
+    }
 
     // Owner edits the focused guest's open draft (not the whole merged list)
     const activeGuestFromBlock =
@@ -1669,31 +1684,44 @@ export function GuestBulkEntryPage() {
       ? focusedGuestUserId ||
         (activeGuestFromBlock ? String(activeGuestFromBlock) : null)
       : guestUserId ?? invite.guestUserId ?? null;
-    if (ownerOverview && !editGuestUserId) return;
+    if (ownerOverview && !editGuestUserId) {
+      if (opts?.force) {
+        throw new Error("Select a guest user before approving.");
+      }
+      return true;
+    }
 
-    const payload = syncPayloadRef.current;
-    const syncKey = ownerOverview
-      ? {
-          guestUserId: editGuestUserId,
-          blocks: payload.blocks.filter(
-            (b) => String(b.guestUserId) === String(editGuestUserId),
-          ),
-        }
-      : payload;
+    const buildSyncKey = () => {
+      const payload = syncPayloadRef.current;
+      return ownerOverview
+        ? {
+            guestUserId: editGuestUserId,
+            blocks: payload.blocks.filter(
+              (b) => String(b.guestUserId) === String(editGuestUserId),
+            ),
+          }
+        : payload;
+    };
+
+    const syncKey = buildSyncKey();
     const hash = quickHash(JSON.stringify(syncKey));
-    if (hash === lastBackendHash.current) return;
+    if (hash === lastBackendHash.current) return true;
 
     if (syncInFlightRef.current) {
       pendingSyncRef.current = true;
-      if (!opts?.force) return;
+      if (!opts?.force) return true;
       const waitStart = Date.now();
       while (syncInFlightRef.current && Date.now() - waitStart < 15000) {
         await new Promise((r) => setTimeout(r, 40));
       }
-      if (quickHash(JSON.stringify(syncKey)) === lastBackendHash.current) {
-        return;
+      if (quickHash(JSON.stringify(buildSyncKey())) === lastBackendHash.current) {
+        return true;
       }
-      if (syncInFlightRef.current) return;
+      if (syncInFlightRef.current) {
+        throw new Error(
+          "Still saving your latest changes. Wait a moment and try Approve again.",
+        );
+      }
     }
     syncInFlightRef.current = true;
 
@@ -1727,6 +1755,13 @@ export function GuestBulkEntryPage() {
             )
           : latest.blocks;
 
+        // Hash the local state we are about to send — not post-await state
+        // (edits during the request must not mark unsaved work as synced).
+        const keyAtSend = ownerOverview
+          ? { guestUserId: editGuestUserId, blocks: sourceBlocks }
+          : latest;
+        const sentHash = quickHash(JSON.stringify(keyAtSend));
+
         // Server keeps accepted history; only ship open blocks (much faster).
         const openBlocks = sourceBlocks
           .filter((b) => b.status !== "accepted")
@@ -1747,9 +1782,9 @@ export function GuestBulkEntryPage() {
           openBlocks.length === 0 &&
           sourceBlocks.some((b) => b.status !== "accepted")
         ) {
-          lastBackendHash.current = quickHash(JSON.stringify(syncKey));
+          lastBackendHash.current = sentHash;
           setSyncStatus("idle");
-          return;
+          return true;
         }
 
         const data = await syncGuestBulk(token, {
@@ -1758,16 +1793,10 @@ export function GuestBulkEntryPage() {
           guestUserId: editGuestUserId,
           blocks: openBlocks,
         });
-        if (!mountedRef.current || gen !== syncGenerationRef.current) return;
-        const nextKey = ownerOverview
-          ? {
-              guestUserId: editGuestUserId,
-              blocks: syncPayloadRef.current.blocks.filter(
-                (b) => String(b.guestUserId) === String(editGuestUserId),
-              ),
-            }
-          : syncPayloadRef.current;
-        lastBackendHash.current = quickHash(JSON.stringify(nextKey));
+        if (!mountedRef.current || gen !== syncGenerationRef.current) {
+          return false;
+        }
+        lastBackendHash.current = sentHash;
         // Clear prior autosave/network errors after a successful save
         setApproveError((prev) =>
           prev &&
@@ -1794,27 +1823,19 @@ export function GuestBulkEntryPage() {
         }
       } while (
         pendingSyncRef.current &&
-        quickHash(
-          JSON.stringify(
-            ownerOverview
-              ? {
-                  guestUserId: editGuestUserId,
-                  blocks: syncPayloadRef.current.blocks.filter(
-                    (b) => String(b.guestUserId) === String(editGuestUserId),
-                  ),
-                }
-              : syncPayloadRef.current,
-          ),
-        ) !== lastBackendHash.current
+        quickHash(JSON.stringify(buildSyncKey())) !== lastBackendHash.current
       );
-      if (!mountedRef.current || gen !== syncGenerationRef.current) return;
+      if (!mountedRef.current || gen !== syncGenerationRef.current) {
+        return false;
+      }
       if (ownerOverview) ownerDraftDirtyRef.current = false;
       setSyncStatus("saved");
       setTimeout(() => {
         if (mountedRef.current) setSyncStatus("idle");
       }, 2000);
+      return true;
     } catch (e: unknown) {
-      if (!mountedRef.current) return;
+      if (!mountedRef.current) return false;
       setSyncStatus("error");
       const msg = e instanceof Error ? e.message : "Autosave failed";
       if (msg) {
@@ -1828,6 +1849,8 @@ export function GuestBulkEntryPage() {
           );
         }
       }
+      if (opts?.force) throw e instanceof Error ? e : new Error(msg);
+      return false;
     } finally {
       syncInFlightRef.current = false;
     }
@@ -1963,11 +1986,18 @@ export function GuestBulkEntryPage() {
   useEffect(() => {
     if (!token || !invite || loading) return;
     if (joinRequired) return;
-    if (
-      invite.isOwner &&
-      invite.scope === "agency" &&
-      !focusedGuestUserId
-    ) {
+    const ownerAgency = Boolean(
+      invite.isOwner && invite.scope === "agency",
+    );
+    const activeGuestFromBlock = ownerAgency
+      ? syncPayload.blocks.find((b) => b.clientId === activeClientId)
+          ?.guestUserId
+      : null;
+    const ownerEditGuest =
+      focusedGuestUserId ||
+      (activeGuestFromBlock ? String(activeGuestFromBlock) : null);
+    // "All users" with no focused entry: skip. Otherwise autosave the active guest.
+    if (ownerAgency && !ownerEditGuest) {
       return;
     }
     if (skipNextSync.current) {
@@ -1980,9 +2010,9 @@ export function GuestBulkEntryPage() {
     );
     const syncKey = ownerOverview
       ? {
-          guestUserId: focusedGuestUserId,
+          guestUserId: ownerEditGuest,
           blocks: syncPayload.blocks.filter(
-            (b) => String(b.guestUserId) === String(focusedGuestUserId),
+            (b) => String(b.guestUserId) === String(ownerEditGuest),
           ),
         }
       : syncPayload;
@@ -2005,6 +2035,7 @@ export function GuestBulkEntryPage() {
     persistGuestDraft,
     joinRequired,
     focusedGuestUserId,
+    activeClientId,
   ]);
 
   useEffect(() => {
@@ -2471,46 +2502,53 @@ export function GuestBulkEntryPage() {
 
   if (loadError || !invite) {
     const rejoin = canRejoinAfterLoadError(loadError || "");
+    const blocked = isGuestBlockedError(loadError || "");
     return (
       <div className="flex min-h-screen items-center justify-center bg-[var(--bg-main)] p-6">
         <div className="w-full max-w-md rounded-2xl border border-rose-200 bg-[var(--bg-card)] p-6 text-center shadow-sm dark:border-rose-500/30">
           <TripwiseLogo variant="auto" className="mx-auto mb-4 h-16 w-16" />
           <AlertCircle className="mx-auto mb-3 h-10 w-10 text-rose-400" />
           <h1 className="text-lg font-bold text-slate-800 dark:text-white">
-            {rejoin ? "Session ended" : "Link unavailable"}
+            {blocked
+              ? "Access blocked"
+              : rejoin
+                ? "Session ended"
+                : "Link unavailable"}
           </h1>
           <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
             {loadError || "This guest link could not be opened."}
           </p>
-          <div className="mt-5 flex flex-col gap-2">
-            <button
-              type="button"
-              disabled={!token || loading}
-              className={`${btnSolidCls} w-full bg-indigo-600 text-white dark:bg-indigo-500`}
-              onClick={() => {
-                if (!token) return;
-                clearStoredGuestUserId(token);
-                setGuestUserId(null);
-                setLoadError(null);
-                setInvite(null);
-                setLoading(true);
-                void (async () => {
-                  try {
-                    const data = await fetchGuestInvite(token, null);
-                    applyInviteData(data);
-                  } catch (e: unknown) {
-                    setLoadError(
-                      e instanceof Error ? e.message : "Failed to load invite",
-                    );
-                  } finally {
-                    setLoading(false);
-                  }
-                })();
-              }}
-            >
-              {rejoin ? "Continue with name & phone" : "Try again"}
-            </button>
-          </div>
+          {!blocked ? (
+            <div className="mt-5 flex flex-col gap-2">
+              <button
+                type="button"
+                disabled={!token || loading}
+                className={`${btnSolidCls} w-full bg-indigo-600 text-white dark:bg-indigo-500`}
+                onClick={() => {
+                  if (!token) return;
+                  clearStoredGuestUserId(token);
+                  setGuestUserId(null);
+                  setLoadError(null);
+                  setInvite(null);
+                  setLoading(true);
+                  void (async () => {
+                    try {
+                      const data = await fetchGuestInvite(token, null);
+                      applyInviteData(data);
+                    } catch (e: unknown) {
+                      setLoadError(
+                        e instanceof Error ? e.message : "Failed to load invite",
+                      );
+                    } finally {
+                      setLoading(false);
+                    }
+                  })();
+                }}
+              >
+                {rejoin ? "Continue with name & phone" : "Try again"}
+              </button>
+            </div>
+          ) : null}
         </div>
       </div>
     );
@@ -2566,7 +2604,11 @@ export function GuestBulkEntryPage() {
           />
           <button
             type="button"
-            disabled={joining || !joinName.trim() || joinPhone.trim().length < 10}
+            disabled={
+              joining ||
+              !joinName.trim() ||
+              joinPhone.replace(/\D/g, "").replace(/^91(?=\d{10}$)/, "").replace(/^0(?=\d{10}$)/, "").length < 10
+            }
             onClick={() => void onJoin()}
             className={`${btnSolidCls} w-full bg-indigo-600 text-white dark:bg-indigo-500 sm:text-sm`}
           >

@@ -854,21 +854,42 @@ function mergeAcceptedBlocksFromServer(
   prev: GuestAgencyBlock[],
   serverBlocks: GuestAgencyBlock[],
   sentIds?: Set<string>,
+  /** Guests never keep / receive approved history. */
+  hideAccepted = false,
 ): GuestAgencyBlock[] {
   const normalized = normalizeGuestBlocks(serverBlocks);
-  const serverMap = new Map(normalized.map((b) => [b.clientId, b]));
-  const merged = prev.map((b) => {
-    const s = serverMap.get(b.clientId);
-    if (s?.status === "accepted") return s;
-    if (s) {
-      return {
-        ...b,
-        activityAt: s.activityAt ?? b.activityAt,
-        acceptedAt: s.acceptedAt ?? b.acceptedAt,
-      };
-    }
-    return b;
-  });
+  const serverVisible = hideAccepted
+    ? normalized.filter((b) => b.status !== "accepted")
+    : normalized;
+  const serverMap = new Map(serverVisible.map((b) => [b.clientId, b]));
+  const prevVisible = hideAccepted
+    ? prev.filter((b) => b.status !== "accepted")
+    : prev;
+  const merged = prevVisible
+    .filter((b) => {
+      // Drop local opens the guest sent that the server no longer returns open
+      // (owner approved them meanwhile — guests must not keep that history).
+      if (
+        hideAccepted &&
+        sentIds?.has(b.clientId) &&
+        !serverMap.has(b.clientId)
+      ) {
+        return false;
+      }
+      return true;
+    })
+    .map((b) => {
+      const s = serverMap.get(b.clientId);
+      if (s?.status === "accepted") return hideAccepted ? b : s;
+      if (s) {
+        return {
+          ...b,
+          activityAt: s.activityAt ?? b.activityAt,
+          acceptedAt: s.acceptedAt ?? b.acceptedAt,
+        };
+      }
+      return b;
+    });
   // Refresh agency / open metadata from server without clobbering local rows.
   const withMeta = merged.map((b) => {
     const s = serverMap.get(b.clientId);
@@ -879,12 +900,20 @@ function mergeAcceptedBlocksFromServer(
       agencyName: b.agencyName || s.agencyName,
     };
   });
-  if (!sentIds) return withMeta;
-  const localIds = new Set(prev.map((b) => b.clientId));
-  const added = normalized.filter(
-    (s) => !localIds.has(s.clientId) && !sentIds.has(s.clientId),
+  if (!sentIds) {
+    return hideAccepted
+      ? withMeta.filter((b) => b.status !== "accepted")
+      : withMeta;
+  }
+  const localIds = new Set(prevVisible.map((b) => b.clientId));
+  const added = serverVisible.filter(
+    (s) =>
+      !localIds.has(s.clientId) &&
+      !sentIds.has(s.clientId) &&
+      (!hideAccepted || s.status !== "accepted"),
   );
-  return added.length ? [...withMeta, ...added] : withMeta;
+  const next = added.length ? [...withMeta, ...added] : withMeta;
+  return hideAccepted ? next.filter((b) => b.status !== "accepted") : next;
 }
 
 function SyncBadge({ status }: { status: SyncStatus }) {
@@ -1400,6 +1429,7 @@ export function GuestBulkEntryPage() {
   const pendingAcceptedDraftRef = useRef<{
     blocks: GuestAgencyBlock[];
     sentIds: Set<string>;
+    hideAccepted?: boolean;
   } | null>(null);
   const blurFlushTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -1492,11 +1522,16 @@ export function GuestBulkEntryPage() {
                   },
             )
         : (list: GuestAgencyBlock[]) => list;
+    // Guests never load approved history (owner overview still does above).
+    const rawGuestBlocks = (data.draft?.blocks?.length
+      ? data.draft.blocks
+      : [emptyBlock()]
+    ).filter((b) => b.status !== "accepted");
     const loaded = stampGuestDriverOnBlocks(
       withAgency(
         ensureEditableWorkspace(
           normalizeGuestBlocks(
-            data.draft?.blocks?.length ? data.draft.blocks : [emptyBlock()],
+            rawGuestBlocks.length ? rawGuestBlocks : [emptyBlock()],
           ),
         ),
       ),
@@ -1806,18 +1841,25 @@ export function GuestBulkEntryPage() {
             ? null
             : prev,
         );
-        // Guest workspace: merge server accepted history.
+        // Guest workspace: merge server draft (guests never keep approved history).
         // Owner overview: keep local merged list (single-user response would wipe others).
         if (data.draft?.blocks && !ownerOverview) {
           const sentIds = new Set(openBlocks.map((b) => b.clientId));
+          const hideAccepted = !invite?.isOwner;
           if (editingDepthRef.current > 0) {
             pendingAcceptedDraftRef.current = {
               blocks: data.draft.blocks,
               sentIds,
+              hideAccepted,
             };
           } else {
             setBlocks((prev) =>
-              mergeAcceptedBlocksFromServer(prev, data.draft!.blocks, sentIds),
+              mergeAcceptedBlocksFromServer(
+                prev,
+                data.draft!.blocks,
+                sentIds,
+                hideAccepted,
+              ),
             );
           }
         }
@@ -1946,7 +1988,12 @@ export function GuestBulkEntryPage() {
     if (!pending) return;
     pendingAcceptedDraftRef.current = null;
     setBlocks((prev) =>
-      mergeAcceptedBlocksFromServer(prev, pending.blocks, pending.sentIds),
+      mergeAcceptedBlocksFromServer(
+        prev,
+        pending.blocks,
+        pending.sentIds,
+        Boolean(pending.hideAccepted),
+      ),
     );
   };
 
@@ -2328,6 +2375,15 @@ export function GuestBulkEntryPage() {
   };
 
   const ownerOverviewMode = Boolean(isOwner && invite?.scope === "agency");
+
+  // Guests have no approved-history / owner-approve filters.
+  useEffect(() => {
+    if (ownerOverviewMode) return;
+    if (entryFilter === "approved" || entryFilter === "approve") {
+      setEntryFilter("all");
+    }
+  }, [ownerOverviewMode, entryFilter]);
+
   const displayBlocks = useMemo(() => {
     if (!ownerOverviewMode || !focusedGuestUserId) return blocks;
     return blocks.filter(
@@ -2866,7 +2922,11 @@ export function GuestBulkEntryPage() {
               Filter
             </span>
             <select
-              value={entryFilter}
+              value={
+                !ownerOverviewMode && entryFilter === "approved"
+                  ? "all"
+                  : entryFilter
+              }
               onChange={(e) =>
                 setEntryFilter(
                   e.target.value as "all" | "open" | "approve" | "approved",
@@ -2875,9 +2935,13 @@ export function GuestBulkEntryPage() {
               className={sidebarSelectCls}
             >
               <option value="all">All</option>
-              <option value="approve">Approve</option>
+              {ownerOverviewMode ? (
+                <option value="approve">Approve</option>
+              ) : null}
               <option value="open">Open</option>
-              <option value="approved">Approved</option>
+              {ownerOverviewMode ? (
+                <option value="approved">Approved</option>
+              ) : null}
             </select>
           </label>
           <label className="space-y-0.5">

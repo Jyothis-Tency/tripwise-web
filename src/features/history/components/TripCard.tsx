@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, type MouseEvent } from "react";
 import { DatePicker } from "../../../components/ui/DatePicker";
 import { todayIsoInAppTz } from "../../../lib/datePickerUtils";
 import {
@@ -14,9 +14,15 @@ import {
   Route,
   Maximize2,
   Building2,
+  Wallet,
 } from "lucide-react";
 import type { HistoryTrip, RecordPaymentTripSummary } from "../api";
-import { deleteTrip, recordPayment, updateTripFields } from "../api";
+import {
+  deleteTrip,
+  fetchHistoryTripById,
+  recordPayment,
+  updateTripFields,
+} from "../api";
 import {
   fmtTimeAmPm,
   isoToTimeInputInTz,
@@ -29,6 +35,7 @@ import {
   getHistoryTripExpenseBreakdown,
   resolveTripAgencyProfitDisplay,
 } from "../tripExpenseBreakdown";
+import { TripCashInModal } from "../../vehicles/components/TripCashInModal";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -89,10 +96,49 @@ function tripStatusDotClass(status: string): string {
   }
 }
 
-function paymentAccentClass(remaining: number, paid: boolean): string {
-  if (paid || remaining <= 1e-6) return "from-emerald-500 to-emerald-400";
-  if (remaining < -1e-6) return "from-indigo-500 to-indigo-400";
-  return "from-amber-500 to-amber-400";
+function paymentAccentClass(
+  status: "paid" | "partial" | "unpaid",
+  remaining: number,
+): string {
+  if (status === "paid" || remaining <= 1e-6) {
+    return "from-emerald-500 to-emerald-400";
+  }
+  if (status === "partial") return "from-amber-500 to-amber-400";
+  return "from-rose-500 to-rose-400";
+}
+
+function cashInStatusLabel(status: "paid" | "partial" | "unpaid"): string {
+  if (status === "paid") return "Fully Paid";
+  if (status === "partial") return "Partially Paid";
+  return "Payment Pending";
+}
+
+function cashInStatusBadgeClass(status: "paid" | "partial" | "unpaid"): string {
+  if (status === "paid") {
+    return "bg-emerald-500/15 text-emerald-700 border border-emerald-500/30 dark:text-emerald-300";
+  }
+  if (status === "partial") {
+    return "bg-amber-500/15 text-amber-800 border border-amber-500/30 dark:text-amber-300";
+  }
+  return "bg-rose-500/15 text-rose-700 border border-rose-500/30 dark:text-rose-300";
+}
+
+function resolveCashInSummary(trip: HistoryTrip): {
+  due: number;
+  paid: number;
+  remaining: number;
+  status: "paid" | "partial" | "unpaid";
+} {
+  if (trip.cashInSummary) {
+    return {
+      due: Number(trip.cashInSummary.due) || 0,
+      paid: Number(trip.cashInSummary.paid) || 0,
+      remaining: Number(trip.cashInSummary.remaining) || 0,
+      status: trip.cashInSummary.status,
+    };
+  }
+  const due = resolveTripAgencyProfitDisplay(trip);
+  return { due, paid: 0, remaining: due, status: "unpaid" };
 }
 
 const NUMBER_FIELDS = new Set([
@@ -573,11 +619,8 @@ interface TripCardProps {
   /** @deprecated Details open in a modal; kept for call-site compatibility. */
   defaultExpanded?: boolean;
   onDeleted?: () => void;
-  /** Called with server summary after a payment; parent can patch list without refetching. */
-  onPaymentRecorded?: (
-    tripId: string,
-    summary: RecordPaymentTripSummary,
-  ) => void;
+  /** After Cash-in success; parent patches list with refreshed trip. */
+  onPaymentRecorded?: (tripId: string, updated: HistoryTrip) => void;
   /** After inline field save: merged trip so parent list order stays stable without refetch. */
   onTripUpdated?: (trip: HistoryTrip) => void;
   resolveAgencyLabel?: (agencyName?: string) => string;
@@ -588,11 +631,10 @@ export function TripCard({
   readOnly = false,
   defaultExpanded = false,
   onDeleted,
-  onPaymentRecorded: _onPaymentRecorded,
+  onPaymentRecorded,
   onTripUpdated,
   resolveAgencyLabel,
 }: TripCardProps) {
-  void _onPaymentRecorded;
   const [trip, setTrip] = useState<HistoryTrip>(initialTrip);
 
   useEffect(() => {
@@ -601,8 +643,11 @@ export function TripCard({
 
   const expenseBreakdown = getHistoryTripExpenseBreakdown(trip);
   const salaryBreakdown = computeDriverSalaryBreakdown(trip);
+  const agencyProfit = resolveTripAgencyProfitDisplay(trip);
+  const cashIn = resolveCashInSummary(trip);
 
   const [detailOpen, setDetailOpen] = useState(defaultExpanded);
+  const [payOpen, setPayOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
@@ -619,17 +664,11 @@ export function TripCard({
     };
   }, [detailOpen]);
 
-  const totalAmount =
-    trip.paymentSummary?.totalAmount ?? (Number(trip.agencyCost) || 0);
-  const paidAmount = trip.paymentSummary?.paidAmount ?? trip.paidAmount ?? 0;
-  const remaining =
-    trip.paymentSummary?.remainingBalance ?? totalAmount - paidAmount;
   const travelledKm =
     trip.startKilometers != null && trip.endKilometers != null
       ? trip.endKilometers - trip.startKilometers
       : null;
 
-  const isPaidSettled = remaining <= 1e-6 && remaining >= -1e-6 && paidAmount > 0;
   const routeFrom = trip.from ?? trip.pickup;
   const routeTo = trip.to ?? trip.drop;
   const durationLabel = fmtTripDuration(trip.startTime, trip.endTime);
@@ -639,6 +678,23 @@ export function TripCard({
       ? resolveAgencyLabel(trip.agencyName)
       : trip.agencyName || ""
   ).trim();
+
+  const openPayments = (e?: MouseEvent) => {
+    e?.stopPropagation();
+    setPayOpen(true);
+  };
+
+  const handleCashInSuccess = async () => {
+    setPayOpen(false);
+    try {
+      const refreshed = await fetchHistoryTripById(trip._id);
+      setTrip(refreshed);
+      onPaymentRecorded?.(trip._id, refreshed);
+      onTripUpdated?.(refreshed);
+    } catch {
+      onDeleted?.();
+    }
+  };
 
   const handleDelete = async () => {
     if (!confirm("Delete this trip? This cannot be undone.")) return;
@@ -894,7 +950,7 @@ export function TripCard({
         className="group relative flex h-full cursor-pointer flex-col overflow-hidden rounded-2xl border border-slate-200 bg-[var(--bg-card)] shadow-sm transition duration-200 hover:-translate-y-0.5 hover:border-indigo-300 hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 dark:border-[#1e2638] dark:hover:border-indigo-500/40"
       >
         <div
-          className={`absolute inset-y-0 left-0 w-1 bg-gradient-to-b ${paymentAccentClass(remaining, isPaidSettled)}`}
+          className={`absolute inset-y-0 left-0 w-1 bg-gradient-to-b ${paymentAccentClass(cashIn.status, cashIn.remaining)}`}
           aria-hidden
         />
 
@@ -912,6 +968,11 @@ export function TripCard({
                     className={`h-1.5 w-1.5 rounded-full ${tripStatusDotClass(trip.status)}`}
                   />
                   {trip.status?.replace(/_/g, " ")}
+                </span>
+                <span
+                  className={`inline-flex shrink-0 items-center rounded-md px-1.5 py-0.5 text-[10px] font-bold ${cashInStatusBadgeClass(cashIn.status)}`}
+                >
+                  {cashInStatusLabel(cashIn.status)}
                 </span>
               </div>
 
@@ -955,6 +1016,44 @@ export function TripCard({
               </span>
             </div>
           </div>
+
+          <div className="grid grid-cols-3 gap-1.5 rounded-xl border border-slate-100 bg-slate-50/80 p-2 dark:border-[#1e2638] dark:bg-white/[0.03]">
+            <div className="min-w-0">
+              <p className="text-[9px] font-semibold uppercase tracking-wide text-slate-400">
+                Agency cost
+              </p>
+              <p className="truncate text-xs font-bold tabular-nums text-slate-800 dark:text-slate-100">
+                {fmtCurrency(trip.agencyCost)}
+              </p>
+            </div>
+            <div className="min-w-0">
+              <p className="text-[9px] font-semibold uppercase tracking-wide text-slate-400">
+                Cab cost
+              </p>
+              <p className="truncate text-xs font-bold tabular-nums text-slate-800 dark:text-slate-100">
+                {fmtCurrency(trip.cabCost)}
+              </p>
+            </div>
+            <div className="min-w-0">
+              <p className="text-[9px] font-semibold uppercase tracking-wide text-emerald-600/80 dark:text-emerald-400/80">
+                Agency profit
+              </p>
+              <p className="truncate text-xs font-bold tabular-nums text-emerald-700 dark:text-emerald-300">
+                {fmtCurrency(agencyProfit)}
+              </p>
+            </div>
+          </div>
+
+          {!readOnly && (
+            <button
+              type="button"
+              onClick={openPayments}
+              className="inline-flex w-fit items-center justify-center gap-1 rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold text-emerald-700 transition hover:border-emerald-300 hover:bg-emerald-100 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300 dark:hover:bg-emerald-500/20"
+            >
+              <Wallet className="h-3 w-3" />
+              Payments
+            </button>
+          )}
 
           <div className="mt-auto flex flex-wrap items-center gap-1.5 border-t border-slate-100 pt-3 text-[11px] dark:border-[#1e2638]">
             <span className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-slate-50 px-2 py-1 font-semibold tabular-nums text-slate-700 dark:border-[#1e2638] dark:bg-white/[0.04] dark:text-slate-200">
@@ -1013,6 +1112,11 @@ export function TripCard({
                     />
                     {trip.status?.replace(/_/g, " ")}
                   </span>
+                  <span
+                    className={`inline-flex items-center rounded-md px-2 py-0.5 text-[10px] font-bold ${cashInStatusBadgeClass(cashIn.status)}`}
+                  >
+                    {cashInStatusLabel(cashIn.status)}
+                  </span>
                 </div>
                 <p className="mt-0.5 truncate text-xs text-slate-500 dark:text-slate-400">
                   {[
@@ -1026,20 +1130,54 @@ export function TripCard({
                     .join(" · ")}
                 </p>
               </div>
-              <button
-                type="button"
-                onClick={() => setDetailOpen(false)}
-                className="rounded-lg p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-white/5 dark:hover:text-slate-200"
-                aria-label="Close"
-              >
-                <X className="h-5 w-5" />
-              </button>
+              <div className="flex shrink-0 items-center gap-1.5">
+                {!readOnly && (
+                  <button
+                    type="button"
+                    onClick={() => setPayOpen(true)}
+                    className="inline-flex items-center gap-1 rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1.5 text-[11px] font-bold text-emerald-700 transition hover:bg-emerald-100 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300"
+                  >
+                    <Wallet className="h-3.5 w-3.5" />
+                    Payments
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setDetailOpen(false)}
+                  className="rounded-lg p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-white/5 dark:hover:text-slate-200"
+                  aria-label="Close"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
             </div>
             <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-5 sm:py-5">
               {detailBody}
             </div>
           </div>
         </div>
+      )}
+
+      {payOpen && (
+        <TripCashInModal
+          trip={{
+            _id: trip._id,
+            tripNumber: trip.tripNumber,
+            from: trip.from,
+            to: trip.to,
+            pickup: trip.pickup,
+            drop: trip.drop,
+            agencyName: trip.agencyName,
+            agencyProfit,
+          }}
+          resolveAgencyLabel={
+            resolveAgencyLabel ?? ((n) => n?.trim() || "—")
+          }
+          onClose={() => setPayOpen(false)}
+          onSuccess={() => {
+            void handleCashInSuccess();
+          }}
+        />
       )}
     </>
   );

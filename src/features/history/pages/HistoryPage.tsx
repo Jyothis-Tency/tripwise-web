@@ -6,7 +6,6 @@ import {
   type HistoryTrip,
   type HistoryPagination,
   type HistoryPaymentSummary,
-  type RecordPaymentTripSummary,
 } from '../api';
 import { TripCard } from '../components/TripCard';
 import { fetchAgencies, type Agency } from '../../bulk-entry/api';
@@ -22,9 +21,9 @@ const STATUS_OPTIONS = [
   { value: 'in_progress', label: 'In Progress' },
   { value: 'scheduled',   label: 'Scheduled' },
   { value: 'cancelled',   label: 'Cancelled' },
-  { value: 'paid',        label: 'Paid' },
-  { value: 'partial',     label: 'Partial' },
-  { value: 'unpaid',      label: 'Unpaid' },
+  { value: 'paid',        label: 'Fully Paid' },
+  { value: 'partial',     label: 'Partially Paid' },
+  { value: 'unpaid',      label: 'Payment Pending' },
 ];
 
 /** Current YYYY-MM in app business timezone (IST). */
@@ -254,31 +253,14 @@ export function HistoryPage() {
     );
   }, []);
 
-  const handlePaymentRecorded = useCallback((tripId: string, summary: RecordPaymentTripSummary) => {
-    const paymentStatus =
-      summary.paymentStatus === 'paid' ||
-      summary.paymentStatus === 'partial' ||
-      summary.paymentStatus === 'unpaid'
-        ? summary.paymentStatus
-        : 'unpaid';
-    setTrips((prev) =>
-      prev.map((t) =>
-        t._id === tripId
-          ? {
-              ...t,
-              paidAmount: summary.paidAmount,
-              paymentSummary: {
-                ...t.paymentSummary,
-                totalAmount: summary.totalAmount,
-                paidAmount: summary.paidAmount,
-                remainingBalance: summary.remainingBalance,
-                paymentStatus,
-              },
-            }
-          : t
-      )
-    );
-  }, []);
+  const handlePaymentRecorded = useCallback(
+    (tripId: string, updated: HistoryTrip) => {
+      setTrips((prev) =>
+        prev.map((t) => (t._id === tripId ? { ...t, ...updated } : t)),
+      );
+    },
+    [],
+  );
 
   const handleExportPdf = async () => {
     const params: Record<string, any> = {

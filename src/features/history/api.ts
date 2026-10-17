@@ -79,6 +79,13 @@ export interface HistoryTrip {
     remainingBalance?: number;
     paymentStatus?: 'paid' | 'partial' | 'unpaid';
   };
+  /** Cash-in vs agency profit (Vehicles / Transaction Payments). */
+  cashInSummary?: {
+    due: number;
+    paid: number;
+    remaining: number;
+    status: 'paid' | 'partial' | 'unpaid';
+  };
   createdAt?: string;
   updatedAt?: string;
 }
@@ -187,8 +194,9 @@ export async function fetchTripHistory(params: HistoryParams = {}): Promise<{
   }
   const res = await apiClient.get(ApiEndpoints.historyTrips, { params: clean });
   const data = res.data?.data ?? {};
+  const tripsRaw: unknown[] = Array.isArray(data.trips) ? data.trips : [];
   return {
-    trips: data.trips ?? [],
+    trips: tripsRaw.map((t) => mapRawTripToHistoryTrip(t)),
     pagination: data.pagination ?? { page: 1, limit: 10, total: 0, pages: 1, hasNext: false, hasPrev: false },
     paymentSummary: data.paymentSummary ?? { totalAmount: 0, totalPaid: 0, totalOutstanding: 0 },
     allTimePaymentSummary: data.allTimePaymentSummary,
@@ -369,6 +377,19 @@ export function mapRawTripToHistoryTrip(t: any): HistoryTrip {
     agencyProfit: t.agencyProfit ?? t.ownerProfit,
     paidAmount: t.paidAmount,
     paymentSummary: t.paymentSummary,
+    cashInSummary: t.cashInSummary
+      ? {
+          due: Number(t.cashInSummary.due) || 0,
+          paid: Number(t.cashInSummary.paid) || 0,
+          remaining: Number(t.cashInSummary.remaining) || 0,
+          status:
+            t.cashInSummary.status === 'paid' ||
+            t.cashInSummary.status === 'partial' ||
+            t.cashInSummary.status === 'unpaid'
+              ? t.cashInSummary.status
+              : 'unpaid',
+        }
+      : undefined,
     createdAt: t.createdAt,
     updatedAt: t.updatedAt,
   };
@@ -377,6 +398,9 @@ export function mapRawTripToHistoryTrip(t: any): HistoryTrip {
 export async function fetchHistoryTripById(tripId: string): Promise<HistoryTrip> {
   const res = await apiClient.get(ApiEndpoints.tripById(tripId));
   const raw = res.data?.data ?? res.data;
+  if (raw && typeof raw === 'object') {
+    return mapRawTripToHistoryTrip(raw);
+  }
   return mapRawTripToHistoryTrip(raw ?? {});
 }
 

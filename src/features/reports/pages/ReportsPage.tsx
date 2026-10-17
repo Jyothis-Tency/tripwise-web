@@ -42,6 +42,7 @@ import { downloadTripReportPdf } from "../tripReportPdf";
 import {
   countSelectedFields,
   defaultReportFieldSelection,
+  ensureReportFieldSelection,
   selectionForAllVisible,
   visibleReportFields,
   type ReportFieldSelection,
@@ -205,6 +206,10 @@ export function ReportsPage() {
   const [tripSource, setTripSource] = useState<"vehicle" | "bulk">("vehicle");
   const [fieldSelection, setFieldSelection] = useState<ReportFieldSelection>(
     () => defaultReportFieldSelection("vehicle"),
+  );
+  const effectiveFieldSelection = useMemo(
+    () => ensureReportFieldSelection(fieldSelection, tripSource),
+    [fieldSelection, tripSource],
   );
 
   const [drivers, setDrivers] = useState<Driver[]>([]);
@@ -377,7 +382,7 @@ export function ReportsPage() {
   }, [previewRequestKey, loadPreview, previewPage]);
 
   const handleGeneratePdf = async () => {
-    if (countSelectedFields(fieldSelection) === 0) {
+    if (countSelectedFields(effectiveFieldSelection) === 0) {
       alert("Select at least one report field to include.");
       return;
     }
@@ -407,7 +412,7 @@ export function ReportsPage() {
         title: "Trip History Report",
         subtitle: subtitle || undefined,
         resolveAgencyLabel,
-        fieldSelection,
+        fieldSelection: effectiveFieldSelection,
         tripSource,
         reportTotals: computeTripReportTotals(result.trips, tripSource),
       });
@@ -421,7 +426,7 @@ export function ReportsPage() {
   const handleExportCsv = async () => {
     setExportingCsv(true);
     try {
-      if (countSelectedFields(fieldSelection) === 0) {
+      if (countSelectedFields(effectiveFieldSelection) === 0) {
         alert("Select at least one report field to include.");
         return;
       }
@@ -436,7 +441,7 @@ export function ReportsPage() {
         alert("No trips match your filters.");
         return;
       }
-      downloadTripReportCsv(result.trips, fieldSelection, {
+      downloadTripReportCsv(result.trips, effectiveFieldSelection, {
         tripSource,
         resolveAgencyLabel,
       });
@@ -464,13 +469,14 @@ export function ReportsPage() {
 
   const toggleReportField = (id: keyof ReportFieldSelection) => {
     setFieldSelection((prev) => {
-      if (prev[id]) {
+      const base = ensureReportFieldSelection(prev, tripSource);
+      if (base[id]) {
         const wouldRemain = visibleReportFields(tripSource).filter(
-          (f) => f.id !== id && prev[f.id],
+          (f) => f.id !== id && base[f.id],
         ).length;
-        if (wouldRemain === 0) return prev;
+        if (wouldRemain === 0) return base;
       }
-      return { ...prev, [id]: !prev[id] };
+      return { ...base, [id]: !base[id] };
     });
   };
 
@@ -483,7 +489,7 @@ export function ReportsPage() {
     paymentStatus,
   });
   const visibleFields = visibleReportFields(tripSource);
-  const selectedFieldCount = countSelectedFields(fieldSelection);
+  const selectedFieldCount = countSelectedFields(effectiveFieldSelection);
   const hasPreviewData = previewTrips.length > 0;
   const isBusy = loadingPreview || generatingPdf || exportingCsv;
 
@@ -943,14 +949,14 @@ export function ReportsPage() {
                         ? "border-t border-slate-100 dark:border-[#1e2638]"
                         : ""
                     } ${
-                      fieldSelection[f.id]
+                      effectiveFieldSelection[f.id]
                         ? "bg-slate-50/80 dark:bg-white/[0.02]"
                         : ""
                     }`}
                   >
                     <input
                       type="checkbox"
-                      checked={fieldSelection[f.id]}
+                      checked={effectiveFieldSelection[f.id]}
                       onChange={() => toggleReportField(f.id)}
                       className="h-3.5 w-3.5 shrink-0 rounded border-slate-300 text-slate-900 focus:ring-slate-300 dark:border-white/20 dark:bg-transparent dark:text-white"
                     />
@@ -1037,7 +1043,7 @@ export function ReportsPage() {
                   <TripReportPreviewDocument
                     trips={previewTrips}
                     totalTrips={previewPagination.total}
-                    fieldSelection={fieldSelection}
+                    fieldSelection={effectiveFieldSelection}
                     title="Trip History Report"
                     subtitle={filterSummary || undefined}
                     resolveAgencyLabel={resolveAgencyLabel}

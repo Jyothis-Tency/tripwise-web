@@ -30,11 +30,16 @@ export interface HistoryTrip {
   priority?: string;
   agencyName?: string;
   notes?: string;
+  startingNote?: string;
   completionNote?: string;
+  isCompleted?: boolean;
   startTime?: string;
   endTime?: string;
   startKilometers?: number;
   endKilometers?: number;
+  /** Bulk trips store hours explicitly; vehicle trips usually derive duration. */
+  hours?: number;
+  grandTotal?: number;
   driver?: {
     _id?: string;
     firstName?: string;
@@ -336,7 +341,7 @@ export function mapRawTripToHistoryTrip(t: any): HistoryTrip {
     date: t.date,
     startDate: t.startDate,
     expectedEndDate: t.expectedEndDate,
-    endDate: t.expectedEndDate ?? t.endDate,
+    endDate: t.endDate ?? t.expectedEndDate,
     from: t.from,
     to: t.to,
     pickup: t.pickup,
@@ -346,18 +351,27 @@ export function mapRawTripToHistoryTrip(t: any): HistoryTrip {
     priority: t.priority,
     agencyName: t.agencyName,
     notes: t.notes,
+    startingNote: t.startingNote,
     completionNote: t.completionNote,
+    isCompleted:
+      typeof t.isCompleted === "boolean" ? t.isCompleted : undefined,
     startTime: t.startTime,
     endTime: t.endTime,
-    startKilometers: t.startKilometers,
-    endKilometers: t.endKilometers,
+    startKilometers: t.startKilometers ?? t.startKm,
+    endKilometers: t.endKilometers ?? t.endKm,
+    hours: t.hours,
+    grandTotal: t.grandTotal ?? t.paymentSummary?.totalAmount,
     driver: normalizeHistoryTripDriver(t.driver, t.driverName),
     vehicle: normalizeHistoryTripVehicle(t.vehicle, t.vehicleNumber),
     careOf: t.careOf,
     agencyCost: t.agencyCost,
     cabCost: t.cabCost,
-    driver_salary: t.driver_salary,
-    driverBata: t.driverBata ?? t.driver_bata ?? t.driver_salary,
+    driver_salary: t.driver_salary ?? t.driverSalary,
+    driverBata: t.driverBata ?? t.driver_bata ?? t.driver_salary ?? t.driverSalary,
+    toll: t.toll,
+    vehicleType: t.vehicleType,
+    mobileNumber: t.mobileNumber,
+    balanceAmount: t.balanceAmount,
     extraPersonalExpenses:
       t.extraPersonalExpenses ??
       t.totalPersonalExpense ??
@@ -375,7 +389,7 @@ export function mapRawTripToHistoryTrip(t: any): HistoryTrip {
     totalCabCost: t.totalCabCost,
     expenses: t.expenses,
     agencyProfit: t.agencyProfit ?? t.ownerProfit,
-    paidAmount: t.paidAmount,
+    paidAmount: t.paidAmount ?? t.paymentSummary?.paidAmount,
     paymentSummary: t.paymentSummary,
     cashInSummary: t.cashInSummary
       ? {

@@ -152,7 +152,9 @@ export function buildAgencyTxRows(
   const tables = detail?.tables;
   if (!tables) return [];
 
-  const bulkGroups = groupBulkTripsForLedger(tables.bulkTripsCashIn ?? []);
+  const bulkGroups = groupBulkTripsForLedger(tables.bulkTripsCashIn ?? []).filter(
+    (row) => (Number(row.grandTotal) || 0) > 0,
+  );
 
   const bulkRows: AgencyTxRow[] = bulkGroups.map((row) => {
     const tripCount = row.tripCount;

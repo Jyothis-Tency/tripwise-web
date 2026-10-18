@@ -115,7 +115,7 @@ export const REPORT_FIELD_DEFS: ReportFieldDef[] = [
     id: "totalCabCost",
     label: "Total Cab Cost",
     section: "right",
-    defaultOn: false,
+    defaultOn: true,
   },
   { id: "grandTotal", label: "Grand Total", section: "right", defaultOn: true },
   {
@@ -138,7 +138,7 @@ export const REPORT_FIELD_DEFS: ReportFieldDef[] = [
   },
   { id: "agencyProfit", label: "Owner Profit", section: "right", defaultOn: false },
   { id: "fuelExpense", label: "Fuel", section: "right", defaultOn: false },
-  { id: "extraExpenses", label: "Extra Expenses", section: "right", defaultOn: false },
+  { id: "extraExpenses", label: "Extra Expenses", section: "right", defaultOn: true },
   { id: "advance", label: "Advance", section: "right", defaultOn: true },
   { id: "paidAmount", label: "Paid Amount", section: "right", defaultOn: false },
   { id: "balance", label: "Remaining", section: "right", defaultOn: true },

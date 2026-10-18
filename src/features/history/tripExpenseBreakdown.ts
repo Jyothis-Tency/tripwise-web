@@ -2,6 +2,8 @@
 
 export type TripExpenseLine = {
   type?: string;
+  /** Some clients send category instead of / in addition to type. */
+  category?: string;
   amount?: number | string;
 };
 
@@ -18,6 +20,12 @@ function isFuelExpenseType(type: unknown): boolean {
   return t === "fuel" || t === "petrol" || t === "diesel";
 }
 
+function expenseLineIsFuel(expense: TripExpenseLine): boolean {
+  return (
+    isFuelExpenseType(expense.type) || isFuelExpenseType(expense.category)
+  );
+}
+
 function roundMoney(n: number): number {
   return Math.round(n * 100) / 100;
 }
@@ -30,7 +38,7 @@ export function computeTripExpenseBreakdownFromLines(
   let extraExpenses = 0;
   for (const expense of expenses ?? []) {
     const amount = Number(expense.amount) || 0;
-    if (isFuelExpenseType(expense.type)) {
+    if (expenseLineIsFuel(expense)) {
       fuelExpense += amount;
     } else {
       extraExpenses += amount;
@@ -85,22 +93,26 @@ export function getHistoryTripExpenseBreakdown(trip: {
   fuelExpense?: number;
   extraExpenses?: number;
   totalExpenses?: number;
+  /** Ignored for math — always recomputed as cabCost + non-fuel extras. */
+  totalCabCost?: number;
 }): TripExpenseBreakdown {
   let fuelExpense: number;
   let extraExpenses: number;
 
-  if (trip.fuelExpense != null && trip.extraExpenses != null) {
-    fuelExpense = Number(trip.fuelExpense) || 0;
-    extraExpenses = Number(trip.extraExpenses) || 0;
-  } else if (trip.expenses?.length) {
+  // Prefer live expense lines when present so tolls/parking etc. are never
+  // dropped because of stale precomputed fuelExpense/extraExpenses (= 0).
+  if (Array.isArray(trip.expenses) && trip.expenses.length > 0) {
     const computed = computeTripExpenseBreakdownFromLines(
       trip.expenses,
       trip.cabCost,
     );
     fuelExpense = computed.fuelExpense;
     extraExpenses = computed.extraExpenses;
+  } else if (trip.fuelExpense != null || trip.extraExpenses != null) {
+    fuelExpense = Number(trip.fuelExpense) || 0;
+    extraExpenses = Number(trip.extraExpenses) || 0;
   } else {
-    // Legacy: totalExpenses was fuel + other — cannot split fuel without line items
+    // Legacy: totalExpenses was non-fuel (or fuel+other) without line items
     const legacyTotal = Number(trip.totalExpenses) || 0;
     fuelExpense = 0;
     extraExpenses = roundMoney(legacyTotal);
@@ -110,6 +122,7 @@ export function getHistoryTripExpenseBreakdown(trip: {
   return {
     fuelExpense: roundMoney(fuelExpense),
     extraExpenses: roundMoney(extraExpenses),
+    // Product rule: Total Cab Cost = Cab Cost + Extra Expenses (tolls, etc.). Fuel is separate.
     totalCabCost: roundMoney(extraExpenses + cab),
   };
 }

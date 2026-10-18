@@ -21,13 +21,21 @@ function tripDistanceKm(t: HistoryTrip): number {
 }
 
 function tripDurationMs(t: HistoryTrip): number {
-  if (!t.startTime || !t.endTime) return 0;
-  const a = new Date(String(t.startTime)).getTime();
-  const b = new Date(String(t.endTime)).getTime();
-  if (!Number.isFinite(a) || !Number.isFinite(b)) return 0;
-  let ms = b - a;
-  if (ms < 0) ms += 24 * 60 * 60 * 1000;
-  return ms > 0 ? ms : 0;
+  if (t.startTime && t.endTime) {
+    const a = new Date(String(t.startTime)).getTime();
+    const b = new Date(String(t.endTime)).getTime();
+    if (Number.isFinite(a) && Number.isFinite(b)) {
+      let ms = b - a;
+      if (ms < 0) ms += 24 * 60 * 60 * 1000;
+      if (ms > 0) return ms;
+    }
+  }
+  // Bulk trips often store hours as a number (and times as "08:00 AM" strings).
+  const hours = Number(t.hours);
+  if (Number.isFinite(hours) && hours > 0) {
+    return Math.round(hours * 60 * 60 * 1000);
+  }
+  return 0;
 }
 
 function tripDayKey(t: HistoryTrip): string | null {
@@ -67,6 +75,8 @@ export type VehicleReportTotals = {
   kind: "vehicle";
   agencyCost: number;
   cabCost: number;
+  /** Cab cost + non-fuel extras (tolls, parking, etc.). */
+  totalCabCost: number;
   advance: number;
   ownerProfit: number;
   distanceKm: number;
@@ -89,6 +99,13 @@ export type BulkReportTotals = {
   advance: number;
   remaining: number;
   tolls: number;
+  /** Sum of driver bata / salary on bulk rows. */
+  driverSalary: number;
+  /**
+   * Sum of bulk commission margin (stored agencyProfit = grandTotal − driverSalary
+   * when set; otherwise outstanding balance). Distinct from `remaining` when margin is stored.
+   */
+  commissionProfit: number;
 };
 
 /** @deprecated Prefer VehicleReportTotals / BulkReportTotals */
@@ -128,6 +145,7 @@ export function computeVehicleReportTotals(
 ): VehicleReportTotals {
   let agencyCost = 0;
   let cabCost = 0;
+  let totalCabCost = 0;
   let advance = 0;
   let ownerProfit = 0;
   let distanceKm = 0;
@@ -154,6 +172,7 @@ export function computeVehicleReportTotals(
     const expenses = getHistoryTripExpenseBreakdown(t);
     fuel += expenses.fuelExpense;
     extraExpense += expenses.extraExpenses;
+    totalCabCost += expenses.totalCabCost;
 
     totalDurationMs += tripDurationMs(t);
     const day = tripDayKey(t);
@@ -165,6 +184,7 @@ export function computeVehicleReportTotals(
     kind: "vehicle",
     agencyCost,
     cabCost,
+    totalCabCost,
     advance,
     ownerProfit,
     distanceKm,
@@ -184,25 +204,37 @@ export function computeBulkReportTotals(trips: HistoryTrip[]): BulkReportTotals 
   let advance = 0;
   let remaining = 0;
   let tolls = 0;
+  let driverSalary = 0;
+  let commissionProfit = 0;
   let totalDurationMs = 0;
   const days = new Set<string>();
 
   for (const t of trips) {
     distanceKm += tripDistanceKm(t);
     const total =
-      n((t as { grandTotal?: number }).grandTotal) ||
-      n(t.paymentSummary?.totalAmount) ||
-      n(t.cabCost) ||
-      n(t.agencyCost);
+      t.grandTotal != null
+        ? n(t.grandTotal)
+        : t.paymentSummary?.totalAmount != null
+          ? n(t.paymentSummary.totalAmount)
+          : n(t.cabCost) || n(t.agencyCost);
     const adv = n(t.advance);
     const rem =
-      n(t.paymentSummary?.remainingBalance) ||
-      n(t.balanceAmount) ||
-      Math.max(total - adv, 0);
+      t.paymentSummary?.remainingBalance != null
+        ? n(t.paymentSummary.remainingBalance)
+        : t.balanceAmount != null
+          ? n(t.balanceAmount)
+          : Math.max(total - adv, 0);
+    const salary = computeDriverSalaryBreakdown(t);
+    const profit =
+      t.agencyProfit != null && Number.isFinite(Number(t.agencyProfit))
+        ? Math.max(n(t.agencyProfit), 0)
+        : rem;
     grandTotal += total;
     advance += adv;
     remaining += rem;
     tolls += n(t.toll);
+    driverSalary += salary.driverBata;
+    commissionProfit += profit;
     totalDurationMs += tripDurationMs(t);
     const day = tripDayKey(t);
     if (day) days.add(day);
@@ -219,6 +251,8 @@ export function computeBulkReportTotals(trips: HistoryTrip[]): BulkReportTotals 
     advance,
     remaining,
     tolls,
+    driverSalary,
+    commissionProfit,
   };
 }
 

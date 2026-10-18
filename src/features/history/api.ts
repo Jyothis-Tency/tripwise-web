@@ -360,7 +360,8 @@ export function mapRawTripToHistoryTrip(t: any): HistoryTrip {
     startKilometers: t.startKilometers ?? t.startKm,
     endKilometers: t.endKilometers ?? t.endKm,
     hours: t.hours,
-    grandTotal: t.grandTotal ?? t.paymentSummary?.totalAmount,
+    // Only real bulk grandTotal — never copy paymentSummary.totalAmount (vehicle trips).
+    grandTotal: t.grandTotal,
     driver: normalizeHistoryTripDriver(t.driver, t.driverName),
     vehicle: normalizeHistoryTripVehicle(t.vehicle, t.vehicleNumber),
     careOf: t.careOf,

@@ -23,13 +23,18 @@ export function tripReportTotalLines(
     return [
       { label: "Agency Cost", value: fmtRs(totals.agencyCost), emphasize: true },
       { label: "Cab Cost", value: fmtRs(totals.cabCost) },
-      { label: "Advance", value: fmtRs(totals.advance) },
+      { label: "Extra Expense", value: fmtRs(totals.extraExpense) },
+      {
+        label: "Total Cab Cost",
+        value: fmtRs(totals.totalCabCost),
+        emphasize: true,
+      },
+      { label: "Fuel", value: fmtRs(totals.fuel) },
       { label: "Owner Profit", value: fmtRs(totals.ownerProfit) },
+      { label: "Advance", value: fmtRs(totals.advance) },
       { label: "Distance", value: fmtKm(totals.distanceKm) },
       { label: "Driver Salary", value: fmtRs(totals.driverSalary) },
       { label: "Driver Advance", value: fmtRs(totals.driverAdvance) },
-      { label: "Fuel", value: fmtRs(totals.fuel) },
-      { label: "Extra Expense", value: fmtRs(totals.extraExpense) },
       { label: "Days & Time", value: totals.daysAndTime },
     ];
   }
@@ -40,5 +45,10 @@ export function tripReportTotalLines(
     { label: "Advance", value: fmtRs(totals.advance) },
     { label: "Remaining", value: fmtRs(totals.remaining) },
     { label: "Tolls", value: fmtRs(totals.tolls) },
+    { label: "Driver Salary", value: fmtRs(totals.driverSalary) },
+    {
+      label: "Commission Profit",
+      value: fmtRs(totals.commissionProfit),
+    },
   ];
 }

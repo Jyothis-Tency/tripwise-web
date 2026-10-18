@@ -2,9 +2,9 @@ import type { HistoryTrip } from "../history/api";
 import { historyDriverName, historyVehicleNumber } from "../history/historyTripDisplay";
 import { fmtTimeAmPm, fmtTripDuration } from "../history/historyTimeUtils";
 import {
-  computeAgencyProfitPreview,
   computeDriverSalaryBreakdown,
   getHistoryTripExpenseBreakdown,
+  resolveTripAgencyProfitDisplay,
 } from "../history/tripExpenseBreakdown";
 import type { ReportFieldId } from "./reportFieldConfig";
 
@@ -115,6 +115,75 @@ function reportVehicleType(trip: HistoryTrip): string {
   return "N/A";
 }
 
+function isBulkAgencyTrip(trip: HistoryTrip): boolean {
+  // Bulk rows always have an explicit grandTotal from AgencyTrip mapping.
+  // Do not treat vehicle paymentSummary.totalAmount as grandTotal.
+  return trip.grandTotal != null && Number.isFinite(Number(trip.grandTotal));
+}
+
+function resolveReportOwnerProfit(trip: HistoryTrip): number {
+  // Bulk: stored commission margin (agencyProfit), else outstanding (grandTotal − advance).
+  if (isBulkAgencyTrip(trip)) {
+    if (trip.agencyProfit != null && Number.isFinite(Number(trip.agencyProfit))) {
+      return Math.max(Number(trip.agencyProfit), 0);
+    }
+    const gt = Number(trip.grandTotal) || 0;
+    const adv = Number(trip.advance) || 0;
+    if (trip.balanceAmount != null && Number.isFinite(Number(trip.balanceAmount))) {
+      return Math.max(Number(trip.balanceAmount), 0);
+    }
+    return Math.max(gt - adv, 0);
+  }
+  // Vehicle: agencyCost − (cabCost + non-fuel extras incl. tolls).
+  return resolveTripAgencyProfitDisplay(trip);
+}
+
+/** Paid / remaining / status — vehicle prefers cash-in (History Pay); bulk uses advance/balance. */
+function resolveReportPaymentFields(trip: HistoryTrip): {
+  paid: number;
+  remaining: number;
+  paymentStatus: string;
+} {
+  if (trip.cashInSummary != null) {
+    const raw = trip.cashInSummary.status ?? "";
+    return {
+      paid: Number(trip.cashInSummary.paid) || 0,
+      remaining: Number(trip.cashInSummary.remaining) || 0,
+      paymentStatus: raw
+        ? String(raw).replace(/_/g, " ").toUpperCase()
+        : "N/A",
+    };
+  }
+
+  if (isBulkAgencyTrip(trip)) {
+    const paid =
+      Number(
+        trip.paidAmount ?? trip.paymentSummary?.paidAmount ?? trip.advance ?? 0,
+      ) || 0;
+    const remaining =
+      trip.balanceAmount != null
+        ? Number(trip.balanceAmount) || 0
+        : trip.paymentSummary?.remainingBalance != null
+          ? Number(trip.paymentSummary.remainingBalance) || 0
+          : Math.max(
+              (Number(trip.grandTotal) || 0) - (Number(trip.advance) || 0),
+              0,
+            );
+    const raw = trip.paymentSummary?.paymentStatus ?? "";
+    return {
+      paid,
+      remaining,
+      paymentStatus: raw
+        ? String(raw).replace(/_/g, " ").toUpperCase()
+        : "N/A",
+    };
+  }
+
+  // Vehicle without cashInSummary: match History TripCard (due = owner profit).
+  const due = resolveTripAgencyProfitDisplay(trip);
+  return { paid: 0, remaining: due, paymentStatus: "UNPAID" };
+}
+
 export function toTripReportRow(
   trip: HistoryTrip,
   resolveAgencyLabel: (agencyName?: string) => string,
@@ -122,32 +191,12 @@ export function toTripReportRow(
   const agencyRaw = trip.agencyName ?? "";
 
   const expenses = getHistoryTripExpenseBreakdown(trip);
-  const agencyProfit =
-    trip.agencyProfit != null && Number.isFinite(Number(trip.agencyProfit))
-      ? Number(trip.agencyProfit)
-      : computeAgencyProfitPreview(trip.agencyCost, trip.cabCost, trip.expenses);
+  // Vehicle: agencyCost − (cabCost + non-fuel extras). Bulk: commission margin or outstanding.
+  const agencyProfit = resolveReportOwnerProfit(trip);
 
   const salary = computeDriverSalaryBreakdown(trip);
 
-  const paid =
-    trip.paidAmount ??
-    trip.paymentSummary?.paidAmount ??
-    trip.cashInSummary?.paid ??
-    0;
-
-  const remaining =
-    trip.balanceAmount ??
-    trip.paymentSummary?.remainingBalance ??
-    trip.cashInSummary?.remaining ??
-    0;
-
-  const paymentStatusRaw =
-    trip.paymentSummary?.paymentStatus ??
-    trip.cashInSummary?.status ??
-    "";
-  const paymentStatus = paymentStatusRaw
-    ? String(paymentStatusRaw).replace(/_/g, " ").toUpperCase()
-    : "N/A";
+  const { paid, remaining, paymentStatus } = resolveReportPaymentFields(trip);
 
   const isCompleted =
     typeof (trip as { isCompleted?: boolean }).isCompleted === "boolean"
@@ -187,13 +236,15 @@ export function toTripReportRow(
     hours: reportHours(trip),
     agencyCost: reportFmtRs(trip.agencyCost ?? 0),
     cabCost: reportFmtRs(trip.cabCost ?? 0),
-    totalCabCost: reportFmtRs(trip.totalCabCost ?? expenses.totalCabCost),
+    // Always cabCost + non-fuel extras (tolls, parking, …) — never a stale trip.totalCabCost.
+    totalCabCost: reportFmtRs(expenses.totalCabCost),
     grandTotal: reportFmtRs(
-      trip.grandTotal ??
-        trip.paymentSummary?.totalAmount ??
-        trip.cabCost ??
-        trip.agencyCost ??
-        0,
+      isBulkAgencyTrip(trip)
+        ? trip.grandTotal ?? 0
+        : trip.paymentSummary?.totalAmount ??
+            trip.agencyCost ??
+            trip.cabCost ??
+            0,
     ),
     driverSalary: reportFmtRs(salary.driverBata),
     personalExpenses: reportFmtRs(salary.personalExpenses),

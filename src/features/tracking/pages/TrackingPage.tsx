@@ -24,7 +24,10 @@ import {
 } from "../api";
 import { fetchAgencies, type Agency } from "../../bulk-entry/api";
 import { resolveAgencyLabelFromName } from "../../../lib/agencyDisplay";
-import { resolveTripAgencyProfitDisplay } from "../../history/tripExpenseBreakdown";
+import {
+  isFuelExpenseType,
+  resolveTripAgencyProfitDisplay,
+} from "../../history/tripExpenseBreakdown";
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // UTILITIES
@@ -405,15 +408,28 @@ function ExpenseInfoTab({
     other = 0;
   expenses.forEach((e) => {
     const amt = Number(e.amount ?? 0);
-    switch ((e.type ?? "").toLowerCase()) {
-      case "fuel":
-        fuel += amt;
-        break;
+    const kind = String(
+      (e as { type?: string; category?: string }).type ??
+        (e as { category?: string }).category ??
+        "",
+    )
+      .toLowerCase()
+      .trim();
+    if (
+      isFuelExpenseType((e as { type?: string }).type) ||
+      isFuelExpenseType((e as { category?: string }).category)
+    ) {
+      fuel += amt;
+      return;
+    }
+    switch (kind) {
       case "toll":
+      case "tolls":
         toll += amt;
         break;
       case "tax":
       case "permit":
+      case "tax & permit":
         taxPermit += amt;
         break;
       case "parking":
@@ -423,6 +439,7 @@ function ExpenseInfoTab({
         other += amt;
     }
   });
+  // Non-fuel extras only (matches History Total Cab Cost extras)
   const totalExpenses = toll + taxPermit + parking + other;
 
   return (

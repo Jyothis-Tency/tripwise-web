@@ -26,6 +26,7 @@ import {
 import type { TripWithExpenses, TripExpense, AddTripExpensePayload } from "../api";
 import { deleteTripExpense, addTripExpense, updateTripExpense } from "../api";
 import { DatePicker } from "../../../components/ui/DatePicker";
+import { isFuelExpenseType } from "../../history/tripExpenseBreakdown";
 
 function fmtCurrency(v: unknown): string {
   const n = parseFloat(String(v ?? 0));
@@ -188,14 +189,20 @@ export const TripExpenseCard: React.FC<Props> = ({
   const tripId = trip._id || (trip as any).id || "";
   const expenses = trip.expenses ?? [];
 
-  // Financial calculations
-  const isFuelType = (type?: string) => {
-    const t = String(type ?? "").toLowerCase().trim();
-    return t === "fuel" || t === "petrol" || t === "diesel";
-  };
-
-  const fuelTotal = expenses.reduce((sum, e) => (isFuelType(e.type || e.category) ? sum + (Number(e.amount) || 0) : sum), 0);
-  const opsTotal = expenses.reduce((sum, e) => (!isFuelType(e.type || e.category) ? sum + (Number(e.amount) || 0) : sum), 0);
+  const fuelTotal = expenses.reduce(
+    (sum, e) =>
+      isFuelExpenseType(e.type) || isFuelExpenseType(e.category)
+        ? sum + (Number(e.amount) || 0)
+        : sum,
+    0,
+  );
+  const opsTotal = expenses.reduce(
+    (sum, e) =>
+      !(isFuelExpenseType(e.type) || isFuelExpenseType(e.category))
+        ? sum + (Number(e.amount) || 0)
+        : sum,
+    0,
+  );
   const totalCombined = fuelTotal + opsTotal;
 
   // Breakdown by Paid By

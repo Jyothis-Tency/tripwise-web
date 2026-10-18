@@ -859,7 +859,7 @@ function useAutosave<T>(
         try {
           do {
             pendingAfterSyncRef.current = false;
-            await onBackendSync(dataRef.current);
+          await onBackendSync(dataRef.current);
             if (!mountedRef.current) return;
             lastBackendHash.current = quickHash(serialize(dataRef.current));
           } while (
@@ -2131,7 +2131,7 @@ const CellInput = memo(function CellInput({
 
   if (type === "date") {
     const dateVal = String(localVal ?? "");
-    return (
+  return (
       <DatePicker
         value={dateVal}
         compact
@@ -2650,7 +2650,7 @@ const BulkEntryTable = forwardRef<
             }
             return r;
           });
-        }
+      }
 
       return next;
     });
@@ -3676,7 +3676,7 @@ const BulkEntryTable = forwardRef<
         >
           <Plus className="h-4 w-4 sm:h-5 sm:w-5" /> Add Driver / Vehicle
       </button>
-      </div>
+    </div>
 
       {transferModalGi != null && groups[transferModalGi] && (
         <ModalShell

@@ -29,7 +29,12 @@ import { DatePicker } from "../../../components/ui/DatePicker";
 import { TimePicker12h } from "../../../components/ui/TimePicker12h";
 import { todayIsoInAppTz } from "../../../lib/datePickerUtils";
 import { isoToHHmmInTz } from "../../../lib/timePickerUtils";
-import { computeAgencyProfitPreview } from "../../history/tripExpenseBreakdown";
+import {
+  computeAgencyProfitPreview,
+  computeDriverSalaryBreakdown,
+  getHistoryTripExpenseBreakdown,
+  resolveTripAgencyProfitDisplay,
+} from "../../history/tripExpenseBreakdown";
 import {
   loadVehiclesUi,
   saveVehiclesUi,
@@ -1370,7 +1375,10 @@ function TripCashInModal({
   onClose: () => void;
   onSuccess: () => void;
 }) {
-  const totalDue = Math.max(0, Math.round(Number(trip.agencyProfit) || 0));
+  const totalDue = Math.max(
+    0,
+    Math.round(resolveTripAgencyProfitDisplay(trip)),
+  );
   const route = [trip.from, trip.to].filter(Boolean).join(" → ");
   const tripLabel = trip.tripNumber ? `Trip ${trip.tripNumber}` : "Vehicle trip";
   const defaultNotes = ["Cash in", tripLabel, route].filter(Boolean).join(" · ");
@@ -2014,20 +2022,20 @@ function VehicleHistoryTab({
                       Driver Salary
                     </div>
                     <div className="mt-1 text-sm font-bold text-slate-900 dark:text-white">
-                      {formatMoney0(t.driver_salary)}
+                      {formatMoney0(computeDriverSalaryBreakdown(t).totalSalary)}
                     </div>
-                    {(t.driverBata != null || t.extraPersonalExpenses != null) && (
-                      <div className="mt-0.5 text-[10px] font-medium text-emerald-700 dark:text-emerald-300">
-                        (driver bata: {Number(t.driverBata ?? t.driver_salary) || 0}, personal expense: {Number(t.extraPersonalExpenses) || 0}, bulk amount: 0)
-                      </div>
-                    )}
+                    <div className="mt-0.5 text-[10px] font-medium text-emerald-700 dark:text-emerald-300">
+                      {computeDriverSalaryBreakdown(t).bracketText}
+                    </div>
                   </div>
                   <div className="rounded-lg border border-amber-200 bg-amber-50/60 p-2 dark:border-amber-500/30 dark:bg-amber-500/10">
                     <div className="text-[11px] font-semibold text-amber-800 dark:text-amber-300">
                       Trip Expense
                     </div>
                     <div className="mt-1 text-sm font-bold text-slate-900 dark:text-white">
-                      {formatMoney0(t.totalExpenses)}
+                      {formatMoney0(
+                        getHistoryTripExpenseBreakdown(t).extraExpenses,
+                      )}
                     </div>
                   </div>
                   <div className="rounded-lg border border-indigo-200 bg-indigo-50/60 p-2 dark:border-indigo-500/30 dark:bg-indigo-500/10">
@@ -2035,7 +2043,7 @@ function VehicleHistoryTab({
                       Owner profit
                     </div>
                     <div className="mt-1 text-sm font-bold text-slate-900 dark:text-white">
-                      {formatMoney0(t.agencyProfit)}
+                      {formatMoney0(resolveTripAgencyProfitDisplay(t))}
                     </div>
                   </div>
                 </div>
@@ -2419,14 +2427,8 @@ function TripDriverTab({
                       </span>
                       <span className="font-bold text-indigo-700 dark:text-indigo-300">
                         ₹
-                        {(
-                          activeTrip.agencyProfit && Number(activeTrip.agencyProfit) > 0
-                            ? Number(activeTrip.agencyProfit)
-                            : Math.max(
-                                (Number(activeTrip.agencyCost) || 0) -
-                                  ((Number(activeTrip.cabCost) || 0) + Number(activeTrip.totalExpenses || 0)),
-                                0,
-                              )
+                        {resolveTripAgencyProfitDisplay(
+                          activeTrip,
                         ).toLocaleString("en-IN")}
                       </span>
                     </div>
@@ -2789,13 +2791,7 @@ function TripDriverTab({
                           <span className="font-bold text-indigo-700 dark:text-indigo-300">
                             ₹
                             {(
-                              trip.agencyProfit && Number(trip.agencyProfit) > 0
-                                ? Number(trip.agencyProfit)
-                                : Math.max(
-                                    (Number(trip.agencyCost) || 0) -
-                                      ((Number(trip.cabCost) || 0) + Number(trip.totalExpenses || 0)),
-                                    0,
-                                  )
+                              resolveTripAgencyProfitDisplay(trip)
                             ).toLocaleString("en-IN")}
                           </span>
               </div>

@@ -1428,7 +1428,7 @@ export function TransactionHistoryPage() {
                     <small className="text-xs text-white/75">
                       All time · Bulk {fmtCurrency(agencyCards.bulkTotal)}
                       {agencyCards.ownerProfit > 0
-                        ? ` · Vehicle ${fmtCurrency(agencyCards.ownerProfit)}`
+                        ? ` · Vehicle agency cost ${fmtCurrency(agencyCards.ownerProfit)}`
                         : ""}
                     </small>
                     <b className="mt-2 block text-[28px] font-extrabold tracking-tight">

@@ -251,7 +251,7 @@ export const RevenueBreakdown: React.FC<RevenueBreakdownProps> = ({
               : agencyLedger
                 ? `All time · ${agencyLedger.agencyCount} agencies · Bulk +${fmtCurrency(agencyLedger.bulkTotal)}${
                     agencyLedger.ownerProfitFromVehicles > 0
-                      ? ` · Vehicle +${fmtCurrency(agencyLedger.ownerProfitFromVehicles)}`
+                      ? ` · Vehicle agency cost +${fmtCurrency(agencyLedger.ownerProfitFromVehicles)}`
                       : ""
                   }`
                 : "All time · Could not load agency totals"}

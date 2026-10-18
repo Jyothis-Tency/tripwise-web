@@ -5,6 +5,11 @@ import { fetchDriverHistoryDetailed } from "../api";
 import type { HistoryTripItem } from "../../vehicles/api";
 import { DatePicker } from "../../../components/ui/DatePicker";
 import { APP_TIMEZONE } from "../../../lib/timePickerUtils";
+import {
+  computeDriverSalaryBreakdown,
+  getHistoryTripExpenseBreakdown,
+  resolveTripAgencyProfitDisplay,
+} from "../../history/tripExpenseBreakdown";
 
 const inputCls =
   "w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20 dark:border-white/10 dark:bg-white/5 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-indigo-400 dark:focus:ring-indigo-500/30";
@@ -409,28 +414,28 @@ export function DriverHistoryModal({
                         Driver Salary
                       </div>
                       <div className="mt-1 text-sm font-bold text-slate-900 dark:text-white">
-                        {formatMoney0(t.driver_salary)}
+                        {formatMoney0(computeDriverSalaryBreakdown(t).totalSalary)}
                       </div>
-                      {(t.driverBata != null || t.extraPersonalExpenses != null) && (
-                        <div className="mt-0.5 text-[10px] font-medium text-emerald-700 dark:text-emerald-300">
-                          (driver bata: {Number(t.driverBata ?? t.driver_salary) || 0}, personal expense: {Number(t.extraPersonalExpenses) || 0}, bulk amount: 0)
-                        </div>
-                      )}
+                      <div className="mt-0.5 text-[10px] font-medium text-emerald-700 dark:text-emerald-300">
+                        {computeDriverSalaryBreakdown(t).bracketText}
+                      </div>
                     </div>
                     <div className="rounded-lg border border-amber-200 bg-amber-50 p-2 dark:border-amber-500/30 dark:bg-amber-500/10">
                       <div className="text-[11px] font-semibold text-amber-800 dark:text-amber-300">
                         Trip Expense
                       </div>
                       <div className="mt-1 text-sm font-bold text-slate-900 dark:text-white">
-                        {formatMoney0(t.totalExpenses)}
+                        {formatMoney0(
+                          getHistoryTripExpenseBreakdown(t).extraExpenses,
+                        )}
                       </div>
                     </div>
                     <div className="rounded-lg border border-indigo-200 bg-indigo-50 p-2 dark:border-indigo-500/30 dark:bg-indigo-500/10">
                       <div className="text-[11px] font-semibold text-indigo-800 dark:text-indigo-300">
-                        Agency Profit
+                        Owner profit
                       </div>
                       <div className="mt-1 text-sm font-bold text-slate-900 dark:text-white">
-                        {formatMoney0(t.agencyProfit || 0)}
+                        {formatMoney0(resolveTripAgencyProfitDisplay(t))}
                       </div>
                     </div>
                   </div>

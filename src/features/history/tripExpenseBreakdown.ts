@@ -20,11 +20,14 @@ function isFuelExpenseType(type: unknown): boolean {
   return t === "fuel" || t === "petrol" || t === "diesel";
 }
 
-function expenseLineIsFuel(expense: TripExpenseLine): boolean {
+/** Exported so Expenses/Tracking use the same fuel classification as History. */
+export function expenseLineIsFuel(expense: TripExpenseLine): boolean {
   return (
     isFuelExpenseType(expense.type) || isFuelExpenseType(expense.category)
   );
 }
+
+export { isFuelExpenseType };
 
 function roundMoney(n: number): number {
   return Math.round(n * 100) / 100;

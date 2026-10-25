@@ -4,6 +4,7 @@ import {
   LayoutDashboard,
   LogOut,
   Moon,
+  ScrollText,
   Sun,
   Users,
 } from "lucide-react";
@@ -15,6 +16,7 @@ const nav = [
   { to: "/admin", end: true, label: "Overview", icon: LayoutDashboard },
   { to: "/admin/owners", end: false, label: "Owners", icon: Building2 },
   { to: "/admin/drivers", end: false, label: "Drivers", icon: Users },
+  { to: "/admin/audit-logs", end: false, label: "Audit Logs", icon: ScrollText },
 ];
 
 export function AdminLayout() {

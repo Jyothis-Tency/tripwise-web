@@ -122,3 +122,79 @@ export async function fetchAdminDashboardStats(): Promise<{
     return {};
   }
 }
+
+export type AuditLogActor = {
+  type: "owner" | "driver" | "admin" | "system";
+  id: string;
+  name: string;
+  email?: string;
+  phone?: string;
+  company?: string;
+};
+
+export type AdminAuditLog = {
+  id: string;
+  timestamp: string;
+  actor: AuditLogActor;
+  category:
+    | "trips"
+    | "agency_trips"
+    | "expenses"
+    | "payments"
+    | "vehicles"
+    | "drivers"
+    | "agencies"
+    | "reminders"
+    | "guest_bulk"
+    | "auth"
+    | string;
+  actionType: string;
+  severity: "success" | "info" | "warning" | "danger";
+  summary: string;
+  explanation: string;
+  targetId?: string;
+  targetType?: string;
+  details: Record<string, unknown>;
+};
+
+export type AdminAuditLogStats = {
+  totalActions: number;
+  actionsToday: number;
+  ownerActions: number;
+  driverActions: number;
+  adminActions: number;
+  categoryBreakdown: Record<string, number>;
+  topActors: Array<{
+    type: string;
+    id: string;
+    name: string;
+    count: number;
+  }>;
+  latestActionTime?: string | null;
+};
+
+export async function fetchAdminAuditLogs(params?: {
+  page?: number;
+  limit?: number;
+  search?: string;
+  category?: string;
+  actorType?: string;
+  actorId?: string;
+  severity?: string;
+  dateFrom?: string;
+  dateTo?: string;
+}): Promise<{ actions: AdminAuditLog[]; pagination: AdminPagination }> {
+  const data = await adminGet<{
+    actions?: AdminAuditLog[];
+    pagination?: AdminPagination;
+  }>(ApiEndpoints.adminAuditLogs, params as Record<string, unknown>);
+  return {
+    actions: Array.isArray(data.actions) ? data.actions : [],
+    pagination: data.pagination ?? { current: 1, pages: 1, total: 0 },
+  };
+}
+
+export async function fetchAdminAuditLogStats(): Promise<AdminAuditLogStats> {
+  return adminGet<AdminAuditLogStats>(ApiEndpoints.adminAuditLogStats);
+}
+

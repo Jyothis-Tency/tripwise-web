@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { Building2, Users } from "lucide-react";
+import { Building2, ScrollText, Users } from "lucide-react";
 import {
+  fetchAdminAuditLogStats,
   fetchAdminDashboardStats,
   fetchAdminDrivers,
   fetchAdminOwners,
@@ -13,6 +14,7 @@ export function AdminOverviewPage() {
     drivers: 0,
     vehicles: 0,
     trips: 0,
+    auditLogs: 0,
   });
   const [loading, setLoading] = useState(true);
 
@@ -21,10 +23,11 @@ export function AdminOverviewPage() {
     (async () => {
       setLoading(true);
       try {
-        const [dash, owners, drivers] = await Promise.all([
+        const [dash, owners, drivers, audit] = await Promise.all([
           fetchAdminDashboardStats(),
           fetchAdminOwners({ page: 1, limit: 1 }),
           fetchAdminDrivers({ page: 1, limit: 1 }),
+          fetchAdminAuditLogStats().catch(() => null),
         ]);
         if (cancelled) return;
         setStats({
@@ -38,9 +41,10 @@ export function AdminOverviewPage() {
             0,
           vehicles: Number(dash.totalVehicles) || 0,
           trips: Number(dash.totalTrips) || 0,
+          auditLogs: audit ? audit.totalActions : 0,
         });
       } catch {
-        if (!cancelled) setStats({ owners: 0, drivers: 0, vehicles: 0, trips: 0 });
+        if (!cancelled) setStats({ owners: 0, drivers: 0, vehicles: 0, trips: 0, auditLogs: 0 });
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -63,6 +67,12 @@ export function AdminOverviewPage() {
       to: "/admin/drivers",
       icon: Users,
     },
+    {
+      label: "Audit Logs",
+      value: stats.auditLogs,
+      to: "/admin/audit-logs",
+      icon: ScrollText,
+    },
   ];
 
   return (
@@ -76,7 +86,7 @@ export function AdminOverviewPage() {
         </p>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid gap-4 sm:grid-cols-3">
         {cards.map(({ label, value, to, icon: Icon }) => (
           <Link
             key={label}

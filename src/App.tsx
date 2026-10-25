@@ -28,6 +28,7 @@ import { AdminLayout } from "./features/admin/components/AdminLayout";
 import { AdminOverviewPage } from "./features/admin/pages/AdminOverviewPage";
 import { AdminOwnersPage } from "./features/admin/pages/AdminOwnersPage";
 import { AdminDriversPage } from "./features/admin/pages/AdminDriversPage";
+import { AdminAuditLogsPage } from "./features/admin/pages/AdminAuditLogsPage";
 
 function App() {
   return (
@@ -47,6 +48,7 @@ function App() {
         <Route index element={<AdminOverviewPage />} />
         <Route path="owners" element={<AdminOwnersPage />} />
         <Route path="drivers" element={<AdminDriversPage />} />
+        <Route path="audit-logs" element={<AdminAuditLogsPage />} />
       </Route>
 
       <Route

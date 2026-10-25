@@ -15,6 +15,8 @@ export const ApiEndpoints = {
   adminOwnerCredentials: (id: string) => `/admin/owners/${id}/credentials`,
   adminDrivers: '/admin/drivers',
   adminDriverById: (id: string) => `/admin/drivers/${id}`,
+  adminAuditLogs: '/admin/audit-logs',
+  adminAuditLogStats: '/admin/audit-logs/stats',
 
   // OWNER PROFILE
   ownerProfile: '/owners/profile',

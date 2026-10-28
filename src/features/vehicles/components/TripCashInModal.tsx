@@ -24,7 +24,14 @@ export interface TripCashInModalTrip {
   pickup?: string;
   drop?: string;
   agencyName?: string;
+  agencyCost?: number | string;
   agencyProfit?: number | string;
+  cashInSummary?: {
+    due?: number;
+    paid?: number;
+    remaining?: number;
+    status?: string;
+  };
 }
 
 const inputCls =
@@ -55,7 +62,15 @@ export function TripCashInModal({
   onSuccess: () => void;
 }) {
   const backdropRef = useRef<HTMLDivElement>(null);
-  const totalDue = Math.max(0, Math.round(Number(trip.agencyProfit) || 0));
+  const cost = Number(trip.agencyCost);
+  const totalDue = Math.max(
+    0,
+    Math.round(
+      Number.isFinite(cost) && cost > 0
+        ? cost
+        : Number(trip.cashInSummary?.due) || Number(trip.agencyProfit) || 0,
+    ),
+  );
   const route = [trip.from ?? trip.pickup, trip.to ?? trip.drop]
     .filter(Boolean)
     .join(" → ");

@@ -1375,9 +1375,14 @@ function TripCashInModal({
   onClose: () => void;
   onSuccess: () => void;
 }) {
+  const cost = Number(trip.agencyCost);
   const totalDue = Math.max(
     0,
-    Math.round(resolveTripAgencyProfitDisplay(trip)),
+    Math.round(
+      Number.isFinite(cost) && cost > 0
+        ? cost
+        : Number(trip.cashInSummary?.due) || resolveTripAgencyProfitDisplay(trip),
+    ),
   );
   const route = [trip.from, trip.to].filter(Boolean).join(" → ");
   const tripLabel = trip.tripNumber ? `Trip ${trip.tripNumber}` : "Vehicle trip";
@@ -2016,7 +2021,15 @@ function VehicleHistoryTab({
                   </div>
                 </div>
 
-                <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3">
+                <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                  <div className="rounded-lg border border-sky-200 bg-sky-50/60 p-2 dark:border-sky-500/30 dark:bg-sky-500/10">
+                    <div className="text-[11px] font-semibold text-sky-800 dark:text-sky-300">
+                      Agency Cost
+                    </div>
+                    <div className="mt-1 text-sm font-bold text-slate-900 dark:text-white">
+                      {formatMoney0(t.agencyCost)}
+                    </div>
+                  </div>
                   <div className="rounded-lg border border-emerald-200 bg-emerald-50/60 p-2 dark:border-emerald-500/30 dark:bg-emerald-500/10">
                     <div className="text-[11px] font-semibold text-emerald-800 dark:text-emerald-300">
                       Driver Salary

@@ -136,6 +136,12 @@ export interface HistoryTripItem {
   agencyProfit?: number;
   agencyCost?: number;
   cabCost?: number;
+  cashInSummary?: {
+    due?: number;
+    paid?: number;
+    remaining?: number;
+    status?: string;
+  };
   careOf?: { name?: string; phone?: string };
   driver?: {
     _id?: string;
@@ -411,6 +417,7 @@ export async function fetchVehicleHistoryDetailed(params: {
       agencyProfit: t.agencyProfit ?? t.ownerProfit,
       agencyCost: t.agencyCost,
       cabCost: t.cabCost,
+      cashInSummary: t.cashInSummary,
       driverName:
         (
           t.driver?.fullName ??

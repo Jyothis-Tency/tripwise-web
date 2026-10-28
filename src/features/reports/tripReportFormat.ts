@@ -179,8 +179,12 @@ function resolveReportPaymentFields(trip: HistoryTrip): {
     };
   }
 
-  // Vehicle without cashInSummary: match History TripCard (due = owner profit).
-  const due = resolveTripAgencyProfitDisplay(trip);
+  // Vehicle without cashInSummary: match History TripCard (due = agency fare / cost).
+  const cost = Number(trip.agencyCost);
+  const due =
+    Number.isFinite(cost) && cost > 0
+      ? cost
+      : resolveTripAgencyProfitDisplay(trip);
   return { paid: 0, remaining: due, paymentStatus: "UNPAID" };
 }
 

@@ -137,7 +137,11 @@ function resolveCashInSummary(trip: HistoryTrip): {
       status: trip.cashInSummary.status,
     };
   }
-  const due = resolveTripAgencyProfitDisplay(trip);
+  const cost = Number(trip.agencyCost);
+  const due =
+    Number.isFinite(cost) && cost > 0
+      ? cost
+      : resolveTripAgencyProfitDisplay(trip);
   return { due, paid: 0, remaining: due, status: "unpaid" };
 }
 
@@ -1168,7 +1172,9 @@ export function TripCard({
             pickup: trip.pickup,
             drop: trip.drop,
             agencyName: trip.agencyName,
+            agencyCost: trip.agencyCost,
             agencyProfit,
+            cashInSummary: trip.cashInSummary,
           }}
           resolveAgencyLabel={
             resolveAgencyLabel ?? ((n) => n?.trim() || "—")

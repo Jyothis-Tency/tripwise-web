@@ -1129,9 +1129,7 @@ export function TransactionHistoryPage() {
     tab === "agencies"
       ? (() => {
           const a = agencies.find((x) => (x._id ?? x.id) === selectedAgencyId);
-          return a
-            ? formatAgencyLabel(a)
-            : (agencyDetail?.agency.name ?? "Agency");
+          return a?.name?.trim() || agencyDetail?.agency.name || "Agency";
         })()
       : (() => {
           const d = drivers.find((x) => (x._id ?? x.id) === selectedDriverId);
@@ -1143,9 +1141,10 @@ export function TransactionHistoryPage() {
   const selectedSubtitle =
     tab === "agencies"
       ? agencies.find((x) => (x._id ?? x.id) === selectedAgencyId)?.phone ||
-        "Agency"
+        (agencyDetail?.agency as { phone?: string })?.phone ||
+        ""
       : drivers.find((x) => (x._id ?? x.id) === selectedDriverId)?.phone ||
-        "Driver";
+        "";
 
   const clearDetail = () => {
     if (tab === "agencies") setSelectedAgencyId(null);
@@ -1317,7 +1316,7 @@ export function TransactionHistoryPage() {
               ) : (
                 filteredAgencies.map((a, i) => {
                   const id = a._id ?? a.id ?? "";
-                  const name = formatAgencyLabel(a);
+                  const name = a.name?.trim() || "Agency";
                   const phone = a.phone || "";
                   const sel = id === selectedAgencyId;
                   return (
@@ -1391,7 +1390,8 @@ export function TransactionHistoryPage() {
                       {selectedTitle}
                       {selectedSubtitle &&
                       selectedSubtitle !== "Agency" &&
-                      selectedSubtitle !== "Driver"
+                      selectedSubtitle !== "Driver" &&
+                      !selectedTitle.includes(selectedSubtitle)
                         ? ` · ${selectedSubtitle}`
                         : ""}
                     </h2>
@@ -1894,7 +1894,7 @@ function EntityRow({
       <span className="min-w-0">
         <span className="block truncate text-sm font-bold text-slate-900 dark:text-[#eef0ff]">
           {name}
-          {phone ? ` · ${phone}` : ""}
+          {phone && !name.includes(phone) ? ` · ${phone}` : ""}
         </span>
         <span className="block truncate text-xs text-slate-500 dark:text-[#8d94b8]">
           {phone || kind}

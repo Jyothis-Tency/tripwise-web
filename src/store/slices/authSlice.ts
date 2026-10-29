@@ -1,6 +1,7 @@
 import { createSlice, createAsyncThunk, type PayloadAction } from '@reduxjs/toolkit';
 import type { AuthState, AuthTokens, User } from '../types/auth.types';
 import { authApi } from '../../features/auth/api';
+import { isInwayOwner, updateDocumentBrand } from '../../lib/brand';
 
 const initialState: AuthState = {
   user: null,
@@ -65,6 +66,7 @@ const authSlice = createSlice({
         }
       }
       state.loading = false;
+      updateDocumentBrand(isInwayOwner(state.user));
     },
     updateTokens(state, action: PayloadAction<AuthTokens>) {
       state.tokens = action.payload;
@@ -106,6 +108,7 @@ const authSlice = createSlice({
         state.isAuthenticated = true;
         state.error = null;
         localStorage.setItem('userData', JSON.stringify(user));
+        updateDocumentBrand(isInwayOwner(user));
       })
       .addCase(loginUser.rejected, (state, action) => {
         state.loading = false;
@@ -124,6 +127,7 @@ const authSlice = createSlice({
         state.user = null;
         state.tokens = null;
         state.isAuthenticated = false;
+        updateDocumentBrand(false);
       })
       .addCase(logoutUser.rejected, (state) => {
         state.loading = false;

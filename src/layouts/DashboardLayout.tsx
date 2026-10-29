@@ -5,6 +5,7 @@ import { useState, useEffect } from "react";
 import { useAuth } from "../hooks/useAuth";
 import { useTheme } from "../hooks/useTheme";
 import { authApi } from "../features/auth/api";
+import { useBrand } from "../lib/brand";
 
 const routeTitle: Record<string, string> = {
   "/": "Dashboard",
@@ -63,6 +64,7 @@ export function DashboardLayout() {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const { user } = useAuth();
   const { theme, toggleTheme } = useTheme();
+  useBrand();
 
   // Close mobile menu on route change
   useEffect(() => {

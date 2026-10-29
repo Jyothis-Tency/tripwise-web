@@ -23,6 +23,18 @@
           if (localStorage.getItem('tripwise.theme') === 'dark') {
             document.documentElement.classList.add('dark');
           }
+          const raw = localStorage.getItem('userData');
+          if (raw) {
+            const u = JSON.parse(raw);
+            const c = (u.company || '').toLowerCase();
+            const e = (u.email || '').toLowerCase();
+            const n = (u.name || '').toLowerCase();
+            if (c.includes('inway') || e.includes('inwaycabs') || n.includes('inway')) {
+              document.title = 'Inway Cabs — Trip Management System';
+              const links = document.querySelectorAll("link[rel~='icon'], link[rel='shortcut icon'], link[rel='apple-touch-icon']");
+              links.forEach(function(l) { l.href = '/inway-favicon.svg'; });
+            }
+          }
         } catch (e) {}
       })();
     </script>

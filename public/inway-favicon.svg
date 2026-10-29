@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="340 187 400 400" role="img" aria-label="Inway Cabs">
+  <style>
+    .tile { fill: #0a0a0a; }
+    .mark-fill { fill: #ffffff; }
+    .mark-stroke { stroke: #ffffff; }
+    @media (prefers-color-scheme: dark) {
+      .tile { fill: #ffffff; }
+      .mark-fill { fill: #0a0a0a; }
+      .mark-stroke { stroke: #0a0a0a; }
+    }
+  </style>
+  <rect class="tile" x="340" y="187" width="400" height="400" rx="80"/>
+  <g id="mark">
+    <path class="mark-fill" d="M399 296 L411 272 Q418 260 432 265 L676 358 Q692 366 688 382 Q686 388 678 392 L497 508 Q485 515 474 510 Q464 504 468 490 L512 392 L408 315 Q396 308 399 296 Z"/>
+    <path class="mark-stroke" fill="none" stroke-width="32" stroke-linecap="round" stroke-linejoin="round" d="M408 429 L424 458 L467 393"/>
+  </g>
+</svg>

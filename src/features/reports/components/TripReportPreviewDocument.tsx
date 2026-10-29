@@ -4,6 +4,8 @@ import type { ReportFieldSelection } from "../reportFieldConfig";
 import { tripReportTotalLines } from "../reportTotalsDisplay";
 import { buildReportCardLines } from "../tripReportCardLayout";
 import { toTripReportRow } from "../tripReportFormat";
+import { useBrand } from "../../../lib/brand";
+import { TripwiseLogo } from "../../../components/brand/TripwiseLogo";
 
 function DetailLine({ label, value }: { label: string; value: string }) {
   return (
@@ -95,18 +97,32 @@ export function TripReportPreviewDocument({
     return `${Number(d)}/${Number(m)}/${Number(y)}`;
   })();
   const totalLines = reportTotals ? tripReportTotalLines(reportTotals) : [];
+  const { confidentialNotice, isInway } = useBrand();
 
   return (
     <div className="mx-auto w-full max-w-full bg-white text-slate-900 shadow-[0_20px_40px_-14px_rgba(15,23,42,0.28)] ring-1 ring-slate-900/10">
       <div className="border-b border-slate-200 bg-slate-50/80 px-4 py-2 sm:px-6">
         <div className="flex items-center justify-between gap-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">
-          <span>TripWise · Confidential</span>
+          <span>{confidentialNotice}</span>
           <span className="font-mono tracking-normal normal-case text-slate-400">
             Preview
           </span>
         </div>
       </div>
       <div className="px-4 py-5 sm:px-6 sm:py-6">
+        {isInway && (
+          <div className="mb-4 flex items-center gap-3">
+            <TripwiseLogo className="h-10 w-10 shrink-0" variant="auto" />
+            <div>
+              <div className="font-['Poppins',system-ui,sans-serif] text-sm font-bold tracking-tight text-slate-900">
+                INWAY CABS
+              </div>
+              <p className="text-[11px] font-medium text-slate-500">
+                Fleet Operations
+              </p>
+            </div>
+          </div>
+        )}
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">
             <h3 className="text-xl font-bold tracking-tight text-slate-900 sm:text-2xl">

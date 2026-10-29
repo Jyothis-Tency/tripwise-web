@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Inway Cabs – Logo</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap">
+<style>
+:root{--bg:#0a0a0a;--fg:#ffffff;--line:#262626;--label:#8a8a8a;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:'Poppins',system-ui,sans-serif;padding:32px 20px}
+h1{font-weight:400;font-size:14px;letter-spacing:.2em;text-transform:uppercase;color:var(--label);text-align:center;margin:0 0 28px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:20px;max-width:960px;margin:0 auto}
+figure{margin:0;border:1px solid var(--line);border-radius:16px;padding:24px;display:flex;flex-direction:column;align-items:center;gap:16px}
+figure svg{width:100%;max-width:360px;height:auto;display:block}
+figcaption{font-size:12px;letter-spacing:.15em;text-transform:uppercase;color:var(--label)}
+</style>
+</head>
+<body>
+<h1>Inway Cabs · Logo</h1>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <g id="mark">
+      <path fill="#fff" d="M399 296 L411 272 Q418 260 432 265 L676 358 Q692 366 688 382 Q686 388 678 392 L497 508 Q485 515 474 510 Q464 504 468 490 L512 392 L408 315 Q396 308 399 296 Z"/>
+      <path fill="none" stroke="#fff" stroke-width="32" stroke-linecap="round" stroke-linejoin="round" d="M408 429 L424 458 L467 393"/>
+    </g>
+  </defs>
+</svg>
+
+<div class="grid">
+  <figure>
+    <svg viewBox="340 207 400 360" role="img" aria-label="Inway Cabs logo mark">
+      <rect x="340" y="207" width="400" height="360" fill="#0a0a0a"/>
+      <use href="#mark"/>
+    </svg>
+    <figcaption>Logo only</figcaption>
+  </figure>
+
+  <figure>
+    <svg viewBox="240 210 600 680" role="img" aria-label="Inway Cabs logo with text">
+      <rect x="240" y="210" width="600" height="680" fill="#0a0a0a"/>
+      <use href="#mark"/>
+      <text x="268" y="710" font-family="'Poppins',system-ui,sans-serif" font-size="176" font-weight="600" fill="#fff" textLength="550" lengthAdjust="spacing">inway</text>
+      <text x="394" y="838" font-family="'Poppins',system-ui,sans-serif" font-size="96" font-weight="400" fill="#d4d4d4" textLength="332" lengthAdjust="spacing">cabs</text>
+    </svg>
+    <figcaption>Logo with text</figcaption>
+  </figure>
+</div>
+</body>
+</html>

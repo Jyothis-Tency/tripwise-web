@@ -28,6 +28,7 @@ export interface Agency {
   phone?: string;
   owner?: string;
   createdAt?: string;
+  remainingAmount?: number;
 }
 
 export interface AgencyTrip {
@@ -135,6 +136,8 @@ export async function fetchAgencies(
       phone: a.phone ?? "",
       owner: a.owner,
       createdAt: a.createdAt,
+      remainingAmount:
+        a.remainingAmount != null ? Number(a.remainingAmount) : undefined,
     })),
     total: root.total ?? root.totalAgencies ?? list.length,
   };

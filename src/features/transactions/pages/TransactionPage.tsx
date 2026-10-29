@@ -367,13 +367,21 @@ export function TransactionPage() {
               id: a._id ?? a.id ?? "",
               label: a.name,
               sub: a.phone || "Agency",
+              remaining: a.remainingAmount,
             }))
-            .filter((o) => o.id && (!q || o.label.toLowerCase().includes(q)))
+            .filter(
+              (o) =>
+                o.id &&
+                (!q ||
+                  o.label.toLowerCase().includes(q) ||
+                  o.sub.toLowerCase().includes(q)),
+            )
         : drivers
             .map((d) => ({
               id: d._id,
               label: driverDisplayName(d),
               sub: d.phone || "Driver",
+              remaining: undefined as number | undefined,
             }))
             .filter(
               (o) =>
@@ -723,13 +731,26 @@ export function TransactionPage() {
                                 )}
                               </div>
                               <div className="min-w-0 flex-1">
-                                <div className="flex min-w-0 items-center gap-1.5">
-                                  <p className="truncate text-sm font-semibold text-slate-900 dark:text-slate-100">
-                                    {o.label}
-                                  </p>
-                                  {o.recent && !nameQuery.trim() && (
-                                    <span className="shrink-0 rounded bg-indigo-50 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-indigo-600 dark:bg-indigo-500/15 dark:text-indigo-300">
-                                      Recent
+                                <div className="flex min-w-0 items-center justify-between gap-1.5">
+                                  <div className="flex min-w-0 items-center gap-1.5">
+                                    <p className="truncate text-sm font-semibold text-slate-900 dark:text-slate-100">
+                                      {o.label}
+                                    </p>
+                                    {o.recent && !nameQuery.trim() && (
+                                      <span className="shrink-0 rounded bg-indigo-50 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-indigo-600 dark:bg-indigo-500/15 dark:text-indigo-300">
+                                        Recent
+                                      </span>
+                                    )}
+                                  </div>
+                                  {o.remaining != null && (
+                                    <span
+                                      className={`shrink-0 rounded-md px-1.5 py-0.5 text-[11px] font-bold tabular-nums ${
+                                        o.remaining > 0
+                                          ? "bg-rose-50 text-rose-600 dark:bg-rose-500/10 dark:text-rose-400"
+                                          : "bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400"
+                                      }`}
+                                    >
+                                      ₹{Math.abs(o.remaining).toLocaleString("en-IN")}
                                     </span>
                                   )}
                                 </div>

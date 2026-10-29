@@ -1319,6 +1319,10 @@ export function TransactionHistoryPage() {
                   const name = a.name?.trim() || "Agency";
                   const phone = a.phone || "";
                   const sel = id === selectedAgencyId;
+                  const remaining =
+                    sel && agencyCards != null
+                      ? agencyCards.remaining
+                      : a.remainingAmount;
                   return (
                     <EntityRow
                       key={id}
@@ -1327,6 +1331,7 @@ export function TransactionHistoryPage() {
                       kind="Agency"
                       color={avatarColor(i)}
                       selected={sel}
+                      remaining={remaining}
                       onClick={() => setSelectedAgencyId(id)}
                     />
                   );
@@ -1338,6 +1343,8 @@ export function TransactionHistoryPage() {
               filteredDrivers.map((d, i) => {
                 const name = driverName(d);
                 const sel = d._id === selectedDriverId;
+                const remaining =
+                  sel && driverCards != null ? driverCards.toPay : undefined;
                 return (
                   <EntityRow
                     key={d._id}
@@ -1346,6 +1353,7 @@ export function TransactionHistoryPage() {
                     kind="Driver"
                     color={avatarColor(i)}
                     selected={sel}
+                    remaining={remaining}
                     onClick={() => setSelectedDriverId(d._id)}
                   />
                 );
@@ -1866,6 +1874,7 @@ function EntityRow({
   kind,
   color,
   selected,
+  remaining,
   onClick,
 }: {
   name: string;
@@ -1873,6 +1882,7 @@ function EntityRow({
   kind: string;
   color: string;
   selected: boolean;
+  remaining?: number | null;
   onClick: () => void;
 }) {
   return (
@@ -1891,10 +1901,22 @@ function EntityRow({
       >
         {initials(name)}
       </span>
-      <span className="min-w-0">
-        <span className="block truncate text-sm font-bold text-slate-900 dark:text-[#eef0ff]">
-          {name}
-          {phone && !name.includes(phone) ? ` · ${phone}` : ""}
+      <span className="min-w-0 flex-1">
+        <span className="flex items-center justify-between gap-1.5">
+          <span className="block truncate text-sm font-bold text-slate-900 dark:text-[#eef0ff]">
+            {name}
+          </span>
+          {remaining != null && (
+            <span
+              className={`shrink-0 rounded-md px-1.5 py-0.5 text-[11px] font-bold tabular-nums ${
+                remaining > 0
+                  ? "bg-rose-50 text-rose-600 dark:bg-rose-500/10 dark:text-rose-400"
+                  : "bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400"
+              }`}
+            >
+              {fmtCardCurrency(remaining)}
+            </span>
+          )}
         </span>
         <span className="block truncate text-xs text-slate-500 dark:text-[#8d94b8]">
           {phone || kind}

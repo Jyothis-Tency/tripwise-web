@@ -1,3 +1,5 @@
+import { useBrand } from "../../lib/brand";
+
 type TripwiseLogoVariant = "navy" | "amber" | "auto";
 
 type TripwiseLogoProps = {
@@ -78,42 +80,133 @@ function MarkSvg({
   );
 }
 
+function InwayMarkSvg({
+  tile = "#0a0a0a",
+  mark = "#ffffff",
+  className,
+  alt = "Inway Cabs",
+}: {
+  tile?: string;
+  mark?: string;
+  className?: string;
+  alt?: string;
+}) {
+  return (
+    <svg
+      viewBox="340 187 400 400"
+      role="img"
+      aria-label={alt}
+      className={className}
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <title>{alt}</title>
+      <rect x="340" y="187" width="400" height="400" rx="80" fill={tile} />
+      <g>
+        <path
+          fill={mark}
+          d="M399 296 L411 272 Q418 260 432 265 L676 358 Q692 366 688 382 Q686 388 678 392 L497 508 Q485 515 474 510 Q464 504 468 490 L512 392 L408 315 Q396 308 399 296 Z"
+        />
+        <path
+          fill="none"
+          stroke={mark}
+          strokeWidth="32"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M408 429 L424 458 L467 393"
+        />
+      </g>
+    </svg>
+  );
+}
+
 /**
- * Official Tripwise brand mark — rounded T with dashed road lines.
- * Spec: navy #12243A · amber #F5A300
+ * Official brand mark — Tripwise or Inway Cabs (dynamic per logged-in owner).
  */
 export function TripwiseLogo({
   className = "h-11 w-11",
-  alt = "Tripwise",
+  alt,
   variant = "auto",
   withWordmark = false,
   tagline,
 }: TripwiseLogoProps) {
+  const { isInway } = useBrand();
+  const effectiveAlt = alt ?? (isInway ? "Inway Cabs" : "Tripwise");
   const markClass = withWordmark ? "h-full w-full" : className;
 
-  const mark =
+  const mark = isInway ? (
     variant === "auto" ? (
       <>
-        <MarkSvg
-          {...COLORS.navy}
-          alt={alt}
+        {/* Light mode: dark tile with white mark */}
+        <InwayMarkSvg
+          tile="#0a0a0a"
+          mark="#ffffff"
           className={`${markClass} dark:hidden`}
+          alt={effectiveAlt}
         />
-        <MarkSvg
-          {...COLORS.amber}
-          alt={alt}
+        {/* Dark mode: crisp white tile with dark mark to match dark theme */}
+        <InwayMarkSvg
+          tile="#ffffff"
+          mark="#0a0a0a"
           className={`${markClass} hidden dark:block`}
+          alt={effectiveAlt}
         />
       </>
+    ) : variant === "amber" ? (
+      <InwayMarkSvg
+        tile="#ffffff"
+        mark="#0a0a0a"
+        className={markClass}
+        alt={effectiveAlt}
+      />
     ) : (
-      <MarkSvg {...COLORS[variant]} alt={alt} className={markClass} />
-    );
+      <InwayMarkSvg
+        tile="#0a0a0a"
+        mark="#ffffff"
+        className={markClass}
+        alt={effectiveAlt}
+      />
+    )
+  ) : variant === "auto" ? (
+    <>
+      <MarkSvg
+        {...COLORS.navy}
+        alt={effectiveAlt}
+        className={`${markClass} dark:hidden`}
+      />
+      <MarkSvg
+        {...COLORS.amber}
+        alt={effectiveAlt}
+        className={`${markClass} hidden dark:block`}
+      />
+    </>
+  ) : (
+    <MarkSvg {...COLORS[variant]} alt={effectiveAlt} className={markClass} />
+  );
 
   if (!withWordmark) {
     if (variant === "auto") {
       return <span className={`inline-flex ${className}`}>{mark}</span>;
     }
     return mark;
+  }
+
+  if (isInway) {
+    return (
+      <div className={`flex min-w-0 items-center gap-2.5 ${className}`}>
+        <div className="relative h-11 w-11 shrink-0">{mark}</div>
+        <div className="min-w-0">
+          <div className="flex items-baseline truncate font-['Poppins',system-ui,sans-serif] text-[15px] font-bold tracking-tight text-slate-900 dark:text-white">
+            <span>inway</span>
+            <span className="ml-1 font-normal text-slate-500 dark:text-neutral-400">cabs</span>
+          </div>
+          {tagline ? (
+            <p className="truncate text-[11px] font-medium text-slate-400 dark:text-slate-500">
+              {tagline}
+            </p>
+          ) : null}
+        </div>
+      </div>
+    );
   }
 
   return (

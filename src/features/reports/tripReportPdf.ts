@@ -8,6 +8,7 @@ import {
   maxBodyLineCount,
 } from "./tripReportCardLayout";
 import { reportFmtDate, toTripReportRow } from "./tripReportFormat";
+import { createInwayLogoPngDataUrl, isInwayOwner } from "../../lib/brand";
 
 export type TripReportPdfOptions = {
   title?: string;
@@ -95,6 +96,26 @@ export function downloadTripReportPdf(
       bold: false,
     });
   };
+
+  const inway = isInwayOwner();
+  if (inway) {
+    const logoData = createInwayLogoPngDataUrl(400);
+    if (logoData) {
+      doc.addImage(logoData, "PNG", leftX, y - 4, 12, 12);
+    } else {
+      doc.setFillColor(10, 10, 10);
+      doc.roundedRect(leftX, y - 4, 12, 12, 2, 2, "F");
+    }
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(14);
+    doc.setTextColor(15, 23, 42);
+    doc.text("INWAY CABS", leftX + 16, y + 2);
+    doc.setFontSize(8);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(100, 116, 139);
+    doc.text("Fleet Operations", leftX + 16, y + 6);
+    y += 16;
+  }
 
   writeText(title, leftX, y, { size: 18, bold: true });
   const tripsLabel = `Total Trips: ${trips.length}`;

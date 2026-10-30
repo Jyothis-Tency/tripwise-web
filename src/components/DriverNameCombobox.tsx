@@ -4,6 +4,7 @@ import {
   fetchDrivers,
   createDriver,
   type Driver,
+  isBulkDriver,
 } from "../features/drivers/api";
 import {
   driverDisplayName,
@@ -385,6 +386,9 @@ export function DriverNameCombobox({
           email: `bulk.${phoneDigits}.${Date.now().toString(36)}@tripwise.com`,
           phone: phoneDigits,
           place: "N/A",
+          Guest: true,
+          guest: true,
+          isGuest: true,
         });
         pickDriver(driver);
         await reload();
@@ -474,7 +478,7 @@ export function DriverNameCombobox({
                 <button
                   key={key}
                   type="button"
-                  className={`w-full px-3 py-2 text-left text-sm hover:bg-indigo-50 dark:hover:bg-indigo-500/10 ${
+                  className={`flex w-full items-center justify-between px-3 py-2 text-left text-sm hover:bg-indigo-50 dark:hover:bg-indigo-500/10 ${
                     isSelected
                       ? "bg-indigo-50 font-medium text-indigo-800 dark:bg-indigo-500/15 dark:text-indigo-300"
                       : "text-slate-800 dark:text-slate-200"
@@ -484,7 +488,12 @@ export function DriverNameCombobox({
                     pickDriver(driver);
                   }}
                 >
-                  {label}
+                  <span className="truncate">{label}</span>
+                  {isBulkDriver(driver) && (
+                    <span className="ml-2 shrink-0 rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-bold text-amber-700 ring-1 ring-inset ring-amber-600/20 dark:bg-amber-400/15 dark:text-amber-300">
+                      Bulk Driver
+                    </span>
+                  )}
                 </button>
               );
             })}

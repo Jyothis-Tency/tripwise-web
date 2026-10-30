@@ -56,6 +56,7 @@ const fullHeightPaths = [
   "/transaction-history",
   "/reports",
   "/history",
+  "/trip-confirmation",
 ];
 
 export function DashboardLayout() {

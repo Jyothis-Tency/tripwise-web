@@ -1,35 +1,22 @@
 /**
- * Trip Confirmation seed — preloadable defaults only.
- *
- * Differs every trip (NOT seeded as values):
- * - Document title
- * - Trip → Booking Confirmation (fields, route, package price, package includes, advance)
- *
- * Preloaded (same most of the time):
- * - Company name
- * - Payment details
- * - Bank / account lines
- * - Fixed sentences (booking, balance, vehicle, tagline)
+ * Trip Confirmation seed — preloadable defaults matching the official Inway Cabs layout.
  */
 
 export type SeedField = { label: string; value: string };
 
 export type TripConfirmationSeed = {
   companyName: string;
-  /** Empty — changes every quotation */
+  subtitle: string;
   documentTitle: string;
-  /** Field names only — values filled per trip */
   tripFieldNames: string[];
   packagePriceHeading: string;
   packageIncludesTitle: string;
-  /** Empty — package includes change every trip */
   packageIncludesItems: string[];
   extraKmLabel: string;
   tripDetailsHeading: string;
   tripDetailFieldNames: string[];
   bookingHeading: string;
   advanceLabel: string;
-  /** Preloaded sentences */
   bookingConfirmSentence: string;
   balanceSentence: string;
   paymentHeading: string;
@@ -38,50 +25,55 @@ export type TripConfirmationSeed = {
   vehicleAvailableSentence: string;
   footerBrand: string;
   footerTagline: string;
+  footerContact: string;
 };
 
-/** Canonical seed from INWAY CABS quotation layout. */
 export const TRIP_CONFIRMATION_SEED: TripConfirmationSeed = {
   companyName: "INWAY CABS",
-  documentTitle: "",
+  subtitle: "Premium Taxi Service · Kochi",
+  documentTitle: "TRIP CONFIRMATION",
   tripFieldNames: [
+    "Customer Name",
     "Trip",
     "Duration",
     "Vehicle",
     "Package",
     "KM Calculation",
+    "Route",
+    "Sightseeing",
   ],
   packagePriceHeading: "PACKAGE PRICE",
-  packageIncludesTitle: "Package Includes:",
-  packageIncludesItems: [],
-  extraKmLabel: "Extra KM",
+  packageIncludesTitle: "Package includes",
+  packageIncludesItems: ["Tolls parking driver exp and fuel"],
+  extraKmLabel: "Extra km",
   tripDetailsHeading: "TRIP DETAILS",
   tripDetailFieldNames: [
+    "Trip Dates",
     "Arrival",
     "Departure",
-    "Driver Name",
-    "Driver Number",
-    "Pickup Time",
+    "Pickup",
+    "Drop",
   ],
   bookingHeading: "BOOKING CONFIRMATION",
   advanceLabel: "Advance",
   bookingConfirmSentence:
     "Booking will be confirmed upon receipt of the advance.",
   balanceSentence:
-    "Balance: Payable directly to the driver before completion of the trip.",
+    "Payable directly to the driver before completion of the trip.",
   paymentHeading: "PAYMENT DETAILS",
   paymentFields: [
     { label: "UPI ID", value: "nebeel2688-1@okhdfcbank" },
-    { label: "G Pay / PhonePe", value: "8086556655" },
+    { label: "GPay / PhonePe", value: "8086556655" },
+    { label: "Bank", value: "HDFC Bank | Current Account" },
+    { label: "Account Name", value: "INWAY CABS" },
+    { label: "A/C No.", value: "50200096785876" },
+    { label: "IFSC", value: "HDFC0007323" },
+    { label: "Branch", value: "Thammanam" },
   ],
-  bankLines: [
-    "HDFC Bank | Current Account",
-    "A/C: 50200096785876",
-    "IFSC: HDFC0007323",
-    "Branch: Thammanam",
-  ],
+  bankLines: [],
   vehicleAvailableSentence: "Vehicle available on pre-booking basis only.",
-  footerBrand: "★ INWAY CABS",
+  footerBrand: "INWAY CABS",
   footerTagline:
     "Professional Service • Clean Vehicles • Experienced Drivers • Customer Satisfaction",
+  footerContact: "+91 80865 56655 · inwaycabs@gmail.com · inwaycabs.in",
 };

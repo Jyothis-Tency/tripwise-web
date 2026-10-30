@@ -18,6 +18,9 @@ export interface Driver {
   isBlocked?: boolean;
   blockedAt?: string;
   status?: string;
+  Guest?: boolean;
+  guest?: boolean;
+  isGuest?: boolean;
   assignedVehicle?: string | { _id: string; vehicleNumber: string; vehicleModel?: string };
   currentTrip?: string;
   documents?: string[];
@@ -25,6 +28,17 @@ export interface Driver {
   totalKm?: number;
   createdAt?: string;
   updatedAt?: string;
+}
+
+export function isBulkDriver(driver: Partial<Driver> | null | undefined): boolean {
+  if (!driver) return false;
+  const d = driver as Record<string, any>;
+  return Boolean(
+    d.Guest ||
+    d.guest ||
+    d.isGuest ||
+    (typeof d.email === "string" && /^bulk\./i.test(d.email))
+  );
 }
 
 export interface DriverSalaryData {
@@ -106,6 +120,9 @@ export async function createDriver(driver: {
   password?: string;
   profileImg?: string;
   licenseImg?: string;
+  Guest?: boolean;
+  guest?: boolean;
+  isGuest?: boolean;
 }): Promise<Driver> {
   const { data } = await apiClient.post('/owners/drivers', driver);
   return data.data ?? data;

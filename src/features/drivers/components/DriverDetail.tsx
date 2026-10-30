@@ -16,6 +16,7 @@ import {
   Search,
   Calendar,
   User,
+  Users,
   Mail,
   Copy,
   Lock,
@@ -24,6 +25,7 @@ import type {
   Driver,
   DriverSalaryData,
 } from "../api";
+import { isBulkDriver } from "../api";
 import {
   blockDriver,
   unblockDriver,
@@ -619,8 +621,12 @@ function buildDriverCredentialsWhatsAppMessage(opts: {
   loginId: string;
   password: string;
 }): string {
+  const isInway =
+    (opts.ownerCompany || "").toLowerCase().includes("inway") ||
+    (opts.ownerName || "").toLowerCase().includes("inway");
+  const brandName = isInway ? "Inway Cabs" : "Tripwise";
   const lines = [
-    "*Tripwise — Driver login*",
+    `*${brandName} — Driver login*`,
     "",
     `*Owner:* ${opts.ownerName || "—"}`,
   ];
@@ -732,6 +738,7 @@ export function DriverDetail({
 
   const name = driverDisplayName(driver);
   const isBlocked = !!driver.isBlocked;
+  const isBulk = isBulkDriver(driver);
   const color = driverAvatarColor(avatarIndex);
 
   const shareOnWhatsApp = () => {
@@ -787,9 +794,16 @@ export function DriverDetail({
           <h2 className="truncate text-2xl font-extrabold tracking-tight">
             {name}
           </h2>
-          <span className="mt-1 inline-flex rounded-full bg-white/20 px-2.5 py-0.5 text-[11px] font-bold">
-            {isBlocked ? "● Blocked" : "● Active"}
-          </span>
+          <div className="mt-1 flex flex-wrap items-center gap-2">
+            <span className="inline-flex rounded-full bg-white/20 px-2.5 py-0.5 text-[11px] font-bold">
+              {isBlocked ? "● Blocked" : "● Active"}
+            </span>
+            {isBulk && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-amber-400/25 px-2.5 py-0.5 text-[11px] font-bold text-amber-100 ring-1 ring-inset ring-amber-300/40">
+                Bulk Driver
+              </span>
+            )}
+          </div>
         </div>
         <div className="ml-auto flex flex-wrap gap-2">
           {driver.phone ? (
@@ -879,6 +893,7 @@ function DetailsTab({
 }) {
   const [showPassword, setShowPassword] = useState(false);
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
+  const isBulk = isBulkDriver(driver);
   const name = driverDisplayName(driver);
   const phone = driver.phone?.trim() || "";
   const email = driver.email?.trim() || "";
@@ -900,6 +915,16 @@ function DetailsTab({
       icon: <User className="h-4 w-4" />,
       accent: "from-indigo-500 to-violet-500",
       chip: "bg-indigo-50 text-indigo-600 dark:bg-[#242a57] dark:text-[#a5b4fc]",
+    },
+    {
+      key: "type",
+      label: "Driver Type",
+      value: isBulk ? "Bulk Driver (Guest Link)" : "Fleet Driver (Registered)",
+      icon: <Users className="h-4 w-4" />,
+      accent: isBulk ? "from-amber-500 to-orange-500" : "from-indigo-500 to-violet-500",
+      chip: isBulk
+        ? "bg-amber-50 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300"
+        : "bg-indigo-50 text-indigo-700 dark:bg-indigo-500/15 dark:text-indigo-300",
     },
     {
       key: "phone",

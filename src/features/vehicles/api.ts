@@ -90,6 +90,9 @@ export interface DriverItem {
   phone?: string;
   status?: string;
   isAvailable?: boolean;
+  Guest?: boolean;
+  guest?: boolean;
+  isGuest?: boolean;
 }
 
 export interface ExpenseItem {
@@ -538,8 +541,12 @@ export async function deleteVehicleExpense(vehicleId: string, expenseId: string)
 
 // ─── Drivers ──────────────────────────────────────────────────────────────────
 
-export async function fetchDriversList(): Promise<DriverItem[]> {
-  const res = await apiClient.get(ApiEndpoints.drivers + '?limit=100');
+export async function fetchDriversList(opts?: { guest?: boolean }): Promise<DriverItem[]> {
+  const params = new URLSearchParams({ limit: "100" });
+  if (opts?.guest !== undefined) {
+    params.set("guest", String(opts.guest));
+  }
+  const res = await apiClient.get(`${ApiEndpoints.drivers}?${params.toString()}`);
   const raw: any = res.data ?? {};
   const root = raw.data ?? raw;
   const data = root.data ?? root;
@@ -557,6 +564,9 @@ export async function fetchDriversList(): Promise<DriverItem[]> {
     phone: d.phone ?? d.phoneNumber,
     status: d.status,
     isAvailable: d.isAvailable ?? d.status === 'active',
+    Guest: Boolean(d.Guest ?? d.guest ?? d.isGuest),
+    guest: Boolean(d.guest ?? d.Guest ?? d.isGuest),
+    isGuest: Boolean(d.isGuest ?? d.guest ?? d.Guest),
   }));
 }
 

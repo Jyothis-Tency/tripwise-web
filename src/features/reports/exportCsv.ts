@@ -110,7 +110,7 @@ export function downloadTripReportCsv(
   const tripSource = opts?.tripSource ?? "vehicle";
   const resolveAgencyLabel = opts?.resolveAgencyLabel ?? ((n) => n ?? "N/A");
   const fields = visibleReportFields(tripSource).filter(
-    (f) => fieldSelection[f.id],
+    (f) => fieldSelection[f.id] && f.id !== "reportTotals",
   );
   if (fields.length === 0) {
     throw new Error("Select at least one report field.");

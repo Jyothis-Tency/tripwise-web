@@ -147,4 +147,89 @@ export function createInwayLogoPngDataUrl(size = 400): string {
   }
 }
 
+/**
+ * Generates a crisp base64 PNG data URL of the official Tripwise brand mark tile
+ * for PDF exports.
+ */
+export function createTripwiseLogoPngDataUrl(size = 400): string {
+  if (typeof document === "undefined") return "";
+  try {
+    const canvas = document.createElement("canvas");
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return "";
+
+    const scale = size / 120;
+    // Tile: #12243A with rounded corners (rx=28)
+    ctx.fillStyle = "#12243A";
+    const r = 28 * scale;
+    ctx.beginPath();
+    if (typeof ctx.roundRect === "function") {
+      ctx.roundRect(0, 0, size, size, r);
+    } else {
+      ctx.rect(0, 0, size, size);
+    }
+    ctx.fill();
+
+    // Tee: #FFFFFF
+    ctx.fillStyle = "#FFFFFF";
+    ctx.beginPath();
+    if (typeof ctx.roundRect === "function") {
+      ctx.roundRect(24 * scale, 24 * scale, 72 * scale, 18 * scale, 9 * scale);
+      ctx.roundRect(51 * scale, 24 * scale, 18 * scale, 72 * scale, 9 * scale);
+    } else {
+      ctx.rect(24 * scale, 24 * scale, 72 * scale, 18 * scale);
+      ctx.rect(51 * scale, 24 * scale, 18 * scale, 72 * scale);
+    }
+    ctx.fill();
+
+    return canvas.toDataURL("image/png");
+  } catch (err) {
+    return "";
+  }
+}
+
+export function createInwayWatermarkPngDataUrl(size = 600, opacity = 0.085): string {
+  if (typeof document === "undefined") return "";
+  try {
+    const canvas = document.createElement("canvas");
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return "";
+
+    const scale = size / 400;
+    ctx.clearRect(0, 0, size, size);
+
+    ctx.save();
+    ctx.globalAlpha = opacity;
+    ctx.scale(scale, scale);
+    ctx.translate(-340, -187);
+
+    // Chevron
+    ctx.fillStyle = "#000000";
+    const p1 = new Path2D(
+      "M399 296 L411 272 Q418 260 432 265 L676 358 Q692 366 688 382 Q686 388 678 392 L497 508 Q485 515 474 510 Q464 504 468 490 L512 392 L408 315 Q396 308 399 296 Z"
+    );
+    ctx.fill(p1);
+
+    // Checkmark
+    ctx.strokeStyle = "#000000";
+    ctx.lineWidth = 32;
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    const p2 = new Path2D("M408 429 L424 458 L467 393");
+    ctx.stroke(p2);
+
+    ctx.restore();
+
+    return canvas.toDataURL("image/png");
+  } catch (err) {
+    console.error("Failed to render Inway watermark to canvas:", err);
+    return "";
+  }
+}
+
+
 

@@ -62,9 +62,33 @@ import { TimePicker12h } from "../../../components/ui/TimePicker12h";
 import { normalizeHHmm } from "../../../lib/timePickerUtils";
 import { useTheme } from "../../../hooks/useTheme";
 import { TripwiseLogo } from "../../../components/brand/TripwiseLogo";
+import { useBrand, updateDocumentBrand } from "../../../lib/brand";
 
 type SyncStatus = "idle" | "saving" | "saved" | "error";
 const AUTOSAVE_DELAY = 1200;
+
+function checkIsInwayInvite(invite?: GuestBulkInvite | null, token?: string): boolean {
+  if (invite) {
+    const c = (invite.ownerCompany || "").toLowerCase();
+    const n = (invite.ownerName || "").toLowerCase();
+    const l = (invite.label || "").toLowerCase();
+    const match = c.includes("inway") || n.includes("inway") || l.includes("inway");
+    if (token && typeof sessionStorage !== "undefined") {
+      try {
+        sessionStorage.setItem(`guestBulkIsInway:${token}`, match ? "1" : "0");
+      } catch {}
+    }
+    return match;
+  }
+  if (token && typeof sessionStorage !== "undefined") {
+    try {
+      const cached = sessionStorage.getItem(`guestBulkIsInway:${token}`);
+      if (cached === "1") return true;
+      if (cached === "0") return false;
+    } catch {}
+  }
+  return false;
+}
 
 function storedGuestSessionError(msg: string) {
   return /guest session not found|enter your phone again|session expired/i.test(
@@ -1358,9 +1382,28 @@ function VehicleGroupsEditor({
 export function GuestBulkEntryPage() {
   const { token = "" } = useParams<{ token: string }>();
   const { theme, toggleTheme } = useTheme();
+  const { isInway: authIsInway } = useBrand();
   const [invite, setInvite] = useState<GuestBulkInvite | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+
+  const isInwayInvite = useMemo(() => {
+    if (authIsInway) return true;
+    return checkIsInwayInvite(invite, token);
+  }, [authIsInway, invite, token]);
+
+  useEffect(() => {
+    if (!invite && !token) return;
+    if (isInwayInvite) {
+      updateDocumentBrand(true);
+      const scopeTitle = invite?.scope === "agency" ? "Agency Entry" : "Driver Entry";
+      document.title = `Inway Cabs — ${scopeTitle}`;
+    } else if (invite) {
+      updateDocumentBrand(false);
+      const scopeTitle = invite.scope === "agency" ? "Agency Entry" : "Driver Entry";
+      document.title = `Tripwise — ${scopeTitle}`;
+    }
+  }, [isInwayInvite, invite, token]);
 
   const [agencies, setAgencies] = useState<Agency[]>([]);
   const [driverName, setDriverName] = useState("");
@@ -2550,7 +2593,7 @@ export function GuestBulkEntryPage() {
   if (loading) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-[var(--bg-main)]">
-        <TripwiseLogo variant="auto" className="h-16 w-16" />
+        <TripwiseLogo variant="auto" overrideInway={isInwayInvite} className="h-16 w-16" />
         <Loader2 className="h-6 w-6 animate-spin text-indigo-500" />
       </div>
     );
@@ -2562,7 +2605,9 @@ export function GuestBulkEntryPage() {
     return (
       <div className="flex min-h-screen items-center justify-center bg-[var(--bg-main)] p-6">
         <div className="w-full max-w-md rounded-2xl border border-rose-200 bg-[var(--bg-card)] p-6 text-center shadow-sm dark:border-rose-500/30">
-          <TripwiseLogo variant="auto" className="mx-auto mb-4 h-16 w-16" />
+          <div className="mb-4 flex justify-center">
+            <TripwiseLogo variant="auto" overrideInway={isInwayInvite} className="h-16 w-16" />
+          </div>
           <AlertCircle className="mx-auto mb-3 h-10 w-10 text-rose-400" />
           <h1 className="text-lg font-bold text-slate-800 dark:text-white">
             {blocked
@@ -2611,13 +2656,18 @@ export function GuestBulkEntryPage() {
   }
 
   if (joinRequired) {
+    const isAgency = invite.scope === "agency";
+    const brandPrefix = isInwayInvite ? "Inway Cabs" : "Tripwise";
+    const entryScopeLabel = isAgency ? "agency entry" : "driver entry";
     return (
       <div className="flex min-h-screen items-center justify-center bg-[var(--bg-main)] p-6">
         <div className="w-full max-w-md space-y-4 rounded-2xl border border-slate-200 bg-[var(--bg-card)] p-6 shadow-sm dark:border-[#1e2638]">
-          <TripwiseLogo variant="auto" className="mx-auto h-16 w-16" />
+          <div className="flex justify-center">
+            <TripwiseLogo variant="auto" overrideInway={isInwayInvite} className="h-16 w-16" />
+          </div>
           <div className="text-center">
             <p className="text-[10px] font-bold uppercase tracking-wider text-[#C98200] dark:text-[#F5A300]">
-              Tripwise · agency entry
+              {brandPrefix} · {entryScopeLabel}
             </p>
             <h1 className="mt-1 text-lg font-bold text-slate-800 dark:text-white">
               {invite.agencyName || invite.label}
@@ -3076,15 +3126,16 @@ export function GuestBulkEntryPage() {
             )}
             <TripwiseLogo
               variant="auto"
+              overrideInway={isInwayInvite}
               className="mt-0.5 h-9 w-9 shrink-0 sm:h-12 sm:w-12"
             />
             <div className="min-w-0 flex-1">
             <p className="text-[10px] font-bold uppercase tracking-wider text-[#C98200] dark:text-[#F5A300]">
               {isOwner
-                ? "Tripwise · owner review"
+                ? `${isInwayInvite ? "Inway Cabs" : "Tripwise"} · owner review`
                 : isAgencyScope
-                  ? "Tripwise · agency entry"
-                  : "Tripwise · driver entry"}
+                  ? `${isInwayInvite ? "Inway Cabs" : "Tripwise"} · agency entry`
+                  : `${isInwayInvite ? "Inway Cabs" : "Tripwise"} · driver entry`}
             </p>
             <h1 className="truncate text-base font-bold leading-snug text-slate-800 dark:text-white sm:text-lg">
               {isAgencyScope && invite.agencyName

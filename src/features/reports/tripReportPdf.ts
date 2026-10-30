@@ -17,6 +17,7 @@ export type TripReportPdfOptions = {
   fieldSelection: ReportFieldSelection;
   tripSource?: "vehicle" | "bulk";
   reportTotals?: TripReportTotals | null;
+  fileName?: string;
 };
 
 export function downloadTripReportPdf(
@@ -138,9 +139,11 @@ export function downloadTripReportPdf(
     y += 6;
   }
 
-  const totalLines = options.reportTotals
-    ? tripReportTotalLines(options.reportTotals)
-    : [];
+  const showTotals = options.fieldSelection?.reportTotals !== false;
+  const totalLines =
+    showTotals && options.reportTotals
+      ? tripReportTotalLines(options.reportTotals)
+      : [];
   if (totalLines.length > 0) {
     y += 2;
     writeText("Report totals", leftX, y, {
@@ -300,5 +303,12 @@ export function downloadTripReportPdf(
 
   const today = fmtDate(new Date()).replaceAll("/", "-");
   const safeTitle = title.replace(/[^\w\s-]/g, "").trim() || "Trip-Report";
-  doc.save(`${safeTitle} ${today}.pdf`);
+  const defaultFileName = `${safeTitle} ${today}`;
+  const rawFileName = options.fileName?.trim() || defaultFileName;
+  const cleanBase =
+    rawFileName
+      .replace(/\.pdf$/i, "")
+      .replace(/[\\/:*?"<>|]+/g, "_")
+      .trim() || "Trip-Report";
+  doc.save(`${cleanBase}.pdf`);
 }

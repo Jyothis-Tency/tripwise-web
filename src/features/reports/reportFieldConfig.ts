@@ -40,9 +40,15 @@ export type ReportFieldId =
   | "advance"
   | "paidAmount"
   | "balance"
-  | "toll";
+  | "toll"
+  | "reportTotals";
 
-export type ReportFieldSection = "header" | "left" | "middle" | "right";
+export type ReportFieldSection =
+  | "header"
+  | "left"
+  | "middle"
+  | "right"
+  | "summary";
 
 export type ReportFieldDef = {
   id: ReportFieldId;
@@ -143,6 +149,12 @@ export const REPORT_FIELD_DEFS: ReportFieldDef[] = [
   { id: "paidAmount", label: "Paid Amount", section: "right", defaultOn: false },
   { id: "balance", label: "Remaining", section: "right", defaultOn: true },
   { id: "toll", label: "Toll", section: "right", defaultOn: true },
+  {
+    id: "reportTotals",
+    label: "Report Totals",
+    section: "summary",
+    defaultOn: true,
+  },
 ];
 
 /** Bulk-only presentation fields (not typical vehicle-trip columns). */
@@ -215,7 +227,8 @@ export function defaultReportFieldSelection(
         f.id === "distance" ||
         f.id === "endDate" ||
         f.id === "vehicleType" ||
-        f.id === "notes"
+        f.id === "notes" ||
+        f.id === "reportTotals"
       ) {
         sel[f.id] = true;
         continue;

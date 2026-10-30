@@ -23,6 +23,7 @@ function withFields(
     base[key] = false;
   }
   for (const id of on) base[id] = true;
+  base.reportTotals = true;
   return base;
 }
 

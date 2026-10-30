@@ -1,4 +1,5 @@
 import type { Driver } from "../api";
+import { isBulkDriver } from "../api";
 
 const AVATAR_COLORS = [
   "#4f46e5",
@@ -54,6 +55,7 @@ export function DriverCard({
   const name = driverDisplayName(driver);
   const phone = driver.phone?.trim();
   const blocked = !!driver.isBlocked;
+  const isBulk = isBulkDriver(driver);
   const color = driverAvatarColor(index);
 
   return (
@@ -95,14 +97,21 @@ export function DriverCard({
         </span>
       </span>
 
-      <span
-        className={`shrink-0 rounded-full px-2.5 py-0.5 text-[11px] font-bold ${
-          blocked
-            ? "bg-rose-50 text-rose-600 dark:bg-[#3a1a1e] dark:text-[#fda4af]"
-            : "bg-emerald-50 text-emerald-700 dark:bg-[#0d3325] dark:text-[#34d399]"
-        }`}
-      >
-        {blocked ? "Blocked" : "Active"}
+      <span className="flex shrink-0 flex-col items-end gap-1">
+        {isBulk && (
+          <span className="inline-flex items-center rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-bold text-amber-700 ring-1 ring-inset ring-amber-600/25 dark:bg-amber-400/15 dark:text-amber-300 dark:ring-amber-400/30">
+            Bulk Driver
+          </span>
+        )}
+        <span
+          className={`rounded-full px-2.5 py-0.5 text-[11px] font-bold ${
+            blocked
+              ? "bg-rose-50 text-rose-600 dark:bg-[#3a1a1e] dark:text-[#fda4af]"
+              : "bg-emerald-50 text-emerald-700 dark:bg-[#0d3325] dark:text-[#34d399]"
+          }`}
+        >
+          {blocked ? "Blocked" : "Active"}
+        </span>
       </span>
     </button>
   );

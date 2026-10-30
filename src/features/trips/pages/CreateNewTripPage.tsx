@@ -97,6 +97,11 @@ function driverShortName(d: DriverItem): string {
 export function CreateNewTripPage() {
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [drivers, setDrivers] = useState<DriverItem[]>([]);
+
+  // Filter strictly to own drivers (exclude guest link drivers)
+  const ownDrivers = useMemo(() => {
+    return drivers.filter((d) => !d.Guest && !d.guest && !d.isGuest);
+  }, [drivers]);
   const [agencies, setAgencies] = useState<Agency[]>([]);
   const [listsLoading, setListsLoading] = useState(true);
   const [listsError, setListsError] = useState<string | null>(null);
@@ -130,7 +135,7 @@ export function CreateNewTripPage() {
     setListsError(null);
     Promise.all([
       fetchVehicles({ page: 1, limit: 500 }),
-      fetchDriversList(),
+      fetchDriversList({ guest: false }),
       fetchAgencies(1, 8).catch(() => ({ agencies: [], total: 0 })),
     ])
       .then(([vRes, dList, aRes]) => {
@@ -500,7 +505,7 @@ export function CreateNewTripPage() {
                           className={`${inputCls} cursor-pointer pl-9`}
                         >
                           <option value="">Assign later</option>
-                          {drivers.map((d) => (
+                          {ownDrivers.map((d) => (
                             <option key={d._id} value={d._id}>
                               {driverLabel(d)}
                             </option>
@@ -510,13 +515,13 @@ export function CreateNewTripPage() {
                     </Field>
                   </div>
 
-                  {drivers.length > 0 && (
+                  {ownDrivers.length > 0 && (
                     <div className="rounded-xl border border-slate-200/80 bg-slate-50/70 p-2.5 dark:border-white/10 dark:bg-white/5">
                       <p className="mb-1.5 text-[11px] font-semibold text-slate-500 dark:text-slate-400">
                         Quick assign driver
                       </p>
                       <div className="flex flex-wrap gap-1.5">
-                        {drivers.slice(0, 6).map((d) => (
+                        {ownDrivers.slice(0, 6).map((d) => (
                           <button
                             key={d._id}
                             type="button"

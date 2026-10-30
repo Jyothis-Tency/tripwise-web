@@ -142,7 +142,7 @@ export function TripReportPreviewDocument({
           </div>
         </div>
 
-        {totalLines.length > 0 && (
+        {fieldSelection.reportTotals !== false && totalLines.length > 0 && (
           <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50/70 px-3 py-3 sm:px-4">
             <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.14em] text-slate-500">
               Report totals

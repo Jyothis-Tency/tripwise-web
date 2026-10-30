@@ -260,6 +260,7 @@ export function toTripReportRow(
     paidAmount: reportFmtRs(paid),
     balance: reportFmtRs(remaining),
     toll: reportFmtRs(trip.toll ?? 0),
+    reportTotals: "",
   };
 }
 
@@ -307,6 +308,7 @@ export function reportFieldLabel(id: ReportFieldId): string {
     paidAmount: "Paid Amount",
     balance: "Remaining",
     toll: "Toll",
+    reportTotals: "Report Totals",
   };
   return labels[id];
 }

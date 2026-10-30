@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Search, UserPlus, Users, ArrowLeft } from "lucide-react";
 import type { Driver, DriverBlockFilter } from "../api";
-import { fetchDrivers } from "../api";
+import { fetchDrivers, isBulkDriver } from "../api";
 import { DriverCard } from "../components/DriverCard";
 import { DriverDetail } from "../components/DriverDetail";
 import { AddDriverModal } from "../components/AddDriverModal";
@@ -34,6 +34,7 @@ export default function DriversPage() {
   const [blockFilter, setBlockFilter] = useState<DriverBlockFilter>(
     savedUi.blockFilter,
   );
+  const [typeFilter, setTypeFilter] = useState<"all" | "fleet" | "bulk">("all");
   const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
   const [detailTab, setDetailTab] = useState<DriverDetailTabId>(initialTab);
   const [showAddModal, setShowAddModal] = useState(false);
@@ -97,8 +98,22 @@ export default function DriversPage() {
     });
   }, [search, blockFilter, selectedIdx, detailTab, drivers]);
 
-  const selectedDriver =
-    selectedIdx !== null ? (drivers[selectedIdx] ?? null) : null;
+  const fleetCount = useMemo(() => drivers.filter((d) => !isBulkDriver(d)).length, [drivers]);
+  const bulkCount = useMemo(() => drivers.filter((d) => isBulkDriver(d)).length, [drivers]);
+
+  const filteredDrivers = useMemo(() => {
+    if (typeFilter === "fleet") return drivers.filter((d) => !isBulkDriver(d));
+    if (typeFilter === "bulk") return drivers.filter((d) => isBulkDriver(d));
+    return drivers;
+  }, [drivers, typeFilter]);
+
+  const selectedDriver = useMemo(() => {
+    if (selectedIdRef.current) {
+      const found = drivers.find((d) => d._id === selectedIdRef.current);
+      if (found) return found;
+    }
+    return selectedIdx !== null ? (drivers[selectedIdx] ?? null) : null;
+  }, [drivers, selectedIdx]);
 
   const syncUrl = (driverId: string | null, tab: DriverDetailTabId) => {
     const next = new URLSearchParams(searchParams);
@@ -113,11 +128,13 @@ export default function DriversPage() {
     setSearchParams(next, { replace: true });
   };
 
-  const selectDriver = (i: number) => {
-    setSelectedIdx(i);
-    const id = drivers[i]?._id ?? null;
-    selectedIdRef.current = id;
-    syncUrl(id, detailTab);
+  const selectDriver = (driverOrIndex: Driver | number) => {
+    const d = typeof driverOrIndex === "number" ? drivers[driverOrIndex] : driverOrIndex;
+    if (!d) return;
+    const realIdx = drivers.findIndex((x) => x._id === d._id);
+    setSelectedIdx(realIdx >= 0 ? realIdx : null);
+    selectedIdRef.current = d._id;
+    syncUrl(d._id, detailTab);
   };
 
   const clearSelection = () => {
@@ -201,6 +218,29 @@ export default function DriversPage() {
                 </button>
               ))}
             </div>
+
+            <div className="grid grid-cols-3 gap-1 rounded-xl bg-[var(--bg-main)] p-1 text-[11px]">
+              {(
+                [
+                  { v: "all" as const, label: `All (${drivers.length})` },
+                  { v: "fleet" as const, label: `Fleet (${fleetCount})` },
+                  { v: "bulk" as const, label: `Bulk (${bulkCount})` },
+                ] as const
+              ).map(({ v, label }) => (
+                <button
+                  key={v}
+                  type="button"
+                  onClick={() => setTypeFilter(v)}
+                  className={`rounded-[9px] py-1 font-semibold transition ${
+                    typeFilter === v
+                      ? "bg-[var(--bg-card)] font-bold text-indigo-600 shadow-sm dark:text-[#a5b4fc]"
+                      : "text-slate-500 hover:text-slate-800 dark:text-[#8d94b8] dark:hover:text-[#eef0ff]"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
           </div>
 
           <div className="flex-1 space-y-2 overflow-y-auto p-3">
@@ -220,13 +260,13 @@ export default function DriversPage() {
                 description="Try another name or switch the filter above."
               />
             ) : (
-              drivers.map((d, i) => (
+              filteredDrivers.map((d, i) => (
                 <DriverCard
                   key={d._id}
                   driver={d}
                   index={i}
-                  isSelected={i === selectedIdx}
-                  onSelect={() => selectDriver(i)}
+                  isSelected={d._id === selectedDriver?._id}
+                  onSelect={() => selectDriver(d)}
                 />
               ))
             )}

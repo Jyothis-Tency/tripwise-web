@@ -16,6 +16,8 @@ type TripwiseLogoProps = {
   withWordmark?: boolean;
   /** Title under wordmark (sidebar) */
   tagline?: string;
+  /** Explicit override for Inway Cabs branding (e.g. for guest / driver links) */
+  overrideInway?: boolean;
 };
 
 const COLORS = {
@@ -128,8 +130,10 @@ export function TripwiseLogo({
   variant = "auto",
   withWordmark = false,
   tagline,
+  overrideInway,
 }: TripwiseLogoProps) {
-  const { isInway } = useBrand();
+  const brand = useBrand();
+  const isInway = overrideInway !== undefined ? overrideInway : brand.isInway;
   const effectiveAlt = alt ?? (isInway ? "Inway Cabs" : "Tripwise");
   const markClass = withWordmark ? "h-full w-full" : className;
 
@@ -185,7 +189,14 @@ export function TripwiseLogo({
 
   if (!withWordmark) {
     if (variant === "auto") {
-      return <span className={`inline-flex ${className}`}>{mark}</span>;
+      const isCentering = className.includes("mx-auto");
+      return (
+        <span
+          className={`${isCentering ? "flex justify-center" : "inline-flex"} ${className}`}
+        >
+          {mark}
+        </span>
+      );
     }
     return mark;
   }

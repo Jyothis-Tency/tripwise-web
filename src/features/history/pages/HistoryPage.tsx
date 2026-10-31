@@ -584,13 +584,13 @@ export function HistoryPage() {
       {/* Compact filter toolbar */}
       <div className="shrink-0 rounded-xl border border-slate-200 bg-[var(--bg-card)] p-2.5 shadow-sm dark:border-[#1e2638] sm:p-3">
         <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
-          <div className="relative w-full max-w-xs sm:w-56 sm:max-w-none md:w-64">
+          <div className="relative w-full max-w-xs sm:w-72 sm:max-w-none md:w-80">
             <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
             <input
               type="text"
               value={search}
               onChange={(e) => handleSearchChange(e.target.value)}
-              placeholder="Search trips…"
+              placeholder="Search vehicle, driver, trip ID, phone…"
               className="h-8 w-full rounded-md border border-slate-200 bg-[var(--bg-elevated)] py-0 pl-8 pr-8 text-xs text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-indigo-400 focus:ring-1 focus:ring-indigo-200 dark:border-[#1e2638] dark:text-slate-100 dark:placeholder:text-slate-500"
             />
             {search && (
@@ -697,7 +697,7 @@ export function HistoryPage() {
         )}
 
         {!loading && !error && trips.length > 0 && (
-          <div className="grid grid-cols-1 gap-3 sm:gap-4 md:grid-cols-2">
+          <div className="flex flex-col gap-3 sm:gap-4">
             {trips.map((trip) => (
               <TripCard
                 key={trip._id}

@@ -1,6 +1,11 @@
 import jsPDF from "jspdf";
 import type { AgencyTxType } from "./agencyTxRows";
-import { createInwayLogoPngDataUrl, isInwayOwner } from "../../lib/brand";
+import {
+  createInwayLogoPngDataUrl,
+  createRightLineLogoPngDataUrl,
+  isInwayOwner,
+  isRightLineOwner,
+} from "../../lib/brand";
 
 export type AgencyTxPdfRow = {
   date: string | null;
@@ -153,8 +158,11 @@ export function downloadAgencyTransactionHistoryPdf(
   };
 
   const inway = isInwayOwner();
-  if (inway) {
-    const logoData = createInwayLogoPngDataUrl(400);
+  const rightline = isRightLineOwner();
+  if (rightline || inway) {
+    const logoData = rightline
+      ? createRightLineLogoPngDataUrl(400)
+      : createInwayLogoPngDataUrl(400);
     if (logoData) {
       doc.addImage(logoData, "PNG", leftX, y - 4, 12, 12);
       y += 12;

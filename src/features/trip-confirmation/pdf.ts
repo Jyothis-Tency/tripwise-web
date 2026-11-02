@@ -8,8 +8,11 @@ import { TRIP_CONFIRMATION_SEED, type TripConfirmationSeed } from "./seed";
 import {
   createInwayLogoPngDataUrl,
   createInwayWatermarkPngDataUrl,
+  createRightLineLogoPngDataUrl,
+  createRightLineWatermarkPngDataUrl,
   createTripwiseLogoPngDataUrl,
   isInwayOwner,
+  isRightLineOwner,
 } from "../../lib/brand";
 
 export * from "./types";
@@ -379,9 +382,14 @@ export function generateTripConfirmationPdf(
   const valColW = tableW - labelColW; // 124mm
 
   const inway = isInwayOwner();
+  const rightline = isRightLineOwner();
 
-  // Background: Large Translucent Logo Watermark (Inway Cabs only)
-  const watermarkData = inway ? createInwayWatermarkPngDataUrl(600, 0.085) : "";
+  // Background: Large Translucent Logo Watermark (Inway Cabs & Right Line)
+  const watermarkData = rightline
+    ? createRightLineWatermarkPngDataUrl(600, 0.085)
+    : inway
+    ? createInwayWatermarkPngDataUrl(600, 0.085)
+    : "";
   const drawWatermark = () => {
     if (watermarkData) {
       const wmSize = 135;
@@ -396,7 +404,9 @@ export function generateTripConfirmationPdf(
 
   // 1. Letterhead Format Header
   // Left: Brand Logo + Name & Subtitle
-  const logoData = inway
+  const logoData = rightline
+    ? createRightLineLogoPngDataUrl(400)
+    : inway
     ? createInwayLogoPngDataUrl(400)
     : createTripwiseLogoPngDataUrl(400);
   const logoSize = 13;
@@ -408,7 +418,12 @@ export function generateTripConfirmationPdf(
   doc.setFont("helvetica", "bold");
   doc.setFontSize(16);
   doc.setTextColor(15, 23, 42);
-  doc.text((docData.companyName || "INWAY CABS").toUpperCase(), textLeft, y + 5.5);
+  const defaultCompanyName = rightline
+    ? "RIGHT LINE"
+    : inway
+    ? "INWAY CABS"
+    : "TRIPWISE";
+  doc.text((docData.companyName || defaultCompanyName).toUpperCase(), textLeft, y + 5.5);
 
   if (docData.subtitle) {
     doc.setFont("helvetica", "normal");
@@ -418,9 +433,12 @@ export function generateTripConfirmationPdf(
   }
 
   // Right: Contact details & website
+  const defaultContacts = rightline
+    ? ["Right Line The Travel Expert"]
+    : ["+91 80865 56655", "inwaycabs@gmail.com", "inwaycabs.in"];
   const contactLines = docData.footerContact
     ? docData.footerContact.split(/[·•|]/).map((s) => s.trim()).filter(Boolean)
-    : ["+91 80865 56655", "inwaycabs@gmail.com", "inwaycabs.in"];
+    : defaultContacts;
 
   doc.setFont("helvetica", "normal");
   doc.setFontSize(8);

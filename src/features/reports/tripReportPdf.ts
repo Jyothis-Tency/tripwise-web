@@ -8,7 +8,12 @@ import {
   maxBodyLineCount,
 } from "./tripReportCardLayout";
 import { reportFmtDate, toTripReportRow } from "./tripReportFormat";
-import { createInwayLogoPngDataUrl, isInwayOwner } from "../../lib/brand";
+import {
+  createInwayLogoPngDataUrl,
+  createRightLineLogoPngDataUrl,
+  isInwayOwner,
+  isRightLineOwner,
+} from "../../lib/brand";
 
 export type TripReportPdfOptions = {
   title?: string;
@@ -99,8 +104,11 @@ export function downloadTripReportPdf(
   };
 
   const inway = isInwayOwner();
-  if (inway) {
-    const logoData = createInwayLogoPngDataUrl(400);
+  const rightline = isRightLineOwner();
+  if (rightline || inway) {
+    const logoData = rightline
+      ? createRightLineLogoPngDataUrl(400)
+      : createInwayLogoPngDataUrl(400);
     if (logoData) {
       doc.addImage(logoData, "PNG", leftX, y - 4, 12, 12);
     } else {
@@ -110,11 +118,15 @@ export function downloadTripReportPdf(
     doc.setFont("helvetica", "bold");
     doc.setFontSize(14);
     doc.setTextColor(15, 23, 42);
-    doc.text("INWAY CABS", leftX + 16, y + 2);
+    doc.text(rightline ? "RIGHT LINE" : "INWAY CABS", leftX + 16, y + 2);
     doc.setFontSize(8);
     doc.setFont("helvetica", "normal");
     doc.setTextColor(100, 116, 139);
-    doc.text("Fleet Operations", leftX + 16, y + 6);
+    doc.text(
+      rightline ? "The Travel Expert" : "Fleet Operations",
+      leftX + 16,
+      y + 6,
+    );
     y += 16;
   }
 

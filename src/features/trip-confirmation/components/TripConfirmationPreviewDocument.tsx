@@ -9,17 +9,46 @@ interface TripConfirmationPreviewDocumentProps {
 export function TripConfirmationPreviewDocument({
   document: doc,
 }: TripConfirmationPreviewDocumentProps) {
-  const { isInway } = useBrand();
+  const { isInway, isRightLine } = useBrand();
 
   // Split contact details into separate lines for the right side of header
   const contactLines = doc.footerContact
     ? doc.footerContact.split(/[·•|]/).map((s) => s.trim()).filter(Boolean)
+    : isRightLine
+    ? ["Right Line The Travel Expert"]
     : ["+91 80865 56655", "inwaycabs@gmail.com", "inwaycabs.in"];
 
   return (
     <div className="relative mx-auto w-full max-w-[760px] overflow-hidden bg-white text-slate-900 shadow-[0_20px_40px_-14px_rgba(15,23,42,0.28)] ring-1 ring-slate-900/10 p-6 sm:p-10 font-sans transition-all">
-      {/* Large Translucent Logo Watermark in the Centre of the Page (Inway Cabs only) */}
-      {isInway && (
+      {/* Large Translucent Logo Watermark in the Centre of the Page */}
+      {isRightLine && (
+        <div
+          className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 opacity-[0.08] select-none z-0"
+          aria-hidden="true"
+        >
+          <svg
+            viewBox="440 3 480 480"
+            className="h-[460px] w-[460px] sm:h-[540px] sm:w-[540px] text-black"
+          >
+            <path
+              fill="currentColor"
+              d="M459 414 L459 150 Q459 72 505 72 L888 72 L900 84 L690 283 L825 414 L750 414 L617 285 L783 118 L548 118 Q517 118 517 150 L517 414 Z"
+            />
+            <path
+              fill="currentColor"
+              d="M527 193 L553 165 L603 213 L679 137 L735 135 L605 267 Z"
+            />
+            <path
+              fill="none"
+              stroke="#ffffff"
+              strokeWidth="6"
+              strokeDasharray="28 26"
+              d="M488 414 L488 150 Q488 88 540 88 L885 88"
+            />
+          </svg>
+        </div>
+      )}
+      {isInway && !isRightLine && (
         <div
           className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 opacity-[0.08] select-none z-0"
           aria-hidden="true"
@@ -53,7 +82,7 @@ export function TripConfirmationPreviewDocument({
             <TripwiseLogo className="h-12 w-12 shrink-0" variant="auto" />
             <div>
               <h1 className="text-xl sm:text-2xl font-black uppercase tracking-tight text-slate-950">
-                {doc.companyName || "INWAY CABS"}
+                {doc.companyName || (isRightLine ? "RIGHT LINE" : isInway ? "INWAY CABS" : "TRIPWISE")}
               </h1>
               {doc.subtitle && (
                 <p className="text-xs sm:text-sm font-medium text-slate-600">

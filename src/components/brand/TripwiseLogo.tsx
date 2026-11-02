@@ -1,4 +1,4 @@
-import { useBrand } from "../../lib/brand";
+import { useBrand, type BrandKey } from "../../lib/brand";
 
 type TripwiseLogoVariant = "navy" | "amber" | "auto";
 
@@ -18,6 +18,8 @@ type TripwiseLogoProps = {
   tagline?: string;
   /** Explicit override for Inway Cabs branding (e.g. for guest / driver links) */
   overrideInway?: boolean;
+  /** Explicit brand key override */
+  overrideBrand?: BrandKey;
 };
 
 const COLORS = {
@@ -121,8 +123,52 @@ function InwayMarkSvg({
   );
 }
 
+function RightLineMarkSvg({
+  tile = "#0a0a0a",
+  mark = "#ffffff",
+  dash = "#0a0a0a",
+  className,
+  alt = "Right Line",
+}: {
+  tile?: string;
+  mark?: string;
+  dash?: string;
+  className?: string;
+  alt?: string;
+}) {
+  return (
+    <svg
+      viewBox="440 3 480 480"
+      role="img"
+      aria-label={alt}
+      className={className}
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <title>{alt}</title>
+      <rect x="440" y="3" width="480" height="480" rx="96" fill={tile} />
+      <g>
+        <path
+          fill={mark}
+          d="M459 414 L459 150 Q459 72 505 72 L888 72 L900 84 L690 283 L825 414 L750 414 L617 285 L783 118 L548 118 Q517 118 517 150 L517 414 Z"
+        />
+        <path
+          fill={mark}
+          d="M527 193 L553 165 L603 213 L679 137 L735 135 L605 267 Z"
+        />
+        <path
+          fill="none"
+          stroke={dash}
+          strokeWidth="6"
+          strokeDasharray="28 26"
+          d="M488 414 L488 150 Q488 88 540 88 L885 88"
+        />
+      </g>
+    </svg>
+  );
+}
+
 /**
- * Official brand mark — Tripwise or Inway Cabs (dynamic per logged-in owner).
+ * Official brand mark — Tripwise, Inway Cabs, or Right Line (dynamic per logged-in owner).
  */
 export function TripwiseLogo({
   className = "h-11 w-11",
@@ -131,61 +177,119 @@ export function TripwiseLogo({
   withWordmark = false,
   tagline,
   overrideInway,
+  overrideBrand,
 }: TripwiseLogoProps) {
   const brand = useBrand();
-  const isInway = overrideInway !== undefined ? overrideInway : brand.isInway;
-  const effectiveAlt = alt ?? (isInway ? "Inway Cabs" : "Tripwise");
+  const effectiveBrand: BrandKey =
+    overrideBrand ??
+    (overrideInway !== undefined
+      ? overrideInway
+        ? "inway"
+        : "tripwise"
+      : brand.brandKey);
+
+  const defaultAlt =
+    effectiveBrand === "rightline"
+      ? "Right Line"
+      : effectiveBrand === "inway"
+      ? "Inway Cabs"
+      : "Tripwise";
+  const effectiveAlt = alt ?? defaultAlt;
   const markClass = withWordmark ? "h-full w-full" : className;
 
-  const mark = isInway ? (
-    variant === "auto" ? (
-      <>
-        {/* Light mode: dark tile with white mark */}
-        <InwayMarkSvg
-          tile="#0a0a0a"
-          mark="#ffffff"
-          className={`${markClass} dark:hidden`}
+  let mark: React.ReactNode;
+
+  if (effectiveBrand === "rightline") {
+    mark =
+      variant === "auto" ? (
+        <>
+          {/* Light mode: dark tile with white mark */}
+          <RightLineMarkSvg
+            tile="#0a0a0a"
+            mark="#ffffff"
+            dash="#0a0a0a"
+            className={`${markClass} dark:hidden`}
+            alt={effectiveAlt}
+          />
+          {/* Dark mode: crisp white tile with dark mark to match dark theme */}
+          <RightLineMarkSvg
+            tile="#ffffff"
+            mark="#0a0a0a"
+            dash="#ffffff"
+            className={`${markClass} hidden dark:block`}
+            alt={effectiveAlt}
+          />
+        </>
+      ) : variant === "amber" ? (
+        <RightLineMarkSvg
+          tile="#ffffff"
+          mark="#0a0a0a"
+          dash="#ffffff"
+          className={markClass}
           alt={effectiveAlt}
         />
-        {/* Dark mode: crisp white tile with dark mark to match dark theme */}
+      ) : (
+        <RightLineMarkSvg
+          tile="#0a0a0a"
+          mark="#ffffff"
+          dash="#0a0a0a"
+          className={markClass}
+          alt={effectiveAlt}
+        />
+      );
+  } else if (effectiveBrand === "inway") {
+    mark =
+      variant === "auto" ? (
+        <>
+          {/* Light mode: dark tile with white mark */}
+          <InwayMarkSvg
+            tile="#0a0a0a"
+            mark="#ffffff"
+            className={`${markClass} dark:hidden`}
+            alt={effectiveAlt}
+          />
+          {/* Dark mode: crisp white tile with dark mark to match dark theme */}
+          <InwayMarkSvg
+            tile="#ffffff"
+            mark="#0a0a0a"
+            className={`${markClass} hidden dark:block`}
+            alt={effectiveAlt}
+          />
+        </>
+      ) : variant === "amber" ? (
         <InwayMarkSvg
           tile="#ffffff"
           mark="#0a0a0a"
-          className={`${markClass} hidden dark:block`}
+          className={markClass}
           alt={effectiveAlt}
         />
-      </>
-    ) : variant === "amber" ? (
-      <InwayMarkSvg
-        tile="#ffffff"
-        mark="#0a0a0a"
-        className={markClass}
-        alt={effectiveAlt}
-      />
-    ) : (
-      <InwayMarkSvg
-        tile="#0a0a0a"
-        mark="#ffffff"
-        className={markClass}
-        alt={effectiveAlt}
-      />
-    )
-  ) : variant === "auto" ? (
-    <>
-      <MarkSvg
-        {...COLORS.navy}
-        alt={effectiveAlt}
-        className={`${markClass} dark:hidden`}
-      />
-      <MarkSvg
-        {...COLORS.amber}
-        alt={effectiveAlt}
-        className={`${markClass} hidden dark:block`}
-      />
-    </>
-  ) : (
-    <MarkSvg {...COLORS[variant]} alt={effectiveAlt} className={markClass} />
-  );
+      ) : (
+        <InwayMarkSvg
+          tile="#0a0a0a"
+          mark="#ffffff"
+          className={markClass}
+          alt={effectiveAlt}
+        />
+      );
+  } else {
+    mark =
+      variant === "auto" ? (
+        <>
+          <MarkSvg
+            {...COLORS.navy}
+            alt={effectiveAlt}
+            className={`${markClass} dark:hidden`}
+          />
+          <MarkSvg
+            {...COLORS.amber}
+            alt={effectiveAlt}
+            className={`${markClass} hidden dark:block`}
+          />
+        </>
+      ) : (
+        <MarkSvg {...COLORS[variant]} alt={effectiveAlt} className={markClass} />
+      );
+  }
 
   if (!withWordmark) {
     if (variant === "auto") {
@@ -201,7 +305,23 @@ export function TripwiseLogo({
     return mark;
   }
 
-  if (isInway) {
+  if (effectiveBrand === "rightline") {
+    return (
+      <div className={`flex min-w-0 items-center gap-2.5 ${className}`}>
+        <div className="relative h-11 w-11 shrink-0">{mark}</div>
+        <div className="min-w-0">
+          <div className="flex items-baseline tracking-wider uppercase font-['Open_Sans',system-ui,sans-serif] text-[13.5px] font-extrabold text-slate-900 dark:text-white">
+            <span>RIGHT LINE</span>
+          </div>
+          <p className="truncate text-[10px] tracking-wider uppercase font-semibold text-slate-500 dark:text-slate-400">
+            {tagline || "The Travel Expert"}
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (effectiveBrand === "inway") {
     return (
       <div className={`flex min-w-0 items-center gap-2.5 ${className}`}>
         <div className="relative h-11 w-11 shrink-0">{mark}</div>

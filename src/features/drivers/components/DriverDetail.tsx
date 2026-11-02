@@ -621,10 +621,15 @@ function buildDriverCredentialsWhatsAppMessage(opts: {
   loginId: string;
   password: string;
 }): string {
-  const isInway =
-    (opts.ownerCompany || "").toLowerCase().includes("inway") ||
-    (opts.ownerName || "").toLowerCase().includes("inway");
-  const brandName = isInway ? "Inway Cabs" : "Tripwise";
+  const ownerCo = (opts.ownerCompany || "").toLowerCase();
+  const ownerNm = (opts.ownerName || "").toLowerCase();
+  const isRightLine =
+    ownerCo.includes("rightline") ||
+    ownerCo.includes("right line") ||
+    ownerNm.includes("rightline") ||
+    ownerNm.includes("right line");
+  const isInway = ownerCo.includes("inway") || ownerNm.includes("inway");
+  const brandName = isRightLine ? "Right Line" : isInway ? "Inway Cabs" : "Tripwise";
   const lines = [
     `*${brandName} — Driver login*`,
     "",

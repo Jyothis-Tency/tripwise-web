@@ -67,27 +67,50 @@ import { useBrand, updateDocumentBrand } from "../../../lib/brand";
 type SyncStatus = "idle" | "saving" | "saved" | "error";
 const AUTOSAVE_DELAY = 1200;
 
-function checkIsInwayInvite(invite?: GuestBulkInvite | null, token?: string): boolean {
+function detectInviteBrand(
+  invite?: GuestBulkInvite | null,
+  token?: string,
+): "inway" | "rightline" | "tripwise" {
   if (invite) {
     const c = (invite.ownerCompany || "").toLowerCase();
     const n = (invite.ownerName || "").toLowerCase();
     const l = (invite.label || "").toLowerCase();
-    const match = c.includes("inway") || n.includes("inway") || l.includes("inway");
+    const isRightline =
+      c.includes("rightline") ||
+      c.includes("right line") ||
+      n.includes("rightline") ||
+      n.includes("right line") ||
+      l.includes("rightline") ||
+      l.includes("right line");
+    const isInway =
+      c.includes("inway") || n.includes("inway") || l.includes("inway");
+    const result = isRightline ? "rightline" : isInway ? "inway" : "tripwise";
     if (token && typeof sessionStorage !== "undefined") {
       try {
-        sessionStorage.setItem(`guestBulkIsInway:${token}`, match ? "1" : "0");
+        sessionStorage.setItem(`guestBulkBrand:${token}`, result);
       } catch {}
     }
-    return match;
+    return result;
   }
   if (token && typeof sessionStorage !== "undefined") {
     try {
-      const cached = sessionStorage.getItem(`guestBulkIsInway:${token}`);
-      if (cached === "1") return true;
-      if (cached === "0") return false;
+      const cached = sessionStorage.getItem(`guestBulkBrand:${token}`);
+      if (
+        cached === "rightline" ||
+        cached === "inway" ||
+        cached === "tripwise"
+      ) {
+        return cached;
+      }
+      const legacyCached = sessionStorage.getItem(`guestBulkIsInway:${token}`);
+      if (legacyCached === "1") return "inway";
     } catch {}
   }
-  return false;
+  return "tripwise";
+}
+
+export function checkIsInwayInvite(invite?: GuestBulkInvite | null, token?: string): boolean {
+  return detectInviteBrand(invite, token) === "inway";
 }
 
 function storedGuestSessionError(msg: string) {
@@ -1382,28 +1405,32 @@ function VehicleGroupsEditor({
 export function GuestBulkEntryPage() {
   const { token = "" } = useParams<{ token: string }>();
   const { theme, toggleTheme } = useTheme();
-  const { isInway: authIsInway } = useBrand();
+  const { isInway: authIsInway, isRightLine: authIsRightLine } = useBrand();
   const [invite, setInvite] = useState<GuestBulkInvite | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const isInwayInvite = useMemo(() => {
-    if (authIsInway) return true;
-    return checkIsInwayInvite(invite, token);
-  }, [authIsInway, invite, token]);
+  const inviteBrand = useMemo(() => {
+    if (authIsRightLine) return "rightline";
+    if (authIsInway) return "inway";
+    return detectInviteBrand(invite, token);
+  }, [authIsRightLine, authIsInway, invite, token]);
+
+  const isInwayInvite = inviteBrand === "inway";
 
   useEffect(() => {
     if (!invite && !token) return;
-    if (isInwayInvite) {
-      updateDocumentBrand(true);
-      const scopeTitle = invite?.scope === "agency" ? "Agency Entry" : "Driver Entry";
-      document.title = `Inway Cabs — ${scopeTitle}`;
-    } else if (invite) {
-      updateDocumentBrand(false);
-      const scopeTitle = invite.scope === "agency" ? "Agency Entry" : "Driver Entry";
-      document.title = `Tripwise — ${scopeTitle}`;
-    }
-  }, [isInwayInvite, invite, token]);
+    updateDocumentBrand(inviteBrand);
+    const brandPrefix =
+      inviteBrand === "rightline"
+        ? "Right Line"
+        : inviteBrand === "inway"
+        ? "Inway Cabs"
+        : "Tripwise";
+    const scopeTitle =
+      invite?.scope === "agency" ? "Agency Entry" : "Driver Entry";
+    document.title = `${brandPrefix} — ${scopeTitle}`;
+  }, [inviteBrand, invite, token]);
 
   const [agencies, setAgencies] = useState<Agency[]>([]);
   const [driverName, setDriverName] = useState("");
@@ -2593,7 +2620,7 @@ export function GuestBulkEntryPage() {
   if (loading) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-[var(--bg-main)]">
-        <TripwiseLogo variant="auto" overrideInway={isInwayInvite} className="h-16 w-16" />
+        <TripwiseLogo variant="auto" overrideBrand={inviteBrand} className="h-16 w-16" />
         <Loader2 className="h-6 w-6 animate-spin text-indigo-500" />
       </div>
     );
@@ -2606,7 +2633,7 @@ export function GuestBulkEntryPage() {
       <div className="flex min-h-screen items-center justify-center bg-[var(--bg-main)] p-6">
         <div className="w-full max-w-md rounded-2xl border border-rose-200 bg-[var(--bg-card)] p-6 text-center shadow-sm dark:border-rose-500/30">
           <div className="mb-4 flex justify-center">
-            <TripwiseLogo variant="auto" overrideInway={isInwayInvite} className="h-16 w-16" />
+            <TripwiseLogo variant="auto" overrideBrand={inviteBrand} className="h-16 w-16" />
           </div>
           <AlertCircle className="mx-auto mb-3 h-10 w-10 text-rose-400" />
           <h1 className="text-lg font-bold text-slate-800 dark:text-white">
@@ -2657,13 +2684,18 @@ export function GuestBulkEntryPage() {
 
   if (joinRequired) {
     const isAgency = invite.scope === "agency";
-    const brandPrefix = isInwayInvite ? "Inway Cabs" : "Tripwise";
+    const brandPrefix =
+      inviteBrand === "rightline"
+        ? "Right Line"
+        : isInwayInvite
+        ? "Inway Cabs"
+        : "Tripwise";
     const entryScopeLabel = isAgency ? "agency entry" : "driver entry";
     return (
       <div className="flex min-h-screen items-center justify-center bg-[var(--bg-main)] p-6">
         <div className="w-full max-w-md space-y-4 rounded-2xl border border-slate-200 bg-[var(--bg-card)] p-6 shadow-sm dark:border-[#1e2638]">
           <div className="flex justify-center">
-            <TripwiseLogo variant="auto" overrideInway={isInwayInvite} className="h-16 w-16" />
+            <TripwiseLogo variant="auto" overrideBrand={inviteBrand} className="h-16 w-16" />
           </div>
           <div className="text-center">
             <p className="text-[10px] font-bold uppercase tracking-wider text-[#C98200] dark:text-[#F5A300]">
@@ -3126,16 +3158,16 @@ export function GuestBulkEntryPage() {
             )}
             <TripwiseLogo
               variant="auto"
-              overrideInway={isInwayInvite}
+              overrideBrand={inviteBrand}
               className="mt-0.5 h-9 w-9 shrink-0 sm:h-12 sm:w-12"
             />
             <div className="min-w-0 flex-1">
             <p className="text-[10px] font-bold uppercase tracking-wider text-[#C98200] dark:text-[#F5A300]">
               {isOwner
-                ? `${isInwayInvite ? "Inway Cabs" : "Tripwise"} · owner review`
+                ? `${inviteBrand === "rightline" ? "Right Line" : isInwayInvite ? "Inway Cabs" : "Tripwise"} · owner review`
                 : isAgencyScope
-                  ? `${isInwayInvite ? "Inway Cabs" : "Tripwise"} · agency entry`
-                  : `${isInwayInvite ? "Inway Cabs" : "Tripwise"} · driver entry`}
+                  ? `${inviteBrand === "rightline" ? "Right Line" : isInwayInvite ? "Inway Cabs" : "Tripwise"} · agency entry`
+                  : `${inviteBrand === "rightline" ? "Right Line" : isInwayInvite ? "Inway Cabs" : "Tripwise"} · driver entry`}
             </p>
             <h1 className="truncate text-base font-bold leading-snug text-slate-800 dark:text-white sm:text-lg">
               {isAgencyScope && invite.agencyName

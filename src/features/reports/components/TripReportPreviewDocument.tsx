@@ -97,7 +97,7 @@ export function TripReportPreviewDocument({
     return `${Number(d)}/${Number(m)}/${Number(y)}`;
   })();
   const totalLines = reportTotals ? tripReportTotalLines(reportTotals) : [];
-  const { confidentialNotice, isInway } = useBrand();
+  const { confidentialNotice, isInway, isRightLine } = useBrand();
 
   return (
     <div className="mx-auto w-full max-w-full bg-white text-slate-900 shadow-[0_20px_40px_-14px_rgba(15,23,42,0.28)] ring-1 ring-slate-900/10">
@@ -110,15 +110,15 @@ export function TripReportPreviewDocument({
         </div>
       </div>
       <div className="px-4 py-5 sm:px-6 sm:py-6">
-        {isInway && (
+        {(isInway || isRightLine) && (
           <div className="mb-4 flex items-center gap-3">
             <TripwiseLogo className="h-10 w-10 shrink-0" variant="auto" />
             <div>
-              <div className="font-['Poppins',system-ui,sans-serif] text-sm font-bold tracking-tight text-slate-900">
-                INWAY CABS
+              <div className="font-['Poppins',system-ui,sans-serif] text-sm font-bold tracking-tight text-slate-900 uppercase">
+                {isRightLine ? "RIGHT LINE" : "INWAY CABS"}
               </div>
               <p className="text-[11px] font-medium text-slate-500">
-                Fleet Operations
+                {isRightLine ? "The Travel Expert" : "Fleet Operations"}
               </p>
             </div>
           </div>

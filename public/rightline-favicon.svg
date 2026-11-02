@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="440 3 480 480" role="img" aria-label="Right Line">
+  <style>
+    .tile { fill: #0a0a0a; }
+    .mark-fill { fill: #ffffff; }
+    .mark-dash { stroke: #0a0a0a; }
+    @media (prefers-color-scheme: dark) {
+      .tile { fill: #ffffff; }
+      .mark-fill { fill: #0a0a0a; }
+      .mark-dash { stroke: #ffffff; }
+    }
+  </style>
+  <rect class="tile" x="440" y="3" width="480" height="480" rx="96"/>
+  <g id="mark">
+    <path class="mark-fill" d="M459 414 L459 150 Q459 72 505 72 L888 72 L900 84 L690 283 L825 414 L750 414 L617 285 L783 118 L548 118 Q517 118 517 150 L517 414 Z"/>
+    <path class="mark-fill" d="M527 193 L553 165 L603 213 L679 137 L735 135 L605 267 Z"/>
+    <path class="mark-dash" fill="none" stroke-width="6" stroke-dasharray="28 26" d="M488 414 L488 150 Q488 88 540 88 L885 88"/>
+  </g>
+</svg>
+

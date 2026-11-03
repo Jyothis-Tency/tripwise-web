@@ -926,9 +926,9 @@ function SyncBadge({ status }: { status: SyncStatus }) {
   }[status];
   return (
     <span
-      className={`inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px] font-bold transition-all sm:gap-1.5 sm:px-3 sm:py-1.5 sm:text-xs ${cfg.cls}`}
+      className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-bold transition-all shrink-0 sm:gap-1.5 sm:px-2.5 sm:py-1 sm:text-xs ${cfg.cls}`}
     >
-      <span className="[&_svg]:h-3.5 [&_svg]:w-3.5 sm:[&_svg]:h-4 sm:[&_svg]:w-4">
+      <span className="[&_svg]:h-3.5 [&_svg]:w-3.5">
         {cfg.icon}
       </span>
       {cfg.text}
@@ -5361,24 +5361,24 @@ export function BulkEntryPage() {
   return (
     <div className="flex h-full flex-col bg-[var(--bg-main)] overflow-hidden">
       {/* ─── HEADER BAR ─── */}
-      <div className="sticky top-0 z-20 flex flex-col justify-between gap-2 border-b border-slate-200 bg-[var(--bg-card)]/90 px-2.5 py-2 shadow-sm backdrop-blur-md shrink-0 dark:border-[#1e2638] sm:flex-row sm:flex-wrap sm:items-center sm:gap-3 sm:px-6 sm:py-3.5">
-        <div className="flex items-center gap-2.5 sm:gap-3 flex-wrap">
-          <FileSpreadsheet className="h-6 w-6 text-indigo-500 shrink-0 hidden sm:block" />
-          <h1 className="text-sm sm:text-base font-bold text-slate-800 uppercase tracking-wider hidden md:block dark:text-white">
+      <div className="sticky top-0 z-20 flex flex-col justify-between gap-2 border-b border-slate-200 bg-[var(--bg-card)]/90 px-2.5 py-2 shadow-sm backdrop-blur-md shrink-0 dark:border-[#1e2638] sm:flex-row sm:items-center sm:gap-2.5 sm:px-4 lg:px-6 sm:py-2.5 sm:flex-nowrap">
+        <div className="flex items-center gap-2 sm:gap-2.5 flex-nowrap min-w-0 shrink">
+          <FileSpreadsheet className="h-5 w-5 sm:h-6 sm:w-6 text-indigo-500 shrink-0 hidden sm:block" />
+          <h1 className="text-sm sm:text-base font-bold text-slate-800 uppercase tracking-wider hidden lg:block dark:text-white shrink-0">
             {isBulkMode ? "Bulk Entry" : "Normal Entry"}
           </h1>
 
           {/* Agency picker */}
-          <div className="relative flex-1 sm:flex-none min-w-0">
+          <div className="relative flex-1 sm:flex-initial min-w-0 max-w-[180px] sm:max-w-[200px] md:max-w-[230px] lg:max-w-[270px]">
             <button
               type="button"
               onClick={(e) => {
                 e.stopPropagation();
                 setShowDropdown(!showDropdown);
               }}
-              className="flex items-center gap-1.5 rounded-md border border-slate-200 bg-[var(--bg-elevated)] px-2 py-1.5 text-xs transition hover:border-indigo-300 w-full sm:min-w-[180px] sm:gap-2 sm:rounded-lg sm:px-3 sm:py-2.5 sm:text-sm dark:border-[#1e2638] dark:hover:border-indigo-400"
+              className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-[var(--bg-elevated)] px-2 py-1.5 text-xs transition hover:border-indigo-300 w-full sm:min-w-[150px] sm:gap-2 sm:px-2.5 sm:py-1.5 sm:text-sm dark:border-[#1e2638] dark:hover:border-indigo-400"
             >
-              <Building2 className="h-3.5 w-3.5 text-slate-400 shrink-0 sm:h-4.5 sm:w-4.5" />
+              <Building2 className="h-3.5 w-3.5 text-slate-400 shrink-0 sm:h-4 sm:w-4" />
               <span className="truncate text-slate-700 font-medium dark:text-slate-200">
                 {selectedAgency
                   ? formatAgencyLabel(selectedAgency)
@@ -5425,7 +5425,7 @@ export function BulkEntryPage() {
           <button
             type="button"
             onClick={() => setShowCreateModal(true)}
-            className="flex items-center gap-1 rounded-md bg-indigo-600 px-2 py-1.5 text-[11px] font-semibold text-white shadow-sm transition hover:bg-indigo-700 shrink-0 sm:gap-1.5 sm:rounded-lg sm:px-3 sm:py-2.5 sm:text-xs dark:bg-indigo-500 dark:hover:bg-indigo-400"
+            className="flex items-center gap-1 rounded-lg bg-indigo-600 px-2 py-1.5 text-[11px] font-semibold text-white shadow-sm transition hover:bg-indigo-700 shrink-0 sm:gap-1.5 sm:px-2.5 sm:py-1.5 sm:text-xs dark:bg-indigo-500 dark:hover:bg-indigo-400"
           >
             <Plus className="h-3.5 w-3.5 sm:h-4 sm:w-4" />{" "}
             <span className="hidden sm:inline">Agency</span>
@@ -5445,31 +5445,14 @@ export function BulkEntryPage() {
             />
           )}
           {guestLinkError && (
-            <span className="text-[11px] font-medium text-rose-600 dark:text-rose-400 max-w-[10rem] truncate sm:max-w-xs">
+            <span className="text-[11px] font-medium text-rose-600 dark:text-rose-400 max-w-[8rem] truncate sm:max-w-xs shrink-0">
               {guestLinkError}
             </span>
           )}
 
-          {/* Payout — temporarily disabled
-          {selectedAgency && (
-            <button
-              type="button"
-              onClick={() => toggleMode("payout")}
-              className={`flex items-center gap-1.5 rounded-lg px-3 py-2.5 text-xs sm:text-sm font-semibold transition shadow-sm shrink-0 border ${
-                activeTab === "payout"
-                  ? "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-500/20"
-                  : "bg-[var(--bg-elevated)] text-emerald-600 border-emerald-100 hover:bg-emerald-50 dark:text-emerald-400 dark:border-emerald-500/20 dark:hover:bg-emerald-500/10"
-              }`}
-            >
-              <Wallet className="h-4 w-4" />{" "}
-              <span className="hidden sm:inline">Payout</span>
-            </button>
-          )}
-          */}
-
           {/* Agency Total Balance Display */}
           {selectedAgency && isBulkMode && (
-            <div className="hidden sm:flex items-center gap-2 rounded-lg bg-emerald-50 px-3 py-2.5 border border-emerald-100 shadow-sm transition-all hover:shadow hover:bg-emerald-100/60 sm:ml-auto dark:bg-emerald-500/10 dark:border-emerald-500/20">
+            <div className="hidden sm:flex items-center gap-1.5 sm:gap-2 rounded-lg bg-emerald-50 px-2.5 py-1.5 border border-emerald-100 shadow-sm transition-all hover:shadow hover:bg-emerald-100/60 shrink-0 dark:bg-emerald-500/10 dark:border-emerald-500/20">
               <span className="text-xs sm:text-sm font-bold text-emerald-600 uppercase tracking-wider">
                 Balance:
               </span>
@@ -5482,7 +5465,7 @@ export function BulkEntryPage() {
           )}
         </div>
 
-        <div className="flex items-center gap-2 sm:gap-2.5">
+        <div className="flex items-center gap-2 sm:gap-2.5 shrink-0 flex-nowrap ml-auto">
           {/* Mobile total balance */}
           {selectedAgency && isBulkMode && (
             <div className="sm:hidden flex items-center gap-1 rounded-md bg-emerald-50 px-1.5 py-1 border border-emerald-100 dark:bg-emerald-500/10 dark:border-emerald-500/20">
@@ -5501,11 +5484,11 @@ export function BulkEntryPage() {
           <SyncBadge status={currentSyncStatus} />
 
           {/* Mode toggle */}
-          <div className="flex items-center rounded-lg border border-slate-200 bg-slate-50 p-0.5 dark:border-[#1e2638] dark:bg-white/5">
+          <div className="flex items-center rounded-lg border border-slate-200 bg-slate-50 p-0.5 dark:border-[#1e2638] dark:bg-white/5 shrink-0">
             <button
               type="button"
               onClick={() => toggleMode("bulk")}
-              className={`rounded-md px-2 py-1 text-[11px] font-semibold transition sm:px-4 sm:py-2 sm:text-sm ${
+              className={`rounded-md px-2 py-1 text-[11px] font-semibold transition sm:px-3 sm:py-1.5 sm:text-xs ${
                 activeTab === "bulk"
                   ? "bg-indigo-600 text-white shadow-sm dark:bg-indigo-500"
                   : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
@@ -5516,7 +5499,7 @@ export function BulkEntryPage() {
             <button
               type="button"
               onClick={() => toggleMode("normal")}
-              className={`rounded-md px-2 py-1 text-[11px] font-semibold transition sm:px-4 sm:py-2 sm:text-sm ${
+              className={`rounded-md px-2 py-1 text-[11px] font-semibold transition sm:px-3 sm:py-1.5 sm:text-xs ${
                 activeTab === "normal"
                   ? "bg-indigo-600 text-white shadow-sm dark:bg-indigo-500"
                   : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
@@ -5529,10 +5512,10 @@ export function BulkEntryPage() {
           <button
             type="button"
             onClick={loadTrips}
-            className="flex h-7 w-7 sm:h-9 sm:w-9 items-center justify-center text-slate-500 hover:bg-slate-100 rounded-full transition active:rotate-180 shrink-0 dark:text-slate-400 dark:hover:bg-white/10"
+            className="flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center text-slate-500 hover:bg-slate-100 rounded-full transition active:rotate-180 shrink-0 dark:text-slate-400 dark:hover:bg-white/10"
             title="Refresh"
           >
-            <RefreshCw className="h-4 w-4 sm:h-5 sm:w-5" />
+            <RefreshCw className="h-4 w-4" />
           </button>
           {/* No manual submit (autosync only) */}
         </div>

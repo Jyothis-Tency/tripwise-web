@@ -3182,7 +3182,7 @@ export function GuestBulkEntryPage() {
             ) : null}
             </div>
           </div>
-          <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0 flex-nowrap">
             <SyncBadge status={syncStatus} />
             <button
               type="button"

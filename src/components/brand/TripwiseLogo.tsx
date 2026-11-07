@@ -22,6 +22,104 @@ type TripwiseLogoProps = {
   overrideBrand?: BrandKey;
 };
 
+/**
+ * Mægler small UI mark — just the stylized "æ" ligature in brand red on a double-bordered tile.
+ * Used in sidebar / app header where only the icon-sized mark is shown.
+ */
+function MaeglerMarkSvg({
+  darkMode = false,
+  className,
+  alt = "Mægler",
+}: {
+  darkMode?: boolean;
+  className?: string;
+  alt?: string;
+}) {
+  const bg = darkMode ? "#121212" : "#ffffff";
+  const border = darkMode ? "#ffffff" : "#000000";
+  return (
+    <svg
+      viewBox="0 0 1024 1024"
+      role="img"
+      aria-label={alt}
+      className={className}
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <title>{alt}</title>
+      <rect width="1024" height="1024" rx="140" fill={bg} />
+      <rect x="36" y="36" width="952" height="952" rx="120" fill="none" stroke={border} strokeWidth="24" />
+      <rect x="72" y="72" width="880" height="880" rx="90" fill="none" stroke={border} strokeWidth="10" />
+      <text
+        x="512"
+        y="680"
+        textAnchor="middle"
+        fontFamily="'Source Serif 4', 'Droid Serif', Georgia, serif"
+        fontWeight="700"
+        fontSize="540"
+        fill="#ee0a0a"
+      >
+        æ
+      </text>
+    </svg>
+  );
+}
+
+/**
+ * Mægler full logo SVG — square tile with double border, "mægler" wordmark
+ * (m + gler in black/white, æ in red) + "Tours and Travels" subtitle.
+ * Used in reports, PDFs, and full branding surfaces.
+ */
+export function MaeglerFullLogoSvg({
+  className,
+  style,
+  darkMode = false,
+}: {
+  className?: string;
+  style?: React.CSSProperties;
+  darkMode?: boolean;
+}) {
+  const stroke = darkMode ? "#ffffff" : "#000000";
+  const textFill = darkMode ? "#ffffff" : "#000000";
+  const bg = darkMode ? "#121212" : "#ffffff";
+  return (
+    <svg
+      viewBox="0 0 1024 1024"
+      role="img"
+      aria-label="Mægler Tours and Travels"
+      className={className}
+      style={style}
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <rect width="1024" height="1024" rx="48" fill={bg} />
+      <rect x="25" y="25" width="974" height="974" rx="48" fill="none" stroke={stroke} strokeWidth="6" />
+      <rect x="36" y="36" width="952" height="952" rx="38" fill="none" stroke={stroke} strokeWidth="2" />
+      <text
+        x="130"
+        y="553"
+        fontFamily="'Source Serif 4', 'Droid Serif', Georgia, serif"
+        fontSize="220"
+        fontWeight="700"
+        fill={textFill}
+        textLength="775"
+        lengthAdjust="spacing"
+      >
+        m<tspan fill="#ee0a0a">æ</tspan>gler
+      </text>
+      <text
+        x="145"
+        y="705"
+        fontFamily="'EB Garamond', Garamond, Georgia, serif"
+        fontSize="100"
+        fill={textFill}
+        textLength="737"
+        lengthAdjust="spacing"
+      >
+        Tours and Travels
+      </text>
+    </svg>
+  );
+}
+
 const COLORS = {
   navy: {
     tile: "#12243A",
@@ -193,6 +291,8 @@ export function TripwiseLogo({
       ? "Right Line"
       : effectiveBrand === "inway"
       ? "Inway Cabs"
+      : effectiveBrand === "maegler"
+      ? "Mægler"
       : "Tripwise";
   const effectiveAlt = alt ?? defaultAlt;
   const markClass = withWordmark ? "h-full w-full" : className;
@@ -271,6 +371,30 @@ export function TripwiseLogo({
           alt={effectiveAlt}
         />
       );
+  } else if (effectiveBrand === "maegler") {
+    mark =
+      variant === "auto" ? (
+        <>
+          {/* Light mode: white tile with black border and red æ */}
+          <MaeglerMarkSvg
+            darkMode={false}
+            className={`${markClass} dark:hidden`}
+            alt={effectiveAlt}
+          />
+          {/* Dark mode: dark tile with matching border */}
+          <MaeglerMarkSvg
+            darkMode={true}
+            className={`${markClass} hidden dark:block`}
+            alt={effectiveAlt}
+          />
+        </>
+      ) : (
+        <MaeglerMarkSvg
+          darkMode={variant === "amber"}
+          className={markClass}
+          alt={effectiveAlt}
+        />
+      );
   } else {
     mark =
       variant === "auto" ? (
@@ -335,6 +459,25 @@ export function TripwiseLogo({
               {tagline}
             </p>
           ) : null}
+        </div>
+      </div>
+    );
+  }
+
+  if (effectiveBrand === "maegler") {
+    const subtitle = tagline === "Fleet operations" ? "Tours and Travels" : tagline || "Tours and Travels";
+    return (
+      <div className={`flex min-w-0 items-center gap-2.5 ${className}`}>
+        <div className="relative h-11 w-11 shrink-0">{mark}</div>
+        <div className="min-w-0 flex flex-col justify-center">
+          <div className="flex items-baseline truncate font-['Source_Serif_4','Droid_Serif',Georgia,serif] text-[17px] font-bold tracking-[0.06em] text-slate-900 dark:text-white leading-tight">
+            <span>m</span>
+            <span className="text-[#ee0a0a]">æ</span>
+            <span>gler</span>
+          </div>
+          <p className="truncate font-['EB_Garamond',Garamond,Georgia,serif] text-[12px] font-normal tracking-[0.04em] text-slate-600 dark:text-slate-300 leading-tight">
+            {subtitle}
+          </p>
         </div>
       </div>
     );

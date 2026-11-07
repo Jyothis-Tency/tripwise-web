@@ -164,9 +164,9 @@ export function computeVehicleReportTotals(
     distanceKm += tripDistanceKm(t);
 
     const salary = computeDriverSalaryBreakdown(t);
-    driverSalary += salary.totalSalary;
+    driverSalary += salary.driverBata;
     driverAdvance += n(
-      (t as { advancePaid?: number }).advancePaid ?? t.advance,
+      (t as { advancePaid?: number }).advancePaid ?? 0,
     );
 
     const expenses = getHistoryTripExpenseBreakdown(t);

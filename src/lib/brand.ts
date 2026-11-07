@@ -7,7 +7,7 @@ export type UserBrandFields = {
   name?: string;
 };
 
-export type BrandKey = "tripwise" | "inway" | "rightline";
+export type BrandKey = "tripwise" | "inway" | "rightline" | "maegler";
 
 /**
  * Returns true if the user belongs to Inway Cabs based on company, email, or name.
@@ -67,11 +67,43 @@ export function isRightLineOwner(user?: UserBrandFields | null): boolean {
 }
 
 /**
+ * Returns true if the user belongs to Mægler Tours and Travels based on company, email, or name.
+ */
+export function isMaeglerOwner(user?: UserBrandFields | null): boolean {
+  if (!user) {
+    if (typeof window !== "undefined") {
+      try {
+        const raw = localStorage.getItem("userData");
+        if (raw) {
+          const u = JSON.parse(raw);
+          return isMaeglerOwner(u);
+        }
+      } catch {}
+    }
+    return false;
+  }
+  const company = (user.company || "").toLowerCase();
+  const email = (user.email || "").toLowerCase();
+  const name = (user.name || "").toLowerCase();
+
+  return (
+    company.includes("maegler") ||
+    company.includes("mægler") ||
+    email.includes("maegler") ||
+    email.includes("mægler") ||
+    name.includes("maegler") ||
+    name.includes("mægler") ||
+    name.includes("hibathulla")
+  );
+}
+
+/**
  * Resolves the BrandKey based on owner user fields.
  */
 export function getBrandKey(user?: UserBrandFields | null): BrandKey {
   if (isRightLineOwner(user)) return "rightline";
   if (isInwayOwner(user)) return "inway";
+  if (isMaeglerOwner(user)) return "maegler";
   return "tripwise";
 }
 
@@ -96,12 +128,16 @@ export function updateDocumentBrand(overrideBrand?: BrandKey | boolean) {
       ? "Right Line — Trip Management System"
       : key === "inway"
       ? "Inway Cabs — Trip Management System"
+      : key === "maegler"
+      ? "Mægler — Trip Management System"
       : "Tripwise — Trip Management System";
   const iconHref =
     key === "rightline"
       ? "/rightline-favicon.svg"
       : key === "inway"
       ? "/inway-favicon.svg"
+      : key === "maegler"
+      ? "/maegler-favicon.svg"
       : "/favicon.svg?v=8";
 
   // Update document title if it contains brand text or default
@@ -109,12 +145,14 @@ export function updateDocumentBrand(overrideBrand?: BrandKey | boolean) {
     !document.title ||
     document.title.includes("Tripwise") ||
     document.title.includes("Inway Cabs") ||
-    document.title.includes("Right Line")
+    document.title.includes("Right Line") ||
+    document.title.includes("Mægler")
   ) {
     document.title = document.title
-      .replace(/^Tripwise/i, key === "rightline" ? "Right Line" : key === "inway" ? "Inway Cabs" : "Tripwise")
-      .replace(/^Inway Cabs/i, key === "rightline" ? "Right Line" : key === "inway" ? "Inway Cabs" : "Tripwise")
-      .replace(/^Right Line/i, key === "rightline" ? "Right Line" : key === "inway" ? "Inway Cabs" : "Tripwise");
+      .replace(/^Tripwise/i, key === "rightline" ? "Right Line" : key === "inway" ? "Inway Cabs" : key === "maegler" ? "Mægler" : "Tripwise")
+      .replace(/^Inway Cabs/i, key === "rightline" ? "Right Line" : key === "inway" ? "Inway Cabs" : key === "maegler" ? "Mægler" : "Tripwise")
+      .replace(/^Right Line/i, key === "rightline" ? "Right Line" : key === "inway" ? "Inway Cabs" : key === "maegler" ? "Mægler" : "Tripwise")
+      .replace(/^Mægler/i, key === "rightline" ? "Right Line" : key === "inway" ? "Inway Cabs" : key === "maegler" ? "Mægler" : "Tripwise");
     if (!document.title.includes("—")) {
       document.title = baseTitle;
     }
@@ -136,7 +174,8 @@ export function useBrand() {
   const { user } = useAuth();
   const isInway = isInwayOwner(user);
   const isRightLine = isRightLineOwner(user);
-  const brandKey: BrandKey = isRightLine ? "rightline" : isInway ? "inway" : "tripwise";
+  const isMaegler = isMaeglerOwner(user);
+  const brandKey: BrandKey = isRightLine ? "rightline" : isInway ? "inway" : isMaegler ? "maegler" : "tripwise";
 
   useEffect(() => {
     updateDocumentBrand(brandKey);
@@ -145,15 +184,18 @@ export function useBrand() {
   return {
     isInway,
     isRightLine,
+    isMaegler,
     brandKey,
-    brandName: isRightLine ? "Right Line" : isInway ? "Inway Cabs" : "Tripwise",
-    shortName: isRightLine ? "Right Line" : isInway ? "Inway" : "Tripwise",
+    brandName: isRightLine ? "Right Line" : isInway ? "Inway Cabs" : isMaegler ? "Mægler" : "Tripwise",
+    shortName: isRightLine ? "Right Line" : isInway ? "Inway" : isMaegler ? "Mægler" : "Tripwise",
     confidentialNotice: isRightLine
       ? "Right Line · Confidential"
       : isInway
       ? "Inway Cabs · Confidential"
+      : isMaegler
+      ? "Mægler · Confidential"
       : "TripWise · Confidential",
-    reportPrefix: isRightLine ? "right-line" : isInway ? "inway-cabs" : "tripwise",
+    reportPrefix: isRightLine ? "right-line" : isInway ? "inway-cabs" : isMaegler ? "maegler" : "tripwise",
   };
 }
 
@@ -429,6 +471,149 @@ export function createRightLineWatermarkPngDataUrl(
     return canvas.toDataURL("image/png");
   } catch (err) {
     console.error("Failed to render Right Line watermark to canvas:", err);
+    return "";
+  }
+}
+
+/**
+ * Generates a crisp base64 PNG data URL of the Mægler brand mark tile
+ * (white square with double border + "mægler" text, "æ" in red) for PDF exports.
+ */
+export function createMaeglerLogoPngDataUrl(size = 400): string {
+  if (typeof document === "undefined") return "";
+  try {
+    const canvas = document.createElement("canvas");
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return "";
+
+    // White background
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, size, size);
+
+    // Double border rect (outer)
+    const outerInset = size * (25 / 1024);
+    const outerW = size - outerInset * 2;
+    const outerRx = size * (48 / 1024);
+    ctx.strokeStyle = "#000000";
+    ctx.lineWidth = size * (6 / 1024);
+    ctx.beginPath();
+    if (typeof ctx.roundRect === "function") {
+      ctx.roundRect(outerInset, outerInset, outerW, outerW, outerRx);
+    } else {
+      ctx.rect(outerInset, outerInset, outerW, outerW);
+    }
+    ctx.stroke();
+
+    // Double border rect (inner)
+    const innerInset = size * (36 / 1024);
+    const innerW = size - innerInset * 2;
+    const innerRx = size * (38 / 1024);
+    ctx.lineWidth = size * (2 / 1024);
+    ctx.beginPath();
+    if (typeof ctx.roundRect === "function") {
+      ctx.roundRect(innerInset, innerInset, innerW, innerW, innerRx);
+    } else {
+      ctx.rect(innerInset, innerInset, innerW, innerW);
+    }
+    ctx.stroke();
+
+    // Only "æ" inside the box (double border tile)
+    const fontSize = size * 0.54;
+    ctx.font = `700 ${fontSize}px 'Source Serif 4', 'Droid Serif', Georgia, serif`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillStyle = "#ee0a0a";
+    ctx.fillText("æ", size / 2, size * 0.52);
+
+    return canvas.toDataURL("image/png");
+  } catch (err) {
+    console.error("Failed to render Mægler logo to canvas:", err);
+    return "";
+  }
+}
+
+/**
+ * Generates a translucent watermark PNG of the full Mægler logo for PDF backgrounds.
+ */
+export function createMaeglerWatermarkPngDataUrl(
+  size = 600,
+  opacity = 0.075
+): string {
+  if (typeof document === "undefined") return "";
+  try {
+    const canvas = document.createElement("canvas");
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return "";
+
+    ctx.clearRect(0, 0, size, size);
+    ctx.globalAlpha = opacity;
+
+    // Double border rect (outer)
+    const outerInset = size * (25 / 1024);
+    const outerW = size - outerInset * 2;
+    const outerRx = size * (48 / 1024);
+    ctx.strokeStyle = "#000000";
+    ctx.lineWidth = size * (6 / 1024);
+    ctx.beginPath();
+    if (typeof ctx.roundRect === "function") {
+      ctx.roundRect(outerInset, outerInset, outerW, outerW, outerRx);
+    } else {
+      ctx.rect(outerInset, outerInset, outerW, outerW);
+    }
+    ctx.stroke();
+
+    // Double border rect (inner)
+    const innerInset = size * (36 / 1024);
+    const innerW = size - innerInset * 2;
+    const innerRx = size * (38 / 1024);
+    ctx.lineWidth = size * (2 / 1024);
+    ctx.beginPath();
+    if (typeof ctx.roundRect === "function") {
+      ctx.roundRect(innerInset, innerInset, innerW, innerW, innerRx);
+    } else {
+      ctx.rect(innerInset, innerInset, innerW, innerW);
+    }
+    ctx.stroke();
+
+    // Word: "mægler"
+    const wordY = size * (553 / 1024);
+    const wordSize = size * (210 / 1024);
+    ctx.font = `700 ${wordSize}px 'Source Serif 4', 'Droid Serif', Georgia, serif`;
+    ctx.textBaseline = "alphabetic";
+
+    const mWidth = ctx.measureText("m").width;
+    const aeWidth = ctx.measureText("æ").width;
+    const glerWidth = ctx.measureText("gler").width;
+    const totalW = mWidth + aeWidth + glerWidth;
+    let startX = (size - totalW) / 2;
+
+    ctx.textAlign = "left";
+    ctx.fillStyle = "#000000";
+    ctx.fillText("m", startX, wordY);
+    startX += mWidth;
+
+    ctx.fillStyle = "#ee0a0a";
+    ctx.fillText("æ", startX, wordY);
+    startX += aeWidth;
+
+    ctx.fillStyle = "#000000";
+    ctx.fillText("gler", startX, wordY);
+
+    // Subtitle: "Tours and Travels"
+    const subY = size * (705 / 1024);
+    const subSize = size * (96 / 1024);
+    ctx.font = `400 ${subSize}px 'EB Garamond', Garamond, Georgia, serif`;
+    ctx.textAlign = "center";
+    ctx.fillStyle = "#000000";
+    ctx.fillText("Tours and Travels", size / 2, subY);
+
+    return canvas.toDataURL("image/png");
+  } catch (err) {
+    console.error("Failed to render Mægler watermark to canvas:", err);
     return "";
   }
 }

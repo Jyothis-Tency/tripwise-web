@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" role="img" aria-label="Mægler">
+  <style>
+    .tile { fill: #ffffff; stroke: #000000; }
+    .mark-fill { fill: #ee0a0a; }
+    @media (prefers-color-scheme: dark) {
+      .tile { fill: #1a1a1a; stroke: #333333; }
+    }
+  </style>
+  <rect class="tile" x="4" y="4" width="112" height="112" rx="22" stroke-width="4"/>
+  <text class="mark-fill" x="60" y="80" text-anchor="middle" font-family="'Source Serif 4', Georgia, serif" font-weight="700" font-size="72">æ</text>
+</svg>
+

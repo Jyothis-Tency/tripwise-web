@@ -34,6 +34,14 @@ import {
   ArrowRightLeft,
 } from "lucide-react";
 import jsPDF from "jspdf";
+import {
+  createInwayWatermarkPngDataUrl,
+  createRightLineWatermarkPngDataUrl,
+  createMaeglerWatermarkPngDataUrl,
+  isInwayOwner,
+  isRightLineOwner,
+  isMaeglerOwner,
+} from "../../../lib/brand";
 import { useAuth } from "../../../hooks/useAuth";
 import { authApi } from "../../auth/api";
 import { TimePicker12h } from "../../../components/ui/TimePicker12h";
@@ -991,6 +999,27 @@ const fmtDate = (d: string | Date | undefined) =>
       })
     : "—";
 
+function drawBulkPdfWatermark(doc: jsPDF) {
+  const inway = isInwayOwner();
+  const rightline = isRightLineOwner();
+  const maegler = isMaeglerOwner();
+  const watermarkData = rightline
+    ? createRightLineWatermarkPngDataUrl(600, 0.085)
+    : maegler
+    ? createMaeglerWatermarkPngDataUrl(600, 0.075)
+    : inway
+    ? createInwayWatermarkPngDataUrl(600, 0.085)
+    : "";
+  if (watermarkData) {
+    const pw = doc.internal.pageSize.getWidth();
+    const ph = doc.internal.pageSize.getHeight();
+    const wmSize = Math.min(pw, ph) * 0.55;
+    const wmX = (pw - wmSize) / 2;
+    const wmY = (ph - wmSize) / 2;
+    doc.addImage(watermarkData, "PNG", wmX, wmY, wmSize, wmSize);
+  }
+}
+
 function drawPDFHeader(
   doc: jsPDF,
   title: string,
@@ -998,6 +1027,7 @@ function drawPDFHeader(
   y: number,
   opts?: { metaLabel?: string; metaLineMatchAgency?: boolean },
 ): number {
+  drawBulkPdfWatermark(doc);
   const pw = doc.internal.pageSize.getWidth();
 
   // Generation Date
@@ -1076,6 +1106,7 @@ function drawPaymentTable(
     // Page break if near bottom
     if (y > doc.internal.pageSize.getHeight() - 30) {
       doc.addPage();
+      drawBulkPdfWatermark(doc);
       y = 20;
     }
     // Alternate row bg
@@ -1332,6 +1363,7 @@ function generateBulkTripsPDF(
   validGroups.forEach((g, driverIdx) => {
     if (y > pageH - 40) {
       doc.addPage();
+      drawBulkPdfWatermark(doc);
       y = 20;
     }
 
@@ -1393,6 +1425,7 @@ function generateBulkTripsPDF(
 
       if (y + rowH > pageH - 25) {
         doc.addPage();
+        drawBulkPdfWatermark(doc);
         y = 20;
       }
 
@@ -1480,6 +1513,7 @@ function generateNormalTripsPDF(
   entries.forEach((r, i) => {
     if (y > doc.internal.pageSize.getHeight() - 25) {
       doc.addPage();
+      drawBulkPdfWatermark(doc);
       y = 20;
     }
 

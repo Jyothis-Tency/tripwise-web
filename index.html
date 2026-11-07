@@ -15,7 +15,7 @@
     <meta property="og:image" content="/tripwise-logo.png?v=7" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Sora:wght@700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=EB+Garamond:wght@400;500;600&family=Source+Serif+4:ital,opsz,wght@0,8..60,600;0,8..60,700;1,8..60,700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Sora:wght@700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
     <title>Tripwise — Trip Management System</title>
     <script>
       (function () {
@@ -29,11 +29,14 @@
             const c = (u.company || '').toLowerCase();
             const e = (u.email || '').toLowerCase();
             const n = (u.name || '').toLowerCase();
-            if (c.includes('inway') || e.includes('inwaycabs') || n.includes('inway')) {
-              document.title = 'Inway Cabs — Trip Management System';
-              const links = document.querySelectorAll("link[rel~='icon'], link[rel='shortcut icon'], link[rel='apple-touch-icon']");
-              links.forEach(function(l) { l.href = '/inway-favicon.svg'; });
-            }
+            const isRightline = c.includes('rightline') || c.includes('right line') || e.includes('rightline') || n.includes('rightline');
+            const isMaegler = c.includes('maegler') || c.includes('mægler') || e.includes('maegler') || n.includes('maegler') || n.includes('hibathulla');
+            const isInway = c.includes('inway') || e.includes('inwaycabs') || n.includes('inway');
+            const fav = isRightline ? '/rightline-favicon.svg' : isMaegler ? '/maegler-favicon.svg' : isInway ? '/inway-favicon.svg' : '/favicon.svg?v=8';
+            const title = isRightline ? 'Right Line — Trip Management System' : isMaegler ? 'Mægler — Trip Management System' : isInway ? 'Inway Cabs — Trip Management System' : 'Tripwise — Trip Management System';
+            document.title = title;
+            const links = document.querySelectorAll("link[rel~='icon'], link[rel='shortcut icon'], link[rel='apple-touch-icon']");
+            links.forEach(function(l) { l.href = fav; });
           }
         } catch (e) {}
       })();

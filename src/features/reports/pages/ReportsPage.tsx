@@ -16,6 +16,9 @@ import {
   RotateCcw,
   CircleDot,
   X,
+  FileText,
+  PanelLeftClose,
+  PanelLeftOpen,
 } from "lucide-react";
 import {
   fetchTripHistory,
@@ -54,6 +57,14 @@ import {
   type TripReportTotals,
 } from "../entityReportTotals";
 import { reportFmtDate } from "../tripReportFormat";
+import {
+  type ReportTotalsSelection,
+  type ReportTotalFieldId,
+  defaultReportTotalsSelection,
+  allReportTotalsSelection,
+  noneReportTotalsSelection,
+  visibleReportTotalDefs,
+} from "../reportTotalsDisplay";
 
 const VEHICLE_STATUS_OPTIONS = [
   { value: "all", label: "All statuses" },
@@ -213,6 +224,27 @@ export function ReportsPage() {
     () => ensureReportFieldSelection(fieldSelection, tripSource),
     [fieldSelection, tripSource],
   );
+  const [totalsSelection, setTotalsSelection] = useState<ReportTotalsSelection>(
+    () => defaultReportTotalsSelection("vehicle"),
+  );
+  const [mobileTab, setMobileTab] = useState<"builder" | "preview">("builder");
+  const [desktopSidebarOpen, setDesktopSidebarOpen] = useState(true);
+
+  const visibleTotals = useMemo(
+    () => visibleReportTotalDefs(tripSource),
+    [tripSource],
+  );
+  const selectedTotalsCount = useMemo(
+    () => visibleTotals.filter((d) => totalsSelection[d.id] !== false).length,
+    [visibleTotals, totalsSelection],
+  );
+
+  const toggleReportTotal = (id: ReportTotalFieldId) => {
+    setTotalsSelection((prev) => ({
+      ...prev,
+      [id]: prev[id] === false ? true : false,
+    }));
+  };
 
   const [drivers, setDrivers] = useState<Driver[]>([]);
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
@@ -439,6 +471,7 @@ export function ReportsPage() {
         subtitle: subtitle || undefined,
         resolveAgencyLabel,
         fieldSelection: effectiveFieldSelection,
+        totalsSelection,
         tripSource,
         reportTotals: computeTripReportTotals(result.trips, tripSource),
         fileName: customFileName || pdfFileName,
@@ -491,6 +524,7 @@ export function ReportsPage() {
     setTripSearchQuery("");
     setTripSource("vehicle");
     setFieldSelection(defaultReportFieldSelection("vehicle"));
+    setTotalsSelection(defaultReportTotalsSelection("vehicle"));
     setReportTotals(null);
     setPreviewPage(1);
   };
@@ -553,6 +587,7 @@ export function ReportsPage() {
       chips.push({ key: "period", label: "All time" });
     }
     chips.push({ key: "cols", label: `${selectedFieldCount} columns` });
+    chips.push({ key: "totals", label: `${selectedTotalsCount} totals` });
     return chips;
   }, [
     tripSource,
@@ -564,6 +599,7 @@ export function ReportsPage() {
     startDate,
     endDate,
     selectedFieldCount,
+    selectedTotalsCount,
   ]);
 
   const statusLabel = isBusy
@@ -664,10 +700,49 @@ export function ReportsPage() {
             </button>
           </div>
         )}
+
+        {/* Mobile View Switcher (phones & tablets < lg) */}
+        <div className="flex shrink-0 border-t border-slate-200 bg-slate-100/90 p-1.5 lg:hidden dark:border-[#1e2638] dark:bg-[#080e1c]">
+          <button
+            type="button"
+            onClick={() => setMobileTab("builder")}
+            className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-semibold transition ${
+              mobileTab === "builder"
+                ? "bg-white text-slate-900 shadow-sm dark:bg-[#131b2e] dark:text-white"
+                : "text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"
+            }`}
+          >
+            <SlidersHorizontal className="h-3.5 w-3.5" />
+            <span>Builder & Filters</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setMobileTab("preview")}
+            className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-semibold transition ${
+              mobileTab === "preview"
+                ? "bg-white text-slate-900 shadow-sm dark:bg-[#131b2e] dark:text-white"
+                : "text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"
+            }`}
+          >
+            <FileText className="h-3.5 w-3.5" />
+            <span>Document Preview</span>
+            {previewPagination.total > 0 && (
+              <span className="rounded-full bg-slate-200 px-1.5 py-0.5 text-[10px] font-bold tabular-nums text-slate-700 dark:bg-white/10 dark:text-slate-200">
+                {previewPagination.total}
+              </span>
+            )}
+          </button>
+        </div>
       </header>
 
       <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
-        <aside className="flex w-full shrink-0 flex-col border-b border-slate-200 bg-[var(--bg-card)] dark:border-[#1e2638] lg:w-[46%] lg:max-w-[520px] lg:border-b-0 lg:border-r xl:w-[48%] xl:max-w-[560px]">
+        <aside
+          className={`flex shrink-0 flex-col border-b border-slate-200 bg-[var(--bg-card)] transition-[width] duration-200 dark:border-[#1e2638] lg:border-b-0 lg:border-r ${
+            desktopSidebarOpen
+              ? "lg:w-[410px] xl:w-[450px] 2xl:w-[480px]"
+              : "lg:w-0 lg:overflow-hidden lg:border-r-0"
+          } ${mobileTab === "builder" ? "w-full min-h-0 flex-1" : "hidden lg:flex"}`}
+        >
           <div className="flex items-center justify-between border-b border-slate-100 px-4 py-2 dark:border-[#1e2638]">
             <div className="flex items-center gap-2">
               <SlidersHorizontal className="h-3.5 w-3.5 text-slate-400" />
@@ -675,14 +750,24 @@ export function ReportsPage() {
                 Builder
               </span>
             </div>
-            <button
-              type="button"
-              onClick={resetFilters}
-              className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-500 transition hover:text-slate-800 dark:hover:text-slate-200"
-            >
-              <RotateCcw className="h-3 w-3" />
-              Reset
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={resetFilters}
+                className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-500 transition hover:text-slate-800 dark:hover:text-slate-200"
+              >
+                <RotateCcw className="h-3 w-3" />
+                Reset
+              </button>
+              <button
+                type="button"
+                onClick={() => setDesktopSidebarOpen(false)}
+                className="hidden text-slate-400 hover:text-slate-700 lg:inline-flex dark:hover:text-slate-200"
+                title="Collapse sidebar to maximize preview"
+              >
+                <PanelLeftClose className="h-3.5 w-3.5" />
+              </button>
+            </div>
           </div>
 
           <div className="flex-1 space-y-3.5 overflow-y-auto p-3.5 sm:p-4">
@@ -713,6 +798,7 @@ export function ReportsPage() {
                         onClick={() => {
                           setTripSource(src);
                           setFieldSelection(defaultReportFieldSelection(src));
+                          setTotalsSelection(defaultReportTotalsSelection(src));
                           // Bulk agency trips use pending/converted — not vehicle "completed"
                           setTripStatus(
                             src === "bulk"
@@ -999,10 +1085,124 @@ export function ReportsPage() {
                 included.
               </p>
             </section>
+
+            <section>
+              <SectionLabel
+                index="04"
+                title="Report Totals"
+                action={
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-medium tabular-nums text-slate-400">
+                      {selectedTotalsCount}/{visibleTotals.length}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (selectedTotalsCount === visibleTotals.length) {
+                          setTotalsSelection(
+                            noneReportTotalsSelection(tripSource),
+                          );
+                        } else {
+                          setTotalsSelection(
+                            allReportTotalsSelection(tripSource),
+                          );
+                        }
+                      }}
+                      className="text-[10px] font-semibold text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white"
+                    >
+                      {selectedTotalsCount === visibleTotals.length
+                        ? "None"
+                        : "All"}
+                    </button>
+                  </div>
+                }
+              />
+              <div className="grid grid-cols-2 overflow-hidden rounded-lg border border-slate-200/90 dark:border-[#243049]">
+                {visibleTotals.map((f, i) => (
+                  <label
+                    key={f.id}
+                    className={`flex cursor-pointer items-center gap-2 px-2 py-1.5 text-[12px] transition hover:bg-slate-50 dark:hover:bg-white/[0.03] ${
+                      i % 2 === 1
+                        ? "border-l border-slate-100 dark:border-[#1e2638]"
+                        : ""
+                    } ${
+                      i >= 2
+                        ? "border-t border-slate-100 dark:border-[#1e2638]"
+                        : ""
+                    } ${
+                      totalsSelection[f.id] !== false
+                        ? "bg-slate-50/80 dark:bg-white/[0.02]"
+                        : ""
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={totalsSelection[f.id] !== false}
+                      onChange={() => toggleReportTotal(f.id)}
+                      className="h-3.5 w-3.5 shrink-0 rounded border-slate-300 text-slate-900 focus:ring-slate-300 dark:border-white/20 dark:bg-transparent dark:text-white"
+                    />
+                    <span className="min-w-0 flex-1 truncate text-slate-700 dark:text-slate-200">
+                      {f.label}
+                    </span>
+                  </label>
+                ))}
+              </div>
+              <p className="mt-2 text-[10px] leading-relaxed text-slate-400">
+                Choose which summary values appear in Report Totals. When all
+                are unchecked, the totals block is omitted.
+              </p>
+            </section>
+          </div>
+
+          {/* Mobile view action to jump to preview */}
+          <div className="border-t border-slate-100 p-3 sm:p-4 lg:hidden dark:border-[#1e2638]">
+            <button
+              type="button"
+              onClick={() => setMobileTab("preview")}
+              className="flex w-full items-center justify-center gap-2 rounded-xl bg-slate-900 py-2.5 text-xs font-semibold text-white shadow-md transition active:scale-[0.98] dark:bg-white dark:text-slate-900"
+            >
+              <span>View Document Preview</span>
+              {previewPagination.total > 0 && (
+                <span className="rounded-full bg-white/20 px-1.5 py-0.5 text-[10px] font-bold tabular-nums text-white dark:bg-black/10 dark:text-slate-900">
+                  {previewPagination.total} trips
+                </span>
+              )}
+            </button>
           </div>
         </aside>
 
-        <main className="relative flex min-w-0 flex-1 flex-col overflow-hidden lg:min-w-[280px]">
+        <main
+          className={`relative min-w-0 flex-1 flex-col overflow-hidden ${
+            mobileTab === "preview" ? "flex min-h-0 flex-1" : "hidden lg:flex"
+          }`}
+        >
+          {/* Desktop button to reopen builder if collapsed */}
+          {!desktopSidebarOpen && (
+            <button
+              type="button"
+              onClick={() => setDesktopSidebarOpen(true)}
+              className="absolute left-3 top-3 z-20 hidden items-center gap-1.5 rounded-lg border border-slate-200 bg-white/95 px-2.5 py-1.5 text-xs font-semibold text-slate-700 shadow-md backdrop-blur transition hover:bg-slate-50 lg:inline-flex dark:border-[#243049] dark:bg-[#0e1524]/95 dark:text-slate-200"
+            >
+              <PanelLeftOpen className="h-3.5 w-3.5" />
+              <span>Show Builder</span>
+            </button>
+          )}
+
+          {/* Mobile bar to jump back to builder */}
+          <div className="flex items-center justify-between border-b border-slate-200/80 bg-white/90 px-3 py-2 backdrop-blur lg:hidden dark:border-[#243049] dark:bg-[#0e1524]/90">
+            <button
+              type="button"
+              onClick={() => setMobileTab("builder")}
+              className="inline-flex items-center gap-1 text-xs font-semibold text-slate-700 hover:text-slate-900 dark:text-slate-200 dark:hover:text-white"
+            >
+              <ChevronLeft className="h-4 w-4" />
+              Edit Filters & Columns
+            </button>
+            <span className="font-mono text-[11px] text-slate-500">
+              {previewPagination.total} records
+            </span>
+          </div>
+
           <div
             className="pointer-events-none absolute inset-0 opacity-[0.35] dark:opacity-[0.2]"
             style={{
@@ -1013,7 +1213,7 @@ export function ReportsPage() {
           />
 
           <div className="relative z-[1] flex min-h-0 flex-1 flex-col overflow-y-auto">
-            <div className="mx-auto w-full max-w-[720px] space-y-2.5 p-3 sm:p-4 xl:max-w-[820px]">
+            <div className="mx-auto w-full max-w-[760px] space-y-3 p-2.5 sm:p-4 xl:max-w-[840px] xl:p-6">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div>
                   <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400">
@@ -1068,21 +1268,24 @@ export function ReportsPage() {
 
               {previewTrips.length > 0 && (
                 <>
-                  <TripReportPreviewDocument
-                    trips={previewTrips}
-                    totalTrips={previewPagination.total}
-                    fieldSelection={effectiveFieldSelection}
-                    title="Trip History Report"
-                    subtitle={filterSummary || undefined}
-                    resolveAgencyLabel={resolveAgencyLabel}
-                    tripIndexOffset={(previewPage - 1) * PREVIEW_LIMIT}
-                    reportTotals={reportTotals}
-                    pageNote={
-                      previewPagination.pages > 1
-                        ? `Showing page ${previewPagination.page} of ${previewPagination.pages}`
-                        : undefined
-                    }
-                  />
+                  <div className="w-full overflow-x-auto rounded-lg">
+                    <TripReportPreviewDocument
+                      trips={previewTrips}
+                      totalTrips={previewPagination.total}
+                      fieldSelection={effectiveFieldSelection}
+                      totalsSelection={totalsSelection}
+                      title="Trip History Report"
+                      subtitle={filterSummary || undefined}
+                      resolveAgencyLabel={resolveAgencyLabel}
+                      tripIndexOffset={(previewPage - 1) * PREVIEW_LIMIT}
+                      reportTotals={reportTotals}
+                      pageNote={
+                        previewPagination.pages > 1
+                          ? `Showing page ${previewPagination.page} of ${previewPagination.pages}`
+                          : undefined
+                      }
+                    />
+                  </div>
                   <PaginationBar
                     p={previewPagination}
                     onChange={setPreviewPage}

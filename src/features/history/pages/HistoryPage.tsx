@@ -2,6 +2,17 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Search, X, RefreshCw, ChevronLeft, ChevronRight, FileDown } from 'lucide-react';
 import jsPDF from 'jspdf';
 import {
+  createInwayWatermarkPngDataUrl,
+  createRightLineWatermarkPngDataUrl,
+  createMaeglerWatermarkPngDataUrl,
+  createInwayLogoPngDataUrl,
+  createRightLineLogoPngDataUrl,
+  createMaeglerLogoPngDataUrl,
+  isInwayOwner,
+  isRightLineOwner,
+  isMaeglerOwner,
+} from '../../../lib/brand';
+import {
   fetchTripHistory,
   type HistoryTrip,
   type HistoryPagination,
@@ -335,10 +346,35 @@ export function HistoryPage() {
     }
 
     const doc = new jsPDF('p', 'mm', 'a4');
+    const pageW = 210;
+    const pageH = 297;
     const leftX = 14;
     const rightX = 196;
     const pageBottomY = 280;
     let y = 16;
+
+    const inway = isInwayOwner();
+    const rightline = isRightLineOwner();
+    const maegler = isMaeglerOwner();
+
+    const watermarkData = rightline
+      ? createRightLineWatermarkPngDataUrl(600, 0.085)
+      : maegler
+      ? createMaeglerWatermarkPngDataUrl(600, 0.075)
+      : inway
+      ? createInwayWatermarkPngDataUrl(600, 0.085)
+      : '';
+
+    const drawWatermark = () => {
+      if (watermarkData) {
+        const wmSize = 135;
+        const wmX = (pageW - wmSize) / 2;
+        const wmY = (pageH - wmSize) / 2;
+        doc.addImage(watermarkData, 'PNG', wmX, wmY, wmSize, wmSize);
+      }
+    };
+
+    drawWatermark();
 
     const fmtDate = (raw: any): string => {
       const s = raw == null ? '' : String(raw).trim();
@@ -411,6 +447,7 @@ export function HistoryPage() {
     const ensureSpace = (needed: number) => {
       if (y + needed <= pageBottomY) return;
       doc.addPage();
+      drawWatermark();
       y = 16;
     };
 
@@ -432,6 +469,52 @@ export function HistoryPage() {
       writeText(label, x, yPos, { size: 9, bold: true });
       writeText(truncateToWidth(value, maxValueW), x + labelW, yPos, { size: 9, bold: false });
     };
+
+    if (rightline || inway || maegler) {
+      const logoData = rightline
+        ? createRightLineLogoPngDataUrl(400)
+        : maegler
+        ? createMaeglerLogoPngDataUrl(400)
+        : createInwayLogoPngDataUrl(400);
+      if (maegler) {
+        if (logoData) {
+          doc.addImage(logoData, 'PNG', leftX, y - 4, 12, 12);
+        }
+        doc.setFont('times', 'bold');
+        doc.setFontSize(14);
+        doc.setTextColor(15, 23, 42);
+        doc.text('m', leftX + 16, y + 2);
+        const mW = doc.getTextWidth('m');
+        doc.setTextColor(238, 10, 10);
+        doc.text('æ', leftX + 16 + mW, y + 2);
+        const aeW = doc.getTextWidth('æ');
+        doc.setTextColor(15, 23, 42);
+        doc.text('gler', leftX + 16 + mW + aeW, y + 2);
+
+        doc.setFontSize(8.5);
+        doc.setFont('times', 'normal');
+        doc.setTextColor(100, 116, 139);
+        doc.text('Tours and Travels', leftX + 16, y + 6);
+        y += 16;
+      } else {
+        if (logoData) {
+          doc.addImage(logoData, 'PNG', leftX, y - 4, 12, 12);
+        }
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(14);
+        doc.setTextColor(15, 23, 42);
+        doc.text(rightline ? 'RIGHT LINE' : 'INWAY CABS', leftX + 16, y + 2);
+        doc.setFontSize(8);
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(100, 116, 139);
+        doc.text(
+          rightline ? 'The Travel Expert' : 'Fleet Operations',
+          leftX + 16,
+          y + 6,
+        );
+        y += 16;
+      }
+    }
 
     // Header (match shared PDF)
     writeText('Trip History Report', leftX, y, { size: 18, bold: true });

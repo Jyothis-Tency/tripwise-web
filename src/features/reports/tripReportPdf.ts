@@ -10,9 +10,14 @@ import {
 import { reportFmtDate, toTripReportRow } from "./tripReportFormat";
 import {
   createInwayLogoPngDataUrl,
+  createInwayWatermarkPngDataUrl,
   createRightLineLogoPngDataUrl,
+  createRightLineWatermarkPngDataUrl,
+  createMaeglerLogoPngDataUrl,
+  createMaeglerWatermarkPngDataUrl,
   isInwayOwner,
   isRightLineOwner,
+  isMaeglerOwner,
 } from "../../lib/brand";
 
 export type TripReportPdfOptions = {
@@ -20,6 +25,7 @@ export type TripReportPdfOptions = {
   subtitle?: string;
   resolveAgencyLabel?: (agencyName?: string) => string;
   fieldSelection: ReportFieldSelection;
+  totalsSelection?: Record<string, boolean>;
   tripSource?: "vehicle" | "bulk";
   reportTotals?: TripReportTotals | null;
   fileName?: string;
@@ -65,9 +71,37 @@ export function downloadTripReportPdf(
     return s.slice(0, cut).trimEnd() + ell;
   };
 
+  const pageW = 210;
+  const pageH = 297;
+  const inway = isInwayOwner();
+  const rightline = isRightLineOwner();
+  const maegler = isMaeglerOwner();
+
+  // Background: Large Translucent Logo Watermark (Inway Cabs, Right Line & Mægler)
+  const watermarkData = rightline
+    ? createRightLineWatermarkPngDataUrl(600, 0.085)
+    : maegler
+    ? createMaeglerWatermarkPngDataUrl(600, 0.075)
+    : inway
+    ? createInwayWatermarkPngDataUrl(600, 0.085)
+    : "";
+
+  const drawWatermark = () => {
+    if (watermarkData) {
+      const wmSize = 135;
+      const wmX = (pageW - wmSize) / 2;
+      const wmY = (pageH - wmSize) / 2;
+      doc.addImage(watermarkData, "PNG", wmX, wmY, wmSize, wmSize);
+    }
+  };
+
+  // Watermark on page 1
+  drawWatermark();
+
   const ensureSpace = (needed: number) => {
     if (y + needed <= pageBottomY) return;
     doc.addPage();
+    drawWatermark();
     y = 16;
   };
 
@@ -103,31 +137,53 @@ export function downloadTripReportPdf(
     });
   };
 
-  const inway = isInwayOwner();
-  const rightline = isRightLineOwner();
-  if (rightline || inway) {
+  if (rightline || inway || maegler) {
     const logoData = rightline
       ? createRightLineLogoPngDataUrl(400)
+      : maegler
+      ? createMaeglerLogoPngDataUrl(400)
       : createInwayLogoPngDataUrl(400);
-    if (logoData) {
-      doc.addImage(logoData, "PNG", leftX, y - 4, 12, 12);
+    if (maegler) {
+      if (logoData) {
+        doc.addImage(logoData, "PNG", leftX, y - 4, 12, 12);
+      }
+      doc.setFont("times", "bold");
+      doc.setFontSize(14);
+      doc.setTextColor(15, 23, 42);
+      doc.text("m", leftX + 16, y + 2);
+      const mW = doc.getTextWidth("m");
+      doc.setTextColor(238, 10, 10);
+      doc.text("æ", leftX + 16 + mW, y + 2);
+      const aeW = doc.getTextWidth("æ");
+      doc.setTextColor(15, 23, 42);
+      doc.text("gler", leftX + 16 + mW + aeW, y + 2);
+
+      doc.setFontSize(8.5);
+      doc.setFont("times", "normal");
+      doc.setTextColor(100, 116, 139);
+      doc.text("Tours and Travels", leftX + 16, y + 6);
+      y += 16;
     } else {
-      doc.setFillColor(10, 10, 10);
-      doc.roundedRect(leftX, y - 4, 12, 12, 2, 2, "F");
+      if (logoData) {
+        doc.addImage(logoData, "PNG", leftX, y - 4, 12, 12);
+      } else {
+        doc.setFillColor(10, 10, 10);
+        doc.roundedRect(leftX, y - 4, 12, 12, 2, 2, "F");
+      }
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(14);
+      doc.setTextColor(15, 23, 42);
+      doc.text(rightline ? "RIGHT LINE" : "INWAY CABS", leftX + 16, y + 2);
+      doc.setFontSize(8);
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(100, 116, 139);
+      doc.text(
+        rightline ? "The Travel Expert" : "Fleet Operations",
+        leftX + 16,
+        y + 6,
+      );
+      y += 16;
     }
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(14);
-    doc.setTextColor(15, 23, 42);
-    doc.text(rightline ? "RIGHT LINE" : "INWAY CABS", leftX + 16, y + 2);
-    doc.setFontSize(8);
-    doc.setFont("helvetica", "normal");
-    doc.setTextColor(100, 116, 139);
-    doc.text(
-      rightline ? "The Travel Expert" : "Fleet Operations",
-      leftX + 16,
-      y + 6,
-    );
-    y += 16;
   }
 
   writeText(title, leftX, y, { size: 18, bold: true });
@@ -151,10 +207,9 @@ export function downloadTripReportPdf(
     y += 6;
   }
 
-  const showTotals = options.fieldSelection?.reportTotals !== false;
   const totalLines =
-    showTotals && options.reportTotals
-      ? tripReportTotalLines(options.reportTotals)
+    options.reportTotals
+      ? tripReportTotalLines(options.reportTotals, options.totalsSelection)
       : [];
   if (totalLines.length > 0) {
     y += 2;

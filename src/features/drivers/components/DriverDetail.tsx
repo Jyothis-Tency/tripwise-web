@@ -629,7 +629,13 @@ function buildDriverCredentialsWhatsAppMessage(opts: {
     ownerNm.includes("rightline") ||
     ownerNm.includes("right line");
   const isInway = ownerCo.includes("inway") || ownerNm.includes("inway");
-  const brandName = isRightLine ? "Right Line" : isInway ? "Inway Cabs" : "Tripwise";
+  const isMaegler =
+    ownerCo.includes("maegler") ||
+    ownerCo.includes("mægler") ||
+    ownerNm.includes("maegler") ||
+    ownerNm.includes("mægler") ||
+    ownerNm.includes("hibathulla");
+  const brandName = isRightLine ? "Right Line" : isMaegler ? "Mægler" : isInway ? "Inway Cabs" : "Tripwise";
   const lines = [
     `*${brandName} — Driver login*`,
     "",

@@ -2,9 +2,14 @@ import jsPDF from "jspdf";
 import type { AgencyTxType } from "./agencyTxRows";
 import {
   createInwayLogoPngDataUrl,
+  createInwayWatermarkPngDataUrl,
   createRightLineLogoPngDataUrl,
+  createRightLineWatermarkPngDataUrl,
+  createMaeglerLogoPngDataUrl,
+  createMaeglerWatermarkPngDataUrl,
   isInwayOwner,
   isRightLineOwner,
+  isMaeglerOwner,
 } from "../../lib/brand";
 
 export type AgencyTxPdfRow = {
@@ -150,18 +155,42 @@ export function downloadAgencyTransactionHistoryPdf(
   const pageBottomY = pageH - 16;
   let y = 16;
 
+  const inway = isInwayOwner();
+  const rightline = isRightLineOwner();
+  const maegler = isMaeglerOwner();
+
+  // Background: Large Translucent Logo Watermark (Inway Cabs, Right Line & Mægler)
+  const watermarkData = rightline
+    ? createRightLineWatermarkPngDataUrl(600, 0.085)
+    : maegler
+    ? createMaeglerWatermarkPngDataUrl(600, 0.075)
+    : inway
+    ? createInwayWatermarkPngDataUrl(600, 0.085)
+    : "";
+
+  const drawWatermark = () => {
+    if (watermarkData) {
+      const wmSize = 135;
+      const wmX = (pageW - wmSize) / 2;
+      const wmY = (pageH - wmSize) / 2;
+      doc.addImage(watermarkData, "PNG", wmX, wmY, wmSize, wmSize);
+    }
+  };
+
+  drawWatermark();
+
   const ensureSpace = (need: number) => {
     if (y + need <= pageBottomY) return false;
     doc.addPage();
+    drawWatermark();
     y = 16;
     return true;
   };
-
-  const inway = isInwayOwner();
-  const rightline = isRightLineOwner();
-  if (rightline || inway) {
+  if (rightline || inway || maegler) {
     const logoData = rightline
       ? createRightLineLogoPngDataUrl(400)
+      : maegler
+      ? createMaeglerLogoPngDataUrl(400)
       : createInwayLogoPngDataUrl(400);
     if (logoData) {
       doc.addImage(logoData, "PNG", leftX, y - 4, 12, 12);

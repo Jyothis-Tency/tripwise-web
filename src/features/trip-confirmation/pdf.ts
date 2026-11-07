@@ -10,9 +10,12 @@ import {
   createInwayWatermarkPngDataUrl,
   createRightLineLogoPngDataUrl,
   createRightLineWatermarkPngDataUrl,
+  createMaeglerLogoPngDataUrl,
+  createMaeglerWatermarkPngDataUrl,
   createTripwiseLogoPngDataUrl,
   isInwayOwner,
   isRightLineOwner,
+  isMaeglerOwner,
 } from "../../lib/brand";
 
 export * from "./types";
@@ -383,10 +386,13 @@ export function generateTripConfirmationPdf(
 
   const inway = isInwayOwner();
   const rightline = isRightLineOwner();
+  const maegler = isMaeglerOwner();
 
-  // Background: Large Translucent Logo Watermark (Inway Cabs & Right Line)
+  // Background: Large Translucent Logo Watermark (Inway Cabs, Right Line & Mægler)
   const watermarkData = rightline
     ? createRightLineWatermarkPngDataUrl(600, 0.085)
+    : maegler
+    ? createMaeglerWatermarkPngDataUrl(600, 0.07)
     : inway
     ? createInwayWatermarkPngDataUrl(600, 0.085)
     : "";
@@ -406,6 +412,8 @@ export function generateTripConfirmationPdf(
   // Left: Brand Logo + Name & Subtitle
   const logoData = rightline
     ? createRightLineLogoPngDataUrl(400)
+    : maegler
+    ? createMaeglerLogoPngDataUrl(400)
     : inway
     ? createInwayLogoPngDataUrl(400)
     : createTripwiseLogoPngDataUrl(400);
@@ -415,26 +423,46 @@ export function generateTripConfirmationPdf(
   }
 
   const textLeft = logoData ? left + logoSize + 3.5 : left;
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(16);
-  doc.setTextColor(15, 23, 42);
-  const defaultCompanyName = rightline
-    ? "RIGHT LINE"
-    : inway
-    ? "INWAY CABS"
-    : "TRIPWISE";
-  doc.text((docData.companyName || defaultCompanyName).toUpperCase(), textLeft, y + 5.5);
+  if (maegler && !docData.companyName) {
+    doc.setFont("times", "bold");
+    doc.setFontSize(16);
+    doc.setTextColor(15, 23, 42);
+    doc.text("m", textLeft, y + 5.5);
+    const mW = doc.getTextWidth("m");
+    doc.setTextColor(238, 10, 10);
+    doc.text("æ", textLeft + mW, y + 5.5);
+    const aeW = doc.getTextWidth("æ");
+    doc.setTextColor(15, 23, 42);
+    doc.text("gler", textLeft + mW + aeW, y + 5.5);
 
-  if (docData.subtitle) {
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(8.5);
+    doc.setFont("times", "normal");
+    doc.setFontSize(9);
     doc.setTextColor(71, 85, 105);
-    doc.text(docData.subtitle, textLeft, y + 10);
+    doc.text(docData.subtitle || "Tours and Travels", textLeft, y + 10);
+  } else {
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(16);
+    doc.setTextColor(15, 23, 42);
+    const defaultCompanyName = rightline
+      ? "RIGHT LINE"
+      : inway
+      ? "INWAY CABS"
+      : "TRIPWISE";
+    doc.text((docData.companyName || defaultCompanyName).toUpperCase(), textLeft, y + 5.5);
+
+    if (docData.subtitle) {
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(8.5);
+      doc.setTextColor(71, 85, 105);
+      doc.text(docData.subtitle, textLeft, y + 10);
+    }
   }
 
   // Right: Contact details & website
   const defaultContacts = rightline
     ? ["Right Line The Travel Expert"]
+    : maegler
+    ? ["Mægler Tours and Travels"]
     : ["+91 80865 56655", "inwaycabs@gmail.com", "inwaycabs.in"];
   const contactLines = docData.footerContact
     ? docData.footerContact.split(/[·•|]/).map((s) => s.trim()).filter(Boolean)

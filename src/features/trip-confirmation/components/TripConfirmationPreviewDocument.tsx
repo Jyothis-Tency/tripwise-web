@@ -9,13 +9,15 @@ interface TripConfirmationPreviewDocumentProps {
 export function TripConfirmationPreviewDocument({
   document: doc,
 }: TripConfirmationPreviewDocumentProps) {
-  const { isInway, isRightLine } = useBrand();
+  const { isInway, isRightLine, isMaegler } = useBrand();
 
   // Split contact details into separate lines for the right side of header
   const contactLines = doc.footerContact
     ? doc.footerContact.split(/[·•|]/).map((s) => s.trim()).filter(Boolean)
     : isRightLine
     ? ["Right Line The Travel Expert"]
+    : isMaegler
+    ? ["Mægler Tours and Travels"]
     : ["+91 80865 56655", "inwaycabs@gmail.com", "inwaycabs.in"];
 
   return (
@@ -48,7 +50,27 @@ export function TripConfirmationPreviewDocument({
           </svg>
         </div>
       )}
-      {isInway && !isRightLine && (
+      {isMaegler && (
+        <div
+          className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 opacity-[0.06] select-none z-0"
+          aria-hidden="true"
+        >
+          <svg
+            viewBox="0 0 1024 1024"
+            className="h-[460px] w-[460px] sm:h-[540px] sm:w-[540px]"
+          >
+            <rect x="25" y="25" width="974" height="974" rx="48" fill="none" stroke="#000" strokeWidth="6"/>
+            <rect x="36" y="36" width="952" height="952" rx="38" fill="none" stroke="#000" strokeWidth="2"/>
+            <text x="130" y="553" fontFamily="'Source Serif 4', Georgia, serif" fontSize="220" fontWeight="700" fill="#000" textLength="775" lengthAdjust="spacing">
+              m<tspan fill="#ee0a0a">æ</tspan>gler
+            </text>
+            <text x="145" y="705" fontFamily="'EB Garamond', Garamond, Georgia, serif" fontSize="100" fill="#000" textLength="737" lengthAdjust="spacing">
+              Tours and Travels
+            </text>
+          </svg>
+        </div>
+      )}
+      {isInway && !isRightLine && !isMaegler && (
         <div
           className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 opacity-[0.08] select-none z-0"
           aria-hidden="true"
@@ -81,13 +103,28 @@ export function TripConfirmationPreviewDocument({
           <div className="flex items-center gap-3">
             <TripwiseLogo className="h-12 w-12 shrink-0" variant="auto" />
             <div>
-              <h1 className="text-xl sm:text-2xl font-black uppercase tracking-tight text-slate-950">
-                {doc.companyName || (isRightLine ? "RIGHT LINE" : isInway ? "INWAY CABS" : "TRIPWISE")}
-              </h1>
-              {doc.subtitle && (
-                <p className="text-xs sm:text-sm font-medium text-slate-600">
-                  {doc.subtitle}
-                </p>
+              {isMaegler && !doc.companyName ? (
+                <>
+                  <h1 className="font-['Source_Serif_4','Droid_Serif',Georgia,serif] text-2xl font-bold tracking-[0.04em] text-slate-950 leading-tight">
+                    <span>m</span>
+                    <span className="text-[#ee0a0a]">æ</span>
+                    <span>gler</span>
+                  </h1>
+                  <p className="font-['EB_Garamond',Garamond,Georgia,serif] text-sm font-normal tracking-[0.03em] text-slate-600 mt-0.5 leading-tight">
+                    {doc.subtitle || "Tours and Travels"}
+                  </p>
+                </>
+              ) : (
+                <>
+                  <h1 className="text-xl sm:text-2xl font-black uppercase tracking-tight text-slate-950">
+                    {doc.companyName || (isRightLine ? "RIGHT LINE" : isInway ? "INWAY CABS" : "TRIPWISE")}
+                  </h1>
+                  {doc.subtitle && (
+                    <p className="text-xs sm:text-sm font-medium text-slate-600">
+                      {doc.subtitle}
+                    </p>
+                  )}
+                </>
               )}
             </div>
           </div>

@@ -271,6 +271,7 @@ export function visibleReportFields(
   tripSource: "vehicle" | "bulk",
 ): ReportFieldDef[] {
   return REPORT_FIELD_DEFS.filter((f) => {
+    if (f.id === "reportTotals") return false;
     if (tripSource === "bulk" && VEHICLE_ONLY_FIELDS.includes(f.id)) return false;
     if (tripSource === "vehicle" && BULK_ONLY_FIELDS.includes(f.id)) return false;
     return true;
@@ -303,6 +304,9 @@ export function selectedFieldsInSection(
   );
 }
 
-export function countSelectedFields(selection: ReportFieldSelection): number {
-  return REPORT_FIELD_DEFS.filter((f) => selection[f.id]).length;
+export function countSelectedFields(
+  selection: ReportFieldSelection,
+  tripSource: "vehicle" | "bulk" = "vehicle",
+): number {
+  return visibleReportFields(tripSource).filter((f) => selection[f.id]).length;
 }

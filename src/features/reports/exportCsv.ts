@@ -1,6 +1,6 @@
 import type { HistoryTrip } from "../history/api";
 import { todayIsoInAppTz } from "../../lib/datePickerUtils";
-import { isInwayOwner } from "../../lib/brand";
+import { getBrandKey } from "../../lib/brand";
 import type { ReportHeader, ReportRunResult } from "./api";
 import {
   type ReportFieldSelection,
@@ -87,7 +87,8 @@ export function downloadReportCsv(
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   const stamp = todayIsoInAppTz();
-  const prefix = isInwayOwner() ? "inway-cabs" : "tripwise";
+  const brand = getBrandKey();
+  const prefix = brand === "rightline" ? "right-line" : brand === "maegler" ? "maegler" : brand === "inway" ? "inway-cabs" : "tripwise";
   a.href = url;
   a.download = filename ?? `${prefix}-report-${result.dataSource}-${stamp}.csv`;
   a.click();
@@ -134,7 +135,8 @@ export function downloadTripReportCsv(
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   const stamp = todayIsoInAppTz();
-  const prefix = isInwayOwner() ? "inway-cabs" : "tripwise";
+  const brand = getBrandKey();
+  const prefix = brand === "rightline" ? "right-line" : brand === "maegler" ? "maegler" : brand === "inway" ? "inway-cabs" : "tripwise";
   a.href = url;
   a.download = opts?.filename ?? `${prefix}-trips-${stamp}.csv`;
   a.click();

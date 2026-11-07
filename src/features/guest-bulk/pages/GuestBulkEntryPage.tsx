@@ -70,7 +70,7 @@ const AUTOSAVE_DELAY = 1200;
 function detectInviteBrand(
   invite?: GuestBulkInvite | null,
   token?: string,
-): "inway" | "rightline" | "tripwise" {
+): "inway" | "rightline" | "maegler" | "tripwise" {
   if (invite) {
     const c = (invite.ownerCompany || "").toLowerCase();
     const n = (invite.ownerName || "").toLowerCase();
@@ -84,7 +84,11 @@ function detectInviteBrand(
       l.includes("right line");
     const isInway =
       c.includes("inway") || n.includes("inway") || l.includes("inway");
-    const result = isRightline ? "rightline" : isInway ? "inway" : "tripwise";
+    const isMaegler =
+      c.includes("maegler") || c.includes("mægler") ||
+      n.includes("maegler") || n.includes("mægler") || n.includes("hibathulla") ||
+      l.includes("maegler") || l.includes("mægler");
+    const result = isRightline ? "rightline" : isInway ? "inway" : isMaegler ? "maegler" : "tripwise";
     if (token && typeof sessionStorage !== "undefined") {
       try {
         sessionStorage.setItem(`guestBulkBrand:${token}`, result);
@@ -98,6 +102,7 @@ function detectInviteBrand(
       if (
         cached === "rightline" ||
         cached === "inway" ||
+        cached === "maegler" ||
         cached === "tripwise"
       ) {
         return cached;
@@ -1405,7 +1410,7 @@ function VehicleGroupsEditor({
 export function GuestBulkEntryPage() {
   const { token = "" } = useParams<{ token: string }>();
   const { theme, toggleTheme } = useTheme();
-  const { isInway: authIsInway, isRightLine: authIsRightLine } = useBrand();
+  const { isInway: authIsInway, isRightLine: authIsRightLine, isMaegler: authIsMaegler } = useBrand();
   const [invite, setInvite] = useState<GuestBulkInvite | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -1413,8 +1418,9 @@ export function GuestBulkEntryPage() {
   const inviteBrand = useMemo(() => {
     if (authIsRightLine) return "rightline";
     if (authIsInway) return "inway";
+    if (authIsMaegler) return "maegler";
     return detectInviteBrand(invite, token);
-  }, [authIsRightLine, authIsInway, invite, token]);
+  }, [authIsRightLine, authIsInway, authIsMaegler, invite, token]);
 
   const isInwayInvite = inviteBrand === "inway";
 
@@ -1426,6 +1432,8 @@ export function GuestBulkEntryPage() {
         ? "Right Line"
         : inviteBrand === "inway"
         ? "Inway Cabs"
+        : inviteBrand === "maegler"
+        ? "Mægler"
         : "Tripwise";
     const scopeTitle =
       invite?.scope === "agency" ? "Agency Entry" : "Driver Entry";
@@ -2689,6 +2697,8 @@ export function GuestBulkEntryPage() {
         ? "Right Line"
         : isInwayInvite
         ? "Inway Cabs"
+        : inviteBrand === "maegler"
+        ? "Mægler"
         : "Tripwise";
     const entryScopeLabel = isAgency ? "agency entry" : "driver entry";
     return (
@@ -3164,10 +3174,10 @@ export function GuestBulkEntryPage() {
             <div className="min-w-0 flex-1">
             <p className="text-[10px] font-bold uppercase tracking-wider text-[#C98200] dark:text-[#F5A300]">
               {isOwner
-                ? `${inviteBrand === "rightline" ? "Right Line" : isInwayInvite ? "Inway Cabs" : "Tripwise"} · owner review`
+                ? `${inviteBrand === "rightline" ? "Right Line" : isInwayInvite ? "Inway Cabs" : inviteBrand === "maegler" ? "Mægler" : "Tripwise"} · owner review`
                 : isAgencyScope
-                  ? `${inviteBrand === "rightline" ? "Right Line" : isInwayInvite ? "Inway Cabs" : "Tripwise"} · agency entry`
-                  : `${inviteBrand === "rightline" ? "Right Line" : isInwayInvite ? "Inway Cabs" : "Tripwise"} · driver entry`}
+                  ? `${inviteBrand === "rightline" ? "Right Line" : isInwayInvite ? "Inway Cabs" : inviteBrand === "maegler" ? "Mægler" : "Tripwise"} · agency entry`
+                  : `${inviteBrand === "rightline" ? "Right Line" : isInwayInvite ? "Inway Cabs" : inviteBrand === "maegler" ? "Mægler" : "Tripwise"} · driver entry`}
             </p>
             <h1 className="truncate text-base font-bold leading-snug text-slate-800 dark:text-white sm:text-lg">
               {isAgencyScope && invite.agencyName

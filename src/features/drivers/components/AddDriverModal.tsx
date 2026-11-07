@@ -45,8 +45,8 @@ export function AddDriverModal({ onClose, onSuccess }: AddDriverModalProps) {
       if (/E11000|duplicate key/i.test(raw)) {
         setError(
           /phone/i.test(raw)
-            ? "A driver with this phone number already exists. Please use a different phone number."
-            : "A driver with this email already exists. Please use a different email.",
+            ? "A driver with this phone number already exists in your fleet."
+            : "A driver with this email already exists in your fleet.",
         );
       } else {
         setError(raw || "Failed to add driver.");

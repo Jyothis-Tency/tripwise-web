@@ -34,7 +34,7 @@ export default function DriversPage() {
   const [blockFilter, setBlockFilter] = useState<DriverBlockFilter>(
     savedUi.blockFilter,
   );
-  const [typeFilter, setTypeFilter] = useState<"all" | "fleet" | "bulk">("all");
+  const [typeFilter, setTypeFilter] = useState<"all" | "fleet" | "bulk">("fleet");
   const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
   const [detailTab, setDetailTab] = useState<DriverDetailTabId>(initialTab);
   const [showAddModal, setShowAddModal] = useState(false);
@@ -80,6 +80,10 @@ export default function DriversPage() {
     if (idx >= 0) {
       setSelectedIdx(idx);
       selectedIdRef.current = driverParam;
+      const target = drivers[idx];
+      if (target && isBulkDriver(target)) {
+        setTypeFilter("bulk");
+      }
     }
   }, [driverParam, drivers, loading]);
 
@@ -174,7 +178,7 @@ export default function DriversPage() {
               <h2 className="flex items-center text-[17px] font-extrabold tracking-tight text-slate-900 dark:text-[#eef0ff]">
                 Drivers
                 <span className="ml-1.5 rounded-full bg-indigo-50 px-2 py-0.5 text-xs font-bold text-indigo-600 dark:bg-[#242a57] dark:text-[#a5b4fc]">
-                  {drivers.length}
+                  {filteredDrivers.length}
                 </span>
               </h2>
               <button
@@ -258,6 +262,14 @@ export default function DriversPage() {
                 }
                 title="No drivers found"
                 description="Try another name or switch the filter above."
+              />
+            ) : filteredDrivers.length === 0 ? (
+              <EmptyState
+                icon={
+                  <Users className="h-8 w-8 text-slate-300 dark:text-slate-600" />
+                }
+                title={`No ${typeFilter === "fleet" ? "fleet" : typeFilter === "bulk" ? "bulk" : ""} drivers found`}
+                description="Switch between Fleet, Bulk, or All above."
               />
             ) : (
               filteredDrivers.map((d, i) => (

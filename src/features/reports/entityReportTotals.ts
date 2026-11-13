@@ -225,10 +225,7 @@ export function computeBulkReportTotals(trips: HistoryTrip[]): BulkReportTotals 
           ? n(t.balanceAmount)
           : Math.max(total - adv, 0);
     const salary = computeDriverSalaryBreakdown(t);
-    const profit =
-      t.agencyProfit != null && Number.isFinite(Number(t.agencyProfit))
-        ? Math.max(n(t.agencyProfit), 0)
-        : rem;
+    const profit = rem;
     grandTotal += total;
     advance += adv;
     remaining += rem;

@@ -352,7 +352,7 @@ export const RevenueBreakdown: React.FC<RevenueBreakdownProps> = ({
             </div>
           </div>
           <p className="mt-4 text-xs text-slate-400">
-            Bulk entry commission (all time)
+            Total of bulk trip balances
           </p>
         </div>
 

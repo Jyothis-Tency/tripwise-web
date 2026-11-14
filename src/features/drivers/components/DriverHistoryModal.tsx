@@ -8,7 +8,7 @@ import { APP_TIMEZONE } from "../../../lib/timePickerUtils";
 import {
   computeDriverSalaryBreakdown,
   getHistoryTripExpenseBreakdown,
-  resolveTripAgencyProfitDisplay,
+  // resolveTripAgencyProfitDisplay,
 } from "../../history/tripExpenseBreakdown";
 
 const inputCls =
@@ -304,6 +304,7 @@ export function DriverHistoryModal({
                 {formatMoney0(financialStats.totalDriverSalary)}
               </div>
             </div>
+            {/* Commented out Owner Revenue
             <div className="rounded-xl border border-indigo-200 bg-indigo-50/60 p-3 dark:border-indigo-500/30 dark:bg-indigo-500/10">
               <div className="text-[11px] font-semibold uppercase tracking-wide text-indigo-700 dark:text-indigo-300">
                 Owner Revenue
@@ -312,6 +313,7 @@ export function DriverHistoryModal({
                 {formatMoney0(financialStats.ownerRevenue)}
               </div>
             </div>
+            */}
             <div className="rounded-xl border border-amber-200 bg-amber-50/60 p-3 dark:border-amber-500/30 dark:bg-amber-500/10">
               <div className="text-[11px] font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-300">
                 Trip Expense
@@ -430,6 +432,7 @@ export function DriverHistoryModal({
                         )}
                       </div>
                     </div>
+                    {/* Commented out Owner profit
                     <div className="rounded-lg border border-indigo-200 bg-indigo-50 p-2 dark:border-indigo-500/30 dark:bg-indigo-500/10">
                       <div className="text-[11px] font-semibold text-indigo-800 dark:text-indigo-300">
                         Owner profit
@@ -438,6 +441,7 @@ export function DriverHistoryModal({
                         {formatMoney0(resolveTripAgencyProfitDisplay(t))}
                       </div>
                     </div>
+                    */}
                   </div>
                 </section>
               );

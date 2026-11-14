@@ -925,6 +925,7 @@ export function TripCard({
               </span>
             </div>
             {E("Advance", fmtCurrency(trip.advance), "advance")}
+            {/* Commented out Owner profit
             <div className="my-1.5 flex items-baseline justify-between gap-2 rounded-lg border border-emerald-200/80 bg-emerald-50/80 px-2.5 py-2 dark:border-emerald-500/30 dark:bg-emerald-500/10">
               <span className="text-sm font-medium text-emerald-700 dark:text-emerald-300">
                 Owner profit
@@ -933,6 +934,7 @@ export function TripCard({
                 {fmtCurrency(resolveTripAgencyProfitDisplay(trip))}
               </span>
             </div>
+            */}
           </div>
         </section>
       </div>
@@ -958,15 +960,15 @@ export function TripCard({
           aria-hidden
         />
 
-        <div className="flex flex-1 flex-col gap-3 p-4 pl-5 sm:p-4 sm:pl-5">
+        <div className="flex flex-1 flex-col gap-2 p-3 pl-4 sm:p-3.5 sm:pl-4.5">
           <div className="flex items-start justify-between gap-2">
-            <div className="min-w-0 space-y-2">
+            <div className="min-w-0 space-y-1">
               <div className="flex flex-wrap items-center gap-1.5">
-                <span className="truncate font-mono text-sm font-bold tracking-tight text-slate-900 tabular-nums dark:text-slate-100">
+                <span className="truncate font-mono text-xs font-bold tracking-tight text-slate-900 tabular-nums dark:text-slate-100">
                   {trip.tripNumber ?? trip._id}
                 </span>
                 <span
-                  className={`inline-flex shrink-0 items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-bold tracking-wider uppercase ${getTripStatusStyle(trip.status)}`}
+                  className={`inline-flex shrink-0 items-center gap-1 rounded-md px-1.5 py-0.5 text-[9px] font-bold tracking-wider uppercase ${getTripStatusStyle(trip.status)}`}
                 >
                   <span
                     className={`h-1.5 w-1.5 rounded-full ${tripStatusDotClass(trip.status)}`}
@@ -974,30 +976,43 @@ export function TripCard({
                   {trip.status?.replace(/_/g, " ")}
                 </span>
                 <span
-                  className={`inline-flex shrink-0 items-center rounded-md px-1.5 py-0.5 text-[10px] font-bold ${cashInStatusBadgeClass(cashIn.status)}`}
+                  className={`inline-flex shrink-0 items-center rounded-md px-1.5 py-0.5 text-[9px] font-bold ${cashInStatusBadgeClass(cashIn.status)}`}
                 >
                   {cashInStatusLabel(cashIn.status)}
                 </span>
               </div>
 
               {routeFrom && routeTo ? (
-                <p className="flex min-w-0 items-center gap-1.5 text-sm font-semibold text-slate-800 dark:text-slate-100">
+                <p className="flex min-w-0 items-center gap-1.5 text-xs font-semibold text-slate-800 dark:text-slate-100">
                   <span className="truncate">{routeFrom}</span>
-                  <ArrowRight className="h-3.5 w-3.5 shrink-0 text-indigo-400" />
+                  <ArrowRight className="h-3 w-3 shrink-0 text-indigo-400" />
                   <span className="truncate">{routeTo}</span>
                 </p>
               ) : (
-                <p className="text-sm text-slate-400">No route set</p>
+                <p className="text-xs text-slate-400">No route set</p>
               )}
               {agencyLabel && agencyLabel !== "—" && (
-                <p className="flex min-w-0 items-center gap-1.5 text-xs font-medium text-slate-500 dark:text-slate-400">
+                <p className="flex min-w-0 items-center gap-1 text-[11px] font-medium text-slate-500 dark:text-slate-400">
                   <Building2 className="h-3 w-3 shrink-0 text-slate-400" />
                   <span className="truncate">{agencyLabel}</span>
                 </p>
               )}
             </div>
 
-            <div className="flex shrink-0 items-center gap-0.5">
+            <div className="flex shrink-0 items-center gap-1">
+              {!readOnly && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    openPayments();
+                  }}
+                  className="inline-flex items-center gap-1 rounded-md border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 transition hover:border-emerald-300 hover:bg-emerald-100 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300 dark:hover:bg-emerald-500/20"
+                >
+                  <Wallet className="h-2.5 w-2.5" />
+                  Payments
+                </button>
+              )}
               {!readOnly && (
                 <button
                   type="button"
@@ -1006,22 +1021,22 @@ export function TripCard({
                     handleDelete();
                   }}
                   disabled={deleting}
-                  className="rounded-lg p-1.5 text-slate-400 opacity-70 transition hover:bg-rose-50 hover:text-rose-500 hover:opacity-100 disabled:opacity-40 group-hover:opacity-100 dark:hover:bg-rose-500/10"
+                  className="rounded-md p-1 text-slate-400 opacity-70 transition hover:bg-rose-50 hover:text-rose-500 hover:opacity-100 disabled:opacity-40 group-hover:opacity-100 dark:hover:bg-rose-500/10"
                   aria-label="Delete trip"
                 >
-                  <Trash2 className="h-4 w-4" />
+                  <Trash2 className="h-3.5 w-3.5" />
                 </button>
               )}
               <span
-                className="rounded-lg p-1.5 text-slate-400 transition group-hover:bg-indigo-50 group-hover:text-indigo-600 dark:group-hover:bg-indigo-500/15 dark:group-hover:text-indigo-300"
+                className="rounded-md p-1 text-slate-400 transition group-hover:bg-indigo-50 group-hover:text-indigo-600 dark:group-hover:bg-indigo-500/15 dark:group-hover:text-indigo-300"
                 aria-hidden
               >
-                <Maximize2 className="h-4 w-4" />
+                <Maximize2 className="h-3.5 w-3.5" />
               </span>
             </div>
           </div>
 
-          <div className="grid grid-cols-3 gap-1.5 rounded-xl border border-slate-100 bg-slate-50/80 p-2 dark:border-[#1e2638] dark:bg-white/[0.03]">
+          <div className="grid grid-cols-3 gap-1.5 rounded-lg border border-slate-100 bg-slate-50/80 p-1.5 dark:border-[#1e2638] dark:bg-white/[0.03]">
             <div className="min-w-0">
               <p className="text-[9px] font-semibold uppercase tracking-wide text-slate-400">
                 Agency cost
@@ -1039,44 +1054,33 @@ export function TripCard({
               </p>
             </div>
             <div className="min-w-0">
-              <p className="text-[9px] font-semibold uppercase tracking-wide text-emerald-600/80 dark:text-emerald-400/80">
-                Agency profit
+              <p className="text-[9px] font-semibold uppercase tracking-wide text-indigo-600 dark:text-indigo-400" title="Cab cost + non-fuel extra expenses">
+                Total cab cost
               </p>
-              <p className="truncate text-xs font-bold tabular-nums text-emerald-700 dark:text-emerald-300">
-                {fmtCurrency(agencyProfit)}
+              <p className="truncate text-xs font-bold tabular-nums text-indigo-700 dark:text-indigo-300">
+                {fmtCurrency(expenseBreakdown.totalCabCost)}
               </p>
             </div>
           </div>
 
-          {!readOnly && (
-            <button
-              type="button"
-              onClick={openPayments}
-              className="inline-flex w-fit items-center justify-center gap-1 rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold text-emerald-700 transition hover:border-emerald-300 hover:bg-emerald-100 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300 dark:hover:bg-emerald-500/20"
-            >
-              <Wallet className="h-3 w-3" />
-              Payments
-            </button>
-          )}
-
-          <div className="mt-auto flex flex-wrap items-center gap-1.5 border-t border-slate-100 pt-3 text-[11px] dark:border-[#1e2638]">
-            <span className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-slate-50 px-2 py-1 font-semibold tabular-nums text-slate-700 dark:border-[#1e2638] dark:bg-white/[0.04] dark:text-slate-200">
-              <Calendar className="h-3 w-3 text-slate-400" />
+          <div className="mt-auto flex flex-wrap items-center gap-1 border-t border-slate-100 pt-2 text-[10px] dark:border-[#1e2638]">
+            <span className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-slate-50 px-1.5 py-0.5 font-semibold tabular-nums text-slate-700 dark:border-[#1e2638] dark:bg-white/[0.04] dark:text-slate-200">
+              <Calendar className="h-2.5 w-2.5 text-slate-400" />
               {fmtDate(trip.startDate ?? trip.date)}
             </span>
             {durationLabel && durationLabel !== "—" && (
-              <span className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-slate-50 px-2 py-1 font-semibold text-slate-600 dark:border-[#1e2638] dark:bg-white/[0.04] dark:text-slate-300">
-                <Clock className="h-3 w-3" />
+              <span className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-slate-50 px-1.5 py-0.5 font-semibold text-slate-600 dark:border-[#1e2638] dark:bg-white/[0.04] dark:text-slate-300">
+                <Clock className="h-2.5 w-2.5" />
                 {durationLabel}
               </span>
             )}
-            <span className="inline-flex max-w-[46%] items-center gap-1 truncate rounded-md border border-slate-200 bg-slate-50 px-2 py-1 font-medium text-slate-700 dark:border-[#1e2638] dark:bg-white/[0.04] dark:text-slate-200">
-              <User className="h-3 w-3 shrink-0 text-slate-400" />
+            <span className="inline-flex max-w-[46%] items-center gap-1 truncate rounded-md border border-slate-200 bg-slate-50 px-1.5 py-0.5 font-medium text-slate-700 dark:border-[#1e2638] dark:bg-white/[0.04] dark:text-slate-200">
+              <User className="h-2.5 w-2.5 shrink-0 text-slate-400" />
               <span className="truncate">{driverName(trip.driver)}</span>
             </span>
             {plate !== "—" && (
-              <span className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-slate-50 px-2 py-1 font-mono text-[10px] font-semibold tracking-wide text-slate-700 dark:border-[#1e2638] dark:bg-white/[0.04] dark:text-slate-200">
-                <Car className="h-3 w-3 text-slate-400" />
+              <span className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-slate-50 px-1.5 py-0.5 font-mono text-[9px] font-semibold tracking-wide text-slate-700 dark:border-[#1e2638] dark:bg-white/[0.04] dark:text-slate-200">
+                <Car className="h-2.5 w-2.5 text-slate-400" />
                 {plate}
               </span>
             )}

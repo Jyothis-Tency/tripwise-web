@@ -13,7 +13,7 @@ import {
   UserCheck,
   UserPlus,
   AlertTriangle,
-  Calculator,
+  // Calculator,
   ArrowLeft,
   ArrowRightLeft,
   Calendar,
@@ -30,7 +30,7 @@ import { TimePicker12h } from "../../../components/ui/TimePicker12h";
 import { todayIsoInAppTz } from "../../../lib/datePickerUtils";
 import { isoToHHmmInTz } from "../../../lib/timePickerUtils";
 import {
-  computeAgencyProfitPreview,
+  // computeAgencyProfitPreview,
   computeDriverSalaryBreakdown,
   getHistoryTripExpenseBreakdown,
   resolveTripAgencyProfitDisplay,
@@ -720,10 +720,12 @@ export function TripFormModal({
     ) =>
       setForm((prev) => ({ ...prev, [k]: e.target.value }));
 
+  /* Commented out Owner profit preview
   const profitPreview = computeAgencyProfitPreview(
     form.agencyCost,
     form.cabCost,
   );
+  */
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -930,6 +932,7 @@ export function TripFormModal({
             </Field>
           </div>
 
+          {/* Commented out Owner profit
           <div className="flex items-center gap-2 rounded-lg border border-indigo-200 bg-indigo-50 p-3 text-indigo-700 dark:border-indigo-500/30 dark:bg-indigo-500/10 dark:text-indigo-300">
             <Calculator className="h-5 w-5 shrink-0" />
             <span className="text-sm font-semibold">
@@ -940,6 +943,7 @@ export function TripFormModal({
               })}
             </span>
           </div>
+          */}
 
           <Field label="Notes (optional)" id="tnotes">
             <textarea
@@ -1875,10 +1879,12 @@ function VehicleHistoryTab({
                   label: "Driver Salary",
                   value: formatMoney0(financialStats.totalDriverSalary),
                 },
+                /* Commented out Owner Revenue
                 {
                   label: "Owner Revenue",
                   value: formatMoney0(financialStats.ownerRevenue),
                 },
+                */
                 {
                   label: "Trip Expense",
                   value: formatMoney0(financialStats.totalExpenses),
@@ -2051,6 +2057,7 @@ function VehicleHistoryTab({
                       )}
                     </div>
                   </div>
+                  {/* Commented out Owner profit
                   <div className="rounded-lg border border-indigo-200 bg-indigo-50/60 p-2 dark:border-indigo-500/30 dark:bg-indigo-500/10">
                     <div className="text-[11px] font-semibold text-indigo-800 dark:text-indigo-300">
                       Owner profit
@@ -2059,6 +2066,7 @@ function VehicleHistoryTab({
                       {formatMoney0(resolveTripAgencyProfitDisplay(t))}
                     </div>
                   </div>
+                  */}
                 </div>
       </section>
             );
@@ -2434,6 +2442,7 @@ function TripDriverTab({
                       isCurrency
                       onSaved={onTripUpdated}
                     />
+                    {/* Commented out Owner profit
                     <div>
                       <span className="mb-0.5 block uppercase text-indigo-500 dark:text-indigo-400">
                         Owner profit
@@ -2445,6 +2454,7 @@ function TripDriverTab({
                         ).toLocaleString("en-IN")}
                       </span>
                     </div>
+                    */}
                   </div>
                 </div>
                 <div className="flex flex-wrap gap-2 border-t border-indigo-100/50 pt-2 dark:border-indigo-500/20">
@@ -2797,6 +2807,7 @@ function TripDriverTab({
                           isCurrency
                           onSaved={onTripUpdated}
                         />
+              {/* Commented out Owner profit
               <div>
                           <span className="mb-0.5 block text-[10px] uppercase text-slate-400 dark:text-slate-500">
                             Owner profit
@@ -2808,6 +2819,7 @@ function TripDriverTab({
                             ).toLocaleString("en-IN")}
                           </span>
               </div>
+              */}
             </div>
                     </div>
                     <div className="mt-3 flex flex-wrap gap-2 border-t border-slate-100 pl-2 pt-2 dark:border-white/10">

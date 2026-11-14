@@ -244,9 +244,11 @@ function AgencyPayoutManager({
                     <th className="px-2 py-2.5 font-semibold text-center text-slate-600">
                       Status
                     </th>
+                    {/* Commented out Owner profit
                     <th className="px-2 py-2.5 font-semibold text-right text-slate-600">
                       Owner profit
                     </th>
+                    */}
                     <th className="px-3 py-2.5 font-semibold text-center text-slate-600">
                       Actions
                     </th>
@@ -312,9 +314,11 @@ function AgencyPayoutManager({
                             </span>
                           </td>
 
+                          {/* Commented out Owner profit
                           <td className="px-2 py-2.5 text-right font-bold text-indigo-600">
                             {fmtCurrency(t.agencyProfit || 0)}
                           </td>
+                          */}
 
                           {/* Actions */}
                           <td className="px-3 py-2.5">
@@ -369,7 +373,7 @@ function AgencyPayoutManager({
                         {isExpanded && (
                           <tr className="bg-slate-50/50 shadow-inner">
                             <td
-                              colSpan={9}
+                              colSpan={8}
                               className="p-0 border-b border-slate-200 dark:border-[#1e2638]"
                             >
                               <div className="m-3 mt-0 bg-[var(--bg-elevated)] rounded-md shadow-sm border border-slate-200 p-3 dark:border-[#1e2638]">

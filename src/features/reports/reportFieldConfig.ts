@@ -142,7 +142,7 @@ export const REPORT_FIELD_DEFS: ReportFieldDef[] = [
     section: "right",
     defaultOn: false,
   },
-  { id: "agencyProfit", label: "Owner Profit", section: "right", defaultOn: false },
+  // { id: "agencyProfit", label: "Owner Profit", section: "right", defaultOn: false },
   { id: "fuelExpense", label: "Fuel", section: "right", defaultOn: false },
   { id: "extraExpenses", label: "Extra Expenses", section: "right", defaultOn: true },
   { id: "advance", label: "Advance", section: "right", defaultOn: true },

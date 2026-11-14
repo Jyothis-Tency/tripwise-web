@@ -7,7 +7,7 @@ import {
   X,
   BadgePercent,
   Coins,
-  Wallet,
+  // Wallet,
   UserRound,
 } from "lucide-react";
 import type { PLRevenue, ExtraCommissionEntry } from "../api";
@@ -117,8 +117,8 @@ export const RevenueBreakdown: React.FC<RevenueBreakdownProps> = ({
   >(null);
   const [driverSalaryLoading, setDriverSalaryLoading] = useState(true);
 
-  const ownerProfit =
-    Number(revenue.ownerProfit ?? revenue.agencyProfit) || 0;
+  // const ownerProfit =
+  //   Number(revenue.ownerProfit ?? revenue.agencyProfit) || 0;
 
   const [modal, setModal] = useState<"add" | "history" | null>(null);
   const [amount, setAmount] = useState("");
@@ -312,8 +312,8 @@ export const RevenueBreakdown: React.FC<RevenueBreakdownProps> = ({
         </div>
       </div>
 
-      {/* Row 2 — commission */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      {/* Row 2 — commission & operations */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <div
           className={`${cardBase} border-indigo-100 dark:border-indigo-500/25`}
         >
@@ -396,30 +396,6 @@ export const RevenueBreakdown: React.FC<RevenueBreakdownProps> = ({
             Manual add-ins (all time)
           </p>
         </div>
-      </div>
-
-      {/* Row 3 — owner profit + driver salary */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <div
-          className={`${cardBase} border-teal-100 dark:border-teal-500/25`}
-        >
-          <div className="flex items-center gap-3 sm:gap-4">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-teal-50 text-teal-700 sm:h-12 sm:w-12 dark:bg-teal-500/15 dark:text-teal-300">
-              <Wallet className="h-5 w-5 sm:h-6 sm:w-6" />
-            </div>
-            <div>
-              <p className="text-xs font-medium text-slate-500 sm:text-sm dark:text-slate-400">
-                Total owner profit
-              </p>
-              <h3 className="font-mono text-lg font-bold text-teal-700 metric-tabular sm:text-xl dark:text-teal-300">
-                {fmtCurrency(ownerProfit)}
-              </h3>
-            </div>
-          </div>
-          <p className="mt-4 text-xs text-slate-400">
-            Vehicle trips · agency cost − cab &amp; expenses (all time)
-          </p>
-        </div>
 
         <div
           className={`${cardBase} border-sky-100 dark:border-sky-500/25`}
@@ -443,7 +419,7 @@ export const RevenueBreakdown: React.FC<RevenueBreakdownProps> = ({
               </h3>
             </div>
           </div>
-          <div className="mt-4 flex flex-wrap gap-x-4 gap-y-1 text-xs">
+          <div className="mt-4 flex flex-wrap gap-x-3 gap-y-1 text-xs">
             <span className="text-slate-500 dark:text-slate-400">
               Given:{" "}
               <span className="font-semibold tabular-nums text-emerald-600 dark:text-emerald-400">

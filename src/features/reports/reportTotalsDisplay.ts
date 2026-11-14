@@ -52,7 +52,7 @@ export const VEHICLE_REPORT_TOTAL_DEFS: ReportTotalFieldDef[] = [
   { id: "extraExpense", label: "Extra Expense", defaultOn: true },
   { id: "totalCabCost", label: "Total Cab Cost", defaultOn: true },
   { id: "fuel", label: "Fuel", defaultOn: true },
-  { id: "ownerProfit", label: "Owner Profit", defaultOn: true },
+  // { id: "ownerProfit", label: "Owner Profit", defaultOn: true },
   { id: "advance", label: "Advance", defaultOn: true },
   { id: "distance", label: "Distance", defaultOn: true },
   { id: "driverSalary", label: "Driver Salary", defaultOn: true },

@@ -10,7 +10,7 @@ import {
 import { Link } from "react-router-dom";
 import {
   ArrowLeftRight,
-  Calculator,
+  // Calculator,
   Car,
   CheckCircle2,
   MapPin,
@@ -34,7 +34,7 @@ import {
   addDaysIso,
   todayIsoInAppTz,
 } from "../../../lib/datePickerUtils";
-import { computeAgencyProfitPreview } from "../../history/tripExpenseBreakdown";
+// import { computeAgencyProfitPreview } from "../../history/tripExpenseBreakdown";
 
 const inputCls =
   "w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-800 shadow-xs outline-none transition-colors placeholder:text-slate-400 focus:border-indigo-600 focus:ring-2 focus:ring-indigo-500/20 dark:border-white/10 dark:bg-white/5 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-indigo-400 dark:focus:ring-indigo-500/30";
@@ -199,6 +199,7 @@ export function CreateNewTripPage() {
     ) =>
       setForm((prev) => ({ ...prev, [k]: e.target.value }));
 
+  /* Commented out Owner profit calculation
   const agencyNum = Number(form.agencyCost) || 0;
   const cabNum = Number(form.cabCost) || 0;
   const profitPreview = computeAgencyProfitPreview(
@@ -208,6 +209,7 @@ export function CreateNewTripPage() {
   const marginPct =
     agencyNum > 0 ? Math.round((profitPreview / agencyNum) * 1000) / 10 : null;
   const showProfit = agencyNum > 0 || cabNum > 0;
+  */
 
   const resetFormFields = useCallback(() => {
     setForm({
@@ -783,6 +785,7 @@ export function CreateNewTripPage() {
                     </Field>
                   </div>
 
+                  {/* Commented out Owner profit
                   {showProfit && (
                     <div className="flex items-start gap-3 rounded-xl border border-indigo-200 bg-indigo-50/80 px-4 py-3 dark:border-indigo-500/30 dark:bg-indigo-500/10">
                       <Calculator className="mt-0.5 h-5 w-5 shrink-0 text-indigo-600 dark:text-indigo-400" />
@@ -805,6 +808,7 @@ export function CreateNewTripPage() {
                       </div>
                     </div>
                   )}
+                  */}
 
                   <Field label="Notes" id="c-notes" optional>
                     <textarea

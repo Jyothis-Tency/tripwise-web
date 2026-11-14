@@ -3,7 +3,7 @@ import type { HistoryTrip } from "../api";
 import { fetchPaymentHistory, updateTripFields } from "../api";
 import { isoToTimeInputInTz, fmtTripDuration } from "../historyTimeUtils";
 import {
-  computeAgencyProfitPreview,
+  // computeAgencyProfitPreview,
   computeDriverSalaryBreakdown,
   getHistoryTripExpenseBreakdown,
 } from "../tripExpenseBreakdown";
@@ -170,6 +170,7 @@ export function EditTripModal({
       ? trip.endKilometers - trip.startKilometers
       : null;
 
+  /* Commented out Owner profit calculation
   const agencyProfit = useMemo(
     () =>
       computeAgencyProfitPreview(
@@ -179,6 +180,7 @@ export function EditTripModal({
       ),
     [fields.agencyCost, fields.cabCost, trip.expenses],
   );
+  */
 
   const salaryBreakdown = useMemo(
     () =>
@@ -679,11 +681,13 @@ export function EditTripModal({
                       />
                 </div>
               </div>
+                  {/* Commented out Owner profit
                   <ReadOnlyRow
                     label="Owner profit"
                     value={fmtCurrency(agencyProfit)}
                     highlight
                   />
+                  */}
                 </div>
               </section>
 

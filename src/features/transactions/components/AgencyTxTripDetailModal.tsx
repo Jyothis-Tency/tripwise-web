@@ -18,7 +18,7 @@ import { BulkTripCashInModal } from "./BulkTripCashInModal";
 import {
   computeDriverSalaryBreakdown,
   getHistoryTripExpenseBreakdown,
-  resolveTripAgencyProfitDisplay,
+  // resolveTripAgencyProfitDisplay,
 } from "../../history/tripExpenseBreakdown";
 import {
   fmtTimeAmPm,
@@ -425,7 +425,7 @@ function VehicleTripSegmentCard({
   const vehicleType =
     typeof trip.vehicle !== "string" ? trip.vehicle?.vehicleType : trip.vehicleType;
 
-  const ownerProfit = resolveTripAgencyProfitDisplay(trip);
+  // const ownerProfit = resolveTripAgencyProfitDisplay(trip);
   const breakdown = getHistoryTripExpenseBreakdown(trip);
   const salaryBreakdown = computeDriverSalaryBreakdown(trip);
   const duration = fmtTripDuration(trip.startTime, trip.endTime);
@@ -491,6 +491,7 @@ function VehicleTripSegmentCard({
               {fmtMoney(trip.agencyCost)}
             </div>
           </div>
+          {/* Commented out Owner Profit
           <div>
             <div className="text-[10px] font-bold uppercase text-indigo-700 dark:text-indigo-300">
               Owner Profit
@@ -499,6 +500,7 @@ function VehicleTripSegmentCard({
               {fmtMoney(ownerProfit)}
             </div>
           </div>
+          */}
         </div>
 
         {(routeFrom || routeTo || duration) ? (
@@ -735,12 +737,14 @@ function VehicleTripSegmentCard({
                 type="number"
                 onSaved={handleSaved}
               />
+              {/* Commented out Owner profit
               <StaticVehicleRow
                 label="Owner profit"
                 value={fmtMoney(ownerProfit)}
                 highlight
                 badge
               />
+              */}
               <EditableVehicleRow
                 label="Notes"
                 value={trip.notes ?? trip.completionNote ?? "—"}

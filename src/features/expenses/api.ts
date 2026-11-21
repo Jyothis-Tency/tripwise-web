@@ -37,6 +37,14 @@ export interface TripWithExpenses {
   fromLocation?: string;
   toLocation?: string;
   startDate?: string;
+  expectedEndDate?: string | null;
+  actualStartTime?: string | null;
+  actualEndTime?: string | null;
+  startTime?: string | null;
+  endTime?: string | null;
+  cancelledAt?: string | null;
+  createdAt?: string | null;
+  updatedAt?: string | null;
   status?: string;
   /** Mongo id of the trip's vehicle, when API returns populated or raw id */
   vehicleId?: string;
@@ -121,11 +129,15 @@ export async function fetchExpenseCategories(): Promise<string[]> {
 
 export async function fetchTripsWithExpenses(params?: {
   page?: number; limit?: number; search?: string;
+  /** Inclusive YYYY-MM-DD range on the trip start date */
+  startDate?: string; endDate?: string;
 }): Promise<{ trips: TripWithExpenses[]; pagination?: any }> {
   const qp = new URLSearchParams();
   if (params?.page) qp.set('page', String(params.page));
   if (params?.limit) qp.set('limit', String(params.limit));
   if (params?.search) qp.set('search', params.search);
+  if (params?.startDate) qp.set('startDate', params.startDate);
+  if (params?.endDate) qp.set('endDate', params.endDate);
   const qs = qp.toString();
   const res = await apiClient.get(`${ApiEndpoints.tripsWithExpenses}${qs ? '?' + qs : ''}`);
   const inner = extract(res);
@@ -166,6 +178,14 @@ export async function fetchTripsWithExpenses(params?: {
       fromLocation: t.from || t.fromLocation || '',
       toLocation: t.to || t.toLocation || '',
       startDate: t.startDate || t.date,
+      expectedEndDate: t.expectedEndDate ?? null,
+      actualStartTime: t.actualStartTime ?? null,
+      actualEndTime: t.actualEndTime ?? null,
+      startTime: t.startTime ?? null,
+      endTime: t.endTime ?? null,
+      cancelledAt: t.cancelledAt ?? null,
+      createdAt: t.createdAt ?? null,
+      updatedAt: t.updatedAt ?? null,
       status: t.status,
       vehicleId,
       driver: t.driver && typeof t.driver === 'object' ? t.driver : null,

@@ -7,6 +7,7 @@ import {
   Wallet,
 } from "lucide-react";
 import type { TripWithExpenses } from "../api";
+import { TripDatesCompact } from "./TripDates";
 
 function statusDotCls(status?: string) {
   switch ((status ?? "").toLowerCase()) {
@@ -200,6 +201,9 @@ export function TripListCard({
           </span>
         </div>
       </div>
+
+      {/* All trip dates */}
+      <TripDatesCompact trip={trip} />
     </div>
   );
 }

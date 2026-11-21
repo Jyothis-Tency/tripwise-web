@@ -1,3 +1,5 @@
+import { DEFAULT_DATE_FILTER, type ExpensesDateFilter } from "./tripDates";
+
 export type ExpensesModeId = "trip" | "vehicle";
 export type ExpensesPayerFilter = "all" | "company" | "personal";
 
@@ -6,6 +8,7 @@ export type ExpensesUiPersisted = {
   tripSearch: string;
   payerFilter: ExpensesPayerFilter;
   selectedTripId: string | null;
+  dateFilter: ExpensesDateFilter;
   vehicleSearch: string;
   selectedVehicleId: string | null;
 };
@@ -18,6 +21,7 @@ function defaultUi(): ExpensesUiPersisted {
     tripSearch: "",
     payerFilter: "all",
     selectedTripId: null,
+    dateFilter: DEFAULT_DATE_FILTER,
     vehicleSearch: "",
     selectedVehicleId: null,
   };
@@ -29,6 +33,23 @@ function isMode(v: unknown): v is ExpensesModeId {
 
 function isPayer(v: unknown): v is ExpensesPayerFilter {
   return v === "all" || v === "company" || v === "personal";
+}
+
+function parseDateFilter(v: unknown): ExpensesDateFilter {
+  const f = v as Partial<ExpensesDateFilter> | null | undefined;
+  if (f && typeof f === "object") {
+    if (f.kind === "month" && typeof f.month === "string") {
+      return { kind: "month", month: f.month };
+    }
+    if (f.kind === "custom") {
+      return {
+        kind: "custom",
+        from: typeof f.from === "string" ? f.from : "",
+        to: typeof f.to === "string" ? f.to : "",
+      };
+    }
+  }
+  return DEFAULT_DATE_FILTER;
 }
 
 export function loadExpensesUi(): ExpensesUiPersisted {
@@ -52,6 +73,7 @@ export function loadExpensesUi(): ExpensesUiPersisted {
           : parsed.selectedTripId === null
             ? null
             : base.selectedTripId,
+      dateFilter: parseDateFilter(parsed.dateFilter),
       vehicleSearch:
         typeof parsed.vehicleSearch === "string"
           ? parsed.vehicleSearch

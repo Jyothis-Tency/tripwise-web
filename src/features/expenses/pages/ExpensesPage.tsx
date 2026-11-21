@@ -3,6 +3,7 @@ import type { TripWithExpenses } from "../api";
 import { fetchTripsWithExpenses } from "../api";
 import { TripExpensesPane } from "../components/TripExpensesPane";
 import { TripListCard } from "../components/TripListCard";
+import { TripDatesStrip } from "../components/TripDates";
 import { VehicleExpensesPane } from "../components/VehicleExpensesPane";
 import { fetchVehicles, type Vehicle } from "../../vehicles/api";
 import { VehicleListCard } from "../../vehicles/components/VehicleListCard";
@@ -13,6 +14,11 @@ import {
   type ExpensesPayerFilter,
 } from "../expensesUiStorage";
 import {
+  currentMonthValue,
+  dateFilterToRange,
+  type ExpensesDateFilter,
+} from "../tripDates";
+import {
   Car,
   Search,
   ChevronLeft,
@@ -20,6 +26,7 @@ import {
   RefreshCw,
   X,
   ArrowRight,
+  CalendarDays,
 } from "lucide-react";
 
 type ExpensesMode = ExpensesModeId;
@@ -87,6 +94,9 @@ function getTripStatusStyle(status?: string): string {
   }
 }
 
+const dateInputCls =
+  "min-w-0 flex-1 rounded-lg border border-slate-200 bg-slate-50 px-2 py-1 text-xs text-slate-700 outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400 dark:border-white/10 dark:bg-white/5 dark:text-slate-200 dark:[color-scheme:dark]";
+
 const ExpensesPage: React.FC = () => {
   const savedUi = useMemo(() => loadExpensesUi(), []);
 
@@ -102,6 +112,10 @@ const ExpensesPage: React.FC = () => {
   );
   const [selectedTripId, setSelectedTripId] = useState<string | null>(
     savedUi.selectedTripId,
+  );
+
+  const [dateFilter, setDateFilter] = useState<ExpensesDateFilter>(
+    savedUi.dateFilter,
   );
 
   // Vehicle Expenses State
@@ -126,6 +140,7 @@ const ExpensesPage: React.FC = () => {
       tripSearch: search,
       payerFilter,
       selectedTripId,
+      dateFilter,
       vehicleSearch,
       selectedVehicleId,
     });
@@ -134,6 +149,7 @@ const ExpensesPage: React.FC = () => {
     search,
     payerFilter,
     selectedTripId,
+    dateFilter,
     vehicleSearch,
     selectedVehicleId,
   ]);
@@ -144,6 +160,7 @@ const ExpensesPage: React.FC = () => {
       const res = await fetchTripsWithExpenses({
         limit: 100,
         search: debouncedSearch || undefined,
+        ...dateFilterToRange(dateFilter),
       });
       setTrips(res.trips);
     } catch {
@@ -151,7 +168,7 @@ const ExpensesPage: React.FC = () => {
     } finally {
       setTripLoading(false);
     }
-  }, [debouncedSearch]);
+  }, [debouncedSearch, dateFilter]);
 
   const loadVehicles = useCallback(async (q: string) => {
     setVehicleLoading(true);
@@ -285,13 +302,103 @@ const ExpensesPage: React.FC = () => {
                 )}
               </div>
 
+              {/* Date filter: all / month / custom range */}
+              <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-2 dark:border-white/10 dark:bg-white/[0.03]">
+                <div className="flex items-center gap-2">
+                  <CalendarDays className="h-3.5 w-3.5 shrink-0 text-slate-400" />
+                  <div
+                    className="grid flex-1 grid-cols-3 rounded-lg border border-slate-200 bg-slate-100 p-0.5 text-[11px] dark:border-white/10 dark:bg-white/5"
+                    role="tablist"
+                    aria-label="Date filter"
+                  >
+                    {(
+                      [
+                        ["all", "All dates"],
+                        ["month", "Month"],
+                        ["custom", "Custom"],
+                      ] as const
+                    ).map(([kind, label]) => (
+                      <button
+                        key={kind}
+                        type="button"
+                        role="tab"
+                        aria-selected={dateFilter.kind === kind}
+                        onClick={() => {
+                          if (dateFilter.kind === kind) return;
+                          if (kind === "month") {
+                            setDateFilter({ kind: "month", month: currentMonthValue() });
+                          } else if (kind === "custom") {
+                            setDateFilter({ kind: "custom", from: "", to: "" });
+                          } else {
+                            setDateFilter({ kind: "all" });
+                          }
+                        }}
+                        className={`rounded px-2 py-0.5 font-semibold transition ${
+                          dateFilter.kind === kind
+                            ? "bg-white text-indigo-700 shadow-2xs dark:bg-indigo-600 dark:text-white"
+                            : "text-slate-500 hover:text-slate-700 dark:text-slate-400"
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {dateFilter.kind === "month" && (
+                  <input
+                    type="month"
+                    value={dateFilter.month}
+                    onChange={(e) =>
+                      e.target.value &&
+                      setDateFilter({ kind: "month", month: e.target.value })
+                    }
+                    className={`${dateInputCls} mt-2 w-full`}
+                    aria-label="Month"
+                  />
+                )}
+
+                {dateFilter.kind === "custom" && (
+                  <div className="mt-2 grid grid-cols-2 gap-2">
+                    <label className="min-w-0">
+                      <span className="mb-0.5 block text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+                        From
+                      </span>
+                      <input
+                        type="date"
+                        value={dateFilter.from}
+                        max={dateFilter.to || undefined}
+                        onChange={(e) =>
+                          setDateFilter({ ...dateFilter, from: e.target.value })
+                        }
+                        className={`${dateInputCls} w-full`}
+                      />
+                    </label>
+                    <label className="min-w-0">
+                      <span className="mb-0.5 block text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+                        To
+                      </span>
+                      <input
+                        type="date"
+                        value={dateFilter.to}
+                        min={dateFilter.from || undefined}
+                        onChange={(e) =>
+                          setDateFilter({ ...dateFilter, to: e.target.value })
+                        }
+                        className={`${dateInputCls} w-full`}
+                      />
+                    </label>
+                  </div>
+                )}
+              </div>
+
               {/* Quick filter pills in sidebar */}
-              <div className="flex items-center justify-between gap-1 text-[11px]">
-                <div className="flex rounded-lg border border-slate-200 bg-slate-100 p-0.5 dark:border-white/10 dark:bg-white/5">
+              <div className="flex items-center gap-2 text-[11px]">
+                <div className="grid flex-1 grid-cols-3 rounded-lg border border-slate-200 bg-slate-100 p-0.5 dark:border-white/10 dark:bg-white/5">
                   <button
                     type="button"
                     onClick={() => setPayerFilter("all")}
-                    className={`rounded px-2 py-0.5 font-semibold transition ${
+                    className={`rounded px-2 py-1 font-semibold transition ${
                       payerFilter === "all"
                         ? "bg-white text-indigo-700 shadow-2xs dark:bg-indigo-600 dark:text-white"
                         : "text-slate-500 hover:text-slate-700 dark:text-slate-400"
@@ -302,7 +409,7 @@ const ExpensesPage: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => setPayerFilter("company")}
-                    className={`rounded px-2 py-0.5 font-semibold transition ${
+                    className={`rounded px-2 py-1 font-semibold transition ${
                       payerFilter === "company"
                         ? "bg-white text-indigo-700 shadow-2xs dark:bg-indigo-600 dark:text-white"
                         : "text-slate-500 hover:text-slate-700 dark:text-slate-400"
@@ -313,7 +420,7 @@ const ExpensesPage: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => setPayerFilter("personal")}
-                    className={`rounded px-2 py-0.5 font-semibold transition ${
+                    className={`rounded px-2 py-1 font-semibold transition ${
                       payerFilter === "personal"
                         ? "bg-amber-500 text-white shadow-2xs dark:bg-amber-500 dark:text-slate-950"
                         : "text-slate-500 hover:text-slate-700 dark:text-slate-400"
@@ -327,7 +434,7 @@ const ExpensesPage: React.FC = () => {
                   type="button"
                   onClick={loadTrips}
                   disabled={tripLoading}
-                  className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 disabled:opacity-50 dark:hover:bg-white/10 dark:text-slate-400"
+                  className="shrink-0 rounded-lg border border-slate-200 p-1.5 text-slate-400 hover:bg-slate-100 dark:border-white/10 hover:text-slate-600 disabled:opacity-50 dark:hover:bg-white/10 dark:text-slate-400"
                   title="Refresh trips"
                 >
                   <RefreshCw className={`h-3.5 w-3.5 ${tripLoading ? "animate-spin" : ""}`} />
@@ -448,6 +555,8 @@ const ExpensesPage: React.FC = () => {
                     </div>
                   </div>
                 </div>
+
+                <TripDatesStrip trip={selectedTrip} />
 
                 <div className="mt-4 min-h-0 flex-1">
                   <TripExpensesPane trip={selectedTrip} onRefresh={loadTrips} />
